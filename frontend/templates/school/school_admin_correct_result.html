@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Correct Result - {{ student_name }}</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    .center-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1200;
+      padding: 16px;
+    }
+    .center-modal-card {
+      width: 100%;
+      max-width: 520px;
+      background: #fff;
+      border: 1px solid #dbe4f0;
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.26);
+      padding: 18px;
+    }
+    .center-modal-title {
+      margin-bottom: 8px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #1e3c72;
+    }
+    .center-modal-text {
+      color: #475467;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    .center-modal-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      min-height: 100px;
+      resize: vertical;
+    }
+    .center-modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+    .center-modal-error {
+      color: #b42318;
+      font-size: 12px;
+      margin: -4px 0 10px;
+      min-height: 16px;
+    }
+  </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+  <div class="app-shell topbar-layout">
+    {% set active_page = 'view_students' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+  <div class="container">
+    <div class="header">
+      <h1>Correct & Republish Result</h1>
+      <p class="meta-line">
+        <strong>Student:</strong> {{ student_name }} ({{ student_id }}) |
+        <strong>Class:</strong> {{ classname }} |
+        <strong>Term:</strong> {{ term }} ({{ academic_year or '-' }})
+      </p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <div class="card">
+      <form method="post" action="{{ url_for('school_admin_correct_result') }}" id="correct-result-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="student_id" value="{{ student_id }}">
+        <input type="hidden" name="term" value="{{ term_token }}">
+        <input type="hidden" name="correction_version" value="{{ correction_version or '' }}">
+        <input type="hidden" name="correction_reason" id="correction_reason_input">
+
+        <h2>Subject Totals</h2>
+        <p class="note">Update total score (0-100) for each subject. This action republishes the corrected result.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Subject</th>
+              <th>Current Grade</th>
+              <th>Corrected Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in subject_rows %}
+            <tr>
+              <td>
+                {{ row.subject }}
+                <input type="hidden" name="subject_name" value="{{ row.subject }}">
+              </td>
+              <td>{{ row.grade or '-' }}</td>
+              <td>
+                <input type="number" name="subject_total_{{ loop.index0 }}" min="0" max="100" step="0.01" value="{{ row.total }}">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="form-group mt-10">
+          <label>Teacher Comment</label>
+          <textarea name="teacher_comment" rows="3">{{ teacher_comment }}</textarea>
+        </div>
+        <div class="form-group mt-10">
+          <label>Principal Comment</label>
+          <textarea name="principal_comment" rows="3">{{ principal_comment }}</textarea>
+        </div>
+        <div class="mt-12">
+          <button type="button" id="open-correction-reason-modal" class="btn btn-primary">Save Correction & Republish</button>
+          <a class="btn btn-secondary" href="{{ url_for('school_admin_student_result', student_id=student_id, term=term_token) }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+    <div id="correction-reason-modal-overlay" class="center-modal-overlay" aria-hidden="true">
+      <div class="center-modal-card" role="dialog" aria-modal="true" aria-labelledby="correction-reason-title">
+        <div id="correction-reason-title" class="center-modal-title">Reason For Correction</div>
+        <div class="center-modal-text">Enter the reason for this published result change before continuing.</div>
+        <textarea id="correction-reason-text" class="center-modal-input" maxlength="500" placeholder="Explain why this result is being corrected."></textarea>
+        <div id="correction-reason-error" class="center-modal-error"></div>
+        <div class="center-modal-actions">
+          <button type="button" id="close-correction-reason-modal" class="btn btn-secondary">Cancel</button>
+          <button type="button" id="submit-correction-with-reason" class="btn btn-primary">Continue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+  <script>
+    (function () {
+      const openBtn = document.getElementById('open-correction-reason-modal');
+      const closeBtn = document.getElementById('close-correction-reason-modal');
+      const continueBtn = document.getElementById('submit-correction-with-reason');
+      const overlay = document.getElementById('correction-reason-modal-overlay');
+      const text = document.getElementById('correction-reason-text');
+      const errorBox = document.getElementById('correction-reason-error');
+      const hiddenInput = document.getElementById('correction_reason_input');
+      const form = document.getElementById('correct-result-form');
+      if (!openBtn || !closeBtn || !continueBtn || !overlay || !text || !errorBox || !hiddenInput || !form) return;
+
+      function closeModal() {
+        overlay.style.display = 'none';
+        overlay.setAttribute('aria-hidden', 'true');
+        errorBox.textContent = '';
+      }
+
+      openBtn.addEventListener('click', function () {
+        overlay.style.display = 'flex';
+        overlay.setAttribute('aria-hidden', 'false');
+        errorBox.textContent = '';
+        setTimeout(function () { text.focus(); }, 20);
+      });
+
+      closeBtn.addEventListener('click', closeModal);
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeModal();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && overlay.style.display === 'flex') closeModal();
+      });
+
+      continueBtn.addEventListener('click', function () {
+        const reason = (text.value || '').trim();
+        if (!reason) {
+          errorBox.textContent = 'Reason is required.';
+          text.focus();
+          return;
+        }
+        errorBox.textContent = '';
+        hiddenInput.value = reason;
+        form.submit();
+      });
+    })();
+  </script>
+</body>
+</html>
+
+

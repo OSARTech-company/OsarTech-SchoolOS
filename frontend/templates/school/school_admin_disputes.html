@@ -1,0 +1,86 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Result Disputes</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'disputes' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Result Disputes</h1>
+        <p><a class="btn" href="{{ url_for('school_admin_dashboard') }}">Back to Dashboard</a></p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <form method="get" class="toolbar">
+            <label>Status</label>
+            <select name="status">
+                <option value="">All</option>
+                <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open</option>
+                <option value="resolved" {% if status_filter == 'resolved' %}selected{% endif %}>Resolved</option>
+                <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+            </select>
+            <button class="btn btn-secondary" type="submit">Filter</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead><tr><th>Student</th><th>Class</th><th>Term</th><th>Title</th><th>Details</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+            {% for row in disputes %}
+            <tr>
+                <td>{{ row.student_id }}</td>
+                <td>{{ row.classname or '-' }}</td>
+                <td>{{ row.term or '-' }} {{ row.academic_year or '' }}</td>
+                <td>{{ row.title }}</td>
+                <td style="max-width:320px">{{ row.details }}</td>
+                <td>{{ row.status|title }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('school_admin_update_dispute') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="dispute_id" value="{{ row.id }}">
+                        <select name="status">
+                            <option value="open" {% if row.status == 'open' %}selected{% endif %}>Open</option>
+                            <option value="resolved" {% if row.status == 'resolved' %}selected{% endif %}>Resolved</option>
+                            <option value="rejected" {% if row.status == 'rejected' %}selected{% endif %}>Rejected</option>
+                        </select>
+                        <input name="resolution_note" placeholder="Resolution note" value="{{ row.resolution_note }}">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                        <a class="btn btn-secondary" href="{{ url_for('school_admin_dispute_thread', dispute_id=row.id) }}">Thread</a>
+                        {% if row.student_id %}
+                        <a class="btn btn-secondary" href="{{ url_for('school_admin_correct_result', student_id=row.student_id, term=row.term) }}">Correct Result</a>
+                        {% endif %}
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">No disputes found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+
+

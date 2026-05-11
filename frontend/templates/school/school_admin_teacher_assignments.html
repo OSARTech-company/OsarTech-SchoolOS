@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Assign Teachers - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      body { min-height: 100vh; }
+      .container { width: min(1220px, 100%); margin: 0 auto; padding: 24px; }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .header h1 { margin: 0; font-size: 1.8rem; }
+      .header .back { color: white; text-decoration: none; font-weight: 700; }
+      .grid-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
+      .table-scroll { width: 100%; overflow-x: auto; border: 1px solid #dde5f0; border-radius: 10px; }
+      .assignment-table { width: 100%; border-collapse: collapse; min-width: 940px; }
+      .assignment-table th, .assignment-table td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+      .assignment-table th { background: #f8fbff; color: #1f3b5c; font-weight: 700; }
+      .note-line { color: #5b6475; font-size: 0.9rem; margin: 6px 0 0; }
+      .meta-muted { color: #64748b; font-size: 0.85rem; }
+      .assignment-helper {
+        margin-top: 8px;
+        color: #5b6475;
+        font-size: 0.92rem;
+      }
+      .class-picker {
+        margin-top: 10px;
+        border: 1px solid #d7e1ef;
+        border-radius: 14px;
+        background: #f8fbff;
+        padding: 14px;
+      }
+      .class-picker-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
+      .class-picker-header h3 {
+        margin: 0;
+        font-size: 1rem;
+        color: #18304e;
+      }
+      .class-picker-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .class-picker-actions .btn {
+        padding: 0.55rem 0.8rem;
+        font-size: 0.88rem;
+      }
+      .class-picker-empty {
+        border: 1px dashed #c7d2e5;
+        border-radius: 12px;
+        padding: 14px;
+        background: #fff;
+        color: #64748b;
+      }
+      .class-picker-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 10px;
+      }
+      .class-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px 12px 11px;
+        border: 1px solid #d9e3f1;
+        border-radius: 12px;
+        background: #fff;
+        cursor: pointer;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+      }
+      .class-option:hover {
+        border-color: var(--brand, #0f4c81);
+        box-shadow: 0 8px 18px rgba(15, 76, 129, 0.08);
+        transform: translateY(-1px);
+      }
+      .class-option input {
+        margin-top: 3px;
+        width: 18px;
+        height: 18px;
+        accent-color: var(--brand, #0f4c81);
+        flex: 0 0 auto;
+      }
+      .class-option-body {
+        min-width: 0;
+      }
+      .class-option-title {
+        font-weight: 700;
+        color: #17304f;
+        line-height: 1.2;
+      }
+      .class-option-subtitle {
+        margin-top: 3px;
+        font-size: 0.84rem;
+        color: #64748b;
+      }
+      .class-option.is-selected {
+        border-color: var(--brand, #0f4c81);
+        background: rgba(15, 76, 129, 0.06);
+      }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-diagram-project"></i> Assign Teachers</h1>
+            <a href="{{ url_for('school_admin_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          <div class="grid-two">
+            <div class="card">
+              <h2><i class="fas fa-user-check"></i> Assign Teacher to Class</h2>
+              <p class="note-line">
+                This assigns class owner for {{ current_term }} {{ current_year }}.
+                {% if school and school.score_entry_mode == 'dean_led' %}
+                Subject assignment is disabled for this school mode.
+                {% endif %}
+              </p>
+              <form action="{{ url_for('school_admin_assign_teacher') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <input type="hidden" name="return_to" value="school_admin_teacher_assignments" />
+                <div class="form-group">
+                  <label for="class_teacher_id">Select Teacher</label>
+                  <select id="class_teacher_id" name="teacher_id" required>
+                    <option value="">-- Select Teacher --</option>
+                    {% for teacher_id, teacher in teachers.items() %}
+                    {% set assigned_classes = teacher_class_map.get(teacher_id, []) %}
+                    <option value="{{ teacher_id }}">
+                      {{ teacher.firstname }} {{ teacher.lastname }}{% if assigned_classes %} (Current: {{ assigned_classes|join(', ') }}){% endif %}
+                    </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="class_name">Class</label>
+                  <input id="class_name" name="classname" list="class_options_list" placeholder="e.g., JSS1A" required />
+                  <p class="note-line">You can type class arms like JSS1A, JSS1B, SS2C.</p>
+                </div>
+                <div class="form-group">
+                  <label for="class_term">Term</label>
+                  <select id="class_term" name="term" required>
+                    <option value="First Term" {% if current_term == 'First Term' %}selected{% endif %}>First Term</option>
+                    <option value="Second Term" {% if current_term == 'Second Term' %}selected{% endif %}>Second Term</option>
+                    <option value="Third Term" {% if current_term == 'Third Term' %}selected{% endif %}>Third Term</option>
+                  </select>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Assign Class Teacher</button>
+              </form>
+            </div>
+
+            {% if not school or school.score_entry_mode != 'dean_led' %}
+            <div class="card">
+              <h2><i class="fas fa-list-check"></i> Assign Subject Teacher</h2>
+              <p class="note-line">Choose a teacher, choose a subject, then mark the classes that offer that subject for {{ current_term }} {{ current_year }}.</p>
+              <form action="{{ url_for('school_admin_assign_subject_teacher') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <input type="hidden" name="return_to" value="school_admin_teacher_assignments" />
+                <input type="hidden" name="assignment_scope" value="selected" />
+                <div class="form-group">
+                  <label for="subject_teacher_id">Select Teacher</label>
+                  <select id="subject_teacher_id" name="teacher_id" required>
+                    <option value="">-- Select Teacher --</option>
+                    {% for teacher_id, teacher in teachers.items() %}
+                    <option value="{{ teacher_id }}">{{ teacher.firstname }} {{ teacher.lastname }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="subject_name">Subject</label>
+                  <select id="subject_name" name="subjects" required>
+                    <option value="">-- Select Subject --</option>
+                    {% for subject_name in subject_options %}
+                    <option value="{{ subject_name }}">{{ subject_name }}</option>
+                    {% endfor %}
+                  </select>
+                  <p class="assignment-helper">Only classes that offer the selected subject will appear below.</p>
+                </div>
+                <div class="form-group">
+                  <label>Classes offering this subject</label>
+                  <div class="class-picker">
+                    <div class="class-picker-header">
+                      <h3><i class="fas fa-school"></i> Select class(es)</h3>
+                      <div class="class-picker-actions">
+                        <button type="button" class="btn btn-secondary" id="select_all_classes_btn"><i class="fas fa-check-double"></i> Select All</button>
+                        <button type="button" class="btn btn-secondary" id="clear_all_classes_btn"><i class="fas fa-eraser"></i> Clear</button>
+                      </div>
+                    </div>
+                    <div id="subject_class_help" class="class-picker-empty">Choose a subject to see the classes that offer it.</div>
+                    <div id="subject_class_choices" class="class-picker-grid" style="display:none;"></div>
+                    <div id="subject_class_summary" class="assignment-helper"></div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="subject_term">Term</label>
+                  <select id="subject_term" name="term" required>
+                    <option value="First Term" {% if current_term == 'First Term' %}selected{% endif %}>First Term</option>
+                    <option value="Second Term" {% if current_term == 'Second Term' %}selected{% endif %}>Second Term</option>
+                    <option value="Third Term" {% if current_term == 'Third Term' %}selected{% endif %}>Third Term</option>
+                  </select>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Assign Subject Teacher</button>
+              </form>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="card">
+            <h2><i class="fas fa-table"></i> Current Class Assigned</h2>
+            {% if assignments %}
+            <div class="table-scroll">
+              <table class="assignment-table">
+                <thead>
+                  <tr>
+                    <th>Teacher</th>
+                    <th>Class</th>
+                    <th>Term</th>
+                    <th>Academic Year</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for a in assignments %}
+                  <tr>
+                    <td>
+                      {{ a.teacher_name or a.teacher_id }}
+                      <br /><span class="meta-muted">{{ a.teacher_id }}</span>
+                    </td>
+                    <td>{{ a.classname }}</td>
+                    <td>{{ a.term }}</td>
+                    <td>{{ a.academic_year }}</td>
+                    <td>
+                      <form action="{{ url_for('school_admin_remove_teacher_assignment') }}" method="POST" onsubmit="return confirm('Remove this class assignment?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <input type="hidden" name="teacher_id" value="{{ a.teacher_id }}" />
+                        <input type="hidden" name="classname" value="{{ a.classname }}" />
+                        <input type="hidden" name="term" value="{{ a.term }}" />
+                        <input type="hidden" name="academic_year" value="{{ a.academic_year }}" />
+                        <input type="hidden" name="return_to" value="school_admin_teacher_assignments" />
+                        <button type="submit" class="btn btn-danger">Remove</button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <p>No class assignments for current term/year.</p>
+            {% endif %}
+          </div>
+
+          <datalist id="class_options_list">
+            {% for class_name in class_options %}
+            <option value="{{ class_name }}"></option>
+            {% endfor %}
+          </datalist>
+
+          {% if not school or school.score_entry_mode != 'dean_led' %}
+          <div class="card">
+            <h2><i class="fas fa-table-list"></i> Current Subject Assigned</h2>
+            {% if subject_assignments %}
+            <div class="table-scroll">
+              <table class="assignment-table">
+                <thead>
+                  <tr>
+                    <th>Teacher</th>
+                    <th>Class</th>
+                    <th>Subject</th>
+                    <th>Term</th>
+                    <th>Academic Year</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for a in subject_assignments %}
+                  <tr>
+                    <td>
+                      {{ a.teacher_name or a.teacher_id }}
+                      <br /><span class="meta-muted">{{ a.teacher_id }}</span>
+                    </td>
+                    <td>{{ a.classname }}</td>
+                    <td>{{ a.subject }}</td>
+                    <td>{{ a.term }}</td>
+                    <td>{{ a.academic_year }}</td>
+                    <td>
+                      <form action="{{ url_for('school_admin_remove_subject_teacher_assignment') }}" method="POST" onsubmit="return confirm('Remove this subject assignment?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <input type="hidden" name="teacher_id" value="{{ a.teacher_id }}" />
+                        <input type="hidden" name="classname" value="{{ a.classname }}" />
+                        <input type="hidden" name="subject" value="{{ a.subject }}" />
+                        <input type="hidden" name="term" value="{{ a.term }}" />
+                        <input type="hidden" name="academic_year" value="{{ a.academic_year }}" />
+                        <input type="hidden" name="return_to" value="school_admin_teacher_assignments" />
+                        <button type="submit" class="btn btn-danger">Remove</button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <p>No subject assignments for current term/year.</p>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script id="assignmentClassSubjectOptions" type="application/json">{{ class_subject_options|tojson }}</script>
+    <script id="assignmentClassOptions" type="application/json">{{ class_options|tojson }}</script>
+    <script>
+      (function () {
+        if (window.innerWidth > 600) document.body.classList.add('rail-expanded');
+      })();
+    </script>
+    <script>
+      (function () {
+        var subjectSelect = document.getElementById('subject_name');
+        var payloadEl = document.getElementById('assignmentClassSubjectOptions');
+        var classOptionsEl = document.getElementById('assignmentClassOptions');
+        var classChoices = document.getElementById('subject_class_choices');
+        var classHelp = document.getElementById('subject_class_help');
+        var classSummary = document.getElementById('subject_class_summary');
+        var selectAllBtn = document.getElementById('select_all_classes_btn');
+        var clearAllBtn = document.getElementById('clear_all_classes_btn');
+        if (!subjectSelect || !classChoices || !classHelp || !classSummary) return;
+        var optionsMap = {};
+        var classOptions = [];
+        try {
+          optionsMap = JSON.parse((payloadEl && payloadEl.textContent) || '{}') || {};
+        } catch (e) {
+          optionsMap = {};
+        }
+        try {
+          classOptions = JSON.parse((classOptionsEl && classOptionsEl.textContent) || '[]') || [];
+        } catch (e) {
+          classOptions = [];
+        }
+        function canonicalizeClassName(value) {
+          return (value || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
+        }
+        function baseClassKey(value) {
+          var canon = canonicalizeClassName(value);
+          var m = canon.match(/^(JSS|SSS|SS)(\d+)/);
+          if (!m) return canon;
+          var level = m[1] === 'SSS' ? 'SS' : m[1];
+          return '' + level + m[2];
+        }
+        function getSubjectsForClass(cls) {
+          var values = Array.isArray(optionsMap[cls]) ? optionsMap[cls] : null;
+          if (!values) {
+            var canon = canonicalizeClassName(cls);
+            values = Array.isArray(canonicalMap[canon]) ? canonicalMap[canon] : null;
+          }
+          if (!values) {
+            var base = baseClassKey(cls);
+            values = Array.isArray(canonicalMap[base]) ? canonicalMap[base] : [];
+          }
+          return values || [];
+        }
+        var canonicalMap = {};
+        Object.keys(optionsMap).forEach(function (key) {
+          var canon = canonicalizeClassName(key);
+          if (canon && !canonicalMap[canon]) {
+            canonicalMap[canon] = optionsMap[key];
+          }
+        });
+        function getSelectedCheckboxValues() {
+          return Array.prototype.slice.call(classChoices.querySelectorAll('input[type="checkbox"][name="target_classnames"]'))
+            .filter(function (checkbox) { return checkbox.checked; })
+            .map(function (checkbox) { return checkbox.value; });
+        }
+        function updateClassSummary() {
+          var selected = getSelectedCheckboxValues();
+          if (!subjectSelect.value) {
+            classSummary.textContent = '';
+            return;
+          }
+          if (!classChoices.querySelectorAll('input[type="checkbox"]').length) {
+            classSummary.textContent = 'No class currently offers ' + subjectSelect.value + '.';
+            return;
+          }
+          if (!selected.length) {
+            classSummary.textContent = 'No class selected yet.';
+            return;
+          }
+          classSummary.textContent = selected.length + ' class' + (selected.length > 1 ? 'es' : '') + ' selected: ' + selected.join(', ');
+        }
+        function renderClasses() {
+          var subject = subjectSelect.value || '';
+          var currentSelections = getSelectedCheckboxValues();
+          classChoices.innerHTML = '';
+          classHelp.style.display = subject ? 'none' : 'block';
+          classChoices.style.display = subject ? 'grid' : 'none';
+          if (!subject) {
+            classHelp.textContent = 'Choose a subject to see the classes that offer it.';
+            classSummary.textContent = '';
+            return;
+          }
+          var matching = classOptions.filter(function (cls) {
+            var subjects = getSubjectsForClass(cls);
+            return Array.isArray(subjects) && subjects.indexOf(subject) !== -1;
+          });
+          if (!matching.length) {
+            classHelp.style.display = 'block';
+            classHelp.textContent = 'No class is configured for ' + subject + ' yet.';
+            classChoices.style.display = 'none';
+            classSummary.textContent = '';
+            return;
+          }
+          classHelp.style.display = 'none';
+          classChoices.style.display = 'grid';
+          matching.forEach(function (cls) {
+            var subjects = getSubjectsForClass(cls);
+            var label = document.createElement('label');
+            label.className = 'class-option';
+            var checked = currentSelections.indexOf(cls) !== -1;
+            if (checked) label.classList.add('is-selected');
+            label.innerHTML = '' +
+              '<input type="checkbox" name="target_classnames" value="' + cls.replace(/"/g, '&quot;') + '"' + (checked ? ' checked' : '') + ' />' +
+              '<span class="class-option-body">' +
+                '<span class="class-option-title">' + cls + '</span>' +
+                '<span class="class-option-subtitle">' + subjects.length + ' subject' + (subjects.length > 1 ? 's' : '') + ' configured</span>' +
+              '</span>';
+            var checkbox = label.querySelector('input[type="checkbox"]');
+            checkbox.addEventListener('change', function () {
+              label.classList.toggle('is-selected', checkbox.checked);
+              updateClassSummary();
+            });
+            label.addEventListener('click', function (event) {
+              if (event.target === checkbox) return;
+              event.preventDefault();
+              checkbox.checked = !checkbox.checked;
+              checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            classChoices.appendChild(label);
+          });
+          updateClassSummary();
+        }
+        subjectSelect.addEventListener('change', function () {
+          renderClasses();
+        });
+        if (selectAllBtn) {
+          selectAllBtn.addEventListener('click', function () {
+            var boxes = classChoices.querySelectorAll('input[type="checkbox"][name="target_classnames"]');
+            boxes.forEach(function (box) {
+              box.checked = true;
+              box.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+          });
+        }
+        if (clearAllBtn) {
+          clearAllBtn.addEventListener('click', function () {
+            var boxes = classChoices.querySelectorAll('input[type="checkbox"][name="target_classnames"]');
+            boxes.forEach(function (box) {
+              box.checked = false;
+              box.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+          });
+        }
+        renderClasses();
+      })();
+    </script>
+      {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

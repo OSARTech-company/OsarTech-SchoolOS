@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Setup</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: #fff; padding: 18px; border-radius: 10px; margin-bottom: 20px; }
+        .header a { color: #fff; text-decoration: none; float: right; margin-left: 16px; }
+        .card { background: #fff; border-radius: 10px; padding: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .row { display: flex; gap: 16px; flex-wrap: wrap; }
+        .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-weight: 600; }
+        .pill.ok { background: #dcfce7; color: #166534; }
+        .pill.warn { background: #fee2e2; color: #991b1b; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 6px; }
+        pre { background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 10px; overflow: auto; }
+        .note { color: #475569; }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'webhook_setup' %}
+        {% include 'super/_super_admin_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <strong>Webhook Setup (Payments)</strong>
+                    <a href="{{ url_for('super_admin_dashboard') }}">Back</a>
+                </div>
+
+                <div class="card">
+                    <div class="row">
+                        <div class="pill {% if webhook_enabled %}ok{% else %}warn{% endif %}">
+                            <i class="fas fa-plug"></i>
+                            Webhook: {{ 'Enabled' if webhook_enabled else 'Disabled' }}
+                        </div>
+                        <div class="pill {% if allow_unsigned %}warn{% else %}ok{% endif %}">
+                            <i class="fas fa-shield"></i>
+                            Unsigned: {{ 'Allowed' if allow_unsigned else 'Blocked' }}
+                        </div>
+                    </div>
+                    <p class="note">Keep your webhook secret private. Update it in environment variables on the server.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Endpoint</h3>
+                    <p>Send payment callbacks to:</p>
+                    <code>{{ endpoint_url }}</code>
+                </div>
+
+                <div class="card">
+                    <h3>Signature</h3>
+                    <p>Secret (masked): <code>{{ secret_masked }}</code></p>
+                    <p>Header:</p>
+                    <code>X-Paystack-Signature: &lt;signature&gt;</code>
+                    <p>Signature algorithm (Paystack):</p>
+<pre>signature = hmac_sha512(secret, raw_body)</pre>
+                </div>
+
+                <div class="card">
+                    <h3>Example (Python)</h3>
+<pre>import hmac, hashlib, json, requests
+
+secret = "YOUR_SECRET"
+payload = {"school_id": "SCH001", "status": "paid", "amount": 12000}
+raw = json.dumps(payload).encode("utf-8")
+sig = hmac.new(secret.encode("utf-8"), raw, hashlib.sha512).hexdigest()
+
+requests.post(
+    "{{ endpoint_url }}",
+    data=raw,
+    headers={"Content-Type": "application/json", "X-Paystack-Signature": sig},
+)</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+

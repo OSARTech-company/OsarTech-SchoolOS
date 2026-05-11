@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Health</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app-assistant.css') }}">
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+        {% include 'school/_school_admin_sidebar.html' %}
+        <main class="main-content">
+            <div class="container">
+            <section class="panel">
+                <h1>System Health</h1>
+                <p class="text-muted">Operational overview for your school instance.</p>
+            </section>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <section class="panel">
+                    {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </section>
+            {% endif %}
+            {% endwith %}
+
+            <section class="panel">
+                <h3>Core Services</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Database</div>
+                        <div class="stat-value">{{ 'Healthy' if db_ok else 'Error' }}</div>
+                        {% if not db_ok and db_error %}
+                        <small>{{ db_error }}</small>
+                        {% endif %}
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Background Worker</div>
+                        <div class="stat-value">{{ 'Running' if worker_running else 'Stopped' }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Storage Used</div>
+                        <div class="stat-value">
+                            {{ '%.2f'|format((storage_usage.bytes_used or 0) / 1048576) }} MB
+                        </div>
+                        <small>
+                            of {{ '%.2f'|format((storage_quota_bytes or 0) / 1048576) }} MB quota
+                        </small>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h3>Message Pipeline</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Queued Notifications</div>
+                        <div class="stat-value">{{ queue_stats.queued or 0 }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Failed Notifications</div>
+                        <div class="stat-value">{{ queue_stats.failed or 0 }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Pending Attachment Scan</div>
+                        <div class="stat-value">{{ scan_stats.pending or 0 }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Blocked Attachments</div>
+                        <div class="stat-value">{{ scan_stats.blocked or 0 }}</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h3>Backup Schedule</h3>
+                <p><strong>Frequency:</strong> Every {{ backup_schedule.frequency_days or 7 }} day(s)</p>
+                <p><strong>Last Backup:</strong> {{ backup_schedule.last_backup_at or 'Not recorded' }}</p>
+                <p><strong>Next Due:</strong> {{ backup_schedule.next_due_at or 'Not scheduled' }}</p>
+            </section>
+            </div>
+        </main>
+    </div>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+
+

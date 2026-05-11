@@ -1,0 +1,179 @@
+<div class="side-taskbar school-admin-sidebar teacher-sidebar">
+    <div class="side-brand teacher-brand">
+        {% if teacher_sidebar_profile_image %}
+        <img src="{{ teacher_sidebar_profile_image }}" alt="Profile Picture" class="teacher-brand-photo">
+        {% else %}
+        <img src="{{ url_for('static', filename='img/osartech-logo.png', v='20260411b') }}" alt="Osartech Logo" class="teacher-brand-photo">
+        {% endif %}
+        <div class="teacher-brand-org">OSARTECH</div>
+        <div class="teacher-brand-name">{{ teacher_sidebar_display_name or 'Teacher' }}</div>
+    </div>
+    {% if school_access_state %}
+    {% set access_status = (school_access_state.effective_status or school_access_state.status or '') %}
+    {% set access_class = 'is-active' if access_status in ['trial_free', 'active_paid'] else ('is-warning' if access_status == 'pending_payment' else 'is-blocked') %}
+    <div class="side-access-status">
+        <span class="label">Access</span>
+        <span class="status {{ access_class }}">{{ access_status|replace('_', ' ')|title }}</span>
+    </div>
+    {% endif %}
+    <div class="side-links">
+        <a href="{{ url_for('teacher_dashboard') }}" class="side-link{% if active_page == 'dashboard' %} active{% endif %}">
+            <i class="fas fa-home"></i>
+            <span>Dashboard</span>
+        </a>
+
+        {% set show_score_tree = ((request.endpoint == 'teacher_dashboard' and ((request.args.get('tab', 'overview') or 'overview')|lower == 'score')) or request.endpoint in ['teacher_enter_scores', 'teacher_enter_subject_scores', 'teacher_subject_score_sheet']) %}
+        <details class="side-group" {% if active_page in ['class_list', 'view_students', 'behaviour', 'attendance', 'period_attendance'] %}open{% endif %}>
+            <summary class="side-group-toggle">
+                <span>Classroom</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
+                <a href="{{ url_for('teacher_class_list') }}" class="side-link{% if active_page == 'class_list' %} active{% endif %}">
+                    <i class="fas fa-list"></i>
+                    <span>Class List</span>
+                </a>
+                <a href="{{ url_for('teacher_view_students') }}" class="side-link{% if active_page == 'view_students' %} active{% endif %}">
+                    <i class="fas fa-users"></i>
+                    <span>View Students</span>
+                </a>
+                {% if teacher_has_class_assignment_nav and (not school or school.score_entry_mode != 'dean_led') %}
+                {% set behaviour_class = classname if classname is defined and classname else (selected_class if selected_class is defined and selected_class else (classes[0] if classes is defined and classes else '')) %}
+                <a href="{{ url_for('teacher_behaviour_assessment', classname=behaviour_class) if behaviour_class else url_for('teacher_dashboard') }}" class="side-link{% if active_page == 'behaviour' %} active{% endif %}">
+                    <i class="fas fa-user-check"></i>
+                    <span>Behaviour</span>
+                </a>
+                {% endif %}
+                {% if teacher_has_class_assignment_nav %}
+                <a href="{{ url_for('teacher_attendance') }}" class="side-link{% if active_page == 'attendance' %} active{% endif %}">
+                    <i class="fas fa-user-check"></i>
+                    <span>Attendance</span>
+                </a>
+                <a href="{{ url_for('teacher_period_attendance') }}" class="side-link{% if active_page == 'period_attendance' %} active{% endif %}">
+                    <i class="fas fa-clock"></i>
+                    <span>Period Attendance</span>
+                </a>
+                {% endif %}
+            </div>
+        </details>
+
+        <details class="side-group" {% if active_page in ['score_entry', 'timetable', 'subject_ranks', 'upload_csv', 'cbt'] or show_score_tree %}open{% endif %}>
+            <summary class="side-group-toggle">
+                <span>Academics</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
+                <a href="{{ url_for('teacher_dashboard', tab='score', score_subject=teacher_selected_score_subject if teacher_selected_score_subject else None, score_class=teacher_selected_score_class if teacher_selected_score_class else None) }}" class="side-link{% if active_page == 'score_entry' %} active{% endif %}">
+                    <i class="fas fa-pen-to-square"></i>
+                    <span>Score Entry</span>
+                </a>
+                {% if teacher_score_nav_tree and show_score_tree %}
+                <div class="side-submenu-wrap">
+                    {% for node in teacher_score_nav_tree %}
+                    <div class="side-submenu-subject">
+                        <a href="{{ url_for('teacher_dashboard', tab='score', score_subject=node.subject) }}"
+                           class="side-subject-link{% if teacher_selected_score_subject == node.subject %} active{% endif %}">
+                            {{ node.subject }}
+                        </a>
+                        {% if teacher_selected_score_subject == node.subject %}
+                        <div class="side-submenu-classes">
+                            {% for cls in node.classes %}
+                            {% if school and school.score_entry_mode == 'subject_sheet' %}
+                            <a href="{{ url_for('teacher_subject_score_sheet', class=cls, subject=node.subject) }}"
+                               class="side-class-link{% if teacher_selected_score_class == cls %} active{% endif %}">
+                                {{ cls }}
+                            </a>
+                            {% else %}
+                            <a href="{{ url_for('teacher_dashboard', tab='score', score_subject=node.subject, score_class=cls) }}"
+                               class="side-class-link{% if teacher_selected_score_class == cls %} active{% endif %}">
+                                {{ cls }}
+                            </a>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <a href="{{ url_for('teacher_timetable') }}" class="side-link{% if active_page == 'timetable' %} active{% endif %}">
+                    <i class="fas fa-table"></i>
+                    <span>Timetable</span>
+                </a>
+                {% if school_cbt_enabled %}
+                <a href="{{ url_for('teacher_cbt') }}" class="side-link{% if active_page == 'cbt' %} active{% endif %}">
+                    <i class="fas fa-laptop-code"></i>
+                    <span>CBT</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('teacher_subject_rank_history') }}" class="side-link{% if active_page == 'subject_ranks' %} active{% endif %}">
+                    <i class="fas fa-list-ol"></i>
+                    <span>Subject Ranks</span>
+                </a>
+                <a href="{{ url_for('teacher_subject_comments') }}" class="side-link{% if active_page == 'subject_comments' %} active{% endif %}">
+                    <i class="fas fa-comments"></i>
+                    <span>Subject Comments</span>
+                </a>
+                {% if not school or school.score_entry_mode != 'dean_led' %}
+                <a href="{{ url_for('teacher_subject_handover') }}" class="side-link{% if active_page == 'subject_handover' %} active{% endif %}">
+                    <i class="fas fa-clipboard-check"></i>
+                    <span>Subject Handover</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('teacher_upload_csv') }}" class="side-link{% if active_page == 'upload_csv' %} active{% endif %}">
+                    <i class="fas fa-file-csv"></i>
+                    <span>Upload CSV</span>
+                </a>
+            </div>
+        </details>
+
+        <details class="side-group" {% if active_page in ['messages', 'notifications'] %}open{% endif %}>
+            <summary class="side-group-toggle">
+                <span>Communication</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
+                <a href="{{ url_for('teacher_messages') }}" class="side-link{% if active_page == 'messages' %} active{% endif %}">
+                    <i class="fas fa-bell"></i>
+                    <span>Messages</span>
+                    {% if teacher_unread_notifications %}
+                    <span class="notif-badge">{{ teacher_unread_notifications }}</span>
+                    {% endif %}
+                </a>
+                <a href="{{ url_for('teacher_notifications') }}" class="side-link{% if active_page == 'notifications' %} active{% endif %}">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    <span>Notifications</span>
+                </a>
+            </div>
+        </details>
+
+        <details class="side-group" {% if request.endpoint == 'change_password' or active_page == 'assistant_analytics' %}open{% endif %}>
+            <summary class="side-group-toggle">
+                <span>Support</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
+                <a href="{{ url_for('teacher_assistant_analytics') }}" class="side-link{% if active_page == 'assistant_analytics' %} active{% endif %}">
+                    <i class="fas fa-robot"></i>
+                    <span>Assistant Analytics</span>
+                </a>
+                <a href="{{ url_for('report_issue') }}" class="side-link">
+                    <i class="fas fa-bug"></i>
+                    <span>Report Issue</span>
+                </a>
+                <a href="{{ url_for('help', role='teacher') }}" class="side-link">
+                    <i class="fas fa-question-circle"></i>
+                    <span>Help</span>
+                </a>
+                <a href="{{ url_for('change_password') }}" class="side-link{% if request.endpoint == 'change_password' %} active{% endif %}">
+                    <i class="fas fa-key"></i>
+                    <span>Change Password</span>
+                </a>
+            </div>
+        </details>
+        <form method="post" action="{{ url_for('logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="side-link side-link-logout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </form>
+    </div>
+</div>
+{% include 'shared/_ai_assistant_widget.html' %}

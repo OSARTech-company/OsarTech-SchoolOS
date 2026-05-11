@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CBT Live Monitor - Teacher</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .container { width: min(1260px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .table-wrap { overflow-x: auto; border: 1px solid #dbe5f2; border-radius: 10px; }
+        .table-wrap table { width: 100%; min-width: 1320px; border-collapse: collapse; }
+        .table-wrap th, .table-wrap td { border-bottom: 1px solid #e7edf7; padding: 10px 12px; text-align: left; vertical-align: top; }
+        .table-wrap th { background: #f7fbff; color: #1e3a5f; font-weight: 700; }
+        .status-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.78rem; text-transform: capitalize; }
+        .status-pill.started { background: #fef3c7; color: #92400e; }
+        .status-pill.submitted { background: #dcfce7; color: #166534; }
+        .status-pill.low { background: #dcfce7; color: #166534; }
+        .status-pill.medium { background: #fef3c7; color: #92400e; }
+        .status-pill.high { background: #fee2e2; color: #991b1b; }
+        .muted { color: #64748b; font-size: 0.9rem; }
+        .inline-form { display: grid; grid-template-columns: 78px 78px auto; gap: 6px; align-items: center; }
+        .inline-form input { width: 100%; padding: 6px; }
+        .inline-form label { display: inline-flex; align-items: center; gap: 4px; font-size: 0.84rem; }
+        .inline-form .btn { padding: 6px 9px; }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+<div class="app-shell topbar-layout">
+    {% set active_page = 'cbt' %}
+    {% include 'teacher/_teacher_sidebar.html' %}
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1><i class="fas fa-user-shield"></i> CBT Live Monitor</h1>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <a href="{{ url_for('teacher_cbt_results', test_id=test.test_id) }}" class="btn btn-secondary"><i class="fas fa-chart-column"></i> Results</a>
+                    <a href="{{ url_for('teacher_cbt_questions', test_id=test.test_id) }}" class="btn"><i class="fas fa-arrow-left"></i> Questions</a>
+                </div>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <h2>{{ test.title }}</h2>
+                <p class="muted">Live invigilation view with integrity risk and accessibility extra time per student.</p>
+            </div>
+
+            <div class="card">
+                {% if attempts %}
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Status</th>
+                                <th>Answered</th>
+                                <th>Score</th>
+                                <th>Time Left</th>
+                                <th>Started</th>
+                                <th>Last Activity</th>
+                                <th>Integrity</th>
+                                <th>Risk</th>
+                                <th>Accessibility Extra Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in attempts %}
+                            <tr>
+                                <td>
+                                    <strong>{{ row.student_id }}</strong><br>
+                                    <span class="muted">{{ row.firstname or '-' }} | {{ row.classname or '-' }}</span>
+                                </td>
+                                <td><span class="status-pill {{ (row.status or '')|lower }}">{{ row.status or '-' }}</span></td>
+                                <td>{{ row.answered_questions or 0 }} / {{ row.total_questions or 0 }}</td>
+                                <td>{{ '%.2f'|format(row.score or 0) }} / {{ '%.2f'|format(row.total_marks or 0) }}</td>
+                                <td>
+                                    {% if (row.remaining_seconds or 0)|int > 0 %}
+                                    {{ ((row.remaining_seconds or 0)|int // 60) }}:{{ '%02d'|format(((row.remaining_seconds or 0)|int % 60)) }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td>{{ row.started_at or '-' }}</td>
+                                <td>{{ row.last_activity_at or '-' }}</td>
+                                <td>
+                                    {{ row.integrity_events_count or 0 }} events
+                                    {% if row.integrity_top_flags %}
+                                    <div class="muted">
+                                        {% for item in row.integrity_top_flags %}
+                                        {{ item[0] }}:{{ item[1] }}{% if not loop.last %}, {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="status-pill {{ (row.integrity_risk_level or 'low')|lower }}">{{ (row.integrity_risk_level or 'low')|title }} ({{ row.integrity_risk_score or 0 }})</span>
+                                    {% if row.integrity_flagged %}
+                                    <div class="muted" style="color:#991b1b; margin-top:4px;">
+                                        Suspicious: {{ row.integrity_flag_reason or 'Review integrity events' }}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="post" action="{{ url_for('teacher_cbt_save_accommodation', test_id=test.test_id) }}" class="inline-form">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="student_id" value="{{ row.student_id }}">
+                                        <input type="number" name="extra_minutes" min="0" max="240" value="{{ row.accommodation.extra_minutes or 0 }}" title="Extra minutes">
+                                        <input type="number" name="extra_percent" min="0" max="300" value="{{ row.accommodation.extra_percent or 0 }}" title="Extra percent">
+                                        <label><input type="checkbox" name="is_active" value="1" {% if row.accommodation.is_active %}checked{% endif %}> Active</label>
+                                        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="muted">No student attempts yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+<script>
+    setTimeout(function () { window.location.reload(); }, 20000);
+</script>
+{% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

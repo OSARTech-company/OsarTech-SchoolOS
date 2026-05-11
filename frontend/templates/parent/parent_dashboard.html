@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Dashboard</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308d') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" integrity="sha384-3B6NwesSXE7YJlcLI9RpRqGf2p/EgVH8BgoKTaUrmKNDkHPStTQ3EyoYjCGXaOTS" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <style>
+        .container { max-width: 1100px; }
+        .parent-shell { display: grid; gap: 18px; }
+        .page-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 22px;
+            padding: 26px;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 32%),
+                linear-gradient(135deg, #0f4c81 0%, #1f7a8c 58%, #2d8a7d 100%);
+            color: #fff;
+            box-shadow: 0 20px 40px rgba(15, 76, 129, 0.22);
+        }
+        .page-hero::after {
+            content: "";
+            position: absolute;
+            inset: auto -60px -80px auto;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+        }
+        .hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.55fr) minmax(220px, 0.8fr);
+            gap: 18px;
+            align-items: end;
+        }
+        .hero-topline {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            font-size: 0.82rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .hero-title { margin: 14px 0 0; font-size: clamp(1.8rem, 3.8vw, 2.6rem); line-height: 1.08; }
+        .hero-text { margin: 12px 0 0; color: rgba(255,255,255,0.88); line-height: 1.6; max-width: 700px; }
+        .hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+        .hero-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            color: #fff;
+            font-weight: 600;
+        }
+        .summary-card {
+            border-radius: 18px;
+            padding: 16px;
+            background: rgba(255,255,255,0.13);
+            border: 1px solid rgba(255,255,255,0.16);
+            backdrop-filter: blur(6px);
+        }
+        .summary-card .label {
+            display: block;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.72);
+            margin-bottom: 6px;
+        }
+        .summary-card .value { font-size: 1.8rem; font-weight: 800; line-height: 1.1; }
+        .summary-card .meta { margin-top: 6px; color: rgba(255,255,255,0.84); }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .stat-card {
+            border: 1px solid #dbe7f3;
+            border-radius: 18px;
+            padding: 18px;
+            background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+        }
+        .stat-card .label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.76rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+        .stat-card .value {
+            font-size: 1.7rem;
+            font-weight: 800;
+            color: #14365e;
+            line-height: 1.1;
+        }
+        .stat-card .meta {
+            margin-top: 6px;
+            color: #5d6d82;
+            font-size: 0.92rem;
+        }
+        .parent-notif-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .parent-empty-state {
+            text-align: center;
+            padding: 28px 18px;
+            border: 1px solid #dbe4ef;
+            background: #f8fbff;
+        }
+        .parent-empty-state .empty-icon {
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 10px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            font-size: 1.8rem;
+            color: #0f4c81;
+            background: #e7f2ff;
+        }
+        .parent-empty-state .empty-title {
+            margin: 6px 0;
+            color: #1e3a5f;
+            font-size: 1.15rem;
+            font-weight: 700;
+        }
+        .parent-empty-state .empty-actions {
+            margin-top: 12px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .parent-quick-actions {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        }
+        .parent-quick-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #d9e3ef;
+            background: #f7fbff;
+            color: #1e3b5f;
+            text-decoration: none;
+            font-weight: 700;
+        }
+        .parent-quick-link:hover { background: #edf5ff; }
+        .feature-card {
+            border-radius: 18px;
+            border: 1px solid #dbe4ef;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04);
+        }
+        .child-card {
+            border-radius: 22px;
+            border: 1px solid #dbe7f3;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+        }
+        .child-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .child-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .child-meta-item {
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #eef6ff;
+            border: 1px solid #dbe7f3;
+        }
+        .child-meta-item .label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #66758a;
+        }
+        .child-meta-item .value {
+            color: #14365e;
+            font-weight: 700;
+        }
+        .child-action-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .child-action-grid .btn {
+            width: 100%;
+            justify-content: center;
+            margin: 0;
+        }
+        .welcome-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1200;
+        }
+        .welcome-modal-card {
+            width: min(700px, 94vw);
+            background: #fff;
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 18px 40px rgba(2, 6, 23, 0.35);
+        }
+        .welcome-modal-card h3 { margin: 0 0 10px; color: #0f172a; }
+        .welcome-modal-card ol { margin: 8px 0 14px 18px; color: #334155; }
+        @media (max-width: 900px) {
+            .hero-grid { grid-template-columns: 1fr; }
+            .stat-grid,
+            .child-meta-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 640px) {
+            .page-hero { padding: 22px 18px; border-radius: 18px; }
+            .hero-chip { width: 100%; justify-content: center; }
+        }
+    </style>
+</head>
+<body style="--accent: {{ parent_theme_accent if parent_theme_accent else '#1F7A8C' }};" data-parent-account="{{ parent_phone|default('parent', true)|e }}" data-unread-parent-messages="{{ unread_parent_messages|default(0, true)|int }}">
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'dashboard' %}
+        {% include 'parent/_parent_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <div class="stack-head">
+                        <h2 class="no-margin"><i class="fas fa-users"></i> Parent Dashboard</h2>
+                    </div>
+                    <div class="muted mt-10">Phone: {{ parent_phone }}</div>
+                    {% if school_access_state %}
+                    {% set access_status = (school_access_state.effective_status or '') %}
+                    {% set access_class = 'is-active' if access_status in ['trial_free', 'active_paid'] else ('is-warning' if access_status == 'pending_payment' else 'is-blocked') %}
+                    <div class="access-badge-row">
+                        <span class="access-badge {{ access_class }}">
+                            <i class="fas fa-shield-alt" aria-hidden="true"></i>
+                            Access: {{ access_status|replace('_', ' ')|title }}
+                        </span>
+                        {% if school_access_state.reason %}
+                        <p class="access-badge-note">{{ school_access_state.reason }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="parent-shell">
+                <section class="page-hero">
+                    <div class="hero-grid">
+                        <div>
+                            <span class="hero-topline"><i class="fas fa-users"></i> Parent Dashboard</span>
+                            <h2 class="hero-title">Follow your child’s progress with clearer updates and faster tools.</h2>
+                            <p class="hero-text">This dashboard brings results, school notifications, timetable access, attendance links, and dispute follow-up into one parent-friendly space.</p>
+                            <div class="hero-meta">
+                                <span class="hero-chip"><i class="fas fa-phone"></i> {{ parent_phone }}</span>
+                                <span class="hero-chip"><i class="fas fa-user-graduate"></i> {{ children|length if children else 0 }} Linked Student{{ '' if (children|length if children else 0) == 1 else 's' }}</span>
+                                <span class="hero-chip"><i class="fas fa-bell"></i> {{ unread_parent_messages or 0 }} Unread Messages</span>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <span class="label">Family Snapshot</span>
+                            <div class="value">{{ children|length if children else 0 }}</div>
+                            <div class="meta">Student records currently linked to this parent account</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="stat-grid">
+                    <div class="stat-card">
+                        <span class="label">Linked Students</span>
+                        <div class="value">{{ children|length if children else 0 }}</div>
+                        <div class="meta">Student profiles available in this account</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">Unread Messages</span>
+                        <div class="value">{{ unread_parent_messages or 0 }}</div>
+                        <div class="meta">School notifications that still need review</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">Visible Programs</span>
+                        <div class="value">{{ parent_term_events|length if parent_term_events else 0 }}</div>
+                        <div class="meta">School events currently shared with parents</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">Ready Results</span>
+                        <div class="value">{{ children|selectattr('has_result')|list|length if children else 0 }}</div>
+                        <div class="meta">Linked students with published results</div>
+                    </div>
+                </section>
+
+                <div class="layout-main">
+                <div class="layout-side">
+                <div class="card feature-card" id="parent-messages-card">
+                    <h3 class="no-margin"><i class="fas fa-bell"></i> School Notifications</h3>
+                    <p class="muted mt-10">Open your dedicated messages page to keep this dashboard light.</p>
+                    <p class="muted">Unread notifications: <strong>{{ unread_parent_messages or 0 }}</strong></p>
+                    <div class="parent-notif-actions">
+                        <button type="button" class="btn btn-secondary btn-xs" id="enableParentBrowserNotif">
+                            <i class="fas fa-desktop"></i> Enable Browser Alerts
+                        </button>
+                        <span class="muted" id="parentBrowserNotifState" aria-live="polite"></span>
+                    </div>
+                    <a href="{{ url_for('parent_messages') }}" class="btn btn-primary mt-10">
+                        <i class="fas fa-external-link-alt"></i> Open Messages
+                    </a>
+                </div>
+
+                {% set first_child_key = children[0].key if children else '' %}
+                <div class="card feature-card" id="parent-tools-card">
+                    <h3 class="no-margin"><i class="fas fa-compass"></i> Parent Tools</h3>
+                    <p class="muted mt-10">Quick links to the most used parent pages.</p>
+                    <div class="parent-quick-actions mt-10">
+                        <a href="{{ url_for('parent_notification_preferences') }}" class="parent-quick-link"><i class="fas fa-sliders-h"></i> Notification Preferences</a>
+                        <a href="{{ url_for('parent_disputes') }}" class="parent-quick-link"><i class="fas fa-comment-dots"></i> Dispute Updates</a>
+                        <a href="{{ url_for('parent_subject_comments', student_key=first_child_key) if first_child_key else url_for('parent_subject_comments') }}" class="parent-quick-link"><i class="fas fa-clipboard-list"></i> Subject Comments</a>
+                        <a href="{{ url_for('parent_timetable', student_key=first_child_key) if first_child_key else url_for('parent_timetable') }}" class="parent-quick-link"><i class="fas fa-calendar-week"></i> Timetable</a>
+                    </div>
+                </div>
+
+                <div class="card feature-card" id="parent-password-card">
+                    <h3 class="no-margin">Change Parent Password</h3>
+                    <p class="muted">For security, change the password after login.</p>
+                    <form method="post" action="{{ url_for('parent_change_password') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="grid">
+                            <div>
+                                <label>Current Password</label>
+                                <input type="password" name="current_password" autocomplete="current-password" required>
+                            </div>
+                            <div>
+                                <label>New Password</label>
+                                <input type="password" name="new_password" autocomplete="new-password" required>
+                            </div>
+                            <div>
+                                <label>Confirm New Password</label>
+                                <input type="password" name="confirm_password" autocomplete="new-password" required>
+                            </div>
+                        </div>
+                        <div class="mt-10">
+                            <button type="submit" class="btn">Update Password</button>
+                        </div>
+                    </form>
+                </div>
+                </div>
+                <div class="layout-primary">
+                <div class="card feature-card">
+                    <h3 class="no-margin"><i class="fas fa-calendar-alt"></i> School Programs (Visible to Parents)</h3>
+                    {% if parent_term_events %}
+                    <table class="mt-10">
+                        <thead>
+                            <tr>
+                                <th>School</th>
+                                <th>Event</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in parent_term_events %}
+                            <tr>
+                                <td>{{ event.school_name }}</td>
+                                <td>{{ event.label }}</td>
+                                <td>{{ event.date }}</td>
+                                <td>{{ event.status|title }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="muted mt-10">No term program event is currently visible to parents.</p>
+                    {% endif %}
+                </div>
+
+                {% if children %}
+                <div class="grid">
+                    {% for child in children %}
+                    <div class="card child-card">
+                        <div class="child-head">
+                            <div>
+                                <h3 class="no-margin">{{ child.firstname }}</h3>
+                                <div class="muted mt-10">{{ child.school_name }}</div>
+                            </div>
+                            <span class="chip {% if child.has_result %}chip-success{% else %}chip-warning{% endif %}">
+                                {% if child.has_result %}Result Available{% else %}Awaiting Result{% endif %}
+                            </span>
+                        </div>
+                        <div class="child-meta-grid">
+                            <div class="child-meta-item">
+                                <span class="label">Student ID</span>
+                                <span class="value">{{ child.student_id }}</span>
+                            </div>
+                            <div class="child-meta-item">
+                                <span class="label">Class</span>
+                                <span class="value">{{ child.classname }}{% if child.stream %} ({{ child.stream }}){% endif %}</span>
+                            </div>
+                        </div>
+                        {% if child.has_result %}
+                        <div class="muted mt-10">
+                            <strong>Latest:</strong> {{ child.latest_term }}{% if child.latest_year %} ({{ child.latest_year }}){% endif %}
+                            <br><strong>Grade:</strong> {{ child.grade }} | <strong>Status:</strong> {{ child.status }} | <strong>Avg:</strong> {{ '%.1f'|format(child.average_marks|float) }}%
+                        </div>
+                        <div class="mt-12">
+                            <strong>Breaking Point:</strong>
+                            {% if child.breakpoint and child.breakpoint.drop and child.breakpoint.drop > 0 %}
+                                Drop of {{ child.breakpoint.drop }} from {{ child.breakpoint.from }} to {{ child.breakpoint.to }}.
+                            {% else %}
+                                No major drop detected yet.
+                            {% endif %}
+                        </div>
+                        <div class="mt-10" style="height:180px;">
+                            <canvas class="child-trend-chart" id="childChart{{ loop.index }}" data-points='{{ child.trend_points|tojson|safe }}'></canvas>
+                        </div>
+                        {% else %}
+                        <div class="muted mt-10">No published result yet.</div>
+                        {% endif %}
+                        <div class="child-action-grid">
+                            <a class="btn" href="{{ url_for('parent_view_result', student_key=child.key) }}">View Results</a>
+                            <a class="btn" href="{{ url_for('parent_compare_results', student_key=child.key) }}">Compare Terms</a>
+                            <a class="btn" href="{{ url_for('parent_period_attendance', student_key=child.key) }}">Attendance</a>
+                            <a class="btn" href="{{ url_for('parent_timetable', student_key=child.key) }}">Timetable</a>
+                            <a class="btn" href="{{ url_for('parent_submit_dispute', student_key=child.key) }}">Report Dispute</a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="card parent-empty-state">
+                    <div class="empty-icon"><i class="fas fa-user-slash"></i></div>
+                    <div class="empty-title">No Linked Students Yet</div>
+                    <p class="muted">This parent account is active, but no student has been linked to it yet.</p>
+                    <ol style="text-align:left; max-width:560px; margin:10px auto 0;">
+                        <li>Contact your school admin/class teacher to link your phone number to your child record.</li>
+                        <li>Confirm your child student ID and class arm are correct in school records.</li>
+                        <li>After linking, refresh this page to see results, attendance, timetable, and disputes.</li>
+                    </ol>
+                    <div class="empty-actions">
+                        <a href="{{ url_for('help', role='parent') }}" class="btn btn-primary">
+                            <i class="fas fa-question-circle"></i> Open Help
+                        </a>
+                        <a href="{{ url_for('report_issue') }}" class="btn btn-secondary">
+                            <i class="fas fa-bug"></i> Report Linking Issue
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+                </div>
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% if show_first_login_tutorial %}
+    <div class="welcome-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-tutorial-title">
+        <div class="welcome-modal-card">
+            <h3 id="welcome-tutorial-title">{{ first_login_tutorial.title }}</h3>
+            <p class="note">Quick start checklist for your first login:</p>
+            <ol>
+                {% for step in first_login_tutorial.steps %}
+                <li>{{ step }}</li>
+                {% endfor %}
+            </ol>
+            <form method="post" action="{{ url_for('complete_first_login_tutorial') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Got It, Continue</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+    {% if unread_parent_messages %}
+    <script>
+        (function () {
+            if (!('Notification' in window)) return;
+            const unread = Number(document.body.getAttribute('data-unread-parent-messages') || '0');
+            if (!Number.isFinite(unread) || unread <= 0) return;
+            const accountMarker = document.body.getAttribute('data-parent-account') || 'parent';
+            const key = 'parentUnreadNotifyShown:' + accountMarker;
+            const marker = String(unread);
+            if (localStorage.getItem(key) === marker) return;
+            if (Notification.permission === 'granted') {
+                new Notification('School Notifications', {
+                    body: 'You have ' + unread + ' unread message(s).'
+                });
+                localStorage.setItem(key, marker);
+            }
+        })();
+    </script>
+    {% endif %}
+    <script>
+        (function () {
+            const stateEl = document.getElementById('parentBrowserNotifState');
+            const btn = document.getElementById('enableParentBrowserNotif');
+            if (!stateEl || !btn) return;
+            if (!('Notification' in window)) {
+                stateEl.textContent = 'Browser alerts are not supported on this device.';
+                btn.disabled = true;
+                return;
+            }
+
+            function updateState() {
+                if (Notification.permission === 'granted') {
+                    stateEl.textContent = 'Browser alerts enabled.';
+                    btn.disabled = true;
+                    return;
+                }
+                if (Notification.permission === 'denied') {
+                    stateEl.textContent = 'Browser alerts blocked. Enable them in browser settings.';
+                    btn.disabled = true;
+                    return;
+                }
+                stateEl.textContent = 'Click to allow browser alerts for new school notifications.';
+                btn.disabled = false;
+            }
+
+            btn.addEventListener('click', function () {
+                Notification.requestPermission().then(function () {
+                    updateState();
+                });
+            });
+
+            updateState();
+        })();
+    </script>
+    <script>
+        (function () {
+            const canvases = Array.from(document.querySelectorAll('.child-trend-chart'));
+            if (!canvases.length) return;
+
+            function renderCharts() {
+                canvases.forEach(function (canvas) {
+                    const rows = JSON.parse(canvas.getAttribute('data-points') || '[]');
+                    if (!rows.length) return;
+                    new Chart(canvas, {
+                        type: 'line',
+                        data: {
+                            labels: rows.map(r => r.label),
+                            datasets: [{
+                                label: 'Average Score Trend',
+                                data: rows.map(r => r.average),
+                                borderColor: '#16a34a',
+                                backgroundColor: 'rgba(22, 163, 74, 0.18)',
+                                fill: true,
+                                tension: 0.25
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: { y: { min: 0, max: 100 } }
+                        }
+                    });
+                });
+            }
+
+            if (typeof Chart !== 'undefined') {
+                renderCharts();
+                return;
+            }
+
+            const chartScript = document.createElement('script');
+            chartScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+            chartScript.integrity = 'sha384-bs/nf9FbdNouRbMiFcrcZfLXYPKiPaGVGplVbv7dLGECccEXDW+S3zjqSKR5ZEaD';
+            chartScript.crossOrigin = 'anonymous';
+            chartScript.referrerPolicy = 'no-referrer';
+            chartScript.onload = renderCharts;
+            document.head.appendChild(chartScript);
+        })();
+    </script>
+    <script src="{{ url_for('static', filename='js/dashboard-enhanced.js', v='20260411b') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+
+
+
+

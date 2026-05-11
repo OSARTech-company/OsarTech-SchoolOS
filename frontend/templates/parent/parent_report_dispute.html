@@ -1,0 +1,60 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Result Dispute</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'dashboard' %}
+    {% include 'parent/_parent_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Report Result Dispute</h1>
+        <p><a class="btn" href="{{ url_for('parent_dashboard') }}">Back to Parent Dashboard</a></p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+    <div class="card">
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="student_key" value="{{ student_key }}">
+            <div class="form-group">
+                <label>Related Published Term</label>
+                <select name="term_token">
+                    <option value="">General</option>
+                    {% for item in published_terms %}
+                    <option value="{{ item.token }}">{{ item.term }}{% if item.academic_year %} ({{ item.academic_year }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" name="title" maxlength="150" required placeholder="e.g. Math score mismatch">
+            </div>
+            <div class="form-group">
+                <label>Details</label>
+                <textarea name="details" rows="8" maxlength="2500" required placeholder="Explain the issue clearly"></textarea>
+            </div>
+            <button class="btn btn-primary" type="submit">Submit Dispute</button>
+        </form>
+    </div>
+</div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+</body>
+</html>
+
+

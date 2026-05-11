@@ -1,0 +1,289 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Timetable</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+        .table-wrap table { width: 100%; min-width: 980px; border-collapse: collapse; }
+        .table-wrap th, .table-wrap td { white-space: nowrap; }
+        .history-note { color: #475569; font-size: 0.9rem; margin-top: 6px; }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'timetable' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Class Timetable</h1>
+        <p><a class="btn" href="{{ url_for('school_admin_dashboard') }}">Back to Dashboard</a></p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+    {% include 'shared/_school_setup_banner.html' %}
+
+    <div class="card">
+        <h2 id="period-form-title">Add / Update Period</h2>
+        <form method="post" id="period-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="grid">
+                <div><label>Class (JSS/SS only)</label><input id="period-classname" name="classname" required placeholder="e.g. JSS1, SS2B"></div>
+                <div><label>Day</label>
+                    <select id="period-day" name="day_of_week" required>
+                        {% for d, name in day_options %}<option value="{{ d }}">{{ name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div><label>Period Label</label><input id="period-label" name="period_label" required placeholder="Period 1"></div>
+                <div><label>Subject</label><input name="subject" id="period-subject" required placeholder="Mathematics"></div>
+                <div>
+                    <label>Assigned Teacher (Auto)</label>
+                    <input id="resolved-teacher" type="text" value="Will auto-fill from subject assignment" readonly>
+                    <small class="muted">Teacher is resolved from class + subject assignment for current term/year.</small>
+                </div>
+                <div><label>Room</label><input id="period-room" name="room" placeholder="Room A1"></div>
+                <div><label>Start</label><input id="period-start-time" type="time" name="start_time"></div>
+                <div><label>End</label><input id="period-end-time" type="time" name="end_time"></div>
+            </div>
+            <div class="mt-12" style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn btn-primary" id="period-save-btn" type="submit">Save Timetable Row</button>
+                <button class="btn btn-secondary" id="period-cancel-edit" type="button" style="display:none;">Cancel Edit</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Import Timetable (CSV)</h2>
+        <p class="muted">Upload period timetable rows in CSV format. Required columns: <code>classname, day_of_week, period_label, subject</code>. Optional: <code>start_time, end_time, room</code>.</p>
+        <p class="muted">Teacher is auto-resolved from subject assignments for the current term/year.</p>
+        <p class="muted"><code>day_of_week</code> accepts numbers <code>1-7</code> or names like <code>Monday</code>. Time format is <code>HH:MM</code>.</p>
+        <p class="mt-10">
+            <a class="btn btn-secondary" href="{{ url_for('school_admin_timetable_template') }}">
+                <i class="fas fa-download"></i> Download CSV Template
+            </a>
+        </p>
+        <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="import_csv">
+            <div class="grid">
+                <div>
+                    <label>CSV File</label>
+                    <input type="file" name="timetable_file" accept=".csv,text/csv" required>
+                </div>
+            </div>
+            <div class="mt-12"><button class="btn btn-primary" type="submit">Upload Timetable CSV</button></div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Current Timetable</h2>
+        <form method="get" class="toolbar">
+            <label>Filter Class</label>
+            <select name="classname">
+                <option value="">All</option>
+                {% for c in classes %}
+                <option value="{{ c }}" {% if selected_class == c %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-secondary" type="submit">Filter</button>
+        </form>
+        <div class="table-wrap">
+        <table>
+            <thead><tr><th>Class</th><th>Day</th><th>Period</th><th>Subject</th><th>Teacher</th><th>Time</th><th>Room</th><th></th></tr></thead>
+            <tbody>
+            {% for row in rows %}
+                <tr>
+                    <td>{{ row.classname }}</td>
+                    <td>{{ row.day_name }}</td>
+                    <td>{{ row.period_label }}</td>
+                    <td>{{ row.subject }}</td>
+                    <td>{{ row.teacher_label }}</td>
+                    <td>{{ row.start_time or '-' }} - {{ row.end_time or '-' }}</td>
+                    <td>{{ row.room or '-' }}</td>
+                    <td>
+                        <button
+                            type="button"
+                            class="btn btn-secondary js-edit-row"
+                            data-classname="{{ row.classname }}"
+                            data-day="{{ row.day_of_week }}"
+                            data-period="{{ row.period_label }}"
+                            data-subject="{{ row.subject }}"
+                            data-room="{{ row.room or '' }}"
+                            data-start="{{ row.start_time or '' }}"
+                            data-end="{{ row.end_time or '' }}"
+                            style="margin-right:6px;"
+                        >
+                            Edit
+                        </button>
+                        <form method="post" style="display:inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="row_id" value="{{ row.id }}">
+                            <button class="btn btn-danger" type="submit">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8">No timetable rows yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Timetable Change History</h2>
+        <p class="history-note">Restore any previous row version. Restore will re-run teacher assignment and conflict validation.</p>
+        <div class="table-wrap">
+        <table>
+            <thead><tr><th>When</th><th>Action</th><th>Class</th><th>Day</th><th>Period</th><th>Before</th><th>After</th><th>Changed By</th><th></th></tr></thead>
+            <tbody>
+            {% for h in history_rows %}
+                <tr>
+                    <td>{{ h.created_at }}</td>
+                    <td>{{ h.action|title }}</td>
+                    <td>{{ h.classname }}</td>
+                    <td>{{ h.day_name }}</td>
+                    <td>{{ h.period_label }}</td>
+                    <td>
+                        {% if h.before %}
+                        {{ h.before.subject or '-' }} | {{ h.before.start_time or '-' }}-{{ h.before.end_time or '-' }} | {{ h.before.room or '-' }}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if h.after %}
+                        {{ h.after.subject or '-' }} | {{ h.after.start_time or '-' }}-{{ h.after.end_time or '-' }} | {{ h.after.room or '-' }}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td>{{ h.changed_by or '-' }}</td>
+                    <td>
+                        <form method="post" style="display:inline" onsubmit="return confirm('Restore this timetable version?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="action" value="restore_history">
+                            <input type="hidden" name="history_id" value="{{ h.id }}">
+                            <button class="btn btn-secondary" type="submit">Restore</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="9">No timetable change history yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+<script>
+  (function () {
+    const teacherMapRaw = {{ class_subject_teacher_map|tojson }};
+    const teacherMap = {};
+    const classInput = document.querySelector('input[name="classname"]');
+    const dayInput = document.getElementById('period-day');
+    const labelInput = document.getElementById('period-label');
+    const subjectInput = document.getElementById('period-subject');
+    const roomInput = document.getElementById('period-room');
+    const startInput = document.getElementById('period-start-time');
+    const endInput = document.getElementById('period-end-time');
+    const formTitle = document.getElementById('period-form-title');
+    const saveBtn = document.getElementById('period-save-btn');
+    const cancelEditBtn = document.getElementById('period-cancel-edit');
+    const form = document.getElementById('period-form');
+    const target = document.getElementById('resolved-teacher');
+    if (!classInput || !subjectInput || !target || !dayInput || !labelInput || !roomInput || !startInput || !endInput || !formTitle || !saveBtn || !cancelEditBtn || !form) return;
+
+    function normalizeText(v) {
+      return (v || '').trim().replace(/\s+/g, ' ');
+    }
+
+    function key(v) {
+      return normalizeText(v).toLowerCase();
+    }
+
+    Object.keys(teacherMapRaw || {}).forEach((cls) => {
+      const clsKey = key(cls);
+      teacherMap[clsKey] = teacherMap[clsKey] || {};
+      const subjects = teacherMapRaw[cls] || {};
+      Object.keys(subjects).forEach((subj) => {
+        teacherMap[clsKey][key(subj)] = subjects[subj];
+      });
+    });
+
+    function refreshTeacherPreview() {
+      const cls = key(classInput.value);
+      const subj = key(subjectInput.value);
+      if (!cls || !subj) {
+        target.value = 'Will auto-fill from subject assignment';
+        return;
+      }
+      const classMap = teacherMap[cls] || {};
+      const match = classMap[subj];
+      if (match && match.teacher_id) {
+        target.value = `${match.teacher_name} (${match.teacher_id})`;
+      } else {
+        target.value = 'No assigned teacher found for this class + subject';
+      }
+    }
+
+    classInput.addEventListener('input', refreshTeacherPreview);
+    subjectInput.addEventListener('input', refreshTeacherPreview);
+
+    function resetEditMode() {
+      formTitle.textContent = 'Add / Update Period';
+      saveBtn.textContent = 'Save Timetable Row';
+      cancelEditBtn.style.display = 'none';
+    }
+
+    function setEditMode() {
+      formTitle.textContent = 'Edit Timetable Period';
+      saveBtn.textContent = 'Update Timetable Row';
+      cancelEditBtn.style.display = 'inline-flex';
+    }
+
+    document.querySelectorAll('.js-edit-row').forEach((btn) => {
+      btn.addEventListener('click', function () {
+        classInput.value = this.dataset.classname || '';
+        dayInput.value = this.dataset.day || '1';
+        labelInput.value = this.dataset.period || '';
+        subjectInput.value = this.dataset.subject || '';
+        roomInput.value = this.dataset.room || '';
+        startInput.value = this.dataset.start || '';
+        endInput.value = this.dataset.end || '';
+        setEditMode();
+        refreshTeacherPreview();
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    cancelEditBtn.addEventListener('click', function () {
+      form.reset();
+      dayInput.value = '1';
+      resetEditMode();
+      refreshTeacherPreview();
+    });
+
+    resetEditMode();
+    refreshTeacherPreview();
+  })();
+</script>
+</body>
+</html>
+
+

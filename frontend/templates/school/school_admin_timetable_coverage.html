@@ -1,0 +1,64 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timetable Coverage</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'timetable_coverage' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Timetable Coverage Check</h1>
+        <p><a class="btn" href="{{ url_for('school_admin_dashboard') }}">Back to Dashboard</a></p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <p><strong>Total classes:</strong> {{ summary.total_classes }} | <strong>Issues:</strong> {{ summary.issue_count }}</p>
+    </div>
+
+    <div class="card">
+        {% if issues %}
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Class</th>
+                    <th>Day</th>
+                    <th>Issue</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in issues %}
+                <tr>
+                    <td>{{ row.classname }}</td>
+                    <td>{{ row.day }}</td>
+                    <td>{{ row.detail }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="muted">No timetable coverage issues detected.</p>
+        {% endif %}
+    </div>
+</div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+

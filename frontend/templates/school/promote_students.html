@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promote Students - School Admin Dashboard</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(1000px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.8rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .student-list { max-height: 420px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+        .student-item { padding: 12px 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; }
+        .student-item:last-child { border-bottom: none; }
+        .student-item:hover { background: #f8f9fa; }
+        .student-item label { flex: 1; cursor: pointer; }
+        .student-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .info-box { background: #fff8dd; border: 1px solid #f1d98b; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+    {% set active_page = 'promote' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-arrow-up"></i> Promote Students</h1>
+            <a href="{{ url_for('school_admin_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back</a>
+        </div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="card">
+            <h2><i class="fas fa-info-circle"></i> Instructions</h2>
+            <div class="info-box">
+                <p>1. Select the current class and the class to promote students to.</p>
+                <p>2. Choose action per student: <strong>Promote</strong>, <strong>Repeat</strong>, or <strong>Remove (Left School)</strong>.</p>
+                <p>3. Students set to Repeat stay in the same class.</p>
+                <p>4. SS3 promoted students are automatically marked as <strong>Graduated</strong>.</p>
+            </div>
+
+            <form method="GET" style="margin-bottom: 20px;">
+                <div class="form-group">
+                    <label for="from_class_filter">Current Class (View List):</label>
+                    <select id="from_class_filter" name="from_class" onchange="this.form.submit()">
+                        <option value="">Select Class...</option>
+                        {% for cls in classes %}
+                        <option value="{{ cls }}" {% if selected_class == cls %}selected{% endif %}>{{ cls }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="form-group">
+                    <label for="from_class">Current Class:</label>
+                    <select id="from_class" name="from_class" required>
+                        <option value="">Select Class...</option>
+                        {% for cls in classes %}
+                        <option value="{{ cls }}" {% if selected_class == cls %}selected{% endif %}>{{ cls }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="to_class">Promote To:</label>
+                    <select id="to_class" name="to_class" required>
+                        <option value="">Select Class...</option>
+                        {% for cls in to_class_options %}
+                        <option value="{{ cls }}">{{ cls }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if suggested_next_class %}
+                    <small style="display:block;margin-top:8px;color:#555;">
+                        Suggested next class for selected students: <strong>{{ suggested_next_class }}</strong>
+                    </small>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group">
+                    <label>Class Students and Actions:</label>
+                    <div class="student-list">
+                        {% for student_id, student in students.items() %}
+                        <div class="student-item">
+                            <label for="promote_{{ student_id }}">
+                                <strong>{{ student.firstname }}</strong> - {{ student.classname }}
+                            </label>
+                            <div class="student-actions">
+                                <label><input type="radio" name="action_{{ student_id }}" value="promote"> Promote</label>
+                                <label><input type="radio" name="action_{{ student_id }}" value="repeat" checked> Repeat</label>
+                                <label><input type="radio" name="action_{{ student_id }}" value="remove"> Remove</label>
+                            </div>
+                        </div>
+                        {% else %}
+                        <p style="padding: 20px; text-align: center;">No students found for this class.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-success"><i class="fas fa-arrow-up"></i> Apply Actions</button>
+                <a href="{{ url_for('school_admin_dashboard') }}" class="btn btn-secondary" style="margin-left: 10px;">Cancel</a>
+            </form>
+        </div>
+    </div>
+    </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+
+
+

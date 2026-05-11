@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Request</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="container" style="max-width: 920px;">
+        <div class="header">
+            <h1><i class="fas fa-user-shield"></i> Privacy / Data Request</h1>
+            <p class="meta-line">Submit a data export, deletion, or correction request.</p>
+        </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <div class="card">
+            <form method="POST" action="{{ url_for('privacy_request') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+                    <div class="form-group">
+                        <label for="request_type">Request Type</label>
+                        <select id="request_type" name="request_type" required>
+                            {% for opt in (request_type_options or []) %}
+                            <option value="{{ opt.value }}">{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="subject_line">Subject</label>
+                        <input id="subject_line" name="subject_line" type="text" placeholder="Short summary">
+                    </div>
+                </div>
+                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                    <div class="form-group">
+                        <label for="target_scope">Target Scope (for export/delete)</label>
+                        <select id="target_scope" name="target_scope">
+                            <option value="">Select scope</option>
+                            <option value="all_school">All school data</option>
+                            <option value="student_only">Student-only data</option>
+                            <option value="teacher_only">Teacher-only data</option>
+                            <option value="parent_only">Parent-only data</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="student_id">Student ID (for student/parent changes)</label>
+                        <input id="student_id" name="student_id" type="text" placeholder="e.g. STU-0001">
+                    </div>
+                    <div class="form-group">
+                        <label for="teacher_id">Teacher Login/Email (for teacher contact change)</label>
+                        <input id="teacher_id" name="teacher_id" type="text" placeholder="e.g. teacher@school.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="parent_slot">Parent Slot (for parent phone change)</label>
+                        <select id="parent_slot" name="parent_slot">
+                            <option value="">Select slot</option>
+                            <option value="1">Parent 1</option>
+                            <option value="2">Parent 2</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="new_parent_phone">New Parent Phone</label>
+                        <input id="new_parent_phone" name="new_parent_phone" type="text" placeholder="+234...">
+                    </div>
+                    <div class="form-group">
+                        <label for="new_student_email">New Student Email</label>
+                        <input id="new_student_email" name="new_student_email" type="email" placeholder="student@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="new_student_name">New Student Name</label>
+                        <input id="new_student_name" name="new_student_name" type="text" placeholder="Full name">
+                    </div>
+                    <div class="form-group">
+                        <label for="new_student_dob">New Student DOB</label>
+                        <input id="new_student_dob" name="new_student_dob" type="date">
+                    </div>
+                    <div class="form-group">
+                        <label for="new_teacher_phone">New Teacher Phone</label>
+                        <input id="new_teacher_phone" name="new_teacher_phone" type="text" placeholder="+234...">
+                    </div>
+                    <div class="form-group">
+                        <label for="new_teacher_email">New Teacher Email/Login</label>
+                        <input id="new_teacher_email" name="new_teacher_email" type="email" placeholder="teacher@example.com">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="details">Details</label>
+                    <textarea id="details" name="details" rows="6" required placeholder="Describe exactly what data you want exported/deleted/corrected."></textarea>
+                </div>
+                <p class="muted">Control policy: each request type has required fields and will be approved before any data change is applied.</p>
+                <div class="toolbar">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Submit Request</button>
+                    <a href="{{ url_for('menu') if role != 'super_admin' else url_for('super_admin_dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
+

@@ -1,0 +1,67 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promotion Audit</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'promotion_audit' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Promotion Audit Log</h1>
+        <p><a class="btn" href="{{ url_for('school_admin_dashboard') }}">Back to Dashboard</a></p>
+    </div>
+    <div class="card">
+        <form method="get" class="toolbar">
+            <label>Class</label>
+            <select name="classname">
+                <option value="">All</option>
+                {% for c in classes %}<option value="{{ c }}" {% if c == selected_class %}selected{% endif %}>{{ c }}</option>{% endfor %}
+            </select>
+            <label>Action</label>
+            <select name="action">
+                <option value="">All</option>
+                <option value="promote" {% if selected_action == 'promote' %}selected{% endif %}>Promote</option>
+                <option value="repeat" {% if selected_action == 'repeat' %}selected{% endif %}>Repeat</option>
+                <option value="remove" {% if selected_action == 'remove' %}selected{% endif %}>Remove</option>
+            </select>
+            <button class="btn btn-secondary" type="submit">Filter</button>
+        </form>
+    </div>
+    <div class="card">
+        <table>
+            <thead><tr><th>When</th><th>Student</th><th>From</th><th>To</th><th>Action</th><th>Term</th><th>Year</th><th>By</th></tr></thead>
+            <tbody>
+            {% for row in logs %}
+                <tr>
+                    <td>{{ row.created_at }}</td>
+                    <td>{{ row.student_name }} ({{ row.student_id }})</td>
+                    <td>{{ row.from_class or '-' }}</td>
+                    <td>{{ row.to_class or '-' }}</td>
+                    <td>{{ row.action|title }}</td>
+                    <td>{{ row.term or '-' }}</td>
+                    <td>{{ row.academic_year or '-' }}</td>
+                    <td>{{ row.changed_by or '-' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8">No promotion audit records found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+
+

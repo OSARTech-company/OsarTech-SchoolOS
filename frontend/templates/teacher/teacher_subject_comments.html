@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subject Teacher Comments - Teacher</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(1160px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.85rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .filters {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            background: #f8fbff;
+            border: 1px solid #dbe4ef;
+            border-radius: 12px;
+            padding: 14px;
+        }
+        .filters label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: .08em; color: #4f5d75; font-weight: 700; }
+        .filters select {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid #d0d7e2;
+            padding: 8px 10px;
+            background: #fff;
+            color: #1b2b45;
+            font-weight: 600;
+        }
+        .summary-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 12px; }
+        .summary-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #dbe4ef;
+            border-radius: 999px;
+            padding: 8px 12px;
+            background: #f8fbff;
+            color: #1e3a5f;
+            font-weight: 700;
+        }
+        .comment-card {
+            border: 1px solid #e4ebf3;
+            border-radius: 12px;
+            padding: 16px;
+            background: white;
+            box-shadow: 0 12px 30px rgba(15, 40, 90, 0.06);
+        }
+        .comment-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            font-weight: 700;
+            color: #1b2b45;
+        }
+        .comment-meta .chip {
+            background: #eef3ff;
+            color: #274472;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 0.8rem;
+        }
+        .comment-body {
+            margin-top: 10px;
+            color: #24324a;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        .comment-grid { display: grid; gap: 14px; }
+        .empty-state {
+            text-align: center;
+            padding: 28px 12px;
+            color: #2b3f5c;
+        }
+        .empty-state i { font-size: 2rem; color: #8aa0bf; margin-bottom: 10px; }
+        .badge-live { background: #f1f5f9; color: #4b5563; }
+        .badge-published { background: #e8fff3; color: #1f7a4d; }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    {% set active_page = active_page|default('subject_comments', true) %}
+    {% set teacher_sidebar_profile_image = teacher_profile_image %}
+    {% set teacher_sidebar_display_name = teacher_name %}
+    <div class="app-shell topbar-layout">
+        {% include 'teacher/_teacher_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-comments"></i> Subject Teacher Comments</h1>
+                    <a href="{{ url_for('teacher_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="GET" action="{{ url_for('teacher_subject_comments') }}" class="filters">
+                    <div>
+                        <label for="classname">Class</label>
+                        <select id="classname" name="classname" onchange="this.form.submit()">
+                            <option value="">All Assigned Classes</option>
+                            {% for cls in classes %}
+                                <option value="{{ cls }}" {% if selected_class == cls %}selected{% endif %}>{{ cls }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="subject">Subject</label>
+                        <select id="subject" name="subject" onchange="this.form.submit()">
+                            <option value="">All Subjects</option>
+                            {% for subj in available_subjects %}
+                                <option value="{{ subj }}" {% if selected_subject == subj %}selected{% endif %}>{{ subj }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="term">Term</label>
+                        <select id="term" name="term" onchange="this.form.submit()">
+                            {% for term in term_options %}
+                                <option value="{{ term }}" {% if selected_term == term %}selected{% endif %}>{{ term }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="academic_year">Academic Year</label>
+                        <select id="academic_year" name="academic_year" onchange="this.form.submit()">
+                            {% for year in year_options %}
+                                <option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+
+                <div class="summary-row">
+                    <span class="summary-chip"><i class="fas fa-list"></i> Comments: {{ comment_rows|length }}</span>
+                    <span class="summary-chip"><i class="fas fa-calendar-alt"></i> {{ selected_term }} {{ selected_year }}</span>
+                </div>
+
+                {% if comment_rows %}
+                <div class="comment-grid">
+                    {% for row in comment_rows %}
+                    <div class="comment-card">
+                        <div class="comment-meta">
+                            <span>{{ row.student_name }}</span>
+                            <span class="chip">{{ row.student_id }}</span>
+                            <span class="chip">{{ row.classname }}</span>
+                            <span class="chip">{{ row.subject }}</span>
+                            <span class="chip {% if row.source == 'published' %}badge-published{% else %}badge-live{% endif %}">
+                                {{ 'Published' if row.source == 'published' else 'Live' }}
+                            </span>
+                        </div>
+                        <div class="comment-body">{{ row.comment }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="comment-card empty-state">
+                    <i class="fas fa-comment-slash"></i>
+                    <h3>No subject teacher comments found</h3>
+                    <p>Try adjusting class, subject, term, or year filters to locate comments.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

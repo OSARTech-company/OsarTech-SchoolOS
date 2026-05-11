@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Requests - Super Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'privacy_requests' %}
+    {% include 'super/_super_admin_sidebar.html' %}
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1><i class="fas fa-user-shield"></i> Privacy Requests</h1>
+                <p class="meta-line"><strong>Last Login:</strong> {{ last_login_at }}</p>
+            </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <form method="GET" class="toolbar">
+                    <div>
+                        <label>Status</label>
+                        <select name="status">
+                            <option value="" {% if not status_filter %}selected{% endif %}>All</option>
+                            <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+                            <option value="resolved" {% if status_filter == 'resolved' %}selected{% endif %}>Resolved</option>
+                            <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Search</label>
+                        <input type="text" name="q" value="{{ text_filter or '' }}" placeholder="request ID / user / school">
+                    </div>
+                    <div>
+                        <label>Rows</label>
+                        <select name="per_page">
+                            {% for opt in [10, 25, 50, 100] %}
+                            <option value="{{ opt }}" {% if per_page == opt %}selected{% endif %}>{{ opt }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Apply</button>
+                    <a href="{{ url_for('super_admin_privacy_requests') }}" class="btn">Reset</a>
+                </form>
+                <p class="muted" style="margin-top: 8px;">Total: {{ total_rows }}</p>
+                <p class="muted no-margin" style="margin-top: 4px;">
+                    Controlled flow: Pending -> School Review -> Super Approval -> Apply Action (auto-resolved). Rejected/Resolved requests are locked.
+                </p>
+            </div>
+
+            {% if requests_data %}
+                {% for row in requests_data %}
+                <div class="school-card">
+                    <div class="school-card-main">
+                        <div class="school-name">{{ row.request_id }}</div>
+                        <div class="school-meta">
+                            Type: <strong>{{ row.request_type|title }}</strong> |
+                            Status: <strong>{{ row.status|title }}</strong> |
+                            Action: <strong>{{ row.allowed_action or '-' }}</strong> |
+                            Role/User: {{ row.role or '-' }} / {{ row.user_id or '-' }} |
+                            School: {{ row.school_id or '-' }} |
+                            Submitted: {{ row.created_at }}
+                        </div>
+                        {% if row.subject_line %}
+                        <div class="school-meta"><strong>Subject:</strong> {{ row.subject_line }}</div>
+                        {% endif %}
+                        <div class="school-meta"><strong>Details:</strong> {{ row.details }}</div>
+                        {% if row.resolution_note %}
+                        <div class="school-meta"><strong>Resolution:</strong> {{ row.resolution_note }}</div>
+                        {% endif %}
+                        <div class="school-meta">
+                            <strong>School Review:</strong> {{ row.school_review_status|title }}
+                            {% if row.school_reviewed_by %}
+                            by {{ row.school_reviewed_by }} at {{ row.school_reviewed_at or '-' }}
+                            {% endif %}
+                            {% if row.school_review_note %}
+                            | {{ row.school_review_note }}
+                            {% endif %}
+                        </div>
+                        {% if row.approved_by %}
+                        <div class="school-meta"><strong>Approved By:</strong> {{ row.approved_by }} at {{ row.approved_at or '-' }}</div>
+                        {% endif %}
+                        {% if row.applied_by %}
+                        <div class="school-meta"><strong>Applied By:</strong> {{ row.applied_by }} at {{ row.applied_at or '-' }}</div>
+                        {% endif %}
+                        {% if row.before_snapshot %}
+                        <div class="school-meta"><strong>Before:</strong> {{ row.before_snapshot }}</div>
+                        {% endif %}
+                        {% if row.after_snapshot %}
+                        <div class="school-meta"><strong>After:</strong> {{ row.after_snapshot }}</div>
+                        {% endif %}
+                        {% if row.status in ['pending', 'approved'] %}
+                        <form method="POST" action="{{ url_for('super_admin_privacy_requests_resolve') }}" class="inline-form super-admin-inline-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="request_id" value="{{ row.request_id }}">
+                            <select name="status">
+                                {% if row.status == 'pending' %}
+                                {% if row.school_review_status == 'approved' %}
+                                <option value="approved">Approved</option>
+                                {% endif %}
+                                <option value="rejected">Rejected</option>
+                                {% endif %}
+                                {% if row.status == 'approved' %}
+                                <option value="resolved">Resolved</option>
+                                <option value="rejected">Rejected</option>
+                                {% endif %}
+                            </select>
+                            <input type="text" name="note" placeholder="Decision note (minimum 8 chars)" required>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Update Status</button>
+                        </form>
+                        {% endif %}
+                        {% if row.status == 'pending' and row.school_review_status != 'approved' %}
+                        <p class="muted no-margin" style="margin-top: 8px;"><i class="fas fa-clock"></i> Waiting for school-admin review approval before super-admin approval.</p>
+                        {% endif %}
+                        {% if row.school_id and row.status == 'approved' and row.allowed_action == 'apply_parent_phone' %}
+                        <form method="POST" action="{{ url_for('super_admin_apply_parent_phone_change') }}" class="inline-form super-admin-inline-form" style="margin-top: 8px;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="request_id" value="{{ row.request_id }}">
+                            <input type="hidden" name="school_id" value="{{ row.school_id }}">
+                            <input type="text" name="student_id" placeholder="Student ID" value="{{ (row.request_payload or {}).get('student_id', '') }}" required>
+                            <select name="parent_slot">
+                                <option value="1" {% if (row.request_payload or {}).get('parent_slot') == '1' %}selected{% endif %}>Parent 1</option>
+                                <option value="2" {% if (row.request_payload or {}).get('parent_slot') == '2' %}selected{% endif %}>Parent 2</option>
+                            </select>
+                            <input type="text" name="new_parent_phone" value="{{ (row.request_payload or {}).get('new_parent_phone', '') }}" placeholder="New parent phone" required>
+                            <input type="text" name="apply_note" placeholder="Apply note (minimum 8 chars)" required>
+                            <button type="submit" class="btn btn-secondary"><i class="fas fa-phone"></i> Apply Phone Change</button>
+                        </form>
+                        {% endif %}
+                        {% if row.school_id and row.status == 'approved' and row.allowed_action == 'apply_student_email' %}
+                        <form method="POST" action="{{ url_for('super_admin_apply_student_email_change') }}" class="inline-form super-admin-inline-form" style="margin-top: 8px;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="request_id" value="{{ row.request_id }}">
+                            <input type="hidden" name="school_id" value="{{ row.school_id }}">
+                            <input type="text" name="student_id" value="{{ (row.request_payload or {}).get('student_id', '') }}" placeholder="Student ID" required>
+                            <input type="email" name="new_student_email" value="{{ (row.request_payload or {}).get('new_student_email', '') }}" placeholder="New student email" required>
+                            <input type="text" name="apply_note" placeholder="Apply note (minimum 8 chars)" required>
+                            <button type="submit" class="btn btn-secondary"><i class="fas fa-envelope"></i> Apply Student Email</button>
+                        </form>
+                        {% endif %}
+                        {% if row.school_id and row.status == 'approved' and row.allowed_action == 'apply_student_name' %}
+                        <form method="POST" action="{{ url_for('super_admin_apply_student_name_change') }}" class="inline-form super-admin-inline-form" style="margin-top: 8px;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="request_id" value="{{ row.request_id }}">
+                            <input type="hidden" name="school_id" value="{{ row.school_id }}">
+                            <input type="text" name="student_id" value="{{ (row.request_payload or {}).get('student_id', '') }}" placeholder="Student ID" required>
+                            <input type="text" name="new_student_name" value="{{ (row.request_payload or {}).get('new_student_name', '') }}" placeholder="New student full name" required>
+                            <input type="text" name="apply_note" placeholder="Apply note (minimum 8 chars)" required>
+                            <button type="submit" class="btn btn-secondary"><i class="fas fa-user-edit"></i> Apply Student Name</button>
+                        </form>
+                        {% endif %}
+                        {% if row.school_id and row.status == 'approved' and row.allowed_action == 'apply_student_dob' %}
+                        <form method="POST" action="{{ url_for('super_admin_apply_student_dob_change') }}" class="inline-form super-admin-inline-form" style="margin-top: 8px;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="request_id" value="{{ row.request_id }}">
+                            <input type="hidden" name="school_id" value="{{ row.school_id }}">
+                            <input type="text" name="student_id" value="{{ (row.request_payload or {}).get('student_id', '') }}" placeholder="Student ID" required>
+                            <input type="date" name="new_student_dob" value="{{ (row.request_payload or {}).get('new_student_dob', '') }}" required>
+                            <input type="text" name="apply_note" placeholder="Apply note (minimum 8 chars)" required>
+                            <button type="submit" class="btn btn-secondary"><i class="fas fa-calendar-alt"></i> Apply Student DOB</button>
+                        </form>
+                        {% endif %}
+                        {% if row.school_id and row.status == 'approved' and row.allowed_action == 'apply_teacher_contact' %}
+                        <form method="POST" action="{{ url_for('super_admin_apply_teacher_contact_change') }}" class="inline-form super-admin-inline-form" style="margin-top: 8px;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="request_id" value="{{ row.request_id }}">
+                            <input type="hidden" name="school_id" value="{{ row.school_id }}">
+                            <input type="text" name="teacher_id" value="{{ (row.request_payload or {}).get('teacher_id', '') }}" placeholder="Current teacher email/login" required>
+                            <input type="text" name="new_teacher_phone" value="{{ (row.request_payload or {}).get('new_teacher_phone', '') }}" placeholder="New teacher phone (optional)">
+                            <input type="email" name="new_teacher_email" value="{{ (row.request_payload or {}).get('new_teacher_email', '') }}" placeholder="New teacher email/login (optional)">
+                            <input type="text" name="apply_note" placeholder="Apply note (minimum 8 chars)" required>
+                            <button type="submit" class="btn btn-secondary"><i class="fas fa-id-card"></i> Apply Teacher Contact</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="card"><p class="no-margin">No privacy requests found.</p></div>
+            {% endif %}
+
+            {% if total_pages > 1 %}
+            <div class="card">
+                <div class="pagination-bar" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    {% if page > 1 %}
+                    <a class="btn btn-sm" href="{{ url_for('super_admin_privacy_requests', status=status_filter, q=text_filter, per_page=per_page, page=page-1) }}">Previous</a>
+                    {% endif %}
+                    <span>Page {{ page }} / {{ total_pages }}</span>
+                    {% if page < total_pages %}
+                    <a class="btn btn-sm" href="{{ url_for('super_admin_privacy_requests', status=status_filter, q=text_filter, per_page=per_page, page=page+1) }}">Next</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+

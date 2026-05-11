@@ -1,0 +1,221 @@
+{% extends "base.html" if base else "shared/login.html" %}
+
+{% block content %}
+<!-- Enhanced Dashboard Showcase -->
+<div class="dashboard-section">
+    <h2><i class="fas fa-star"></i> Dashboard Overview</h2>
+    <p>Welcome to the enhanced dashboard with beautiful visuals and interactive charts</p>
+</div>
+
+<!-- Key Metrics Grid -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-users"></i></div>
+        <h3 data-count="{{ total_users | default(1234) }}">{{ total_users | default(1234) }}</h3>
+        <p>Total Users</p>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+        <h3 data-count="{{ active_users | default(856) }}">{{ active_users | default(856) }}</h3>
+        <p>Active Users</p>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+        <h3 data-count="{{ pending_items | default(42) }}">{{ pending_items | default(42) }}</h3>
+        <p>Pending Items</p>
+    </div>
+    <div class="stat-card danger">
+        <div class="stat-icon"><i class="fas fa-exclamation-circle"></i></div>
+        <h3 data-count="{{ issues | default(8) }}">{{ issues | default(8) }}</h3>
+        <p>Issues to Review</p>
+    </div>
+</div>
+
+<!-- Progress Indicators -->
+<div class="dashboard-section">
+    <h2><i class="fas fa-tasks"></i> Progress Tracking</h2>
+    
+    <div style="margin: 20px 0;">
+        <h4>Completion Rate</h4>
+        <div class="progress-bar-container">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 78%" data-width="78%"></div>
+            </div>
+            <div class="progress-text">78%</div>
+        </div>
+    </div>
+    
+    <div style="margin: 20px 0;">
+        <h4>Success Rate</h4>
+        <div class="progress-bar-container">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 92%" data-width="92%"></div>
+            </div>
+            <div class="progress-text">92%</div>
+        </div>
+    </div>
+    
+    <div style="margin: 20px 0;">
+        <h4>Performance Score</h4>
+        <div class="progress-bar-container">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 85%; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)" data-width="85%"></div>
+            </div>
+            <div class="progress-text">85%</div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Grid -->
+<div class="dashboard-section">
+    <h2><i class="fas fa-th"></i> Quick Metrics</h2>
+    
+    <div class="data-grid">
+        <div class="data-card">
+            <div class="data-card-label">New Registrations</div>
+            <div class="data-card-value">234</div>
+        </div>
+        <div class="data-card">
+            <div class="data-card-label">Completed Tasks</div>
+            <div class="data-card-value">1,892</div>
+        </div>
+        <div class="data-card">
+            <div class="data-card-label">Revenue</div>
+            <div class="data-card-value">$24.5K</div>
+        </div>
+        <div class="data-card">
+            <div class="data-card-label">Active Sessions</div>
+            <div class="data-card-value">487</div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="dashboard-grid">
+    <div class="mini-chart-card">
+        <h4>Trend Analysis</h4>
+        <div class="mini-chart-container">
+            <canvas id="trendChart"></canvas>
+        </div>
+    </div>
+    
+    <div class="mini-chart-card">
+        <h4>Performance Distribution</h4>
+        <div class="mini-chart-container">
+            <canvas id="distributionChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Status Indicators -->
+<div class="dashboard-section">
+    <h2><i class="fas fa-info-circle"></i> Status Updates</h2>
+    
+    <div class="alert-card info">
+        <div class="alert-icon"><i class="fas fa-info-circle"></i></div>
+        <div class="alert-content">
+            <strong>System Update</strong>
+            <p>Dashboard has been upgraded with enhanced visuals and real-time charts</p>
+        </div>
+    </div>
+    
+    <div class="alert-card success">
+        <div class="alert-icon"><i class="fas fa-check-circle"></i></div>
+        <div class="alert-content">
+            <strong>All Systems Operational</strong>
+            <p>All services are running normally with no issues detected</p>
+        </div>
+    </div>
+    
+    <div class="alert-card warning">
+        <div class="alert-icon"><i class="fas fa-exclamation-triangle"></i></div>
+        <div class="alert-content">
+            <strong>Maintenance Scheduled</strong>
+            <p>Scheduled maintenance will occur on March 25, 2026 from 2:00 AM - 4:00 AM UTC</p>
+        </div>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="dashboard-section">
+    <h2><i class="fas fa-table"></i> Recent Activities</h2>
+    
+    <table class="enhanced-table">
+        <thead>
+            <tr>
+                <th>Activity</th>
+                <th>User</th>
+                <th>Status</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Login</strong></td>
+                <td>Admin User</td>
+                <td><span class="status-badge active">✓ Active</span></td>
+                <td>2 minutes ago</td>
+            </tr>
+            <tr>
+                <td><strong>Report Generated</strong></td>
+                <td>Teacher Portal</td>
+                <td><span class="status-badge success">✓ Complete</span></td>
+                <td>15 minutes ago</td>
+            </tr>
+            <tr>
+                <td><strong>Data Backup</strong></td>
+                <td>System</td>
+                <td><span class="status-badge warning">⏳ Pending</span></td>
+                <td>1 hour ago</td>
+            </tr>
+            <tr>
+                <td><strong>Settings Updated</strong></td>
+                <td>School Admin</td>
+                <td><span class="status-badge active">✓ Active</span></td>
+                <td>3 hours ago</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Action Buttons -->
+<div class="dashboard-section">
+    <h2><i class="fas fa-cog"></i> Quick Actions</h2>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+        <button class="quick-action-btn" onclick="Dashboard.exportDashboardDataAsCSV()">
+            <i class="fas fa-download"></i> Export Data
+        </button>
+        <button class="quick-action-btn" onclick="Dashboard.printDashboardSection('dashboard-section')">
+            <i class="fas fa-print"></i> Print Report
+        </button>
+        <button class="quick-action-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%)">
+            <i class="fas fa-refresh"></i> Refresh Data
+        </button>
+    </div>
+</div>
+
+<script>
+    // Initialize chart scripts
+    window.addEventListener('load', function() {
+        // Trend Chart
+        if (document.getElementById('trendChart') && window.Chart) {
+            Dashboard.createTrendChart(
+                'trendChart',
+                ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'],
+                [65, 78, 72, 88, 92, 87],
+                'Performance Trend'
+            );
+        }
+        
+        // Distribution Chart
+        if (document.getElementById('distributionChart') && window.Chart) {
+            Dashboard.createDistributionChart(
+                'distributionChart',
+                ['Excellent', 'Good', 'Average', 'Fair', 'Poor'],
+                [45, 32, 18, 8, 5],
+                'pie'
+            );
+        }
+    });
+</script>

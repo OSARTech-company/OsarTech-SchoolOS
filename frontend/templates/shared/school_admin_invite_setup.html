@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set School Admin Password</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="container" style="max-width: 760px;">
+        <div class="header">
+            <h1><i class="fas fa-key"></i> Set School Admin Password</h1>
+            <p class="meta-line">Account: {{ invite.username }} | School: {{ invite.school_id }} | Expires: {{ expires_at }}</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <form method="POST" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group">
+                    <label for="new_password">New Password</label>
+                    <input id="new_password" name="new_password" type="password" autocomplete="new-password" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password</label>
+                    <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required>
+                </div>
+                <div class="toolbar">
+                    <button class="btn btn-primary" type="submit"><i class="fas fa-check"></i> Set Password</button>
+                    <a class="btn btn-secondary" href="{{ url_for('login') }}"><i class="fas fa-arrow-left"></i> Back to Login</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
+

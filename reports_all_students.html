@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>All Students Report - Student Score Management System</title>
+    <meta name="description" content="Comprehensive all students performance report with detailed academic analytics.">
+    <link rel="stylesheet" href="static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .report-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: var(--border-radius-xl);
+            box-shadow: 0 25px 50px var(--shadow-heavy);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .report-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: var(--primary-gradient);
+        }
+
+        .report-header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 40px 40px 30px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .report-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: float 8s ease-in-out infinite;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .header-info h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header-meta {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            opacity: 0.95;
+        }
+
+        .meta-item i {
+            font-size: 1.1rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all var(--transition-normal);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .action-btn.primary {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .action-btn.primary:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .action-btn.secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .action-btn.secondary:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .report-content {
+            padding: 40px;
+        }
+
+        .students-section {
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-title i {
+            color: var(--primary-color);
+        }
+
+        .student-card {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            padding: 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 25px var(--shadow-light);
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: all var(--transition-normal);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .student-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--primary-gradient);
+        }
+
+        .student-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px var(--shadow-medium);
+        }
+
+        .student-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .student-info h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .student-meta {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .meta-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .meta-badge.class {
+            background: var(--success-gradient);
+            color: white;
+        }
+
+        .meta-badge.average {
+            background: var(--warning-gradient);
+            color: white;
+        }
+
+        .meta-badge.grade {
+            background: var(--info-gradient);
+            color: white;
+        }
+
+        .meta-badge.status {
+            background: var(--secondary-gradient);
+            color: white;
+        }
+
+        .performance-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            border-radius: var(--border-radius-md);
+            overflow: hidden;
+            box-shadow: 0 4px 15px var(--shadow-light);
+        }
+
+        .performance-table thead {
+            background: var(--primary-gradient);
+            color: white;
+        }
+
+        .performance-table th {
+            padding: 15px 12px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .performance-table td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            font-size: 0.9rem;
+        }
+
+        .performance-table tbody tr:hover {
+            background: rgba(102, 126, 234, 0.02);
+        }
+
+        .performance-table tfoot {
+            background: var(--bg-light);
+            font-weight: 600;
+        }
+
+        .performance-table tfoot th {
+            text-align: right;
+            padding-right: 20px;
+        }
+
+        .subject-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: left;
+        }
+
+        .score-cell {
+            font-weight: 500;
+        }
+
+        .grade-cell {
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .grade-A { color: #27ae60; }
+        .grade-B { color: #3498db; }
+        .grade-C { color: #f39c12; }
+        .grade-D { color: #e67e22; }
+        .grade-F { color: #e74c3c; }
+
+        .report-footer {
+            background: var(--bg-light);
+            padding: 30px 40px;
+            border-top: 1px solid rgba(0,0,0,0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .footer-info {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .footer-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .footer-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color var(--transition-normal);
+        }
+
+        .footer-link:hover {
+            color: var(--secondary-color);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(30px, -30px) rotate(120deg); }
+            66% { transform: translate(-20px, 20px) rotate(240deg); }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        @media print {
+            body { background: white !important; }
+            .report-container { box-shadow: none !important; border: none !important; }
+            .report-header { background: white !important; color: black !important; }
+            .report-header::before { display: none !important; }
+            .action-btn { display: none !important; }
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 15px; }
+
+            .report-header {
+                padding: 30px 20px 20px;
+            }
+
+            .header-info h1 {
+                font-size: 1.8rem;
+            }
+
+            .report-content {
+                padding: 20px;
+            }
+
+            .student-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .performance-table {
+                font-size: 0.8rem;
+            }
+
+            .performance-table th,
+            .performance-table td {
+                padding: 8px 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="report-container fade-in-up">
+        <div class="report-header">
+            <div class="header-content">
+                <div class="header-info">
+                    <h1><i class="fas fa-users"></i> All Students Report</h1>
+                    <div class="header-meta">
+                        <div class="meta-item">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span>Generated: 2026-01-31 01:27</span>
+                        </div>
+                        <div class="meta-item">
+                            <i class="fas fa-school"></i>
+                            <span>Multi-School System</span>
+                        </div>
+                        <div class="meta-item">
+                            <i class="fas fa-chart-line"></i>
+                            <span>Comprehensive Analytics</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="action-btn primary" onclick="window.print()">
+                        <i class="fas fa-print"></i> Print Report
+                    </button>
+                    <button class="action-btn secondary" onclick="exportToPDF()">
+                        <i class="fas fa-file-pdf"></i> Export PDF
+                    </button>
+                    <button class="action-btn secondary" onclick="exportToCSV()">
+                        <i class="fas fa-file-csv"></i> Export CSV
+                    </button>
+                    <button class="action-btn secondary" onclick="exportToExcel()">
+                        <i class="fas fa-file-excel"></i> Export Excel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="report-content">
+            <!-- Executive Summary Dashboard -->
+            <div class="summary-dashboard">
+                <h2 class="section-title">
+                    <i class="fas fa-chart-pie"></i>
+                    Executive Summary
+                </h2>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="metric-content">
+                            <h3>3</h3>
+                            <p>Total Students</p>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="metric-content">
+                            <h3>82.8%</h3>
+                            <p>Average Score</p>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <i class="fas fa-trophy"></i>
+                        </div>
+                        <div class="metric-content">
+                            <h3>100%</h3>
+                            <p>Pass Rate</p>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <div class="metric-content">
+                            <h3>A</h3>
+                            <p>Overall Grade</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-section">
+                    <h3>Performance Distribution</h3>
+                    <svg class="performance-chart" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="50" y="150" width="50" height="30" fill="#27ae60" />
+                        <text x="75" y="170" text-anchor="middle" fill="white" font-size="12">A (3)</text>
+                        <rect x="150" y="150" width="50" height="30" fill="#3498db" />
+                        <text x="175" y="170" text-anchor="middle" fill="white" font-size="12">B (0)</text>
+                        <rect x="250" y="150" width="50" height="30" fill="#f39c12" />
+                        <text x="275" y="170" text-anchor="middle" fill="white" font-size="12">C (0)</text>
+                        <rect x="350" y="150" width="50" height="30" fill="#e74c3c" />
+                        <text x="375" y="170" text-anchor="middle" fill="white" font-size="12">F (0)</text>
+                        <text x="200" y="20" text-anchor="middle" fill="#2c3e50" font-size="16" font-weight="bold">Grade Distribution</text>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="students-section">
+                <h2 class="section-title">
+                    <i class="fas fa-user-graduate"></i>
+                    Student Performance Details
+                </h2>
+
+                <div class="student-card">
+                    <div class="student-header">
+                        <div class="student-info">
+                            <h3>Testy (S001)</h3>
+                            <div class="student-meta">
+                                <span class="meta-badge class">
+                                    <i class="fas fa-school"></i>
+                                    JSS1
+                                </span>
+                                <span class="meta-badge average">
+                                    <i class="fas fa-chart-bar"></i>
+                                    77.5%
+                                </span>
+                                <span class="meta-badge grade grade-A">
+                                    <i class="fas fa-medal"></i>
+                                    Grade A
+                                </span>
+                                <span class="meta-badge status">
+                                    <i class="fas fa-check-circle"></i>
+                                    Passed
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table class="performance-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; width: 15%;">Subject</th>
+                                <th>Test1</th>
+                                <th>Test2</th>
+                                <th>Test3</th>
+                                <th>Total Tests</th>
+                                <th>CBT</th>
+                                <th>Theory</th>
+                                <th>Total Exam</th>
+                                <th>Overall</th>
+                                <th>Grade</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="subject-name">Math</td>
+                                <td class="score-cell">8</td>
+                                <td class="score-cell">7</td>
+                                <td class="score-cell">9</td>
+                                <td class="score-cell">24</td>
+                                <td class="score-cell">25</td>
+                                <td class="score-cell">35</td>
+                                <td class="score-cell">60</td>
+                                <td class="score-cell">84</td>
+                                <td class="grade-cell grade-A">A</td>
+                                <td>Passed</td>
+                            </tr>
+                            <tr>
+                                <td class="subject-name">English</td>
+                                <td class="score-cell">6</td>
+                                <td class="score-cell">7</td>
+                                <td class="score-cell">8</td>
+                                <td class="score-cell">21</td>
+                                <td class="score-cell">20</td>
+                                <td class="score-cell">30</td>
+                                <td class="score-cell">50</td>
+                                <td class="score-cell">71</td>
+                                <td class="grade-cell grade-B">B</td>
+                                <td>Passed</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="8" style="text-align: right; padding-right: 20px;">Average per subject</th>
+                                <th>77.5</th>
+                                <th class="grade-A">A</th>
+                                <th>Passed</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="student-card">
+                    <div class="student-header">
+                        <div class="student-info">
+                            <h3>Stanley Osondu (21/1/522)</h3>
+                            <div class="student-meta">
+                                <span class="meta-badge class">
+                                    <i class="fas fa-school"></i>
+                                    SS2
+                                </span>
+                                <span class="meta-badge average">
+                                    <i class="fas fa-chart-bar"></i>
+                                    87.0%
+                                </span>
+                                <span class="meta-badge grade grade-A">
+                                    <i class="fas fa-medal"></i>
+                                    Grade A
+                                </span>
+                                <span class="meta-badge status">
+                                    <i class="fas fa-check-circle"></i>
+                                    Passed
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table class="performance-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; width: 15%;">Subject</th>
+                                <th>Test1</th>
+                                <th>Test2</th>
+                                <th>Test3</th>
+                                <th>Total Tests</th>
+                                <th>CBT</th>
+                                <th>Theory</th>
+                                <th>Total Exam</th>
+                                <th>Overall</th>
+                                <th>Grade</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="subject-name">maths</td>
+                                <td class="score-cell">9</td>
+                                <td class="score-cell">9</td>
+                                <td class="score-cell">7</td>
+                                <td class="score-cell">25</td>
+                                <td class="score-cell">22</td>
+                                <td class="score-cell">37</td>
+                                <td class="score-cell">59</td>
+                                <td class="score-cell">84</td>
+                                <td class="grade-cell grade-A">A</td>
+                                <td>Passed</td>
+                            </tr>
+                            <tr>
+                                <td class="subject-name">English</td>
+                                <td class="score-cell">9</td>
+                                <td class="score-cell">8</td>
+                                <td class="score-cell">8</td>
+                                <td class="score-cell">25</td>
+                                <td class="score-cell">25</td>
+                                <td class="score-cell">35</td>
+                                <td class="score-cell">60</td>
+                                <td class="score-cell">85</td>
+                                <td class="grade-cell grade-A">A</td>
+                                <td>Passed</td>
+                            </tr>
+                            <tr>
+                                <td class="subject-name">lathin</td>
+                                <td class="score-cell">9</td>
+                                <td class="score-cell">7</td>
+                                <td class="score-cell">7</td>
+                                <td class="score-cell">23</td>
+                                <td class="score-cell">29</td>
+                                <td class="score-cell">40</td>
+                                <td class="score-cell">69</td>
+                                <td class="score-cell">92</td>
+                                <td class="grade-cell grade-A">A</td>
+                                <td>Passed</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="8" style="text-align: right; padding-right: 20px;">Average per subject</th>
+                                <th>87.0</th>
+                                <th class="grade-A">A</th>
+                                <th>Passed</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="student-card">
+                    <div class="student-header">
+                        <div class="student-info">
+                            <h3>Stanley Oson (21/1/520)</h3>
+                            <div class="student-meta">
+                                <span class="meta-badge class">
+                                    <i class="fas fa-school"></i>
+                                    SS2
+                                </span>
+                                <span class="meta-badge average">
+                                    <i class="fas fa-chart-bar"></i>
+                                    84.0%
+                                </span>
+                                <span class="meta-badge grade grade-A">
+                                    <i class="fas fa-medal"></i>
+                                    Grade A
+                                </span>
+                                <span class="meta-badge status">
+                                    <i class="fas fa-check-circle"></i>
+                                    Passed
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table class="performance-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; width: 15%;">Subject</th>
+                                <th>Test1</th>
+                                <th>Test2</th>
+                                <th>Test3</th>
+                                <th>Total Tests</th>
+                                <th>CBT</th>
+                                <th>Theory</th>
+                                <th>Total Exam</th>
+                                <th>Overall</th>
+                                <th>Grade</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="subject-name">maths</td>
+                                <td class="score-cell">9</td>
+                                <td class="score-cell">9</td>
+                                <td class="score-cell">9</td>
+                                <td class="score-cell">27</td>
+                                <td class="score-cell">22</td>
+                                <td class="score-cell">33</td>
+                                <td class="score-cell">55</td>
+                                <td class="score-cell">82</td>
+                                <td class="grade-cell grade-A">A</td>
+                                <td>Passed</td>
+                            </tr>
+                            <tr>
+                                <td class="subject-name">English</td>
+                                <td class="score-cell">9</td>
+                                <td class="score-cell">8</td>
+                                <td class="score-cell">9</td>
+                                <td class="score-cell">26</td>
+                                <td class="score-cell">22</td>
+                                <td class="score-cell">33</td>
+                                <td class="score-cell">55</td>
+                                <td class="score-cell">81</td>
+                                <td class="grade-cell grade-A">A</td>
+                                <td>Passed</td>
+                            </tr>
+                            <tr>
+                                <td class="subject-name">lathin</td>
+                                <td class="score-cell">9</td>
+                                <td class="score-cell">7</td>
+                                <td class="score-cell">9</td>
+                                <td class="score-cell">25</td>
+                                <td class="score-cell">25</td>
+                                <td class="score-cell">39</td>
+                                <td class="score-cell">64</td>
+                                <td class="score-cell">89</td>
+                                <td class="grade-cell grade-A">A</td>
+                                <td>Passed</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="8" style="text-align: right; padding-right: 20px;">Average per subject</th>
+                                <th>84.0</th>
+                                <th class="grade-A">A</th>
+                                <th>Passed</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="report-footer">
+            <div class="footer-info">
+                <i class="fas fa-info-circle"></i>
+                Report generated by Student Score Management System
+            </div>
+            <div class="footer-actions">
+                <a href="/view_students" class="footer-link">
+                    <i class="fas fa-arrow-left"></i> Back to Students
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Advanced animations and micro-interactions
+        document.addEventListener('DOMContentLoaded', function() {
+            // Intersection Observer for scroll animations
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.animationPlayState = 'running';
+                    }
+                });
+            }, observerOptions);
+
+            // Observe all animated elements
+            document.querySelectorAll('.student-card, .metric-card, .chart-section').forEach(el => {
+                el.style.animationPlayState = 'paused';
+                observer.observe(el);
+            });
+
+            // Search and filter functionality
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.placeholder = 'Search students...';
+            searchInput.className = 'search-input';
+            searchInput.style.cssText = `
+                width: 100%;
+                max-width: 400px;
+                padding: 12px 20px;
+                border: 2px solid var(--primary-color);
+                border-radius: 25px;
+                font-size: 1rem;
+                margin-bottom: 20px;
+                outline: none;
+                transition: all 0.3s ease;
+            `;
+
+            searchInput.addEventListener('focus', function() {
+                this.style.borderColor = '#764ba2';
+                this.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
+            });
+
+            searchInput.addEventListener('blur', function() {
+                this.style.borderColor = 'var(--primary-color)';
+                this.style.boxShadow = 'none';
+            });
+
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const studentCards = document.querySelectorAll('.student-card');
+
+                studentCards.forEach(card => {
+                    const studentName = card.querySelector('h3').textContent.toLowerCase();
+                    if (studentName.includes(searchTerm)) {
+                        card.style.display = 'block';
+                        card.style.animation = 'fadeInUp 0.5s ease-out';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+
+            // Insert search input before students section
+            const studentsSection = document.querySelector('.students-section');
+            studentsSection.insertBefore(searchInput, studentsSection.firstChild.nextSibling);
+
+            // Export functions (simulated)
+            window.exportToPDF = function() {
+                alert('PDF export functionality would be implemented here. This would generate a downloadable PDF version of the report.');
+            };
+
+            window.exportToCSV = function() {
+                alert('CSV export functionality would be implemented here. This would generate a downloadable CSV file with all student data.');
+            };
+
+            window.exportToExcel = function() {
+                alert('Excel export functionality would be implemented here. This would generate a downloadable Excel spreadsheet.');
+            };
+
+            // Performance insights
+            const insights = document.createElement('div');
+            insights.className = 'performance-insights';
+            insights.style.cssText = `
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 30px;
+                border-radius: var(--border-radius-lg);
+                margin-bottom: 40px;
+                box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            `;
+            insights.innerHTML = `
+                <h3 style="margin-bottom: 15px; font-size: 1.5rem;"><i class="fas fa-lightbulb"></i> Performance Insights</h3>
+                <ul style="list-style: none; padding: 0;">
+                    <li style="margin-bottom: 10px;"><i class="fas fa-check-circle" style="margin-right: 10px;"></i> All students achieved Grade A performance</li>
+                    <li style="margin-bottom: 10px;"><i class="fas fa-chart-line" style="margin-right: 10px;"></i> Mathematics shows consistent high performance across all students</li>
+                    <li style="margin-bottom: 10px;"><i class="fas fa-trophy" style="margin-right: 10px;"></i> 100% pass rate indicates excellent overall academic standards</li>
+                    <li><i class="fas fa-users" style="margin-right: 10px;"></i> Student performance varies by class level, with SS2 showing highest averages</li>
+                </ul>
+            `;
+
+            // Insert insights after summary dashboard
+            const summaryDashboard = document.querySelector('.summary-dashboard');
+            summaryDashboard.appendChild(insights);
+
+            // Accessibility enhancements
+            document.querySelectorAll('.action-btn, .footer-link').forEach(btn => {
+                btn.setAttribute('tabindex', '0');
+                btn.setAttribute('role', 'button');
+                if (!btn.getAttribute('aria-label')) {
+                    btn.setAttribute('aria-label', btn.textContent.trim());
+                }
+            });
+
+            // Keyboard navigation for cards
+            document.querySelectorAll('.student-card').forEach(card => {
+                card.setAttribute('tabindex', '0');
+                card.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        this.click();
+                    }
+                });
+            });
+        });
+
+        // Advanced hover effects
+        document.addEventListener('mousemove', function(e) {
+            const cards = document.querySelectorAll('.student-card, .metric-card');
+            cards.forEach(card => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    const rotateX = (y - centerY) / 10;
+                    const rotateY = (centerX - x) / 10;
+
+                    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(10px)`;
+                } else {
+                    card.style.transform = '';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

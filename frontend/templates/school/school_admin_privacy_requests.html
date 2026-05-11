@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Privacy Requests</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+{% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'privacy_requests' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1><i class="fas fa-user-shield"></i> Data Requests Review</h1>
+                <p class="meta-line"><strong>Last Login:</strong> {{ last_login_at }}</p>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <form method="GET" class="toolbar">
+                    <div>
+                        <label>Queue</label>
+                        <select name="queue">
+                            <option value="pending_school" {% if queue_filter == 'pending_school' %}selected{% endif %}>Pending School Review</option>
+                            <option value="pending_super" {% if queue_filter == 'pending_super' %}selected{% endif %}>Pending Super Admin</option>
+                            <option value="approved" {% if queue_filter == 'approved' %}selected{% endif %}>Approved</option>
+                            <option value="resolved" {% if queue_filter == 'resolved' %}selected{% endif %}>Resolved</option>
+                            <option value="rejected" {% if queue_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+                            <option value="all" {% if queue_filter == 'all' %}selected{% endif %}>All</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Search</label>
+                        <input type="text" name="q" value="{{ text_filter or '' }}" placeholder="request ID / user / subject">
+                    </div>
+                    <div>
+                        <label>Rows</label>
+                        <select name="per_page">
+                            {% for opt in [10, 25, 50, 100] %}
+                            <option value="{{ opt }}" {% if per_page == opt %}selected{% endif %}>{{ opt }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Apply</button>
+                    <a href="{{ url_for('school_admin_privacy_requests') }}" class="btn">Reset</a>
+                </form>
+                <p class="muted" style="margin-top: 8px;">Total: {{ total_rows }}</p>
+                <p class="muted no-margin" style="margin-top: 4px;">
+                    Flow: User submits -> School admin reviews -> Super admin finalizes/apply.
+                </p>
+            </div>
+
+            {% if requests_data %}
+                {% for row in requests_data %}
+                <div class="school-card">
+                    <div class="school-card-main">
+                        <div class="school-name">{{ row.request_id }}</div>
+                        <div class="school-meta">
+                            Type: <strong>{{ row.request_type|title }}</strong> |
+                            Main Status: <strong>{{ row.status|title }}</strong> |
+                            School Review: <strong>{{ row.school_review_status|title }}</strong> |
+                            User: {{ row.role or '-' }} / {{ row.user_id or '-' }} |
+                            Submitted: {{ row.created_at or '-' }}
+                        </div>
+                        {% if row.subject_line %}
+                        <div class="school-meta"><strong>Subject:</strong> {{ row.subject_line }}</div>
+                        {% endif %}
+                        <div class="school-meta"><strong>Details:</strong> {{ row.details }}</div>
+                        {% if row.request_payload %}
+                        <div class="school-meta"><strong>Payload:</strong> {{ row.request_payload }}</div>
+                        {% endif %}
+                        {% if row.school_review_note %}
+                        <div class="school-meta"><strong>School Review Note:</strong> {{ row.school_review_note }}</div>
+                        {% endif %}
+                        {% if row.resolution_note %}
+                        <div class="school-meta"><strong>Final Resolution Note:</strong> {{ row.resolution_note }}</div>
+                        {% endif %}
+                        {% if row.school_reviewed_by %}
+                        <div class="school-meta"><strong>Reviewed By:</strong> {{ row.school_reviewed_by }} at {{ row.school_reviewed_at or '-' }}</div>
+                        {% endif %}
+                        {% if row.resolved_by %}
+                        <div class="school-meta"><strong>Resolved By:</strong> {{ row.resolved_by }} at {{ row.resolved_at or '-' }}</div>
+                        {% endif %}
+                        {% if row.status == 'pending' and row.school_review_status == 'pending' %}
+                        <form method="POST" action="{{ url_for('school_admin_privacy_requests_review') }}" class="inline-form super-admin-inline-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="request_id" value="{{ row.request_id }}">
+                            <input type="hidden" name="queue" value="{{ queue_filter }}">
+                            <input type="hidden" name="q" value="{{ text_filter or '' }}">
+                            <input type="hidden" name="page" value="{{ page }}">
+                            <input type="hidden" name="per_page" value="{{ per_page }}">
+                            <select name="decision" required>
+                                <option value="approved">Approve for Super Admin</option>
+                                <option value="rejected">Reject Request</option>
+                            </select>
+                            <input type="text" name="note" placeholder="Review note (minimum 8 chars)" minlength="8" required>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Submit Review</button>
+                        </form>
+                        {% elif row.status == 'pending' and row.school_review_status == 'approved' %}
+                        <p class="muted no-margin" style="margin-top: 8px;"><i class="fas fa-clock"></i> Waiting for super-admin final action.</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="card"><p class="no-margin">No data requests found for this queue.</p></div>
+            {% endif %}
+
+            {% if total_pages > 1 %}
+            <div class="card">
+                <div class="pagination-bar" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    {% if page > 1 %}
+                    <a class="btn btn-sm" href="{{ url_for('school_admin_privacy_requests', queue=queue_filter, q=text_filter, per_page=per_page, page=page-1) }}">Previous</a>
+                    {% endif %}
+                    <span>Page {{ page }} / {{ total_pages }}</span>
+                    {% if page < total_pages %}
+                    <a class="btn btn-sm" href="{{ url_for('school_admin_privacy_requests', queue=queue_filter, q=text_filter, per_page=per_page, page=page+1) }}">Next</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+

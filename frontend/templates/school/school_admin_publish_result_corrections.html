@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Correct Published Results - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      body { min-height: 100vh; }
+      .container { width: min(1120px, 100%); margin: 0 auto; padding: 24px; }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .header h1 { margin: 0; font-size: 1.7rem; }
+      .header .back { color: white; text-decoration: none; font-weight: 700; }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% set active_page = 'publish_results' %}
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-pen"></i> Correct Result - {{ classname }} ({{ term }})</h1>
+            <a href="{{ url_for('school_admin_publish_results') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Publish Results</a>
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          <div class="card">
+            <h2><i class="fas fa-users"></i> Published Students</h2>
+            {% if students %}
+            <div class="table-scroll">
+              <table class="assignment-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Student ID</th>
+                    <th>Average</th>
+                    <th>Grade</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in students %}
+                  <tr>
+                    <td>{{ row.firstname }}</td>
+                    <td>{{ row.student_id }}</td>
+                    <td>{{ '%.2f'|format(row.average_marks or 0) }}</td>
+                    <td>{{ row.grade or '-' }}</td>
+                    <td>{{ row.status or '-' }}</td>
+                    <td>
+                      <a class="btn btn-primary btn-sm" href="{{ url_for('school_admin_correct_result', student_id=row.student_id, term=term_token) }}">
+                        Open Correction
+                      </a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <p>No published students found for {{ classname }} ({{ term }}).</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+      {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+
+

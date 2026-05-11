@@ -1,0 +1,64 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Integrity</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'data_integrity' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Data Integrity Checks</h1>
+        <p><a class="btn" href="{{ url_for('school_admin_dashboard') }}">Back to Dashboard</a></p>
+    </div>
+    <div class="card">
+        <form method="get" class="toolbar">
+            <div><label>Term</label>
+                <select name="term">
+                    {% for t in ['First Term','Second Term','Third Term'] %}
+                    <option value="{{ t }}" {% if selected_term == t %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div><label>Academic Year</label><input name="academic_year" value="{{ selected_year }}"></div>
+            <button class="btn btn-secondary" type="submit">Run Checks</button>
+        </form>
+    </div>
+    <div class="card">
+        <h2>Summary</h2>
+        <p><strong>Total checks:</strong> {{ summary.total_checks if summary else 0 }}</p>
+        <p><strong>Issues found:</strong> {{ summary.issue_count if summary else 0 }}</p>
+    </div>
+    <div class="card">
+        <h2>Issues</h2>
+        <table>
+            <thead><tr><th>Severity</th><th>Issue</th><th>Recommended Action</th></tr></thead>
+            <tbody>
+            {% for issue in (issues or []) %}
+            <tr>
+                <td>{{ issue.severity }}</td>
+                <td>{{ issue.message }}</td>
+                <td>{{ issue.hint }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3">No integrity issue found for selected context.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+
+

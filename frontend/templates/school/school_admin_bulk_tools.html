@@ -1,0 +1,189 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Tools</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'bulk' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Bulk Import / Export / Backup</h1>
+        <p><a class="btn" href="{{ url_for('school_admin_dashboard') }}">Back to Dashboard</a></p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+    {% if error_token %}
+    <div class="card">
+        <p><strong>Import Error Report:</strong> Some rows failed validation.</p>
+        <a class="btn btn-danger" href="{{ url_for('school_admin_import_csv_error_rows', token=error_token) }}">Download Error Rows CSV</a>
+        <a class="btn btn-secondary ml-10" href="{{ url_for('school_admin_import_csv_error_preview', token=error_token) }}">View Full Error Table</a>
+        {% if error_preview_rows %}
+        <div class="mt-10">
+            <button type="button" class="btn btn-secondary btn-sm" id="toggle-error-preview">Hide Preview</button>
+        </div>
+        <div class="table-wrap mt-10" id="error-preview-table" style="display:none;">
+            <table class="list-table">
+                <thead>
+                    <tr>
+                        {% for header in error_preview_headers %}
+                        <th>{{ header }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in error_preview_rows %}
+                    <tr>
+                        {% for header in error_preview_headers %}
+                        <td>{{ row.get(header, '') }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if error_preview_truncated %}
+        <p class="note" id="error-preview-note" style="display:none;">Preview shows first 5 error rows. Download the CSV for full details.</p>
+        {% endif %}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Storage Usage</h2>
+        <p><strong>Used:</strong> {{ storage_usage.used_mb if storage_usage else 0 }} MB / {{ storage_usage.quota_mb if storage_usage else 0 }} MB</p>
+        <p><strong>Usage:</strong> {{ storage_usage.pct if storage_usage else 0 }}%</p>
+        {% if storage_usage and storage_usage.pct >= 90 %}
+        <div class="flash error">Storage is above 90%. Clean old attachments/backups soon.</div>
+        {% elif storage_usage and storage_usage.pct >= 75 %}
+        <div class="flash warning">Storage is above 75%. Monitor usage.</div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Export CSV</h2>
+        <a class="btn" href="{{ url_for('school_admin_export_target', target='students') }}">Export Students</a>
+        <a class="btn ml-10" href="{{ url_for('school_admin_export_target', target='teachers') }}">Export Teachers</a>
+        <a class="btn ml-10" href="{{ url_for('school_admin_export_target', target='class_assignments') }}">Export Class Assignments</a>
+    </div>
+
+    <div class="card">
+        <h2>Import CSV</h2>
+        {% if last_import_error_token %}
+        <div class="flash warning">
+            <strong>Last Import Report:</strong>
+            {{ last_import_target|default('')|replace('_', ' ')|title }} -
+            {{ last_import_failed_rows or 0 }} failed row(s).
+            {% if last_import_at %}({{ last_import_at }}){% endif %}
+            <a class="btn btn-secondary btn-sm ml-10" href="{{ url_for('school_admin_import_report') }}">Open Report</a>
+        </div>
+        {% endif %}
+        <p class="note">Students columns: student_id (optional, leave blank to auto-generate), firstname (or student_name/name), lastname/surname (optional), email (optional), date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects, promoted, parent_phone, parent_phone_2</p>
+        <form method="post" action="{{ url_for('school_admin_import_target', target='students') }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="file" name="file" accept=".csv" required>
+            <label style="margin-left:10px;"><input type="checkbox" name="dry_run" value="1"> Dry run only</label>
+            <button class="btn btn-primary" type="submit">Import Students CSV</button>
+        </form>
+        <hr>
+        <p class="note">Teachers columns: user_id, firstname, lastname, phone, gender, assigned_classes, subjects_taught</p>
+        <form method="post" action="{{ url_for('school_admin_import_target', target='teachers') }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="file" name="file" accept=".csv" required>
+            <label style="margin-left:10px;"><input type="checkbox" name="dry_run" value="1"> Dry run only</label>
+            <button class="btn btn-primary" type="submit">Import Teachers CSV</button>
+        </form>
+        <hr>
+        <p class="note">Class assignments columns: teacher_id, classname, term, academic_year</p>
+        <form method="post" action="{{ url_for('school_admin_import_target', target='class_assignments') }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="file" name="file" accept=".csv" required>
+            <label style="margin-left:10px;"><input type="checkbox" name="dry_run" value="1"> Dry run only</label>
+            <button class="btn btn-primary" type="submit">Import Class Assignments CSV</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Backup / Restore</h2>
+        {% if backup_health %}
+        <p class="note"><strong>Backup Exports (30d):</strong> {{ backup_health.exports }}</p>
+        <p class="note"><strong>Restore Runs (30d):</strong> {{ backup_health.restores }} | <strong>Dry-runs:</strong> {{ backup_health.restore_dry_runs }}</p>
+        {% if backup_health.is_overdue %}
+        <div class="flash warning">Backup is overdue. Run a backup now.</div>
+        {% endif %}
+        {% endif %}
+        <a class="btn btn-secondary" href="{{ url_for('school_admin_backup') }}">Download Full JSON Backup</a>
+        <form method="post" action="{{ url_for('school_admin_backup_encrypted') }}" class="mt-12">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="password" name="backup_passphrase" placeholder="Backup passphrase (min 8 chars)" minlength="8" required>
+            <button class="btn btn-secondary" type="submit">Download Encrypted Backup</button>
+        </form>
+        <form method="post" action="{{ url_for('school_admin_restore') }}" enctype="multipart/form-data" class="mt-12">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="file" name="backup_file" accept=".json,application/json" required>
+            <input type="password" name="backup_passphrase" placeholder="Passphrase (only for encrypted backup)">
+            <select name="mode">
+                <option value="merge">Merge</option>
+                <option value="replace">Replace Existing</option>
+            </select>
+            <label style="margin-left:10px;"><input type="checkbox" name="dry_run" value="1"> Dry-run verify only</label>
+            <button class="btn btn-danger" type="submit">Restore Backup</button>
+        </form>
+        <hr>
+        <h3>Backup Schedule</h3>
+        <form method="post" action="{{ url_for('school_admin_backup_schedule') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="frequency_days">
+                <option value="1" {% if backup_schedule and backup_schedule.frequency_days == 1 %}selected{% endif %}>Daily</option>
+                <option value="7" {% if backup_schedule and backup_schedule.frequency_days == 7 %}selected{% endif %}>Weekly</option>
+                <option value="30" {% if backup_schedule and backup_schedule.frequency_days == 30 %}selected{% endif %}>Monthly</option>
+            </select>
+            <label style="margin-left:10px;">
+                <input type="checkbox" name="encrypted_by_default" value="1" {% if backup_schedule and backup_schedule.encrypted_by_default %}checked{% endif %}>
+                Encrypted by default
+            </label>
+            <button class="btn btn-primary" type="submit">Save Schedule</button>
+        </form>
+        <p class="note">Last backup: {{ backup_schedule.last_backup_at if backup_schedule else 'N/A' }}</p>
+        <p class="note">Next due: {{ backup_schedule.next_due_at if backup_schedule and backup_schedule.next_due_at else 'Not scheduled yet' }}</p>
+    </div>
+</div>
+    </div>
+</div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+        (function () {
+            const toggleBtn = document.getElementById('toggle-error-preview');
+            const table = document.getElementById('error-preview-table');
+            const note = document.getElementById('error-preview-note');
+            if (!toggleBtn || !table) {
+                return;
+            }
+            toggleBtn.textContent = 'Show Preview';
+            toggleBtn.addEventListener('click', function () {
+                const isHidden = table.style.display === 'none';
+                table.style.display = isHidden ? '' : 'none';
+                if (note) {
+                    note.style.display = isHidden ? '' : 'none';
+                }
+                toggleBtn.textContent = isHidden ? 'Hide Preview' : 'Show Preview';
+            });
+        })();
+    </script>
+</body>
+</html>
+
+

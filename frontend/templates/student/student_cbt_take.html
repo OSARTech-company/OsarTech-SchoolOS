@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take CBT - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .container { width: min(1320px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.85rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .meta-strip { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+        .meta-chip { border-radius: 999px; padding: 6px 12px; border: 1px solid #cfe0f8; background: #eef5ff; color: #1f3b5c; font-size: 0.86rem; }
+        .timer-box { font-size: 1rem; font-weight: 700; color: #0f2f53; }
+        .muted { color: #64748b; font-size: 0.9rem; }
+
+        .exam-layout-wrap {
+            width: 100%;
+            overflow-x: auto;
+            padding-bottom: 6px;
+        }
+        .exam-layout {
+            display: grid;
+            grid-template-columns: 1.15fr 2.25fr 1fr;
+            gap: 14px;
+            align-items: start;
+            min-width: 980px;
+        }
+        .exam-panel {
+            background: #f9fbff;
+            border: 1px solid #dbe5f2;
+            border-radius: 14px;
+            padding: 14px;
+        }
+        .exam-panel h3 {
+            margin: 0 0 10px;
+            color: #14365e;
+            font-size: 1.02rem;
+        }
+        .left-timer {
+            border-radius: 12px;
+            background: #0f2f53;
+            color: #fff;
+            border: 2px solid #8ec2ff;
+            padding: 12px 14px;
+            margin-bottom: 12px;
+        }
+        .left-timer .label {
+            font-size: 0.78rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            opacity: 0.92;
+            margin-bottom: 4px;
+        }
+        .left-timer .value {
+            font-size: 2rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+        .image-box {
+            min-height: 240px;
+            border: 1px dashed #b9cbe4;
+            border-radius: 12px;
+            background: #eef4ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            overflow: hidden;
+            padding: 8px;
+        }
+        .image-box img {
+            max-width: 100%;
+            max-height: 320px;
+            border-radius: 10px;
+            object-fit: contain;
+            display: block;
+        }
+        .image-empty {
+            color: #60728a;
+            font-weight: 700;
+        }
+
+        .question-pane { display: none; }
+        .question-pane.active { display: block; }
+        .question-title { font-size: 1.08rem; color: #14365e; margin-bottom: 10px; font-weight: 800; line-height: 1.45; }
+        .question-meta { margin-bottom: 10px; }
+        .option-row { display: block; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: #fff; cursor: pointer; }
+        .option-row.correct { border-color: #16a34a; background: #ecfdf5; }
+        .option-row.wrong { border-color: #dc2626; background: #fef2f2; }
+        .option-row input { margin-right: 8px; }
+        .typed-answer {
+            width: 100%;
+            margin-top: 8px;
+            border-radius: 8px;
+            border: 1px solid #cfd9e8;
+            padding: 10px 12px;
+            min-height: 44px;
+            font-size: 1rem;
+        }
+        .nav-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid #dbe5f2;
+        }
+
+        .quick-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+            gap: 8px;
+        }
+        .qbox {
+            height: 38px;
+            border: 1px solid #c8d8ee;
+            border-radius: 8px;
+            background: #ffffff;
+            color: #123964;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all .15s ease;
+        }
+        .qbox:hover { transform: translateY(-1px); border-color: #8fb0da; }
+        .qbox.current { background: #123e78; color: #fff; border-color: #123e78; }
+        .qbox.answered { background: #dbeafe; border-color: #93c5fd; }
+
+        .timeup-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .timeup-modal .modal-card {
+            background: #ffffff;
+            border-radius: 14px;
+            padding: 20px;
+            width: min(92vw, 360px);
+            text-align: center;
+            border: 1px solid #dbe5f2;
+        }
+        .timeup-modal h3 { margin: 0 0 8px; color: #991b1b; }
+        .timeup-modal p { margin: 0 0 14px; color: #334155; }
+
+        @media (max-width: 1120px) {
+            .image-box { min-height: 180px; }
+            .left-timer .value { font-size: 1.65rem; }
+            .quick-grid { grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); }
+        }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+<div class="app-shell topbar-layout">
+    <div class="side-taskbar">
+        <div class="side-brand">
+            <img src="{{ url_for('static', filename='img/osartech-logo.png', v='20260411b') }}" alt="Osartech Logo" class="brand-logo">
+            <span>Student</span>
+        </div>
+        <div class="side-links">
+            {% if session.get('cbt_only') %}
+            <a href="{{ url_for('student_cbt') }}" class="side-link active">
+                <i class="fas fa-laptop-code"></i>
+                <span>CBT</span>
+            </a>
+            <form method="post" action="{{ url_for('logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="side-link side-link-logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </form>
+            {% else %}
+            <a href="{{ url_for('student_dashboard') }}" class="side-link">
+                <i class="fas fa-home"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="{{ url_for('student_messages') }}" class="side-link">
+                <i class="fas fa-bell"></i>
+                <span>Messages</span>
+            </a>
+            <a href="{{ url_for('student_view_result') }}" class="side-link">
+                <i class="fas fa-chart-bar"></i>
+                <span>View Results</span>
+            </a>
+            <a href="{{ url_for('student_cbt') }}" class="side-link active">
+                <i class="fas fa-laptop-code"></i>
+                <span>CBT</span>
+            </a>
+            <a href="{{ url_for('student_profile') }}" class="side-link">
+                <i class="fas fa-user"></i>
+                <span>Profile</span>
+            </a>
+            <a href="{{ url_for('student_subject_requests') }}" class="side-link">
+                <i class="fas fa-book"></i>
+                <span>Subject Requests</span>
+            </a>
+            <a href="{{ url_for('student_change_password') }}" class="side-link">
+                <i class="fas fa-key"></i>
+                <span>Change Password</span>
+            </a>
+            <a href="{{ url_for('help', role='student') }}" class="side-link">
+                <i class="fas fa-question-circle"></i>
+                <span>Help</span>
+            </a>
+            <form method="post" action="{{ url_for('logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="side-link side-link-logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1><i class="fas fa-pencil-ruler"></i> {{ test.title }}</h1>
+                <a href="{{ url_for('student_cbt') }}" class="back"><i class="fas fa-arrow-left"></i> Back to CBT List</a>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="meta-strip">
+                <span class="meta-chip">Class: {{ test.classname }}</span>
+                <span class="meta-chip">Subject: {{ test.subject }}</span>
+                <span class="meta-chip">Term: {{ test.term }} {{ test.academic_year }}</span>
+                <span class="meta-chip">Questions: {{ questions_required or 0 }} of {{ question_pool_size or 0 }}</span>
+                <span class="meta-chip">Marks: {{ '%.2f'|format(test.total_marks or 0) }}</span>
+                <span class="meta-chip">Duration: {{ (duration_seconds // 60)|int }}m {{ (duration_seconds % 60)|int }}s</span>
+                {% if (extra_minutes or 0) > 0 or (extra_percent or 0) > 0 %}
+                <span class="meta-chip">Accessibility Extra Time: +{{ extra_minutes or 0 }}m / +{{ extra_percent or 0 }}%</span>
+                {% endif %}
+                <span class="meta-chip">Integrity Monitoring: On</span>
+                {% if not is_submitted and test.status|lower == 'published' %}
+                <span class="meta-chip timer-box">Time Left: <span id="cbtTimer">{{ (remaining_seconds // 60)|int }}:{{ '%02d'|format((remaining_seconds % 60)|int) }}</span></span>
+                <span class="meta-chip" id="cbtDraftStatus">Draft: saving...</span>
+                {% endif %}
+            </div>
+
+            {% if test.instructions %}
+            <div class="card">
+                <h2><i class="fas fa-info-circle"></i> Instructions</h2>
+                <p>{{ test.instructions }}</p>
+            </div>
+            {% endif %}
+
+            {% if is_submitted %}
+            <div class="card">
+                <h2><i class="fas fa-check-circle"></i> Submission Summary</h2>
+                <p><strong>Status:</strong> Submitted</p>
+                <p><strong>Score:</strong> {{ '%.2f'|format(attempt.score or 0) }} / {{ '%.2f'|format(attempt.total_marks or test.total_marks or 0) }}</p>
+                <p><strong>Total Questions:</strong> {{ total_count or (attempt.total_questions or questions_required or questions|length) }}</p>
+                <p><strong>Attempted:</strong> {{ attempted_count or 0 }}</p>
+                <p><strong>Correct:</strong> {{ correct_count or 0 }}</p>
+                <p><strong>Wrong:</strong> {{ wrong_count or 0 }}</p>
+                {% if attempt.submitted_at %}
+                <p><strong>Submitted At:</strong> {{ attempt.submitted_at }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <form method="post" id="studentCbtForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="integrity_events_json" id="cbtIntegrityEvents" value="[]">
+                <input type="hidden" name="remaining_seconds" id="cbtRemainingSeconds" value="{{ remaining_seconds|int }}">
+                <button type="submit" id="cbtRealSubmit" hidden aria-hidden="true"></button>
+
+                <div class="exam-layout-wrap">
+                <div class="exam-layout">
+                    <aside class="exam-panel">
+                        <h3><i class="fas fa-image"></i> Question Image</h3>
+                        {% if not is_submitted and test.status|lower == 'published' %}
+                        <div class="left-timer" aria-live="polite" aria-atomic="true">
+                            <div class="label">Time Left</div>
+                            <div class="value" id="cbtTimerBold">--:--</div>
+                        </div>
+                        {% endif %}
+                        <div class="image-box" id="cbtImageBox">
+                            <span class="image-empty">No image for this question</span>
+                        </div>
+                    </aside>
+
+                    <section class="exam-panel">
+                        <h3><i class="fas fa-pen"></i> Question Workspace</h3>
+
+                        {% for q in questions %}
+                        {% set answer = answer_map.get(q.question_no, {}) %}
+                        {% set qtype = (q.question_type or 'mcq4') %}
+                        {% set q_image = (q.question_image_url or q.question_image or q.image_url or q.image or '') %}
+                        <div
+                            class="question-pane {% if loop.first %}active{% endif %}"
+                            data-q-index="{{ loop.index0 }}"
+                            data-q-total="{{ questions|length }}"
+                            data-q-no="{{ q.question_no }}"
+                            data-q-image="{{ q_image }}"
+                        >
+                            <div class="question-title">Q{{ loop.index }}. {{ q.question_text }}</div>
+                            <p class="muted question-meta">Question Time: {{ q.time_seconds or 60 }} seconds</p>
+
+                            {% if qtype == 'fill_blank' %}
+                            {% set typed_val = answer.get('selected_option', '') %}
+                            <label class="option-row {% if is_submitted and answer.get('is_correct') %}correct{% elif is_submitted and typed_val %}wrong{% endif %}">
+                                <strong>Fill in the Answer:</strong>
+                                <input
+                                    type="text"
+                                    class="typed-answer"
+                                    name="q_{{ q.question_no }}"
+                                    value="{{ typed_val }}"
+                                    maxlength="500"
+                                    placeholder="Type your answer"
+                                    {% if is_submitted or test.status|lower != 'published' %}disabled{% endif %}
+                                >
+                            </label>
+                            {% if is_submitted %}
+                            <p class="muted"><strong>Expected:</strong> {{ q.correct_text or '-' }}</p>
+                            {% if q.accepted_answers %}
+                            <p class="muted"><strong>Also accepted:</strong> {{ q.accepted_answers }}</p>
+                            {% endif %}
+                            {% endif %}
+                            {% elif qtype == 'true_false' %}
+                            {% for opt in ['A', 'B'] %}
+                            {% set option_text = q['option_' ~ opt|lower] %}
+                            {% set is_selected = (answer.get('selected_option', '') == opt) %}
+                            {% set is_correct = (q.correct_option == opt) %}
+                            {% set row_class = '' %}
+                            {% if is_submitted and is_correct %}
+                            {% set row_class = 'correct' %}
+                            {% elif is_submitted and is_selected and not is_correct %}
+                            {% set row_class = 'wrong' %}
+                            {% endif %}
+                            <label class="option-row {{ row_class }}">
+                                <input
+                                    type="radio"
+                                    name="q_{{ q.question_no }}"
+                                    value="{{ opt }}"
+                                    {% if is_selected %}checked{% endif %}
+                                    {% if is_submitted or test.status|lower != 'published' %}disabled{% endif %}
+                                >
+                                <strong>{{ opt }}.</strong> {{ option_text }}
+                                {% if is_submitted and is_correct %}
+                                <span class="muted"> (Correct)</span>
+                                {% endif %}
+                            </label>
+                            {% endfor %}
+                            {% else %}
+                            {% for opt in ['A', 'B', 'C', 'D'] %}
+                            {% set option_text = q['option_' ~ opt|lower] %}
+                            {% set is_selected = (answer.get('selected_option', '') == opt) %}
+                            {% set is_correct = (q.correct_option == opt) %}
+                            {% set row_class = '' %}
+                            {% if is_submitted and is_correct %}
+                            {% set row_class = 'correct' %}
+                            {% elif is_submitted and is_selected and not is_correct %}
+                            {% set row_class = 'wrong' %}
+                            {% endif %}
+                            <label class="option-row {{ row_class }}">
+                                <input
+                                    type="radio"
+                                    name="q_{{ q.question_no }}"
+                                    value="{{ opt }}"
+                                    {% if is_selected %}checked{% endif %}
+                                    {% if is_submitted or test.status|lower != 'published' %}disabled{% endif %}
+                                >
+                                <strong>{{ opt }}.</strong> {{ option_text }}
+                                {% if is_submitted and is_correct %}
+                                <span class="muted"> (Correct)</span>
+                                {% endif %}
+                            </label>
+                            {% endfor %}
+                            {% endif %}
+
+                            {% if is_submitted and q.explanation %}
+                            <p class="muted"><strong>Explanation:</strong> {{ q.explanation }}</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+
+                        <div class="nav-actions" id="cbtNavActions"></div>
+                    </section>
+
+                    <aside class="exam-panel">
+                        <h3><i class="fas fa-th"></i> Questions</h3>
+                        <p class="muted">Tap a number to jump.</p>
+                        <div class="quick-grid" id="cbtQuickGrid">
+                            {% for q in questions %}
+                            <button
+                                type="button"
+                                class="qbox {% if loop.first %}current{% endif %}"
+                                data-jump-index="{{ loop.index0 }}"
+                            >
+                                {{ loop.index }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </aside>
+                </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<div id="cbtTimeUpModal" class="timeup-modal" role="dialog" aria-modal="true" aria-labelledby="timeUpTitle">
+    <div class="modal-card">
+        <h3 id="timeUpTitle"><i class="fas fa-clock"></i> Time Up</h3>
+        <p id="cbtTimeUpMessage">Your CBT time has ended. Click OK to submit now.</p>
+        <button type="button" id="timeUpSubmitBtn" class="btn btn-primary">OK, Submit</button>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+<script>
+    (function () {
+        var form = document.getElementById('studentCbtForm');
+        if (!form) return;
+        var panes = Array.prototype.slice.call(document.querySelectorAll('.question-pane'));
+        var navHost = document.getElementById('cbtNavActions');
+        var jumpButtons = Array.prototype.slice.call(document.querySelectorAll('.qbox[data-jump-index]'));
+        var imageBox = document.getElementById('cbtImageBox');
+        var canSubmit = {{ 'true' if (not is_submitted and (test.status|lower == 'published')) else 'false' }};
+        if (!panes.length || !navHost) return;
+
+        var currentIndex = 0;
+        for (var i = 0; i < panes.length; i += 1) {
+            if (panes[i].classList.contains('active')) {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        function isAnswered(pane) {
+            if (!pane) return false;
+            var txt = pane.querySelector('input[type="text"], textarea');
+            if (txt && String(txt.value || '').trim()) return true;
+            var checked = pane.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked');
+            return !!checked;
+        }
+
+        function updateImageFor(index) {
+            if (!imageBox) return;
+            var pane = panes[index];
+            if (!pane) return;
+            var src = String(pane.getAttribute('data-q-image') || '').trim();
+            if (!src) {
+                imageBox.innerHTML = '<span class="image-empty">No image for this question</span>';
+                return;
+            }
+            imageBox.innerHTML = '<img src="' + src.replace(/"/g, '&quot;') + '" alt="Question image">';
+        }
+
+        function paintQuestionBoxes() {
+            jumpButtons.forEach(function (btn) {
+                var idx = Number(btn.getAttribute('data-jump-index') || -1);
+                btn.classList.toggle('current', idx === currentIndex);
+                btn.classList.toggle('answered', idx >= 0 && idx < panes.length && isAnswered(panes[idx]));
+            });
+        }
+
+        function navButton(label, className, clickHandler) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = className || 'btn btn-secondary';
+            btn.textContent = label;
+            btn.addEventListener('click', clickHandler);
+            return btn;
+        }
+
+        function buildNav() {
+            navHost.innerHTML = '';
+            var lastIndex = panes.length - 1;
+            var atFirst = currentIndex === 0;
+            var atLast = currentIndex === lastIndex;
+
+            if (!canSubmit) {
+                if (!atFirst) navHost.appendChild(navButton('First', 'btn', function () { goTo(0); }));
+                if (!atFirst) navHost.appendChild(navButton('Previous', 'btn', function () { goTo(currentIndex - 1); }));
+                if (!atLast) navHost.appendChild(navButton('Next', 'btn btn-primary', function () { goTo(currentIndex + 1); }));
+                if (!atLast) navHost.appendChild(navButton('Last', 'btn', function () { goTo(lastIndex); }));
+                return;
+            }
+
+            if (lastIndex <= 0) {
+                navHost.appendChild(navButton('Submit', 'btn btn-primary', function () {
+                    var real = document.getElementById('cbtRealSubmit');
+                    if (real) {
+                        real.click();
+                    } else {
+                        form.submit();
+                    }
+                }));
+                return;
+            }
+            if (atFirst) {
+                navHost.appendChild(navButton('Next', 'btn btn-primary', function () { goTo(currentIndex + 1); }));
+                navHost.appendChild(navButton('Last', 'btn', function () { goTo(lastIndex); }));
+                return;
+            }
+            if (atLast) {
+                navHost.appendChild(navButton('First', 'btn', function () { goTo(0); }));
+                navHost.appendChild(navButton('Previous', 'btn', function () { goTo(currentIndex - 1); }));
+                navHost.appendChild(navButton('Submit', 'btn btn-primary', function () {
+                    var real = document.getElementById('cbtRealSubmit');
+                    if (real) {
+                        real.click();
+                    } else {
+                        form.submit();
+                    }
+                }));
+                return;
+            }
+            navHost.appendChild(navButton('First', 'btn', function () { goTo(0); }));
+            navHost.appendChild(navButton('Next', 'btn btn-primary', function () { goTo(currentIndex + 1); }));
+            navHost.appendChild(navButton('Previous', 'btn', function () { goTo(currentIndex - 1); }));
+            navHost.appendChild(navButton('Last', 'btn', function () { goTo(lastIndex); }));
+        }
+
+        function goTo(index) {
+            var i = Number(index);
+            if (!Number.isFinite(i)) return;
+            if (i < 0) i = 0;
+            if (i > panes.length - 1) i = panes.length - 1;
+            currentIndex = i;
+            panes.forEach(function (pane, idx) {
+                pane.classList.toggle('active', idx === currentIndex);
+            });
+            updateImageFor(currentIndex);
+            paintQuestionBoxes();
+            buildNav();
+        }
+
+        jumpButtons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var idx = Number(btn.getAttribute('data-jump-index') || -1);
+                if (idx >= 0) goTo(idx);
+            });
+        });
+
+        form.addEventListener('change', paintQuestionBoxes);
+        form.addEventListener('input', paintQuestionBoxes);
+        goTo(currentIndex);
+    })();
+</script>
+{% if not is_submitted and test.status|lower == 'published' %}
+<script>
+    (function () {
+        var seconds = Number({{ remaining_seconds|int }});
+        var strictMode = Number({{ test.strict_mode|default(1)|int }}) === 1;
+        var fullscreenRequired = Number({{ test.fullscreen_required|default(1)|int }}) === 1;
+        var tabSwitchLimit = Number({{ test.tab_switch_limit|default(3)|int }});
+        var blockClipboard = Number({{ test.block_clipboard|default(1)|int }}) === 1;
+        var timerNode = document.getElementById('cbtTimer');
+        var timerBoldNode = document.getElementById('cbtTimerBold');
+        var form = document.getElementById('studentCbtForm');
+        var integrityNode = document.getElementById('cbtIntegrityEvents');
+        var remainingNode = document.getElementById('cbtRemainingSeconds');
+        var autosaveStatus = document.getElementById('cbtDraftStatus');
+        var modal = document.getElementById('cbtTimeUpModal');
+        var modalMessageNode = document.getElementById('cbtTimeUpMessage');
+        var submitBtn = document.getElementById('timeUpSubmitBtn');
+        var autosaveUrl = "{{ url_for('student_cbt_autosave', test_id=test.test_id) }}";
+        if (!timerNode || !form || !Number.isFinite(seconds)) return;
+        if (seconds < 0) seconds = 0;
+        if (!Number.isFinite(tabSwitchLimit) || tabSwitchLimit < 0) tabSwitchLimit = 3;
+        var submitted = false;
+        var integrityEvents = [];
+        var lastEventTs = {};
+        var autosaveInFlight = false;
+        var lastAutosaveAtMs = 0;
+        var pendingSubmitCause = 'time_up';
+        var focusLeaveCount = 0;
+        var fullscreenViolationCount = 0;
+        var clipboardBlockCount = 0;
+        var lastFocusViolationAt = 0;
+        var examLockedByIntegrity = false;
+        var handle = null;
+
+        function writeIntegrityEvents() {
+            if (integrityNode) {
+                integrityNode.value = JSON.stringify(integrityEvents);
+            }
+        }
+        function pushIntegrityEvent(type, detail, minGapMs) {
+            var nowMs = Date.now();
+            var gap = Number(minGapMs || 0);
+            if (gap > 0 && (lastEventTs[type] || 0) + gap > nowMs) return;
+            lastEventTs[type] = nowMs;
+            if (integrityEvents.length >= 200) return;
+            integrityEvents.push({
+                type: String(type || '').toLowerCase(),
+                ts: new Date(nowMs).toISOString(),
+                detail: String(detail || '').slice(0, 220)
+            });
+            writeIntegrityEvents();
+        }
+        function setDraftStatus(text, isError) {
+            if (!autosaveStatus) return;
+            autosaveStatus.textContent = text;
+            autosaveStatus.style.color = isError ? '#991b1b' : '#1f3b5c';
+            autosaveStatus.style.borderColor = isError ? '#fecaca' : '#cfe0f8';
+            autosaveStatus.style.background = isError ? '#fef2f2' : '#eef5ff';
+        }
+        function parseMaybeJsonResponse(resp) {
+            return resp.text().then(function (text) {
+                var raw = String(text || '');
+                var contentType = String(resp.headers.get('content-type') || '').toLowerCase();
+                var looksJson = contentType.indexOf('application/json') >= 0 || contentType.indexOf('+json') >= 0;
+                if (!looksJson) {
+                    var trimmed = raw.trim();
+                    if (trimmed && trimmed.charAt(0) === '{') {
+                        looksJson = true;
+                    }
+                }
+                if (!looksJson) {
+                    var plain = raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                    if (!plain) {
+                        plain = 'Draft save pending...';
+                    } else if (plain.length > 220) {
+                        plain = plain.slice(0, 220);
+                    }
+                    throw new Error(plain);
+                }
+                try {
+                    return JSON.parse(raw || '{}');
+                } catch (_err) {
+                    throw new Error('Autosave returned an invalid JSON payload.');
+                }
+            });
+        }
+        function setModalMessage(text) {
+            if (modalMessageNode) {
+                modalMessageNode.textContent = text;
+            }
+        }
+        function showSubmitModal(messageText, cause) {
+            pendingSubmitCause = String(cause || 'time_up').toLowerCase();
+            setModalMessage(messageText || 'Your CBT time has ended. Click OK to submit now.');
+            if (modal) {
+                modal.style.display = 'flex';
+            }
+        }
+        function autosave(force) {
+            if (submitted || autosaveInFlight) return;
+            var nowMs = Date.now();
+            if (!force && nowMs - lastAutosaveAtMs < 10000) return;
+            autosaveInFlight = true;
+            writeIntegrityEvents();
+            if (remainingNode) remainingNode.value = String(Math.max(0, seconds));
+            var formData = new FormData(form);
+            var body = new URLSearchParams();
+            formData.forEach(function (value, key) {
+                body.append(key, value);
+            });
+            fetch(autosaveUrl, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: body,
+                credentials: 'same-origin',
+                keepalive: !!force
+            }).then(function (resp) {
+                return parseMaybeJsonResponse(resp).catch(function () { return { ok: false }; });
+            }).then(function (payload) {
+                if (payload && payload.ok) {
+                    lastAutosaveAtMs = Date.now();
+                    setDraftStatus('Draft saved');
+                } else {
+                    setDraftStatus('Draft save pending...', true);
+                }
+            }).catch(function () {
+                setDraftStatus('Draft save pending...', true);
+            }).finally(function () {
+                autosaveInFlight = false;
+            });
+        }
+        function lockExamByIntegrity(reasonText, eventType) {
+            if (submitted || examLockedByIntegrity) return;
+            examLockedByIntegrity = true;
+            if (handle) {
+                clearInterval(handle);
+                handle = null;
+            }
+            pushIntegrityEvent(eventType || 'integrity_lock', reasonText || 'integrity_policy_triggered', 0);
+            autosave(true);
+            showSubmitModal(
+                'Security policy triggered: ' + (reasonText || 'Exam integrity limit reached') + '. Click OK to submit now.',
+                'integrity_lock'
+            );
+        }
+        function registerFocusLeave(eventType, detail) {
+            var nowMs = Date.now();
+            if (nowMs - lastFocusViolationAt < 1200) return;
+            lastFocusViolationAt = nowMs;
+            focusLeaveCount += 1;
+            pushIntegrityEvent(eventType, detail, 1200);
+            if (strictMode && tabSwitchLimit >= 0 && focusLeaveCount > tabSwitchLimit) {
+                lockExamByIntegrity(
+                    'Focus/window left ' + focusLeaveCount + ' times (limit ' + tabSwitchLimit + ')',
+                    'integrity_focus_limit'
+                );
+            }
+        }
+        function registerFullscreenViolation(eventType, detail) {
+            fullscreenViolationCount += 1;
+            pushIntegrityEvent(eventType, detail, 1000);
+            if (strictMode && fullscreenRequired && fullscreenViolationCount >= 2) {
+                lockExamByIntegrity('Repeated fullscreen violations', 'integrity_fullscreen_limit');
+                return;
+            }
+            if (strictMode && fullscreenRequired) {
+                setTimeout(enterFullscreenIfPossible, 350);
+            }
+        }
+        function enterFullscreenIfPossible() {
+            var root = document.documentElement;
+            if (!root) return;
+            var request = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
+            if (!request) return;
+            try {
+                var result = request.call(root);
+                if (result && typeof result.catch === 'function') {
+                    result.catch(function () {
+                        registerFullscreenViolation('fullscreen_denied', 'browser_blocked_fullscreen');
+                    });
+                }
+            } catch (err) {
+                registerFullscreenViolation('fullscreen_denied', 'fullscreen_exception');
+            }
+        }
+        function isInFullscreen() {
+            return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+        }
+
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+                registerFocusLeave('tab_hidden', 'tab_or_window_hidden');
+            }
+        });
+        window.addEventListener('blur', function () {
+            registerFocusLeave('window_blur', 'focus_left_exam_window');
+        });
+        document.addEventListener('fullscreenchange', function () {
+            if (!isInFullscreen()) {
+                registerFullscreenViolation('fullscreen_exit', 'left_fullscreen_mode');
+            }
+        });
+        if (blockClipboard) {
+            ['copy', 'cut', 'paste', 'contextmenu'].forEach(function (evtName) {
+                document.addEventListener(evtName, function (evt) {
+                    evt.preventDefault();
+                    clipboardBlockCount += 1;
+                    pushIntegrityEvent(evtName + '_blocked', 'action_prevented', 500);
+                    if (strictMode && clipboardBlockCount >= 6) {
+                        lockExamByIntegrity('Repeated blocked copy/paste/context actions', 'integrity_clipboard_limit');
+                    }
+                }, true);
+            });
+        }
+        form.addEventListener('submit', function () {
+            pushIntegrityEvent('submit_attempt', 'student_submitted_answers', 0);
+            writeIntegrityEvents();
+        });
+        if (fullscreenRequired) {
+            enterFullscreenIfPossible();
+        }
+
+        function render() {
+            if (remainingNode) remainingNode.value = String(Math.max(0, seconds));
+            var mins = Math.floor(seconds / 60);
+            var secs = seconds % 60;
+            var text = String(mins) + ':' + String(secs).padStart(2, '0');
+            timerNode.textContent = text;
+            if (timerBoldNode) timerBoldNode.textContent = text;
+        }
+        render();
+        if (seconds <= 0) {
+            pushIntegrityEvent('time_up', 'resume_opened_after_time_expired', 0);
+            showSubmitModal('Your CBT time has ended. Click OK to submit now.', 'time_up');
+        }
+        function submitNow() {
+            if (submitted) return;
+            submitted = true;
+            writeIntegrityEvents();
+            if (remainingNode) remainingNode.value = String(Math.max(0, seconds));
+            var realSubmitBtn = document.getElementById('cbtRealSubmit');
+            if (realSubmitBtn) {
+                realSubmitBtn.click();
+            } else {
+                form.submit();
+            }
+        }
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function () {
+                var submitEventType = String((pendingSubmitCause || 'time_up') + '_submit').toLowerCase();
+                pushIntegrityEvent(submitEventType, 'confirmed_from_submit_modal', 0);
+                submitNow();
+            });
+        }
+        handle = setInterval(function () {
+            seconds -= 1;
+            if (seconds <= 0) {
+                clearInterval(handle);
+                timerNode.textContent = '0:00';
+                if (timerBoldNode) timerBoldNode.textContent = '0:00';
+                if (remainingNode) remainingNode.value = '0';
+                pushIntegrityEvent('time_up', 'countdown_reached_zero', 0);
+                showSubmitModal('Your CBT time has ended. Click OK to submit now.', 'time_up');
+                return;
+            }
+            render();
+            autosave(false);
+        }, 1000);
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) autosave(true);
+        });
+        window.addEventListener('beforeunload', function () {
+            autosave(true);
+        });
+        autosave(true);
+    })();
+</script>
+{% endif %}
+{% if not session.get('cbt_only') and session.get('role') in ['student', 'school_admin', 'teacher', 'parent', 'super_admin'] %}
+{% include 'shared/_ai_assistant_widget.html' %}
+{% endif %}
+{% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+
+

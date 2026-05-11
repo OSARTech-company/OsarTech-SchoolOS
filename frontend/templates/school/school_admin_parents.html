@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>School Parents - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css', v='20260228b') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body.rail-expanded .topbar-layout .side-link span { display: inline !important; }
+      body.rail-expanded .topbar-layout .side-brand span { display: inline !important; }
+    </style>
+  </head>
+  <body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+      {% include 'school/_school_admin_sidebar.html' %}
+
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-user-friends"></i> Parent Links</h1>
+            <p class="meta-line">
+              <strong>School:</strong> {{ school.school_name if school and school.school_name else '-' }} |
+              <strong>Location:</strong> {{ school.location if school and school.location else '-' }} |
+              <strong>Last Login:</strong> {{ last_login_at }}
+            </p>
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+          {% endif %}
+          {% endwith %}
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <h3>{{ parent_count }}</h3>
+              <p>Unique Parents</p>
+            </div>
+            <div class="stat-card">
+              <h3>{{ linked_students }}</h3>
+              <p>Students Linked</p>
+            </div>
+            <div class="stat-card">
+              <h3><a href="{{ url_for('school_admin_parent_directory') }}">Open</a></h3>
+              <p>Parent Directory</p>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2><i class="fas fa-list"></i> Parents Linked By Students</h2>
+            {% if parent_links %}
+            <table>
+              <thead>
+                <tr>
+                  <th>Parent Phone</th>
+                  <th>Student ID</th>
+                  <th>Student Name</th>
+                  <th>Class</th>
+                  <th>Term</th>
+                  <th>Stream</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in parent_links %}
+                <tr>
+                  <td>{{ row.parent_phone }}</td>
+                  <td>{{ row.student_id }}</td>
+                  <td>{{ row.firstname }}</td>
+                  <td>{{ row.classname }}</td>
+                  <td>{{ row.term }}</td>
+                  <td>{{ row.stream or '-' }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <p class="note">No parent accounts linked yet. Students must add parent access from student dashboard.</p>
+            {% endif %}
+          </div>
+
+          <div class="card">
+            <h2><i class="fas fa-user-plus"></i> Link Parent to Student</h2>
+            <p class="note">Use this to create parent access directly for a student. If password is blank, a temporary password is generated.</p>
+            <form method="post" action="{{ url_for('school_admin_link_parent') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="grid">
+                <div>
+                  <label>Student ID</label>
+                  <input list="studentIdOptions" name="student_id" placeholder="e.g. STD001" required>
+                  <datalist id="studentIdOptions">
+                    {% for opt in student_options %}
+                    <option value="{{ opt.student_id }}">{{ opt.label }}</option>
+                    {% endfor %}
+                  </datalist>
+                </div>
+                <div>
+                  <label>Parent Slot</label>
+                  <select name="parent_slot" required>
+                    <option value="1">Parent 1</option>
+                    <option value="2">Parent 2</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Parent Name</label>
+                  <input type="text" name="parent_name" placeholder="Full name" required>
+                </div>
+                <div>
+                  <label>Parent Phone</label>
+                  <input type="text" name="parent_phone" placeholder="+234..." required>
+                </div>
+                <div>
+                  <label>Parent Gender</label>
+                  <select name="parent_gender" required>
+                    <option value="">Select</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Parent Password (optional)</label>
+                  <input type="password" name="parent_password" placeholder="Leave blank to auto-generate">
+                </div>
+                <div>
+                  <label>Confirm Password</label>
+                  <input type="password" name="confirm_parent_password" placeholder="Confirm password">
+                </div>
+                <div class="mt-10">
+                  <label>
+                    <input type="checkbox" name="replace_existing" value="1">
+                    Replace existing parent for this slot
+                  </label>
+                </div>
+              </div>
+              <div class="mt-10">
+                <button type="submit" class="btn btn-primary">Link Parent</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+      (function () {
+        var body = document.body;
+        if (window.innerWidth > 600) {
+          body.classList.add('rail-expanded');
+        }
+      })();
+    </script>
+  </body>
+</html>
+
+
+

@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SMS Logs - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      body { min-height: 100vh; }
+      .container { width: min(1150px, 100%); margin: 0 auto; padding: 24px; }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .header h1 { margin: 0; font-size: 1.85rem; }
+      .header .back { color: white; text-decoration: none; font-weight: 700; }
+      .table-wrap { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; min-width: 900px; }
+      th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.92rem; }
+      th { background: #f1f5f9; color: #1e3a5f; font-weight: 700; }
+      .chip { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; }
+      .chip-success { background: #dcfce7; color: #166534; }
+      .chip-danger { background: #fee2e2; color: #991b1b; }
+      .chip-warning { background: #fef3c7; color: #92400e; }
+      .pagination { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 12px; }
+      .pagination a { color: #1e3a5f; font-weight: 700; text-decoration: none; }
+      .note { color: #6b7280; font-size: 0.9rem; }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% set active_page = 'sms_logs' %}
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-list"></i> SMS Logs</h1>
+            <a href="{{ url_for('school_admin_sms_health') }}" class="back"><i class="fas fa-arrow-left"></i> Back to SMS Health</a>
+          </div>
+
+          <div class="card">
+            <h2><i class="fas fa-clock"></i> Recent Deliveries</h2>
+            <p class="note">Shows the most recent SMS attempts for this school.</p>
+            <form method="get" action="{{ url_for('school_admin_sms_logs') }}" class="mb-10">
+              <div class="grid-two" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+                <div class="form-group">
+                  <label for="filter_status">Status</label>
+                  <select id="filter_status" name="status">
+                    <option value="">All</option>
+                    <option value="sent" {% if status_filter == 'sent' %}selected{% endif %}>Sent</option>
+                    <option value="failed" {% if status_filter == 'failed' %}selected{% endif %}>Failed</option>
+                    <option value="retry" {% if status_filter == 'retry' %}selected{% endif %}>Retry</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="filter_provider">Provider</label>
+                  <select id="filter_provider" name="provider">
+                    <option value="">All</option>
+                    <option value="twilio" {% if provider_filter == 'twilio' %}selected{% endif %}>Twilio</option>
+                    <option value="webhook" {% if provider_filter == 'webhook' %}selected{% endif %}>Webhook</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="filter_phone">Phone</label>
+                  <input type="text" id="filter_phone" name="phone" value="{{ phone_filter }}" placeholder="+234..." />
+                </div>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <button type="submit" class="btn btn-secondary btn-xs"><i class="fas fa-filter"></i> Apply Filters</button>
+                <a class="btn btn-secondary btn-xs" href="{{ url_for('school_admin_sms_logs_export', status=status_filter, provider=provider_filter, phone=phone_filter) }}">
+                  <i class="fas fa-file-csv"></i> Export CSV
+                </a>
+                <button type="button" class="btn btn-secondary btn-xs" data-open-clear-logs>
+                  <i class="fas fa-trash"></i> Clear Logs
+                </button>
+              </div>
+            </form>
+            <form method="post" action="{{ url_for('school_admin_sms_logs_clear') }}" class="mt-10" data-clear-logs-form style="display:none;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="clear_scope" value="logs">
+              <input type="hidden" name="confirm" value="0" data-confirm-clear>
+              <button type="submit" class="btn btn-secondary btn-xs">
+                <i class="fas fa-trash"></i> Confirm Clear Logs
+              </button>
+            </form>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Role</th>
+                    <th>Phone</th>
+                    <th>Provider</th>
+                    <th>Context</th>
+                    <th>Error</th>
+                    <th>Sent At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in log_items %}
+                  <tr>
+                    <td>
+                      {% if row.status == 'sent' %}
+                      <span class="chip chip-success">sent</span>
+                      {% elif row.status == 'retry' %}
+                      <span class="chip chip-warning">retry</span>
+                      {% else %}
+                      <span class="chip chip-danger">{{ row.status }}</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ row.audience_role }}</td>
+                    <td>{{ row.phone }}</td>
+                    <td>{{ row.provider }}</td>
+                    <td>{{ row.context }}</td>
+                    <td>{{ row.error_message if row.error_message else '-' }}</td>
+                    <td>{{ row.created_at }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="7" class="note">No SMS logs yet.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination">
+              <span class="note">Page {{ page }} of {{ total_pages }} ({{ total_rows }} rows)</span>
+              {% if page > 1 %}
+              <a href="{{ url_for('school_admin_sms_logs', page=page-1, per_page=per_page) }}">&laquo; Prev</a>
+              {% endif %}
+              {% if page < total_pages %}
+              <a href="{{ url_for('school_admin_sms_logs', page=page+1, per_page=per_page) }}">Next &raquo;</a>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="card mt-20">
+            <h2><i class="fas fa-repeat"></i> Retry Queue</h2>
+            <p class="note">Failed messages are queued for retry automatically.</p>
+            <form method="post" action="{{ url_for('school_admin_sms_logs_retry') }}" class="mb-10">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="retry_all" value="1">
+              <button type="submit" class="btn btn-primary btn-xs" data-confirm-retry-all>
+                <i class="fas fa-rotate"></i> Retry All
+              </button>
+            </form>
+            <form method="post" action="{{ url_for('school_admin_sms_logs_clear') }}" class="mb-10">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="clear_scope" value="queue">
+              <input type="hidden" name="confirm" value="0" data-confirm-clear>
+              <button type="submit" class="btn btn-secondary btn-xs" data-confirm-clear-btn>
+                <i class="fas fa-trash"></i> Clear Queue
+              </button>
+            </form>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Phone</th>
+                    <th>Provider</th>
+                    <th>Status</th>
+                    <th>Retries</th>
+                    <th>Last Error</th>
+                    <th>Created</th>
+                    <th>Sent At</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in queue_items %}
+                  <tr>
+                    <td>{{ row.id }}</td>
+                    <td>{{ row.phone }}</td>
+                    <td>{{ row.provider }}</td>
+                    <td>{{ row.status }}</td>
+                    <td>{{ row.retry_count }} / {{ row.max_retries }}</td>
+                    <td>{{ row.last_error if row.last_error else '-' }}</td>
+                    <td>{{ row.created_at }}</td>
+                    <td>{{ row.sent_at if row.sent_at else '-' }}</td>
+                    <td>
+                      <form method="post" action="{{ url_for('school_admin_sms_logs_retry') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="queue_id" value="{{ row.id }}">
+                        <button type="submit" class="btn btn-secondary btn-xs">
+                          <i class="fas fa-rotate"></i> Retry
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="9" class="note">No queued SMS items.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var openBtn = document.querySelector('[data-open-clear-logs]');
+        var form = document.querySelector('[data-clear-logs-form]');
+        if (!openBtn || !form) return;
+        openBtn.addEventListener('click', function () {
+          form.style.display = (form.style.display === 'none' || !form.style.display) ? 'block' : 'none';
+        });
+      })();
+      (function () {
+        function handleConfirm(button, message) {
+          if (!button) return;
+          button.addEventListener('click', function (evt) {
+            var form = button.closest('form');
+            var confirmInput = form ? form.querySelector('[data-confirm-clear]') : null;
+            if (!form || !confirmInput) return;
+            if (!window.confirm(message)) {
+              evt.preventDefault();
+              return;
+            }
+            confirmInput.value = '1';
+          });
+        }
+        var clearButtons = document.querySelectorAll('[data-confirm-clear-btn]');
+        clearButtons.forEach(function (btn) {
+          handleConfirm(btn, 'Clear the SMS queue? This cannot be undone.');
+        });
+        var confirmLogForm = document.querySelector('[data-clear-logs-form]');
+        if (confirmLogForm) {
+          var confirmLogBtn = confirmLogForm.querySelector('button[type="submit"]');
+          if (confirmLogBtn) {
+            confirmLogBtn.addEventListener('click', function (evt) {
+              var confirmInput = confirmLogForm.querySelector('[data-confirm-clear]');
+              if (!window.confirm('Clear SMS logs? This cannot be undone.')) {
+                evt.preventDefault();
+                return;
+              }
+              if (confirmInput) {
+                confirmInput.value = '1';
+              }
+            });
+          }
+        }
+        var retryAllBtn = document.querySelector('[data-confirm-retry-all]');
+        if (retryAllBtn) {
+          retryAllBtn.addEventListener('click', function (evt) {
+            if (!window.confirm('Retry all queued SMS now?')) {
+              evt.preventDefault();
+            }
+          });
+        }
+      })();
+    </script>
+      {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

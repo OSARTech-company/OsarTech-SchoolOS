@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Timetable - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(1100px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.85rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end; }
+        .filters label { display: block; font-weight: 600; margin-bottom: 4px; }
+        .filters select { width: 100%; }
+        .chip-line { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; }
+        .table-wrap table { width: 100%; min-width: 760px; border-collapse: collapse; }
+        .table-wrap th, .table-wrap td { white-space: nowrap; }
+        .day-block { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: #f8fbff; }
+        .day-title { margin: 0 0 8px; color: #1e3a5f; font-size: 1rem; }
+        @media print {
+            .no-print { display: none !important; }
+            .container { width: 100%; max-width: 100%; padding: 0; }
+            .card { border: none; box-shadow: none; padding: 0; margin-bottom: 12px; }
+            body { background: #fff !important; }
+        }
+        @media (max-width: 860px) {
+            .filters { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body style="--accent: {{ parent_theme_accent if parent_theme_accent else '#1F7A8C' }};">
+    {% if print_mode %}
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-table"></i> Child Timetable</h1>
+            <div class="no-print">
+                <button type="button" class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
+            </div>
+        </div>
+        <div class="card">
+            <h3 class="no-margin">
+                {{ selected_student.firstname }} ({{ selected_student.student_id }})
+                - {{ selected_student.classname }}{% if selected_student.stream %} ({{ selected_student.stream }}){% endif %}
+            </h3>
+            <p class="muted mt-10">School: {{ selected_school.school_name if selected_school and selected_school.school_name else selected_school.school_id }}</p>
+        </div>
+        <div class="card">
+            {% for day_group in grouped_rows %}
+            <div class="day-block">
+                <h4 class="day-title">{{ day_group.day_name }}</h4>
+                <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Period</th>
+                            <th>Subject</th>
+                            {% if show_teacher_names %}<th>Teacher</th>{% endif %}
+                            <th>Time</th>
+                            <th>Room</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in day_group.rows %}
+                        <tr>
+                            <td>{{ row.period_label }}</td>
+                            <td>{{ row.subject }}</td>
+                            {% if show_teacher_names %}<td>{{ row.teacher_display }}</td>{% endif %}
+                            <td>{{ row.start_time or '-' }} - {{ row.end_time or '-' }}</td>
+                            <td>{{ row.room or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+            {% else %}
+            <p>No timetable periods match this student's class + offered subjects yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'timetable' %}
+        {% include 'parent/_parent_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-table"></i> Child Timetable</h1>
+                    <a href="{{ url_for('parent_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="card">
+                    <form method="get" action="{{ url_for('parent_timetable') }}" class="filters">
+                        <div>
+                            <label>Student</label>
+                            <select name="student_key" required>
+                                {% for child in children %}
+                                <option value="{{ child.key }}" {% if child.key == selected_key %}selected{% endif %}>
+                                    {{ child.firstname }} ({{ child.student_id }}) - {{ child.school_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Load Timetable</button>
+                            <a class="btn btn-secondary ml-10" target="_blank" href="{{ url_for('parent_timetable', student_key=selected_key, print='1') }}">
+                                <i class="fas fa-print"></i> Print / PDF
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3 class="no-margin">
+                        {{ selected_student.firstname }} ({{ selected_student.student_id }})
+                        - {{ selected_student.classname }}{% if selected_student.stream %} ({{ selected_student.stream }}){% endif %}
+                    </h3>
+                    <p class="muted mt-10">
+                        School: {{ selected_school.school_name if selected_school and selected_school.school_name else selected_school.school_id }}
+                    </p>
+                    <p class="muted mt-10">Showing only periods for this student's class and subjects offered.</p>
+                    <div class="chip-line">
+                        {% for subject in offered_subjects %}
+                        <span class="chip chip-info">{{ subject }}</span>
+                        {% else %}
+                        <span class="chip chip-warning">No subject list configured for this student.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3 class="no-margin"><i class="fas fa-calendar-alt"></i> Visible Timetable Periods</h3>
+                    {% for day_group in grouped_rows %}
+                    <div class="day-block">
+                        <h4 class="day-title">{{ day_group.day_name }}</h4>
+                        <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Period</th>
+                                    <th>Subject</th>
+                                    {% if show_teacher_names %}<th>Teacher</th>{% endif %}
+                                    <th>Time</th>
+                                    <th>Room</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in day_group.rows %}
+                                <tr>
+                                    <td>{{ row.period_label }}</td>
+                                    <td>{{ row.subject }}</td>
+                                    {% if show_teacher_names %}<td>{{ row.teacher_display }}</td>{% endif %}
+                                    <td>{{ row.start_time or '-' }} - {{ row.end_time or '-' }}</td>
+                                    <td>{{ row.room or '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="mt-10">No timetable periods match this student's class + offered subjects yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+    {% if print_mode %}
+    <script>
+        window.addEventListener('load', function () { window.print(); });
+    </script>
+    {% endif %}
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subject Handover - Teacher</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'subject_handover' %}
+    {% include 'teacher/_teacher_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Subject Handover Report</h1>
+        <p><a class="btn" href="{{ url_for('teacher_dashboard') }}">Back to Dashboard</a></p>
+    </div>
+
+    <div class="card">
+        <p><strong>Term:</strong> {{ current_term }} | <strong>Year:</strong> {{ current_year }}</p>
+        <p class="note">Summary of subject coverage based on current assignments.</p>
+    </div>
+
+    <div class="card">
+        {% if report_rows %}
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Class</th>
+                    <th>Subject</th>
+                    <th>Eligible</th>
+                    <th>Completed</th>
+                    <th>Pending</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in report_rows %}
+                <tr>
+                    <td>{{ row.classname }}</td>
+                    <td>{{ row.subject }}</td>
+                    <td>{{ row.eligible_students }}</td>
+                    <td>{{ row.completed_students }}</td>
+                    <td>{{ row.pending_students }}</td>
+                    <td>{{ 'Complete' if row.ready else 'Pending' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="muted">No subject assignments found for this term.</p>
+        {% endif %}
+    </div>
+</div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+</body>
+</html>
+

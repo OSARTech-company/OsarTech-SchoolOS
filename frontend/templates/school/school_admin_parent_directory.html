@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parent Directory - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css', v='20260228b') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body.rail-expanded .topbar-layout .side-link span { display: inline !important; }
+      body.rail-expanded .topbar-layout .side-brand span { display: inline !important; }
+      .parent-card { margin-bottom: 16px; }
+      .parent-meta { display: flex; gap: 12px; flex-wrap: wrap; color: #475569; font-size: 0.92rem; }
+      .student-table th, .student-table td { font-size: 0.92rem; }
+    </style>
+  </head>
+  <body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+      {% include 'school/_school_admin_sidebar.html' %}
+
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-address-book"></i> Parent Directory</h1>
+            <p class="meta-line">
+              <strong>School:</strong> {{ school.school_name if school and school.school_name else '-' }} |
+              <strong>Location:</strong> {{ school.location if school and school.location else '-' }} |
+              <strong>Last Login:</strong> {{ last_login_at }}
+            </p>
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+          {% endif %}
+          {% endwith %}
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <h3>{{ parent_count }}</h3>
+              <p>Unique Parents</p>
+            </div>
+            <div class="stat-card">
+              <h3>{{ linked_students }}</h3>
+              <p>Students Linked</p>
+            </div>
+            <div class="stat-card">
+              <h3><a href="{{ url_for('school_admin_view_parents') }}">Back</a></h3>
+              <p>Parent Links</p>
+            </div>
+          </div>
+
+          {% if directory %}
+            {% for parent in directory %}
+            <div class="card parent-card">
+              <div class="stack-head">
+                <h3 class="no-margin">{{ parent.parent_name or 'Parent' }}</h3>
+                <span class="chip chip-primary">{{ parent.parent_phone }}</span>
+              </div>
+              <div class="parent-meta mt-6">
+                <span><strong>Gender:</strong> {{ parent.parent_gender or '-' }}</span>
+                <span><strong>Students Linked:</strong> {{ parent.students|length }}</span>
+              </div>
+              {% if parent.students %}
+              <div class="table-wrap mt-10">
+                <table class="student-table">
+                  <thead>
+                    <tr>
+                      <th>Student ID</th>
+                      <th>Name</th>
+                      <th>Class</th>
+                      <th>Term</th>
+                      <th>Stream</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for student in parent.students %}
+                    <tr>
+                      <td>{{ student.student_id }}</td>
+                      <td>{{ student.firstname }}</td>
+                      <td>{{ student.classname }}</td>
+                      <td>{{ student.term }}</td>
+                      <td>{{ student.stream or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% else %}
+              <p class="note mt-10">No students linked yet.</p>
+              {% endif %}
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="card">
+              <p class="note">No parents linked yet.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+      (function () {
+        var body = document.body;
+        if (window.innerWidth > 600) {
+          body.classList.add('rail-expanded');
+        }
+      })();
+    </script>
+  </body>
+</html>
+

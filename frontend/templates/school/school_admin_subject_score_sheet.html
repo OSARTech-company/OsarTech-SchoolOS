@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ selected_subject }} Subject Sheet</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(180deg, #f2fafc 0%, #eef5fb 100%);
+        }
+        .container {
+            max-width: 1620px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .header {
+            background: linear-gradient(135deg, #0f3d56 0%, #166486 58%, #17927d 100%);
+            color: #fff;
+            padding: 24px 28px;
+            border-radius: 18px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 14px;
+            flex-wrap: wrap;
+            box-shadow: 0 18px 36px rgba(20, 84, 116, 0.18);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: clamp(1.6rem, 3vw, 2.3rem);
+        }
+        .header p {
+            margin: 10px 0 0;
+            color: rgba(255,255,255,0.88);
+        }
+        .header .back {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 700;
+        }
+        .card {
+            background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+            border-radius: 18px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.07);
+            border: 1px solid #dce7f5;
+        }
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .meta-card {
+            border: 1px solid #dbe7f3;
+            border-radius: 16px;
+            padding: 16px 18px;
+            background: linear-gradient(180deg, #fbfeff 0%, #f2fbfb 100%);
+        }
+        .meta-card .label {
+            display: block;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #64809b;
+            margin-bottom: 6px;
+        }
+        .meta-card .value {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #153f5d;
+        }
+        .flash {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .flash.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .flash.info { background: #e7f3ff; color: #114a7a; border: 1px solid #cfe1f7; }
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .toolbar h2 {
+            margin: 0;
+            color: #183b59;
+        }
+        .table-wrap {
+            overflow-x: auto;
+            border: 1px solid #dbe6f3;
+            border-radius: 18px;
+            background: #fff;
+        }
+        table {
+            width: 100%;
+            min-width: 1500px;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        th, td {
+            padding: 12px 12px;
+            text-align: center;
+            border-right: 1px solid #d7dde4;
+            border-bottom: 1px solid #d7dde4;
+            vertical-align: middle;
+        }
+        thead th {
+            background: linear-gradient(180deg, #17435f 0%, #1c5f72 100%);
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.84rem;
+            min-width: 120px;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        thead th:first-child,
+        thead th:nth-child(2) {
+            z-index: 3;
+        }
+        thead th:first-child,
+        tbody th {
+            min-width: 220px;
+            left: 0;
+        }
+        thead th:nth-child(2),
+        tbody td.student-id-cell {
+            min-width: 130px;
+            left: 220px;
+        }
+        tbody th {
+            background: #f8fbff;
+            color: #20354d;
+            text-align: left;
+            white-space: normal;
+            position: sticky;
+            z-index: 1;
+        }
+        tbody td.student-id-cell {
+            position: sticky;
+            background: #fcfdff;
+            z-index: 1;
+        }
+        tbody tr:nth-child(even) td {
+            background: #fbfdff;
+        }
+        tbody tr:hover td,
+        tbody tr:hover th {
+            background: #f2fbfb;
+        }
+        input[type="text"],
+        textarea {
+            width: 112px;
+            min-height: 44px;
+            padding: 10px 12px;
+            border: 1px solid #bfcddd;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 0.98rem;
+            font-weight: 700;
+            background: #fff;
+        }
+        textarea {
+            width: 220px;
+            min-height: 48px;
+            text-align: left;
+            font-weight: 500;
+            resize: vertical;
+        }
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #14908c;
+            box-shadow: 0 0 0 4px rgba(20, 144, 140, 0.12);
+        }
+        .readonly-input {
+            background: #eef7fb;
+            color: #16324a;
+            font-weight: 700;
+        }
+        .grade-chip {
+            display: inline-flex;
+            min-width: 44px;
+            justify-content: center;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: #dff7f2;
+            font-weight: 800;
+            color: #135e58;
+        }
+        .student-meta {
+            color: #607086;
+            font-size: 0.88rem;
+            margin-top: 6px;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .lock-note {
+            color: #b42318;
+            font-weight: 700;
+        }
+        @media (max-width: 960px) {
+            .meta-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        @media (max-width: 640px) {
+            .container {
+                padding: 12px;
+            }
+            .header {
+                padding: 16px;
+                margin-bottom: 16px;
+            }
+            .meta-grid {
+                grid-template-columns: 1fr;
+            }
+            .actions .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'score_entry' %}
+        {% if role == 'teacher' %}
+        {% set teacher_selected_score_subject = selected_subject %}
+        {% set teacher_selected_score_class = selected_class %}
+        {% include 'teacher/_teacher_sidebar.html' %}
+        {% else %}
+        {% include 'school/_school_admin_sidebar.html' %}
+        {% endif %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <div>
+                        <h1><i class="fas fa-table-list"></i> {{ selected_subject }} Subject Sheet</h1>
+                        <p>{{ score_entry_mode_label }} keeps this page focused on one class and one subject so you can score only the students offering that subject in one pass.</p>
+                    </div>
+                    <a href="{{ back_url }}" class="back"><i class="fas fa-arrow-left"></i> {{ back_label or 'Back' }}</a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="card">
+                    <div class="meta-grid">
+                        <div class="meta-card">
+                            <span class="label">Class</span>
+                            <div class="value">{{ selected_class }}</div>
+                        </div>
+                        <div class="meta-card">
+                            <span class="label">Subject</span>
+                            <div class="value">{{ selected_subject }}</div>
+                        </div>
+                        <div class="meta-card">
+                            <span class="label">Term / Year</span>
+                            <div class="value">{{ selected_term }}{% if current_year %} / {{ current_year }}{% endif %}</div>
+                        </div>
+                        <div class="meta-card">
+                            <span class="label">Roster Size</span>
+                            <div class="value">{{ total_students }} Student{{ '' if total_students == 1 else 's' }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                        <div class="toolbar">
+                            <h2><i class="fas fa-pen-to-square"></i> Bulk Score Entry</h2>
+                            <div class="actions">
+                                {% if is_locked %}
+                                <span class="lock-note">{{ lock_message or 'This subject sheet is locked.' }}</span>
+                                {% else %}
+                                <button type="submit" form="subject-sheet-form" class="btn btn-primary"><i class="fas fa-save"></i> Save Edited Rows</button>
+                                {% endif %}
+                            <a href="{{ back_url }}" class="btn btn-secondary">{{ back_label or 'Back' }}</a>
+                            </div>
+                        </div>
+
+                    {% if roster_rows %}
+                    <form id="subject-sheet-form" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <input type="hidden" name="class" value="{{ selected_class }}">
+                        <input type="hidden" name="subject" value="{{ selected_subject }}">
+                        <input type="hidden" name="term" value="{{ selected_term }}">
+                        {% if class_access %}
+                        <div style="margin-bottom:16px;">
+                            <label for="score_override_reason" style="display:block; margin-bottom:6px; font-weight:700; color:#183b59;">Reason For Score Change</label>
+                            <textarea
+                                id="score_override_reason"
+                                name="score_override_reason"
+                                rows="3"
+                                style="width:min(520px, 100%);"
+                                placeholder="{% if role == 'school_admin' %}Required when school admin changes score entered by a teacher.{% else %}Required when class teacher changes score entered by subject teacher.{% endif %}"
+                                {% if is_locked %}disabled{% endif %}
+                            ></textarea>
+                        </div>
+                        {% endif %}
+                        <div class="table-wrap">
+                            <table
+                                id="subject-sheet-table"
+                                data-grade-a="{{ grade_cfg.a }}"
+                                data-grade-b="{{ grade_cfg.b }}"
+                                data-grade-c="{{ grade_cfg.c }}"
+                                data-grade-d="{{ grade_cfg.d }}"
+                            >
+                                <thead>
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Student ID</th>
+                                        {% if school.test_enabled %}
+                                            {% for i in range(1, max_tests + 1) %}
+                                            <th>Test {{ i }}</th>
+                                            {% endfor %}
+                                            <th>Total Test</th>
+                                        {% endif %}
+                                        {% if school.exam_enabled %}
+                                            {% if exam_config.exam_mode == 'combined' %}
+                                            <th>Exam</th>
+                                            {% else %}
+                                            <th>Objective</th>
+                                            <th>Theory</th>
+                                            <th>Total Exam</th>
+                                            {% endif %}
+                                        {% endif %}
+                                        <th>Total Score</th>
+                                        <th>Grade</th>
+                                        <th>Subject Teacher Comment</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in roster_rows %}
+                                    {% set block = row.score_block or {} %}
+                                    <tr class="score-row" data-row-key="{{ row.row_key }}">
+                                        <th>
+                                            {{ row.fullname }}
+                                            <div class="student-meta">{{ row.stream or 'No stream' }}{% if row.term and row.term != selected_term %} | Stored term: {{ row.term }}{% endif %}</div>
+                                            <input type="hidden" name="row_touched_{{ row.row_key }}" value="0" class="row-touched-input">
+                                        </th>
+                                        <td class="student-id-cell">{{ row.student_id }}</td>
+                                        {% if school.test_enabled %}
+                                            {% for i in range(1, max_tests + 1) %}
+                                            <td>
+                                                <input
+                                                    type="text"
+                                                    name="test_{{ i }}_{{ row.row_key }}"
+                                                    value="{{ block.get('test_' ~ i, '') }}"
+                                                    inputmode="decimal"
+                                                    class="score-input calc-input"
+                                                    data-kind="test"
+                                                    data-row-key="{{ row.row_key }}"
+                                                    {% if is_locked %}disabled{% endif %}
+                                                >
+                                            </td>
+                                            {% endfor %}
+                                            <td>
+                                                <input type="text" readonly class="readonly-input total-test" data-row-key="{{ row.row_key }}" value="{{ block.get('total_test', '') }}">
+                                            </td>
+                                        {% endif %}
+                                        {% if school.exam_enabled %}
+                                            {% if exam_config.exam_mode == 'combined' %}
+                                            <td>
+                                                <input
+                                                    type="text"
+                                                    name="exam_score_{{ row.row_key }}"
+                                                    value="{{ block.get('exam_score', block.get('total_exam', '')) }}"
+                                                    inputmode="decimal"
+                                                    class="score-input calc-input"
+                                                    data-kind="exam_combined"
+                                                    data-row-key="{{ row.row_key }}"
+                                                    {% if is_locked %}disabled{% endif %}
+                                                >
+                                            </td>
+                                            {% else %}
+                                            <td>
+                                                <input
+                                                    type="text"
+                                                    name="objective_{{ row.row_key }}"
+                                                    value="{{ block.get('objective', '') }}"
+                                                    inputmode="decimal"
+                                                    class="score-input calc-input"
+                                                    data-kind="objective"
+                                                    data-row-key="{{ row.row_key }}"
+                                                    {% if is_locked %}disabled{% endif %}
+                                                >
+                                            </td>
+                                            <td>
+                                                <input
+                                                    type="text"
+                                                    name="theory_{{ row.row_key }}"
+                                                    value="{{ block.get('theory', '') }}"
+                                                    inputmode="decimal"
+                                                    class="score-input calc-input"
+                                                    data-kind="theory"
+                                                    data-row-key="{{ row.row_key }}"
+                                                    {% if is_locked %}disabled{% endif %}
+                                                >
+                                            </td>
+                                            <td>
+                                                <input type="text" readonly class="readonly-input total-exam" data-row-key="{{ row.row_key }}" value="{{ block.get('total_exam', '') }}">
+                                            </td>
+                                            {% endif %}
+                                        {% endif %}
+                                        <td>
+                                            <input type="text" readonly class="readonly-input total-score" data-row-key="{{ row.row_key }}" value="{{ block.get('overall_mark', block.get('total_score', '')) }}">
+                                        </td>
+                                        <td>
+                                            <span class="grade-chip grade-output" data-row-key="{{ row.row_key }}">{{ block.get('grade', '-') or '-' }}</span>
+                                        </td>
+                                        <td>
+                                            <textarea
+                                                name="subject_comment_{{ row.row_key }}"
+                                                class="comment-input"
+                                                data-row-key="{{ row.row_key }}"
+                                                autocomplete="off"
+                                                autocapitalize="off"
+                                                autocorrect="off"
+                                                spellcheck="false"
+                                                data-lpignore="true"
+                                                data-form-type="other"
+                                                placeholder="Enter subject teacher comment"
+                                                {% if is_locked %}disabled{% endif %}
+                                            >{{ block.get('subject_teacher_comment', '') }}</textarea>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="flash info">No students were found for this class-subject combination.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+    <script>
+      (function () {
+        var table = document.getElementById('subject-sheet-table');
+        if (!table) return;
+
+        var gradeA = parseFloat(table.dataset.gradeA || '70');
+        var gradeB = parseFloat(table.dataset.gradeB || '60');
+        var gradeC = parseFloat(table.dataset.gradeC || '50');
+        var gradeD = parseFloat(table.dataset.gradeD || '40');
+
+        function parseValue(value) {
+          var text = (value || '').trim();
+          if (!text || text === '-' || text === '–' || text === '—') return 0;
+          var num = parseFloat(text);
+          return Number.isFinite(num) ? num : 0;
+        }
+
+        function formatNumber(value) {
+          if (!Number.isFinite(value)) return '';
+          return Math.round(value * 100) / 100;
+        }
+
+        function gradeFromScore(score) {
+          if (score >= gradeA) return 'A';
+          if (score >= gradeB) return 'B';
+          if (score >= gradeC) return 'C';
+          if (score >= gradeD) return 'D';
+          return 'F';
+        }
+
+        function getEditableRows() {
+          return Array.prototype.slice.call(
+            table.querySelectorAll('tbody .score-row')
+          ).filter(function (row) {
+            return row.querySelector('.calc-input:not([disabled]), .comment-input:not([disabled])');
+          });
+        }
+
+        function getEditableFields(row) {
+          if (!row) return [];
+          return Array.prototype.slice.call(
+            row.querySelectorAll('.calc-input:not([disabled]), .comment-input:not([disabled])')
+          );
+        }
+
+        function focusField(field) {
+          if (!field) return;
+          field.focus();
+          if (typeof field.select === 'function' && !field.classList.contains('comment-input')) {
+            field.select();
+          }
+        }
+
+        function moveFocus(currentField, direction) {
+          var currentRow = currentField.closest('.score-row');
+          if (!currentRow) return false;
+
+          var rows = getEditableRows();
+          var rowIndex = rows.indexOf(currentRow);
+          if (rowIndex === -1) return false;
+
+          var currentFields = getEditableFields(currentRow);
+          var fieldIndex = currentFields.indexOf(currentField);
+          if (fieldIndex === -1) return false;
+
+          if (direction === 'left') {
+            if (fieldIndex <= 0) return false;
+            focusField(currentFields[fieldIndex - 1]);
+            return true;
+          }
+          if (direction === 'right') {
+            if (fieldIndex >= currentFields.length - 1) return false;
+            focusField(currentFields[fieldIndex + 1]);
+            return true;
+          }
+          if (direction === 'up') {
+            if (rowIndex <= 0) return false;
+            var previousFields = getEditableFields(rows[rowIndex - 1]);
+            focusField(previousFields[Math.min(fieldIndex, previousFields.length - 1)]);
+            return true;
+          }
+          if (direction === 'down') {
+            if (rowIndex >= rows.length - 1) return false;
+            var nextFields = getEditableFields(rows[rowIndex + 1]);
+            focusField(nextFields[Math.min(fieldIndex, nextFields.length - 1)]);
+            return true;
+          }
+          return false;
+        }
+
+        function markTouched(rowKey) {
+          var row = document.querySelector('.score-row[data-row-key="' + rowKey + '"]');
+          if (!row) return;
+          var marker = row.querySelector('.row-touched-input');
+          if (marker) marker.value = '1';
+        }
+
+        function recalcRow(rowKey) {
+          var row = document.querySelector('.score-row[data-row-key="' + rowKey + '"]');
+          if (!row) return;
+
+          var testTotal = 0;
+          row.querySelectorAll('.calc-input[data-row-key="' + rowKey + '"][data-kind="test"]').forEach(function (input) {
+            testTotal += parseValue(input.value);
+          });
+
+          var totalTestEl = row.querySelector('.total-test[data-row-key="' + rowKey + '"]');
+          if (totalTestEl) totalTestEl.value = formatNumber(testTotal);
+
+          var totalExam = 0;
+          var combinedExam = row.querySelector('.calc-input[data-row-key="' + rowKey + '"][data-kind="exam_combined"]');
+          if (combinedExam) {
+            totalExam = parseValue(combinedExam.value);
+          } else {
+            var objectiveEl = row.querySelector('.calc-input[data-row-key="' + rowKey + '"][data-kind="objective"]');
+            var theoryEl = row.querySelector('.calc-input[data-row-key="' + rowKey + '"][data-kind="theory"]');
+            totalExam = parseValue(objectiveEl ? objectiveEl.value : '') + parseValue(theoryEl ? theoryEl.value : '');
+            var totalExamEl = row.querySelector('.total-exam[data-row-key="' + rowKey + '"]');
+            if (totalExamEl) totalExamEl.value = formatNumber(totalExam);
+          }
+
+          var totalScore = testTotal + totalExam;
+          var totalScoreEl = row.querySelector('.total-score[data-row-key="' + rowKey + '"]');
+          if (totalScoreEl) totalScoreEl.value = formatNumber(totalScore);
+
+          var gradeEl = row.querySelector('.grade-output[data-row-key="' + rowKey + '"]');
+          if (gradeEl) gradeEl.textContent = gradeFromScore(totalScore);
+        }
+
+        document.querySelectorAll('.calc-input, .comment-input').forEach(function (input) {
+          input.addEventListener('input', function () {
+            var rowKey = input.getAttribute('data-row-key');
+            markTouched(rowKey);
+            recalcRow(rowKey);
+          });
+          input.addEventListener('change', function () {
+            var rowKey = input.getAttribute('data-row-key');
+            markTouched(rowKey);
+            recalcRow(rowKey);
+          });
+          input.addEventListener('keydown', function (event) {
+            var isCommentField = input.classList.contains('comment-input');
+            var direction = '';
+            if (event.key === 'ArrowLeft' && !isCommentField) direction = 'left';
+            if (event.key === 'ArrowRight' && !isCommentField) direction = 'right';
+            if (event.key === 'ArrowUp') direction = 'up';
+            if (event.key === 'ArrowDown') direction = 'down';
+            if (!direction || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+            if (moveFocus(input, direction)) {
+              event.preventDefault();
+            }
+          });
+        });
+
+        document.querySelectorAll('.score-row').forEach(function (row) {
+          recalcRow(row.getAttribute('data-row-key'));
+        });
+      })();
+    </script>
+</body>
+</html>

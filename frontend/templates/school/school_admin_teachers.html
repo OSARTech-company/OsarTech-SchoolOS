@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Teachers - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      body { min-height: 100vh; }
+      .container { width: min(1220px, 100%); margin: 0 auto; padding: 24px; }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .header h1 { margin: 0; font-size: 1.8rem; }
+      .header .back { color: white; text-decoration: none; font-weight: 700; }
+      .table-scroll { width: 100%; overflow-x: auto; border: 1px solid #dde5f0; border-radius: 10px; }
+      .assignment-table { width: 100%; border-collapse: collapse; min-width: 980px; }
+      .assignment-table th, .assignment-table td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+      .assignment-table th { background: #f8fbff; color: #1f3b5c; font-weight: 700; }
+      .chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+      .chip-item { border: 1px solid #c9d8ea; background: #f8fbff; border-radius: 999px; padding: 2px 8px; font-size: 0.78rem; }
+      .meta-muted { color: #64748b; font-size: 0.85rem; }
+      .archived-toggle-row { display: flex; justify-content: flex-end; margin-top: 10px; }
+      .archived-count-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        padding: 2px 6px;
+        margin-left: 8px;
+        border-radius: 999px;
+        background: #1e3a5f;
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 700;
+      }
+      .archived-count-badge.is-hidden { display: none; }
+      .archived-section { display: none; }
+      .archived-section.is-open { display: block; }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-chalkboard-teacher"></i> Teachers</h1>
+            <a href="{{ url_for('school_admin_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+          {% include 'shared/_school_setup_banner.html' %}
+
+          <div class="card">
+            <h2><i class="fas fa-user-plus"></i> Add New Teacher</h2>
+            <form action="{{ url_for('school_admin_add_teacher') }}" method="POST">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <div class="form-group">
+                <label for="username">Username (Email)</label>
+                <input type="email" id="username" name="username" placeholder="e.g., teacher@school.com" required />
+              </div>
+              <div class="form-group">
+                <label for="firstname">First Name</label>
+                <input type="text" id="firstname" name="firstname" required />
+              </div>
+              <div class="form-group">
+                <label for="lastname">Last Name</label>
+                <input type="text" id="lastname" name="lastname" />
+              </div>
+              <div class="form-group">
+                <label for="phone">Phone (optional, for SMS)</label>
+                <input type="text" id="phone" name="phone" placeholder="+234..." />
+              </div>
+              <div class="form-group">
+                <label for="gender">Gender</label>
+                <select id="gender" name="gender" required>
+                  <option value="">-- Select Gender --</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="password">Password (optional, auto-generated if empty)</label>
+                <input type="password" id="password" name="password" autocomplete="new-password" />
+              </div>
+              <div class="form-group">
+                <label class="checkbox-row">
+                  <input type="checkbox" name="send_credentials" value="1" checked />
+                  Email/SMS login details to the teacher
+                </label>
+              </div>
+              <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add Teacher</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h2><i class="fas fa-table"></i> Active Teachers ({{ current_term }} {{ current_year }})</h2>
+            {% if teacher_rows %}
+            <div class="table-scroll">
+              <table class="assignment-table">
+                <thead>
+                  <tr>
+                    <th>Teacher</th>
+                    <th>Username</th>
+                    <th>Gender</th>
+                    <th>Phone</th>
+                    <th>Current Class Assigned</th>
+                    <th>Current Subject Assigned</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in teacher_rows %}
+                  <tr>
+                    <td><strong>{{ row.name }}</strong></td>
+                    <td class="meta-muted">{{ row.teacher_id }}</td>
+                    <td>{{ (row.gender or 'Not set')|title }}</td>
+                    <td>{{ row.phone or 'Not set' }}</td>
+                    <td>
+                      {% if row.classes %}
+                        <div class="chip-list">
+                          {% for cls in row.classes %}
+                          <span class="chip-item">{{ cls }}</span>
+                          {% endfor %}
+                        </div>
+                      {% else %}
+                        <span class="meta-muted">No current class assignment</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if row.subjects %}
+                        <div class="chip-list">
+                          {% for subj in row.subjects %}
+                          <span class="chip-item">{{ subj }}</span>
+                          {% endfor %}
+                        </div>
+                      {% else %}
+                        <span class="meta-muted">No current subject assignment</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <form action="{{ url_for('school_admin_archive_teacher') }}" method="POST" onsubmit="return confirm('Archive this teacher and clear current assignments?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <input type="hidden" name="teacher_id" value="{{ row.teacher_id }}" />
+                        <input type="hidden" name="return_to" value="school_admin_teachers" />
+                        <button type="submit" class="btn btn-danger">Archive</button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <p>No active teachers yet.</p>
+            {% endif %}
+            <div class="archived-toggle-row">
+              <button type="button" id="toggle-archived-teachers" class="btn btn-secondary btn-sm">
+                <i class="fas fa-box-archive"></i> View Archived Teachers
+                {% set archived_count = archived_teacher_rows|length %}
+                <span class="archived-count-badge {% if archived_count == 0 %}is-hidden{% endif %}">{{ archived_count }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="card archived-section" id="archived-teachers-section">
+            <h2><i class="fas fa-box-archive"></i> Archived Teachers</h2>
+            {% if archived_teacher_rows %}
+            <div class="table-scroll">
+              <table class="assignment-table">
+                <thead>
+                  <tr>
+                    <th>Teacher</th>
+                    <th>Username</th>
+                    <th>Gender</th>
+                    <th>Phone</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in archived_teacher_rows %}
+                  <tr>
+                    <td><strong>{{ row.name }}</strong></td>
+                    <td class="meta-muted">{{ row.teacher_id }}</td>
+                    <td>{{ (row.gender or 'Not set')|title }}</td>
+                    <td>{{ row.phone or 'Not set' }}</td>
+                    <td>
+                      <form action="{{ url_for('school_admin_restore_teacher') }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <input type="hidden" name="teacher_id" value="{{ row.teacher_id }}" />
+                        <input type="hidden" name="return_to" value="school_admin_teachers" />
+                        <button type="submit" class="btn btn-primary">Restore</button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <p>No archived teachers.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+      (function () {
+        if (window.innerWidth > 600) document.body.classList.add('rail-expanded');
+        const toggle = document.getElementById('toggle-archived-teachers');
+        const archived = document.getElementById('archived-teachers-section');
+        if (!toggle || !archived) return;
+        toggle.addEventListener('click', function () {
+          archived.classList.toggle('is-open');
+          const isOpen = archived.classList.contains('is-open');
+          toggle.innerHTML = isOpen
+            ? '<i class="fas fa-eye-slash"></i> Hide Archived Teachers'
+            : '<i class="fas fa-box-archive"></i> View Archived Teachers';
+          if (isOpen) archived.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      })();
+    </script>
+      {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

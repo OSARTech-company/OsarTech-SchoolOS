@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>School Setup Wizard - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308d') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      .wizard-wrap { width: min(1180px, 100%); margin: 0 auto; padding: 24px; }
+      .wizard-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+      .wizard-title h1 { margin: 0 0 6px; font-size: 1.95rem; }
+      .wizard-title p { margin: 0; color: #5b6475; }
+      .wizard-layout { display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); gap: 16px; align-items: start; }
+      .wizard-panel, .wizard-step-card, .wizard-side-card { background: #fff; border: 1px solid #d8e3f0; border-radius: 18px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04); }
+      .wizard-side-card { padding: 18px; position: sticky; top: 18px; }
+      .wizard-progress { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+      .wizard-progress-ring { width: 96px; height: 96px; flex: 0 0 auto; }
+      .wizard-progress-meta { color: #475569; font-size: 0.95rem; }
+      .wizard-progress-meta strong { color: #0f172a; }
+      .wizard-steps-nav { display: grid; gap: 8px; margin-top: 12px; }
+      .wizard-step-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid #e2e8f0; color: #0f172a; background: #f8fafc; text-decoration: none; }
+      .wizard-step-nav.active { background: #eff6ff; border-color: #93c5fd; }
+      .wizard-step-nav.done { background: #ecfdf5; border-color: #86efac; }
+      .wizard-step-nav .meta { font-size: 0.78rem; color: #64748b; }
+      .wizard-step-nav .status { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
+      .wizard-step-nav .status.done { color: #166534; }
+      .wizard-step-nav .status.required { color: #1d4ed8; }
+      .wizard-step-nav .status.optional { color: #4338ca; }
+      .wizard-main { display: grid; gap: 16px; }
+      .wizard-step-card { padding: 20px; }
+      .wizard-hero { background: linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 50%, #14b8a6 100%); color: #fff; padding: 24px; border-radius: 18px; box-shadow: 0 16px 40px rgba(29, 78, 216, 0.18); }
+      .wizard-hero h2 { margin: 0 0 10px; font-size: 1.7rem; }
+      .wizard-hero p { margin: 0 0 14px; color: rgba(255, 255, 255, 0.92); line-height: 1.55; }
+      .wizard-hero .hero-sub { font-weight: 700; font-size: 1rem; margin-top: 4px; }
+      .wizard-hero .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+      .wizard-bullets { margin: 14px 0 0; padding-left: 20px; color: #e8f1ff; }
+      .wizard-bullets li { margin: 8px 0; }
+      .wizard-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+      .wizard-header h3 { margin: 0; font-size: 1.3rem; color: #0f172a; }
+      .wizard-header p { margin: 6px 0 0; color: #5b6475; line-height: 1.5; }
+      .wizard-badges { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+      .wizard-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; }
+      .wizard-badge.done { background: #dcfce7; color: #166534; }
+      .wizard-badge.required { background: #dbeafe; color: #1d4ed8; }
+      .wizard-badge.optional { background: #eef2ff; color: #4338ca; }
+      .wizard-box { display: grid; gap: 12px; margin-top: 16px; }
+      .wizard-info-box { border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; background: #f8fafc; }
+      .wizard-info-box h4 { margin: 0 0 8px; color: #0f172a; font-size: 1rem; }
+      .wizard-info-box p { margin: 0; color: #475569; line-height: 1.55; }
+      .wizard-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+      .wizard-footer-note { color: #64748b; font-size: 0.92rem; margin: 10px 0 0; }
+      .wizard-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
+      .wizard-summary-card { background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); border: 1px solid #dce7f5; border-radius: 14px; padding: 14px; }
+      .wizard-summary-card h4 { margin: 0; font-size: 1.35rem; color: #0f172a; }
+      .wizard-summary-card p { margin: 5px 0 0; color: #64748b; }
+      @media (max-width: 960px) { .wizard-layout { grid-template-columns: 1fr; } .wizard-side-card { position: static; } }
+      @media (max-width: 768px) { .wizard-wrap { padding: 16px; } .wizard-hero { padding: 18px; } }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+        <div class="wizard-wrap">
+          <div class="wizard-top">
+            <div class="wizard-title">
+              <h1><i class="fas fa-wand-magic-sparkles"></i> School Setup Wizard</h1>
+              <p>First-time setup for your school, presented one step at a time.</p>
+            </div>
+            <a href="{{ url_for('school_admin_dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          <div class="wizard-layout">
+            <aside class="wizard-side-card">
+              <div class="wizard-progress">
+                {% set pct = (setup_summary.percentage if setup_summary else 0) %}
+                {% set circ = 283 %}
+                {% set off = ((100 - pct) * circ / 100) %}
+                <svg class="wizard-progress-ring" viewBox="0 0 120 120" role="img" aria-label="Setup progress {{ pct }} percent">
+                  <circle cx="60" cy="60" r="45" fill="none" stroke="#dbeafe" stroke-width="12"></circle>
+                  <circle cx="60" cy="60" r="45" fill="none" stroke="#0ea5e9" stroke-width="12" stroke-linecap="round" transform="rotate(-90 60 60)" stroke-dasharray="{{ circ }}" stroke-dashoffset="{{ off }}"></circle>
+                  <text x="60" y="66" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">{{ pct }}%</text>
+                </svg>
+              <div class="wizard-progress-meta">
+                  <div><strong>Step:</strong> {{ wizard_step_index if wizard_step_index else 1 }} / {{ wizard_total_steps if wizard_total_steps else 1 }}</div>
+                  <div><strong>Status:</strong> {{ 'Complete' if setup_completed else 'In progress' }}</div>
+                  <div><strong>Current Step:</strong> {{ wizard_step.title if wizard_step else 'Welcome' }}</div>
+                  <div><strong>Required:</strong> {{ setup_summary.required_completed if setup_summary else 0 }} / {{ setup_summary.required_total if setup_summary else 0 }}</div>
+                </div>
+              </div>
+
+              <div class="wizard-steps-nav">
+                {% for step in wizard_steps %}
+                <a href="{{ url_for('school_admin_setup_wizard', step=step.key) }}" class="wizard-step-nav{% if wizard_step_key == step.key %} active{% endif %}{% if step.done %} done{% endif %}">
+                  <div>
+                    <div style="font-weight:800;">{{ loop.index }}. {{ step.title }}</div>
+                    <div class="meta">{{ step.subtitle }}</div>
+                  </div>
+                  <span class="status {% if step.done %}done{% elif step.required %}required{% else %}optional{% endif %}">
+                    {% if step.done %}Done{% elif step.required %}Required{% else %}Optional{% endif %}
+                  </span>
+                </a>
+                {% endfor %}
+              </div>
+
+              <div class="wizard-summary-grid">
+                <div class="wizard-summary-card"><h4>{{ setup_summary.teacher_count if setup_summary else 0 }}</h4><p>Teachers</p></div>
+                <div class="wizard-summary-card"><h4>{{ setup_summary.student_count if setup_summary else 0 }}</h4><p>Students</p></div>
+                <div class="wizard-summary-card"><h4>{{ setup_summary.class_count if setup_summary else 0 }}</h4><p>Classes</p></div>
+                <div class="wizard-summary-card"><h4>{{ setup_summary.timetable_count if setup_summary else 0 }}</h4><p>Timetable Rows</p></div>
+              </div>
+            </aside>
+
+            <main class="wizard-main">
+              {% if wizard_step_key == 'welcome' %}
+              <section class="wizard-hero">
+                <h2>Welcome to School Setup</h2>
+                <div class="hero-sub">This will take less than 5 minutes.</div>
+                <p>We’ll guide you through the essential setup steps in a simple order so your school is ready to use.</p>
+                <ul class="wizard-bullets">
+                  <li>Clear setup order with simple next-step navigation</li>
+                  <li>Quick access to the right page for each task</li>
+                  <li>Designed for first-time school admins</li>
+                </ul>
+                <div class="hero-actions">
+                  <form method="post" action="{{ url_for('school_admin_setup_wizard') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    <input type="hidden" name="action" value="start" />
+                    <button type="submit" class="btn btn-light"><i class="fas fa-play"></i> Start Setup</button>
+                  </form>
+                  <a href="{{ url_for('school_admin_dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-right-to-bracket"></i> Skip for now</a>
+                </div>
+                <p class="wizard-footer-note" style="color: rgba(255,255,255,0.9);">
+                  If you skip now, the wizard will appear again on your next login until setup is completed.
+                </p>
+              </section>
+              {% else %}
+              <section class="wizard-step-card">
+                <div class="wizard-header">
+                  <div>
+                    <h3>Step {{ wizard_step_index if wizard_step_index else 1 }} of {{ wizard_total_steps if wizard_total_steps else 1 }}: {{ wizard_step.title }}</h3>
+                    <p>{{ wizard_step.description }}</p>
+                  </div>
+                  <div class="wizard-badges">
+                    <span class="wizard-badge {% if wizard_step.done %}done{% endif %}"><i class="fas {% if wizard_step.done %}fa-circle-check{% else %}fa-circle-info{% endif %}"></i> {{ 'Done' if wizard_step.done else 'Pending' }}</span>
+                    <span class="wizard-badge {% if wizard_step.required %}required{% else %}optional{% endif %}">{{ 'Required' if wizard_step.required else 'Optional' }}</span>
+                  </div>
+                </div>
+
+                <div class="wizard-box">
+                  <div class="wizard-info-box">
+                    <h4>What to do on this step</h4>
+                    <p>{{ wizard_step.subtitle }}</p>
+                    <ul class="wizard-bullets" style="color:#334155; margin-top:12px;">
+                      {% for item in wizard_step.bullets %}
+                      <li>{{ item }}</li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                  {% if wizard_step.primary_endpoint %}
+                  <div class="wizard-info-box">
+                    <h4>Open the right page</h4>
+                    <p>Use the button below to complete this step in the main app, then come back here and continue.</p>
+                  </div>
+                  {% endif %}
+                  {% if wizard_step.support_endpoint %}
+                  <div class="wizard-info-box">
+                    <h4>Related action</h4>
+                    <p>This step also needs a quick dashboard action before the setup will show as complete.</p>
+                  </div>
+                  {% endif %}
+                </div>
+
+                <div class="wizard-actions">
+                  {% if wizard_step.primary_endpoint %}
+                  <a href="{{ url_for(wizard_step.primary_endpoint) }}" class="btn btn-primary"><i class="fas fa-arrow-right"></i> {{ wizard_step.primary_label }}</a>
+                  {% endif %}
+                  {% if wizard_step.support_endpoint %}
+                  <a href="{{ url_for(wizard_step.support_endpoint) }}" class="btn btn-secondary"><i class="fas fa-signature"></i> {{ wizard_step.support_label }}</a>
+                  {% endif %}
+                  {% if wizard_step.prev_key %}
+                  <a href="{{ url_for('school_admin_setup_wizard', step=wizard_step.prev_key) }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Previous</a>
+                  {% endif %}
+                  {% if wizard_step.next_key and not wizard_step.final_step %}
+                  <form method="post" action="{{ url_for('school_admin_setup_wizard', step=wizard_step.key) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    <input type="hidden" name="action" value="continue" />
+                    <button type="submit" class="btn btn-secondary"><i class="fas fa-arrow-right"></i> {{ wizard_step.secondary_label or 'Continue' }}</button>
+                  </form>
+                  {% endif %}
+                  {% if wizard_step.final_step %}
+                  <form method="post" action="{{ url_for('school_admin_setup_wizard', step=wizard_step.key) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    <input type="hidden" name="action" value="complete" />
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Mark Setup Complete</button>
+                  </form>
+                  {% endif %}
+                </div>
+                <p class="wizard-footer-note">{% if wizard_step.final_step %}Review the progress summary on the left, then complete the wizard when you are satisfied.{% else %}After completing this task, come back here and continue to the next step.{% endif %}</p>
+              </section>
+              {% endif %}
+
+              <section class="wizard-step-card">
+                <div class="wizard-header">
+                  <div>
+                    <h3>Setup Summary</h3>
+                    <p>At a glance view of the current school setup.</p>
+                  </div>
+                </div>
+                <div class="wizard-summary-grid">
+                  <div class="wizard-summary-card"><h4>{{ setup_summary.percentage if setup_summary else 0 }}%</h4><p>Required setup complete</p></div>
+                  <div class="wizard-summary-card"><h4>{{ setup_summary.required_completed if setup_summary else 0 }}/{{ setup_summary.required_total if setup_summary else 0 }}</h4><p>Required steps done</p></div>
+                  <div class="wizard-summary-card"><h4>{{ setup_summary.term_event_count if setup_summary else 0 }}</h4><p>Term events</p></div>
+                  <div class="wizard-summary-card"><h4>{{ setup_summary.class_count if setup_summary else 0 }}</h4><p>Configured classes</p></div>
+                </div>
+              </section>
+            </main>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+  </body>
+</html>
+
+

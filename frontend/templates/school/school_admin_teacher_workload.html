@@ -1,0 +1,131 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Teacher Workload - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      .container { width: min(1240px, 100%); margin: 0 auto; padding: 24px; }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .header h1 { margin: 0; font-size: 1.8rem; }
+      .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 12px 0; }
+      .summary-card { background: #f8fbff; border: 1px solid #dbe7f3; border-radius: 10px; padding: 12px; }
+      .summary-card h3 { margin: 0 0 6px; font-size: 0.95rem; color: #1f3b5c; }
+      .summary-card .value { font-size: 1.5rem; font-weight: 800; color: #0f172a; }
+      .table-scroll { width: 100%; overflow-x: auto; border: 1px solid #dde5f0; border-radius: 10px; }
+      .assignment-table { width: 100%; border-collapse: collapse; min-width: 980px; }
+      .assignment-table th, .assignment-table td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+      .assignment-table th { background: #f8fbff; color: #1f3b5c; font-weight: 700; }
+      .tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: #eef2ff; color: #273270; font-size: 0.75rem; font-weight: 700; }
+      .muted { color: #64748b; font-size: 0.9rem; }
+      .pill-list { display: flex; flex-wrap: wrap; gap: 6px; }
+      .pill { background: #edf5ff; color: #1e3a5f; border-radius: 999px; padding: 2px 8px; font-size: 0.75rem; font-weight: 600; }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-people-roof"></i> Teacher Workload</h1>
+            <a href="{{ url_for('school_admin_dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+          </div>
+
+          <div class="summary-grid">
+            <div class="summary-card">
+              <h3>Current Term</h3>
+              <div class="value">{{ current_term }}{% if current_year %} ({{ current_year }}){% endif %}</div>
+            </div>
+            <div class="summary-card">
+              <h3>Class Assignments</h3>
+              <div class="value">{{ class_assignment_count or 0 }}</div>
+            </div>
+            <div class="summary-card">
+              <h3>Subject Assignments</h3>
+              <div class="value">{{ subject_assignment_count or 0 }}</div>
+            </div>
+            <div class="summary-card">
+              <h3>Teachers Listed</h3>
+              <div class="value">{{ workload_rows|length }}</div>
+            </div>
+          </div>
+
+          {% if conflict_messages %}
+          <div class="card">
+            <h2><i class="fas fa-triangle-exclamation"></i> Assignment Conflicts</h2>
+            <ul class="note-line">
+              {% for msg in conflict_messages %}
+              <li>{{ msg }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+
+          <div class="card">
+            <div class="header">
+              <h2>Workload Table</h2>
+              <a class="btn btn-secondary" href="{{ url_for('school_admin_teacher_workload', include_archived=('1' if not include_archived else '0')) }}">
+                {% if include_archived %}Hide Archived{% else %}Show Archived{% endif %}
+              </a>
+            </div>
+            <div class="table-scroll">
+              <table class="assignment-table">
+                <thead>
+                  <tr>
+                    <th>Teacher</th>
+                    <th>Class Assignments</th>
+                    <th>Subject Assignments</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in workload_rows %}
+                  <tr>
+                    <td>
+                      <strong>{{ row.teacher_name }}</strong>
+                      <div class="muted">{{ row.teacher_id }}</div>
+                      {% if row.is_archived %}
+                      <div class="tag">Archived</div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div class="tag">{{ row.class_count }} class{% if row.class_count != 1 %}es{% endif %}</div>
+                      {% if row.class_list %}
+                      <div class="pill-list mt-6">
+                        {% for cls in row.class_list %}
+                        <span class="pill">{{ cls }}</span>
+                        {% endfor %}
+                      </div>
+                      {% else %}
+                      <div class="muted">No class assignment</div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div class="tag">{{ row.subject_count }} subject{% if row.subject_count != 1 %}s{% endif %}</div>
+                      {% if row.subject_list %}
+                      <div class="pill-list mt-6">
+                        {% for subj in row.subject_list %}
+                        <span class="pill">{{ subj }}</span>
+                        {% endfor %}
+                      </div>
+                      {% else %}
+                      <div class="muted">No subject assignment</div>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+      {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

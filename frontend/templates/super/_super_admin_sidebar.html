@@ -1,0 +1,57 @@
+<div class="side-taskbar">
+    <div class="side-brand">
+        <img src="{{ url_for('static', filename='img/osartech-logo.png', v='20260411b') }}" alt="Osartech Logo" class="brand-logo">
+        <span>Super Admin</span>
+    </div>
+    <div class="side-links">
+        <a href="{{ url_for('super_admin_dashboard') }}" class="side-link{% if active_page == 'dashboard' %} active{% endif %}">
+            <i class="fas fa-chart-line"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('super_admin_add_school_page') }}" class="side-link{% if active_page == 'add_school' %} active{% endif %}">
+            <i class="fas fa-plus-circle"></i>
+            <span>Add School</span>
+        </a>
+        <a href="{{ url_for('super_admin_view_schools') }}" class="side-link{% if active_page == 'schools' %} active{% endif %}">
+            <i class="fas fa-school"></i>
+            <span>View Schools</span>
+        </a>
+        <a href="{{ url_for('super_admin_onboarding_requests') }}" class="side-link{% if active_page == 'onboarding_requests' %} active{% endif %}">
+            <i class="fas fa-user-plus"></i>
+            <span>Onboarding Requests</span>
+        </a>
+        <a href="{{ url_for('super_admin_privacy_requests') }}" class="side-link{% if active_page == 'privacy_requests' %} active{% endif %}">
+            <i class="fas fa-user-shield"></i>
+            <span>Privacy Requests</span>
+        </a>
+        <a href="{{ url_for('view_reports') }}" class="side-link{% if active_page == 'reports' %} active{% endif %}">
+            <i class="fas fa-clipboard-list"></i>
+            <span>Reported Issues</span>
+        </a>
+        <a href="{{ url_for('super_admin_error_logs') }}" class="side-link{% if active_page == 'error_logs' %} active{% endif %}">
+            <i class="fas fa-triangle-exclamation"></i>
+            <span>Error Logs</span>
+        </a>
+        <a href="{{ url_for('super_admin_system_settings') }}" class="side-link{% if active_page == 'system_settings' %} active{% endif %}">
+            <i class="fas fa-sliders-h"></i>
+            <span>System Settings</span>
+        </a>
+        <a href="{{ url_for('super_admin_assistant_analytics') }}" class="side-link{% if active_page == 'assistant_analytics' %} active{% endif %}">
+            <i class="fas fa-robot"></i>
+            <span>Assistant Analytics</span>
+        </a>
+        <a href="{{ url_for('super_admin_webhook_setup') }}" class="side-link{% if active_page == 'webhook_setup' %} active{% endif %}">
+            <i class="fas fa-plug"></i>
+            <span>Webhook Setup</span>
+        </a>
+        <form method="post" action="{{ url_for('logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="side-link side-link-logout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </form>
+    </div>
+</div>
+{% include 'shared/_ai_assistant_widget.html' %}
+

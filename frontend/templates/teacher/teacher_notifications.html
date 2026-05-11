@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Missing Score Notifications - Teacher</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(1120px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.85rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .summary-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        .summary-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #dbe4ef;
+            border-radius: 999px;
+            padding: 8px 12px;
+            background: #f8fbff;
+            color: #1e3a5f;
+            font-weight: 700;
+        }
+        .arm-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid #dbe4ef;
+            background: #f8fbff;
+            color: #1e3a5f;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .arm-toggle select { border-radius: 8px; padding: 4px 8px; }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    {% set active_page = active_page|default('notifications', true) %}
+    {% set teacher_sidebar_profile_image = teacher_profile_image %}
+    {% set teacher_sidebar_display_name = teacher_name %}
+    <div class="app-shell topbar-layout">
+        {% include 'teacher/_teacher_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-bell"></i> Missing Score Notifications</h1>
+                    <a href="{{ url_for('teacher_dashboard', tab='overview', arm_mode=(request.args.get('arm_mode') or '')) }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                {% set arm_mode_value = (request.args.get('arm_mode') or (school.class_arm_ranking_mode if school else 'separate')) %}
+                <form method="GET" action="{{ url_for('teacher_notifications') }}" class="arm-toggle">
+                    <i class="fas fa-layer-group" aria-hidden="true"></i>
+                    <span>Class Arm View:</span>
+                    <select name="arm_mode" onchange="this.form.submit()">
+                        <option value="separate" {% if arm_mode_value == 'separate' %}selected{% endif %}>Separate Arms</option>
+                        <option value="together" {% if arm_mode_value == 'together' %}selected{% endif %}>Combine Arms</option>
+                    </select>
+                </form>
+
+                <div class="card">
+                    <div class="summary-row">
+                        <span class="summary-chip"><i class="fas fa-list"></i> Alerts: {{ missing_score_alert_count }}</span>
+                        <span class="summary-chip"><i class="fas fa-users"></i> Pending Entries: {{ total_pending_entries }}</span>
+                        <span class="summary-chip"><i class="fas fa-calendar-alt"></i> {{ current_term }} {{ current_year }}</span>
+                    </div>
+                    {% if teacher_missing_score_alerts %}
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Scope</th>
+                                    <th>Class</th>
+                                    <th>Subject</th>
+                                    <th>Pending Students</th>
+                                    <th>Details</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for alert in teacher_missing_score_alerts %}
+                                <tr class="student-row">
+                                    <td>{{ 'Class Owner' if alert.scope == 'class_owner' else 'Subject Teacher' }}</td>
+                                    <td>{{ alert.classname }}</td>
+                                    <td>{{ alert.subject or '-' }}</td>
+                                    <td>{{ alert.pending_students }}</td>
+                                    <td>{{ alert.message }}</td>
+                                    <td>
+                                        {% if alert.subject %}
+                                        <a href="{{ url_for('teacher_dashboard', tab='score', score_class=alert.classname, score_subject=alert.subject, arm_mode=(request.args.get('arm_mode') or '')) }}" class="btn btn-primary btn-xs">
+                                            Go to Score Entry
+                                        </a>
+                                        {% else %}
+                                        <a href="{{ url_for('teacher_dashboard', tab='score', score_class=alert.classname, arm_mode=(request.args.get('arm_mode') or '')) }}" class="btn btn-primary btn-xs">
+                                            Go to Score Entry
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="success-note">No missing score alerts right now.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

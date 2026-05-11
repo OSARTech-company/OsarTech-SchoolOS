@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request School Access</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="container" style="max-width: 980px;">
+        <div class="header">
+            <h1><i class="fas fa-school"></i> Request School Access</h1>
+            <p class="meta-line">For new schools that want to onboard remotely without in-person meeting.</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <h2><i class="fas fa-file-signature"></i> School Registration Request</h2>
+            <p class="note">Submit this form once with verifiable school details. Email verification is required before super-admin review.</p>
+            <form method="POST" action="{{ url_for('school_access_request') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="form_action" value="submit">
+                <input type="text" name="website" value="" style="position:absolute;left:-10000px;opacity:0;" tabindex="-1" autocomplete="off">
+                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));">
+                    <div class="form-group">
+                        <label for="school_name">School Name *</label>
+                        <input id="school_name" name="school_name" type="text" required placeholder="e.g., Saint Mark College">
+                    </div>
+                    <div class="form-group">
+                        <label for="location">Location</label>
+                        <input id="location" name="location" type="text" placeholder="e.g., Lagos, Nigeria">
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">School Phone *</label>
+                        <input id="phone" name="phone" type="text" required placeholder="e.g., +2348012345678">
+                    </div>
+                    <div class="form-group">
+                        <label for="school_email">Official School Email *</label>
+                        <input id="school_email" name="school_email" type="email" required placeholder="e.g., info@school.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="principal_name">Principal Name</label>
+                        <input id="principal_name" name="principal_name" type="text" placeholder="e.g., Rev. John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label for="admin_name">Proposed Admin Name</label>
+                        <input id="admin_name" name="admin_name" type="text" placeholder="e.g., Mrs Jane Smith">
+                    </div>
+                    <div class="form-group">
+                        <label for="admin_email">Proposed Admin Email *</label>
+                        <input id="admin_email" name="admin_email" type="email" required placeholder="e.g., admin@school.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="website_url">School Website / Official Social Page</label>
+                        <input id="website_url" name="website_url" type="url" placeholder="e.g., https://schoolname.edu.ng">
+                    </div>
+                    <div class="form-group">
+                        <label for="expected_students">Expected Students</label>
+                        <input id="expected_students" name="expected_students" type="number" min="0" value="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="proof_document">Proof Document * (PDF or image, max 5MB)</label>
+                    <input id="proof_document" name="proof_document" type="file" required accept=".pdf,.png,.jpg,.jpeg,.webp">
+                </div>
+                <div class="form-group">
+                    <label for="note">Additional Note</label>
+                    <textarea id="note" name="note" rows="4" placeholder="Tell us your school size, term timeline, or preferred onboarding date."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="challenge_answer">Anti-bot Check: {{ challenge_text }} = ?</label>
+                    <input id="challenge_answer" name="challenge_answer" type="number" required>
+                </div>
+                <div class="toolbar">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Submit Request</button>
+                    <a href="{{ url_for('login') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Login</a>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2><i class="fas fa-envelope-open-text"></i> Verify School Email</h2>
+            <p class="note">Use the code sent to your school email after submission.</p>
+            <form method="POST" action="{{ url_for('school_access_request') }}" class="toolbar">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="form_action" value="verify_email">
+                <div>
+                    <label for="verify_request_id">Request Reference</label>
+                    <input id="verify_request_id" name="verify_request_id" type="text" placeholder="REQ-20260308-ABC123" required>
+                </div>
+                <div>
+                    <label for="verify_school_email">School Email</label>
+                    <input id="verify_school_email" name="verify_school_email" type="email" placeholder="info@school.com">
+                </div>
+                <div>
+                    <label for="verify_code">Verification Code</label>
+                    <input id="verify_code" name="verify_code" type="text" inputmode="numeric" maxlength="6" placeholder="6-digit code" required>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-check-circle"></i> Verify Email</button>
+            </form>
+            <form method="POST" action="{{ url_for('school_access_request') }}" class="toolbar" style="margin-top:10px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="form_action" value="resend_verify_code">
+                <div>
+                    <label for="resend_request_id">Request Reference</label>
+                    <input id="resend_request_id" name="resend_request_id" type="text" placeholder="REQ-20260308-ABC123" required>
+                </div>
+                <div>
+                    <label for="resend_school_email">School Email</label>
+                    <input id="resend_school_email" name="resend_school_email" type="email" placeholder="info@school.com">
+                </div>
+                <button type="submit" class="btn btn-secondary"><i class="fas fa-paper-plane"></i> Resend Code</button>
+            </form>
+        </div>
+
+        {% if manual_payment_info %}
+        <div class="card">
+            <h2><i class="fas fa-receipt"></i> Submit Manual Payment Proof</h2>
+            <p class="note">If you paid via transfer, upload proof so we can confirm your payment.</p>
+            <form method="POST" action="{{ url_for('school_access_request') }}" enctype="multipart/form-data" class="toolbar">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="form_action" value="submit_payment_proof">
+                <div>
+                    <label for="payment_request_id">Request Reference</label>
+                    <input id="payment_request_id" name="payment_request_id" type="text" placeholder="REQ-20260308-ABC123" required>
+                </div>
+                <div>
+                    <label for="payment_school_email">School Email</label>
+                    <input id="payment_school_email" name="payment_school_email" type="email" placeholder="info@school.com">
+                </div>
+                <div>
+                    <label for="payment_reference">Payment Reference (optional)</label>
+                    <input id="payment_reference" name="payment_reference" type="text" placeholder="Bank transfer reference">
+                </div>
+                <div>
+                    <label for="payment_amount">Amount (optional)</label>
+                    <input id="payment_amount" name="payment_amount" type="number" min="0" step="0.01" placeholder="0.00">
+                </div>
+                <div>
+                    <label for="payment_proof">Payment Proof (PDF or image, max 5MB)</label>
+                    <input id="payment_proof" name="payment_proof" type="file" required accept=".pdf,.png,.jpg,.jpeg,.webp">
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> Submit Proof</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <h2><i class="fas fa-search"></i> Track Existing Request</h2>
+            <form method="POST" action="{{ url_for('school_access_request') }}" class="toolbar">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="form_action" value="track">
+                <div>
+                    <label for="track_request_id">Request Reference</label>
+                    <input id="track_request_id" name="track_request_id" type="text" placeholder="e.g., REQ-20260308-ABC123" required>
+                </div>
+                <div>
+                    <label for="track_admin_email">Admin Email (optional)</label>
+                    <input id="track_admin_email" name="track_admin_email" type="email" placeholder="admin@school.com">
+                </div>
+                <button type="submit" class="btn btn-secondary"><i class="fas fa-magnifying-glass"></i> Check Status</button>
+            </form>
+            {% if tracked_request %}
+            <div class="stack-card">
+                <p><strong>Request:</strong> {{ tracked_request.request_id }}</p>
+                <p><strong>School:</strong> {{ tracked_request.school_name }}</p>
+                <p><strong>Status:</strong> {{ tracked_request.status|replace('_', ' ')|title }}</p>
+                <p><strong>Website/Social:</strong> {{ tracked_request.website_url or '-' }}</p>
+                <p><strong>Proof Document:</strong> {{ 'Received' if tracked_request.proof_document_path else 'Not received' }}</p>
+                <p><strong>Submitted:</strong> {{ tracked_request.created_at }}</p>
+                <p><strong>School Email Verified:</strong> {{ 'Yes' if tracked_request.school_email_verified else 'No' }}</p>
+                <p><strong>Phone Verified (Admin Checklist):</strong> {{ 'Yes' if tracked_request.phone_verified else 'No' }}</p>
+                <p><strong>Document Verified (Admin Checklist):</strong> {{ 'Yes' if tracked_request.document_verified else 'No' }}</p>
+                {% if tracked_request.reviewed_at %}
+                <p><strong>Reviewed:</strong> {{ tracked_request.reviewed_at }}</p>
+                {% endif %}
+                {% if tracked_request.review_note %}
+                <p><strong>Note:</strong> {{ tracked_request.review_note }}</p>
+                {% endif %}
+                {% if tracked_request.linked_school_id %}
+                <p><strong>School ID:</strong> {{ tracked_request.linked_school_id }}</p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if manual_payment_info %}
+        <div class="card">
+            <h2><i class="fas fa-building-columns"></i> Manual Payment (Optional)</h2>
+            <p class="note">If your school prefers manual payment, use the details below and submit proof to support.</p>
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                <div class="stack-card">
+                    <p><strong>Account Number:</strong> {{ manual_payment_info.account_number }}</p>
+                    <p><strong>Account Name:</strong> {{ manual_payment_info.account_name }}</p>
+                    {% if manual_payment_info.bank_name %}
+                    <p><strong>Bank:</strong> {{ manual_payment_info.bank_name }}</p>
+                    {% endif %}
+                    {% if manual_payment_info.contact_phone %}
+                    <p><strong>Contact:</strong> {{ manual_payment_info.contact_phone }}</p>
+                    {% endif %}
+                    {% if manual_payment_info.note %}
+                    <p><strong>Note:</strong> {{ manual_payment_info.note }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
+

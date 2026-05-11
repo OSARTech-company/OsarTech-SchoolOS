@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSARtech SchoolOS CBT Login</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260309a') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: #f3f6fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .box {
+            width: min(520px, 100%);
+            background: #fff;
+            border: 1px solid #dbe5f2;
+            border-radius: 14px;
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+            padding: 22px;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+            color: #0f2f53;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+        }
+        .brand img {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            border-radius: 8px;
+            border: 1px solid #dbe5f2;
+            background: #fff;
+            padding: 4px;
+        }
+        h1 {
+            margin: 0 0 8px;
+            color: #0f2f53;
+            font-size: 1.45rem;
+        }
+        .muted { color: #5b6475; margin: 0 0 14px; }
+        .alert { padding: 10px 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #d5e5f7; background: #f4f9ff; color: #21486a; }
+        .alert.error { border-color: #f4c6c6; background: #fff4f4; color: #b42318; }
+        label { display: block; font-weight: 700; margin: 0 0 6px; color: #2a4661; }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        input:focus { outline: none; border-color: #0f4c81; box-shadow: 0 0 0 3px rgba(31, 122, 140, 0.15); }
+        .terms { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0 14px; color: #3d556d; font-size: .9rem; }
+        .terms a { color: #0f4c81; font-weight: 700; text-decoration: none; }
+        .terms a:hover { text-decoration: underline; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-main {
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(140deg, #0f4c81 0%, #1f7a8c 100%);
+            color: #fff;
+            padding: 11px 16px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-alt {
+            border-radius: 8px;
+            border: 1px solid #b7c7dc;
+            background: #fff;
+            color: #0f4c81;
+            padding: 11px 16px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="box">
+        <div class="brand">
+            <img src="{{ url_for('static', filename='img/osartech-logo.png', v='20260411b') }}" alt="Osartech">
+            <span>OSARtech SchoolOS CBT</span>
+        </div>
+        <h1><i class="fas fa-laptop-code"></i> Student CBT Login</h1>
+        <p class="muted">Sign in with your student ID and password to access CBT exams only.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert {% if category == 'error' %}error{% endif %}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if blocked_access_state %}
+        <div class="alert error">{{ blocked_access_state.reason or blocked_access_state.message or 'School access is restricted.' }}</div>
+        {% endif %}
+
+        <form method="post" action="{{ url_for('cbt_login') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="username">Student ID</label>
+            <input type="text" id="username" name="username" autocomplete="username" required>
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" autocomplete="current-password" required>
+            <div class="terms">
+                <input type="checkbox" id="agree_terms" name="agree_terms" {% if terms_read %}checked{% endif %}>
+                <label for="agree_terms">
+                    I agree to the <a href="{{ url_for('terms_privacy') }}" target="_blank" rel="noopener">Terms & Privacy Policy</a>.
+                </label>
+            </div>
+            <div class="actions">
+                <button type="submit" class="btn-main"><i class="fas fa-sign-in-alt"></i> Enter CBT</button>
+                <a href="{{ url_for('login') }}" class="btn-alt"><i class="fas fa-user-shield"></i> Main Login</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
+
+

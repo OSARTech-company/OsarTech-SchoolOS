@@ -1,0 +1,101 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app-assistant.css', v='20260308n') }}">
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.body.classList.add('has-global-footer');
+    });
+</script>
+{% set footer_school_name = '' %}
+{% if school and school.get('school_name') %}
+{% set footer_school_name = school.get('school_name') %}
+{% elif school_name %}
+{% set footer_school_name = school_name %}
+{% elif children and children[0] and children[0].school_name %}
+{% set footer_school_name = children[0].school_name %}
+{% else %}
+{% set footer_school_name = 'Student Score Management System' %}
+{% endif %}
+{% set footer_term_label = current_term if current_term else '' %}
+{% set footer_year_label = current_year if current_year else '' %}
+<footer class="app-global-footer" role="contentinfo">
+    <div class="app-global-footer-left">
+        <span class="app-global-footer-brand">{{ footer_school_name }}</span>
+        {% if footer_term_label or footer_year_label %}
+        <span class="app-global-footer-sep">|</span>
+        <span>{{ footer_term_label }}{% if footer_year_label %} {{ footer_year_label }}{% endif %}</span>
+        {% endif %}
+        <span class="app-global-footer-sep">|</span>
+        <span>By Osartech LTD</span>
+    </div>
+    <div class="app-global-footer-right">
+        <a href="{{ url_for('help') }}">Help</a>
+        <a href="{{ url_for('report_issue') }}">Report Issue</a>
+        <a href="{{ url_for('privacy_request') }}">Data Request</a>
+        <a href="{{ url_for('terms_privacy') }}">Privacy</a>
+    </div>
+</footer>
+{% if post_login_welcome_name %}
+<div class="app-welcome-toast" role="status" aria-live="polite">
+    Welcome, {{ post_login_welcome_name }}.
+</div>
+{% endif %}
+{% set assistant_intro = 'Ask anything about how to use this app. I can guide you step-by-step, but I cannot execute actions.' %}
+{% if session.get('role') == 'teacher' %}
+{% set assistant_intro = 'Ask me any teacher workflow question. I will explain step-by-step based on your class/subject assignment, but I cannot execute actions.' %}
+{% endif %}
+<div class="app-ai-assistant" data-role="{{ (session.get('role') or '')|e }}" data-preferred-mode="{{ assistant_preferred_mode|default('standard', true)|e }}">
+    <input type="hidden" class="app-ai-csrf" value="{{ csrf_token() }}">
+    <button type="button" class="app-ai-toggle" aria-expanded="false" aria-controls="app-ai-panel">AI Help</button>
+    <section id="app-ai-panel" class="app-ai-panel" hidden>
+        <header class="app-ai-header">
+            <strong>App Assistant</strong>
+            <div class="app-ai-header-actions">
+                <button type="button" class="app-ai-clear" title="Clear the last two days assistant memory">Clear Memory</button>
+                <button type="button" class="app-ai-close" aria-label="Close assistant">&times;</button>
+            </div>
+        </header>
+        <div class="app-ai-messages" aria-live="polite" data-intro="{{ assistant_intro }}">
+            <div class="app-ai-bot-msg">{{ assistant_intro }}</div>
+        </div>
+        <form class="app-ai-form" autocomplete="off">
+            <select class="app-ai-mode" name="response_mode" aria-label="Assistant response style">
+                <option value="ultra_simple" {% if assistant_preferred_mode == 'ultra_simple' %}selected{% endif %}>Ultra Simple</option>
+                <option value="standard" {% if assistant_preferred_mode == 'standard' %}selected{% endif %}>Standard</option>
+                <option value="simple" {% if assistant_preferred_mode == 'simple' %}selected{% endif %}>Simple English</option>
+                <option value="detailed" {% if assistant_preferred_mode == 'detailed' %}selected{% endif %}>Detailed</option>
+                <option value="checklist" {% if assistant_preferred_mode == 'checklist' %}selected{% endif %}>Checklist</option>
+                <option value="local" {% if assistant_preferred_mode == 'local' %}selected{% endif %}>Local Style</option>
+                <option value="pidgin" {% if assistant_preferred_mode == 'pidgin' %}selected{% endif %}>Pidgin-friendly</option>
+            </select>
+            <input type="text" name="question" maxlength="1200" placeholder="Ask about workflows or paste an error message..." required>
+            <button type="submit">Ask</button>
+        </form>
+        <div class="app-ai-quick" data-default-prompts='{{ (assistant_quick_prompts or [])|tojson|safe }}'></div>
+    </section>
+</div>
+{% set show_alert_fab = false %}
+{% set alert_count = 0 %}
+{% set alert_target = '#' %}
+{% set alert_label = 'Notifications' %}
+{% if session.get('role') == 'school_admin' %}
+{% set show_alert_fab = true %}
+{% set alert_count = school_pending_privacy_review_count|default(0, true) %}
+{% set alert_target = url_for('school_admin_privacy_requests') %}
+{% set alert_label = 'Pending data requests' %}
+{% elif session.get('role') == 'teacher' and request.endpoint == 'teacher_dashboard' %}
+{% set show_alert_fab = true %}
+{% set alert_count = teacher_missing_score_alerts|default([], true)|length %}
+{% set alert_target = url_for('teacher_notifications') %}
+{% set alert_label = 'Missing score alerts' %}
+{% endif %}
+{% if show_alert_fab %}
+<a href="{{ alert_target }}"
+   class="app-alert-fab {% if alert_count > 0 %}has-alerts{% endif %}"
+   aria-label="{{ alert_label }}{% if alert_count > 0 %}: {{ alert_count }}{% endif %}"
+   title="{% if alert_count > 0 %}{{ alert_count }} {{ alert_label|lower }}{% else %}No {{ alert_label|lower }}{% endif %}">
+    <i class="fas fa-bell" aria-hidden="true"></i>
+    {% if alert_count > 0 %}
+    <span class="app-alert-fab-badge">{{ alert_count }}</span>
+    {% endif %}
+</a>
+{% endif %}
+<script src="{{ url_for('static', filename='js/app-assistant.js', v='20260328d') }}" defer></script>

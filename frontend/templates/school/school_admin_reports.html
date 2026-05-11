@@ -1,0 +1,45 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Reports</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'reports' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Reports Export</h1>
+        <p><a class="btn" href="{{ url_for('school_admin_dashboard') }}">Back to Dashboard</a></p>
+    </div>
+    <div class="card">
+        <form method="get">
+            <label>Term</label>
+            <input type="text" name="term" value="{{ selected_term }}">
+            <label>Academic Year</label>
+            <input type="text" name="academic_year" value="{{ selected_year }}">
+            <button class="btn" type="submit">Apply</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Exports</h2>
+        <p class="note">Download summaries as CSV files for the selected term and academic year.</p>
+        <a class="btn" href="{{ url_for('school_admin_reports_export', kind='term_summary', term=selected_term, academic_year=selected_year) }}">Term Summary</a>
+        <a class="btn ml-10" href="{{ url_for('school_admin_reports_export', kind='attendance_summary', term=selected_term, academic_year=selected_year) }}">Attendance Summary</a>
+        <a class="btn ml-10" href="{{ url_for('school_admin_reports_export', kind='subject_performance', term=selected_term, academic_year=selected_year) }}">Subject Performance</a>
+    </div>
+</div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+

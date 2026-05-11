@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin Dashboard - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308d') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" integrity="sha384-3B6NwesSXE7YJlcLI9RpRqGf2p/EgVH8BgoKTaUrmKNDkHPStTQ3EyoYjCGXaOTS" crossorigin="anonymous" referrerpolicy="no-referrer">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+        <div class="side-taskbar">
+            <div class="side-brand">
+                <img src="{{ url_for('static', filename='img/osartech-logo.png', v='20260411b') }}" alt="Osartech Logo" class="brand-logo">
+                <span>Super Admin</span>
+            </div>
+            <div class="side-links">
+                <a href="{{ url_for('super_admin_dashboard') }}" class="side-link active">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('super_admin_add_school_page') }}" class="side-link">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Add School</span>
+                </a>
+                <a href="{{ url_for('super_admin_view_schools') }}" class="side-link">
+                    <i class="fas fa-school"></i>
+                    <span>View Schools</span>
+                </a>
+                <a href="{{ url_for('super_admin_onboarding_requests') }}" class="side-link">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Onboarding Requests</span>
+                </a>
+                <a href="{{ url_for('super_admin_privacy_requests') }}" class="side-link">
+                    <i class="fas fa-user-shield"></i>
+                    <span>Privacy Requests</span>
+                </a>
+                <a href="{{ url_for('view_reports') }}" class="side-link">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Reported Issues</span>
+                </a>
+                <a href="{{ url_for('super_admin_error_logs') }}" class="side-link">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    <span>Error Logs</span>
+                </a>
+                <a href="{{ url_for('super_admin_system_settings') }}" class="side-link">
+                    <i class="fas fa-sliders-h"></i>
+                    <span>System Settings</span>
+                </a>
+                <a href="{{ url_for('super_admin_assistant_analytics') }}" class="side-link">
+                    <i class="fas fa-robot"></i>
+                    <span>Assistant Analytics</span>
+                </a>
+                <a href="{{ url_for('super_admin_webhook_setup') }}" class="side-link">
+                    <i class="fas fa-plug"></i>
+                    <span>Webhook Setup</span>
+                </a>
+                <form method="post" action="{{ url_for('logout') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="side-link side-link-logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-crown"></i> Osartech</h1>
+                    <p class="meta-line"><strong>Last Login:</strong> {{ last_login_at }}</p>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>{{ overview.total_schools }}</h3>
+                        <p>Total Schools</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ overview.operations_on }}</h3>
+                        <p>Operations ON</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ overview.operations_off }}</h3>
+                        <p>Operations OFF</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ overview.with_admin }}</h3>
+                        <p>Schools with Admin</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ overview.pending_payment }}</h3>
+                        <p>Pending Payment</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ overview.suspended }}</h3>
+                        <p>Suspended</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ overview.billing_overdue }}</h3>
+                        <p>Billing Overdue</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ overview.billing_due_soon }}</h3>
+                        <p>Billing Due Soon</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ overview.low_completeness }}</h3>
+                        <p>Low Setup &lt;80%</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ overview.pending_onboarding_requests }}</h3>
+                        <p>Pending Onboarding</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ overview.pending_privacy_requests }}</h3>
+                        <p>Pending Privacy</p>
+                    </div>
+                </div>
+
+                <div class="layout-main">
+                    <div class="layout-primary">
+                        <div class="card">
+                            <h2><i class="fas fa-chart-bar"></i> School Distribution by Location</h2>
+                            {% if overview.location_bars %}
+                                {% for row in overview.location_bars %}
+                                    <div class="mt-12">
+                                        <div class="stack-head">
+                                            <strong>{{ row.label }}</strong>
+                                            <span class="chip chip-primary">{{ row.count }}</span>
+                                        </div>
+                                        <div class="location-bar" style="height: 10px; border-radius: 999px; background: #dfe7f3; overflow: hidden;">
+                                            <div class="location-bar-fill" data-pct="{{ row.pct }}" style="height: 100%; width: 0; background: linear-gradient(90deg, #1f7a8c, #0f4c81);"></div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="muted">No location data yet.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="layout-side"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+      (function () {
+        var bars = document.querySelectorAll('.location-bar-fill[data-pct]');
+        bars.forEach(function (bar) {
+          var pct = Number(bar.getAttribute('data-pct') || 0);
+          if (!Number.isFinite(pct)) pct = 0;
+          pct = Math.max(0, Math.min(100, pct));
+          bar.style.width = pct + '%';
+        });
+      })();
+    </script>
+    <script src="{{ url_for('static', filename='js/dashboard-enhanced.js', v='20260411b') }}"></script>
+    {% include 'shared/_ai_assistant_widget.html' %}
+</body>
+</html>
+
+
+
+

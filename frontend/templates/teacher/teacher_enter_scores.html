@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enter Scores - {{ 'School Admin' if role == 'school_admin' else 'Teacher' }} Dashboard</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(180deg, #f3f7fd 0%, #edf4fb 100%); }
+        .container { max-width: 1560px; margin: 0 auto; padding: 24px; }
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 24px 28px;
+            border-radius: 18px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: wrap;
+            box-shadow: 0 18px 36px rgba(30, 60, 114, 0.18);
+        }
+        .header h1 { margin: 0; font-size: 2rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .card {
+            background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+            border-radius: 18px;
+            padding: 28px;
+            margin-bottom: 20px;
+            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
+            border: 1px solid #dce7f5;
+        }
+        .btn { padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; font-weight: 500; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .flash { padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+        .flash.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .table-wrap {
+            overflow-x: auto;
+            border: 1px solid #dbe6f3;
+            border-radius: 18px;
+            background: #fff;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.55);
+        }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 0; min-width: 1400px; }
+        th, td { padding: 14px 12px; text-align: center; border-right: 1px solid #d7dde4; border-bottom: 1px solid #d7dde4; vertical-align: middle; }
+        thead th {
+            background: linear-gradient(180deg, #17355c 0%, #214b7f 100%);
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.86rem;
+            min-width: 126px;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        thead th:first-child {
+            min-width: 210px;
+            left: 0;
+            z-index: 3;
+        }
+        tbody th {
+            background: #f8fbff;
+            color: #20354d;
+            text-align: left;
+            white-space: normal;
+            min-width: 210px;
+            position: sticky;
+            left: 0;
+            z-index: 1;
+        }
+        tbody tr:nth-child(even) td { background: #fbfdff; }
+        tbody tr:hover td,
+        tbody tr:hover th { background: #f2f7ff; }
+        input[type="number"], .score-input {
+            width: 118px;
+            min-height: 46px;
+            padding: 10px 12px;
+            border: 1px solid #bfcddd;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1rem;
+            font-weight: 700;
+            background: #fff;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        .score-input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+            transform: translateY(-1px);
+        }
+        input[readonly] {
+            background: #eef4fb;
+            font-weight: 700;
+            color: #16324a;
+        }
+        .readonly-cell { background: #f4f8fc; }
+        .grade-chip {
+            display: inline-flex;
+            min-width: 44px;
+            justify-content: center;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: #e8f1ff;
+            font-weight: 800;
+            color: #1e3c72;
+        }
+        .student-info {
+            background: linear-gradient(135deg, #e7f3ff 0%, #f7fbff 100%);
+            padding: 18px 20px;
+            border-radius: 14px;
+            margin-bottom: 20px;
+            border: 1px solid #cfe1f7;
+        }
+        .hint { margin-top: 12px; color: #4e5d6c; font-size: 0.97rem; }
+        .subject-comment-input {
+            width: 220px;
+            min-height: 42px;
+            border: 1px solid #ccd3db;
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+        @media (max-width: 640px) {
+            .container { padding: 12px; }
+            .header { padding: 14px; margin-bottom: 16px; }
+            .header h1 { font-size: 1.3rem; }
+            .btn { width: 100%; }
+            .btn-cancel-inline { margin-left: 0 !important; margin-top: 8px; }
+            table { min-width: 1200px; }
+            input[type="number"], .score-input { width: 104px; min-height: 42px; }
+            .subject-comment-input { width: 180px; }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+    {% set active_page = 'score_entry' %}
+    {% if role == 'school_admin' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    {% else %}
+    {% include 'teacher/_teacher_sidebar.html' %}
+    {% endif %}
+    <div class="main-content">
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-calculator"></i> {{ 'School Admin Score Entry' if role == 'school_admin' else 'Enter Scores' }}</h1>
+            <a href="{{ url_for('school_admin_view_students') if role == 'school_admin' else url_for('teacher_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back</a>
+        </div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="card">
+            <div class="student-info">
+                <h3><i class="fas fa-user"></i> {{ student.firstname }}</h3>
+                <p><strong>Student ID:</strong> {{ student.student_id }}</p>
+                <p><strong>Class:</strong> {{ student.classname }} | <strong>Term:</strong> {{ student.term }} | <strong>Stream:</strong> {{ student.stream }}</p>
+                {% if is_locked %}
+                <p style="margin-top:8px; color:#b03a2e; font-weight:700;">
+                    This term has been published. Scores are locked for editing.
+                </p>
+                {% endif %}
+            </div>
+            
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="table-wrap">
+                    <table id="score-entry-table"
+                           data-grade-a="{{ grade_cfg.a }}"
+                           data-grade-b="{{ grade_cfg.b }}"
+                           data-grade-c="{{ grade_cfg.c }}"
+                           data-grade-d="{{ grade_cfg.d }}">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                {% if school.test_enabled %}
+                                    {% for i in range(1, school.max_tests + 1) %}
+                                        <th>Test {{ i }}</th>
+                                    {% endfor %}
+                                    <th>Total Test Score (Auto, Max {{ school.test_score_max }})</th>
+                                {% endif %}
+                                {% if school.exam_enabled %}
+                                    {% if exam_config.exam_mode == 'combined' %}
+                                        <th>Exam Score (Max {{ exam_config.exam_score_max }})</th>
+                                    {% else %}
+                                        <th>Objective (Max {{ exam_config.objective_max }})</th>
+                                        <th>Theory (Max {{ exam_config.theory_max }})</th>
+                                        <th>Total Exam Score (Auto)</th>
+                                    {% endif %}
+                                {% endif %}
+                                <th>Total Score (Auto)</th>
+                                <th>Grade (Auto by Admin Config)</th>
+                                <th>Subject Teacher Comment</th>
+                                <th>Last Edited</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for subject in subjects %}
+                                {% set subj_key = subject_key_map.get(subject, subject) %}
+                                {% set s = student.scores.get(subject, {}) if student.scores else {} %}
+                                {% set row_editable = subject in editable_subjects %}
+                                {% set row_locked_by_submission = (locked_subjects_for_class is defined and subject in locked_subjects_for_class) %}
+                                {% set last_edit = subject_last_edits.get(subject, {}) %}
+                                <tr class="subject-row" data-subj-key="{{ subj_key }}">
+                                    <th>
+                                        {{ subject }}
+                                        <input type="hidden" name="entry_touched_{{ subj_key }}" value="0" class="entry-touched" data-subj-key="{{ subj_key }}">
+                                        {% if row_locked_by_submission %}
+                                        <br><small style="color:#b36b00; font-weight:600;">Locked: waiting for subject teacher submission</small>
+                                        {% endif %}
+                                    </th>
+                                    {% if school.test_enabled %}
+                                        {% for i in range(1, school.max_tests + 1) %}
+                                        <td>
+                                            <input type="text"
+                                                   step="0.01"
+                                                   class="score-input calc-input"
+                                                   data-subj-key="{{ subj_key }}"
+                                                   data-kind="test"
+                                                   name="test_{{ i }}_{{ subj_key }}"
+                                                   inputmode="decimal"
+                                                   placeholder="0 or -"
+                                                   value="{{ s.get('test_' ~ i, 0) }}"
+                                                   {% if is_locked or not row_editable %}disabled{% endif %}>
+                                        </td>
+                                        {% endfor %}
+                                        <td class="readonly-cell">
+                                            <input type="number" step="0.01" readonly class="total-test"
+                                                   data-subj-key="{{ subj_key }}"
+                                                   value="{{ s.get('total_test', 0) }}">
+                                        </td>
+                                    {% endif %}
+                                    {% if school.exam_enabled %}
+                                        {% if exam_config.exam_mode == 'combined' %}
+                                        <td>
+                                            <input type="text"
+                                                   step="0.01"
+                                                   class="score-input calc-input"
+                                                   data-subj-key="{{ subj_key }}"
+                                                   data-kind="exam_combined"
+                                                   name="exam_score_{{ subj_key }}"
+                                                   inputmode="decimal"
+                                                   placeholder="0 or -"
+                                                   value="{{ s.get('exam_score', s.get('total_exam', 0)) }}"
+                                                   {% if is_locked or not row_editable %}disabled{% endif %}>
+                                        </td>
+                                        {% else %}
+                                        <td>
+                                            <input type="text"
+                                                   step="0.01"
+                                                   class="score-input calc-input"
+                                                   data-subj-key="{{ subj_key }}"
+                                                   data-kind="objective"
+                                                   name="objective_{{ subj_key }}"
+                                                   inputmode="decimal"
+                                                   placeholder="0 or -"
+                                                   value="{{ s.get('objective', 0) }}"
+                                                   {% if is_locked or not row_editable %}disabled{% endif %}>
+                                        </td>
+                                        <td>
+                                            <input type="text"
+                                                   step="0.01"
+                                                   class="score-input calc-input"
+                                                   data-subj-key="{{ subj_key }}"
+                                                   data-kind="theory"
+                                                   name="theory_{{ subj_key }}"
+                                                   inputmode="decimal"
+                                                   placeholder="0 or -"
+                                                   value="{{ s.get('theory', 0) }}"
+                                                   {% if is_locked or not row_editable %}disabled{% endif %}>
+                                        </td>
+                                        <td class="readonly-cell">
+                                            <input type="number" step="0.01" readonly class="total-exam"
+                                                   data-subj-key="{{ subj_key }}"
+                                                   value="{{ s.get('total_exam', 0) }}">
+                                        </td>
+                                        {% endif %}
+                                    {% endif %}
+                                    <td class="readonly-cell">
+                                        <input type="number" step="0.01" readonly class="overall-mark"
+                                               data-subj-key="{{ subj_key }}"
+                                               value="{{ s.get('overall_mark', 0) }}">
+                                    </td>
+                                    <td class="readonly-cell">
+                                        <span class="grade-chip auto-grade" data-subj-key="{{ subj_key }}">{{ s.get('grade', '-') }}</span>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               class="subject-comment-input"
+                                               name="subject_comment_{{ subj_key }}"
+                                               maxlength="300"
+                                               placeholder="Comment for parent"
+                                               value="{{ s.get('subject_teacher_comment', '') }}"
+                                               {% if is_locked or not row_editable %}disabled{% endif %}>
+                                    </td>
+                                    <td class="readonly-cell" style="text-align:left;">
+                                        {% if last_edit %}
+                                            {% set editor_id = last_edit.get('changed_by', '') %}
+                                            <div><strong>{{ teacher_name_map.get(editor_id, editor_id or '-') }}</strong></div>
+                                            <div style="font-size:0.85rem; color:#5c6b7a;">{{ last_edit.get('changed_at', '-') }}</div>
+                                            <div style="font-size:0.8rem; color:#7a8794;">{{ last_edit.get('change_source', '') }}</div>
+                                        {% else %}
+                                            <span style="color:#7a8794;">No edits yet</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="hint">Totals and grade are generated automatically per subject using the configured grading rules. You can type <strong>-</strong> for any score field and it will be saved as zero.</p>
+                {% if school and school.score_entry_mode == 'dean_led' %}
+                <p class="hint">
+                    {% if role == 'school_admin' %}
+                    Simple Mode is active, so school admin can manage all subjects offered by this student.
+                    {% else %}
+                    Simple Mode is active, so class-assigned staff can edit all subjects offered by this student.
+                    {% endif %}
+                </p>
+                <p class="hint">This page now acts as a shared draft sheet for scores, behaviour traits, and class comment, so school admin and class teacher see each other's updates immediately.</p>
+                {% else %}
+                <p class="hint">Only your assigned subject(s) are editable on this page; other subjects are read-only.</p>
+                {% endif %}
+                {% if locked_subjects_for_class %}
+                <p class="hint" style="color:#b36b00;">
+                    Locked subject(s) pending subject-teacher submission: {{ locked_subjects_for_class|join(', ') }}.
+                </p>
+                {% endif %}
+                {% if can_edit_teacher_comment %}
+                <div style="margin-top:14px;">
+                    <label for="teacher_comment" style="display:block; margin-bottom:6px; font-weight:600; color:#2c3e50;">{{ 'School Comment' if role == 'school_admin' else 'Teacher Comment' }}</label>
+                    <textarea id="teacher_comment" name="teacher_comment" rows="4" style="width:100%; border:1px solid #ccd3db; border-radius:6px; padding:10px;" placeholder="Enter comment for this student's report" {% if is_locked %}disabled{% endif %}>{{ student.teacher_comment or '' }}</textarea>
+                </div>
+                <div style="margin-top:14px;">
+                    <label for="score_override_reason" style="display:block; margin-bottom:6px; font-weight:600; color:#2c3e50;">Reason For Score Change</label>
+                    <textarea id="score_override_reason" name="score_override_reason" rows="3" style="width:100%; border:1px solid #ccd3db; border-radius:6px; padding:10px;" placeholder="{% if role == 'school_admin' %}Required when school admin changes score entered by a teacher.{% else %}Required when class teacher changes score entered by subject teacher.{% endif %}" {% if is_locked %}disabled{% endif %}></textarea>
+                    <p class="hint">
+                        {% if role == 'school_admin' %}
+                        School admin must provide this reason when overriding score values entered by a teacher.
+                        {% else %}
+                        Class teacher must provide this reason when overriding score values entered by another teacher.
+                        {% endif %}
+                    </p>
+                </div>
+                {% endif %}
+                {% if can_edit_behaviour %}
+                <div style="margin-top:18px;">
+                    <label style="display:block; margin-bottom:10px; font-weight:700; color:#2c3e50;">Behaviour Traits</label>
+                    <p class="hint" style="margin:0 0 12px;">
+                        Behaviour grading scale:
+                        <strong>{{ 'A, B, C, D' if behaviour_grade_mode == 'alpha_ad' else '1, 2, 3, 4, 5' }}</strong>.
+                    </p>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
+                        {% for trait in behaviour_traits %}
+                        <div>
+                            <label for="behaviour_{{ loop.index0 }}" style="display:block; margin-bottom:6px; font-weight:600; color:#4a5568;">{{ trait }}</label>
+                            <select id="behaviour_{{ loop.index0 }}" name="behaviour_{{ trait }}" style="width:100%; min-height:44px; border:1px solid #ccd3db; border-radius:10px; padding:0 10px;" {% if is_locked %}disabled{% endif %}>
+                                <option value="">Select grade</option>
+                                {% set current_trait_value = (current_behaviour_assessment.get(trait, '') if current_behaviour_assessment else '') %}
+                                {% for code, label in behaviour_grade_scale.items() %}
+                                <option value="{{ code }}" {% if current_trait_value == code %}selected{% endif %}>{{ code }} - {{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <button type="submit" class="btn btn-primary" {% if is_locked %}disabled{% endif %}><i class="fas fa-save"></i> Save Scores</button>
+                <a href="{{ url_for('school_admin_view_students') if role == 'school_admin' else url_for('teacher_dashboard') }}" class="btn btn-secondary btn-cancel-inline" style="margin-left: 10px;">Cancel</a>
+            </form>
+        </div>
+    </div>
+    </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+        (function () {
+            const table = document.getElementById('score-entry-table');
+            if (!table) return;
+
+            const thresholds = {
+                a: Number(table.dataset.gradeA || 70),
+                b: Number(table.dataset.gradeB || 60),
+                c: Number(table.dataset.gradeC || 50),
+                d: Number(table.dataset.gradeD || 40)
+            };
+
+            function gradeFromScore(score) {
+                if (score >= thresholds.a) return 'A';
+                if (score >= thresholds.b) return 'B';
+                if (score >= thresholds.c) return 'C';
+                if (score >= thresholds.d) return 'D';
+                return 'F';
+            }
+
+            function numVal(input) {
+                if (!input) return 0;
+                const v = parseFloat(input.value);
+                return Number.isFinite(v) ? v : 0;
+            }
+
+            function setInput(selector, value) {
+                const el = document.querySelector(selector);
+                if (el) el.value = value.toFixed(2);
+            }
+
+            function setText(selector, value) {
+                const el = document.querySelector(selector);
+                if (el) el.textContent = value;
+            }
+
+            function recalcForSubject(subjKey) {
+                const testInputs = document.querySelectorAll(`input[data-subj-key="${subjKey}"][data-kind="test"]`);
+                let totalTest = 0;
+                testInputs.forEach((i) => { totalTest += numVal(i); });
+
+                const combinedExam = document.querySelector(`input[data-subj-key="${subjKey}"][data-kind="exam_combined"]`);
+                const objective = document.querySelector(`input[data-subj-key="${subjKey}"][data-kind="objective"]`);
+                const theory = document.querySelector(`input[data-subj-key="${subjKey}"][data-kind="theory"]`);
+
+                let totalExam = 0;
+                if (combinedExam) {
+                    totalExam = numVal(combinedExam);
+                } else {
+                    totalExam = numVal(objective) + numVal(theory);
+                }
+
+                const totalScore = totalTest + totalExam;
+                const grade = gradeFromScore(totalScore);
+
+                setInput(`.total-test[data-subj-key="${subjKey}"]`, totalTest);
+                setInput(`.total-exam[data-subj-key="${subjKey}"]`, totalExam);
+                setInput(`.overall-mark[data-subj-key="${subjKey}"]`, totalScore);
+                setText(`.auto-grade[data-subj-key="${subjKey}"]`, grade);
+            }
+
+            function recalcAll() {
+                const rows = document.querySelectorAll('.subject-row[data-subj-key]');
+                rows.forEach((row) => recalcForSubject(row.dataset.subjKey));
+            }
+
+            function markTouched(subjKey) {
+                const touched = document.querySelector(`.entry-touched[data-subj-key="${subjKey}"]`);
+                if (touched) touched.value = '1';
+            }
+
+            function getEditableScoreRows() {
+                return Array.from(document.querySelectorAll('.subject-row[data-subj-key]')).map((row) => (
+                    Array.from(row.querySelectorAll('.calc-input:not([disabled])'))
+                )).filter((cells) => cells.length > 0);
+            }
+
+            function moveScoreFocus(currentInput, direction) {
+                const rows = getEditableScoreRows();
+                for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+                    const colIndex = rows[rowIndex].indexOf(currentInput);
+                    if (colIndex === -1) continue;
+
+                    if (direction === 'left' && colIndex > 0) {
+                        return rows[rowIndex][colIndex - 1];
+                    }
+                    if (direction === 'right' && colIndex < rows[rowIndex].length - 1) {
+                        return rows[rowIndex][colIndex + 1];
+                    }
+                    if (direction === 'up' && rowIndex > 0) {
+                        const targetRow = rows[rowIndex - 1];
+                        return targetRow[Math.min(colIndex, targetRow.length - 1)];
+                    }
+                    if (direction === 'down' && rowIndex < rows.length - 1) {
+                        const targetRow = rows[rowIndex + 1];
+                        return targetRow[Math.min(colIndex, targetRow.length - 1)];
+                    }
+                    return null;
+                }
+                return null;
+            }
+
+            document.querySelectorAll('.calc-input').forEach((input) => {
+                input.addEventListener('input', () => {
+                    recalcForSubject(input.dataset.subjKey);
+                    markTouched(input.dataset.subjKey);
+                });
+                input.addEventListener('keydown', (event) => {
+                    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+                        const directionMap = {
+                            ArrowLeft: 'left',
+                            ArrowRight: 'right',
+                            ArrowUp: 'up',
+                            ArrowDown: 'down'
+                        };
+                        const nextCell = moveScoreFocus(input, directionMap[event.key]);
+                        if (nextCell) {
+                            event.preventDefault();
+                            nextCell.focus();
+                            nextCell.select();
+                        }
+                        return;
+                    }
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+                    const editableInputs = Array.from(
+                        document.querySelectorAll('.calc-input:not([disabled])')
+                    );
+                    const currentIndex = editableInputs.indexOf(input);
+                    if (currentIndex === -1) return;
+                    const nextInput = editableInputs[currentIndex + 1];
+                    if (nextInput) {
+                        nextInput.focus();
+                        nextInput.select();
+                        return;
+                    }
+                    const subjectCommentInputs = Array.from(
+                        document.querySelectorAll('.subject-comment-input:not([disabled])')
+                    );
+                    if (subjectCommentInputs.length) {
+                        const firstComment = subjectCommentInputs[0];
+                        firstComment.focus();
+                        firstComment.select();
+                    }
+                });
+                input.addEventListener('focus', () => {
+                    if (typeof input.select === 'function') {
+                        input.select();
+                    }
+                });
+            });
+
+            document.querySelectorAll('.subject-comment-input').forEach((input) => {
+                input.addEventListener('input', () => {
+                    const row = input.closest('.subject-row[data-subj-key]');
+                    if (!row) return;
+                    markTouched(row.dataset.subjKey);
+                });
+                input.addEventListener('keydown', (event) => {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+                    const commentInputs = Array.from(
+                        document.querySelectorAll('.subject-comment-input:not([disabled])')
+                    );
+                    const currentIndex = commentInputs.indexOf(input);
+                    if (currentIndex === -1) return;
+                    const nextComment = commentInputs[currentIndex + 1];
+                    if (nextComment) {
+                        nextComment.focus();
+                        nextComment.select();
+                        return;
+                    }
+                    const submitButton = document.querySelector('button[type="submit"]:not([disabled])');
+                    if (submitButton) {
+                        submitButton.focus();
+                    }
+                });
+            });
+
+            recalcAll();
+        })();
+    </script>
+</body>
+</html>
+
+

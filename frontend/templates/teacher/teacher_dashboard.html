@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Dashboard - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .school-logo, .school-logo-fallback { position: absolute; top: 14px; right: 14px; object-fit: contain; padding: 4px; }
+        .teacher-title-row { display: inline-flex; align-items: center; gap: 10px; }
+        .teacher-title-avatar, .teacher-title-avatar-fallback {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1px solid #cfe0f3;
+            background: #f8fbff;
+            box-shadow: 0 2px 6px rgba(2, 6, 23, 0.12);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #1e3a5f;
+            font-weight: 800;
+            flex: 0 0 40px;
+        }
+        .teacher-title-avatar { object-fit: cover; }
+        .teacher-title-avatar-fallback i { font-size: 15px; }
+        .teacher-title-avatar-fallback span { font-size: 13px; line-height: 1; margin-left: 3px; }
+        @media (max-width: 768px) {
+            .school-logo, .school-logo-fallback { width: 54px; height: 54px; top: 10px; right: 10px; font-size: 20px; }
+            .teacher-title-avatar, .teacher-title-avatar-fallback {
+                width: 34px;
+                height: 34px;
+                flex-basis: 34px;
+            }
+        }
+        .term-progress-wrap { display: flex; align-items: center; gap: 16px; }
+        .term-progress-ring { width: 110px; height: 110px; flex: 0 0 auto; }
+        .term-progress-meta { font-size: 0.95rem; color: #475569; }
+        .term-progress-meta strong { color: #0f172a; }
+        .assignment-overview { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 14px; }
+        .assignment-box { border: 1px solid #dbe4ef; border-radius: 10px; padding: 12px; background: #f8fbff; }
+        .assignment-box h3 { margin: 0 0 8px; font-size: 1rem; color: #1e3a5f; }
+        .assignment-count { font-size: 1.45rem; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
+        .assignment-list { margin: 0; padding-left: 18px; color: #334155; }
+        .assignment-table-wrap { overflow-x: auto; }
+        .assignment-table-wrap table { min-width: 680px; }
+        .dash-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+        .dash-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            border: 1px solid #d5e2f0;
+            background: #f8fbff;
+            color: #1e3a5f;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .dash-tab.active {
+            background: #1e3a5f;
+            border-color: #1e3a5f;
+            color: #ffffff;
+        }
+        .side-submenu-wrap { margin: 4px 0 8px 8px; padding-left: 10px; border-left: 2px solid rgba(255,255,255,0.2); }
+        .side-submenu-subject { margin: 6px 0; }
+        .side-subject-link {
+            display: block;
+            color: #d7e6fb;
+            text-decoration: none;
+            font-size: 0.88rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .side-subject-link.active { background: rgba(255,255,255,0.16); color: #fff; font-weight: 700; }
+        .side-submenu-classes { margin: 4px 0 0 10px; }
+        .side-class-link {
+            display: block;
+            color: #c4daff;
+            text-decoration: none;
+            font-size: 0.82rem;
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+        .side-class-link.active { background: rgba(255,255,255,0.14); color: #fff; font-weight: 700; }
+        .welcome-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1200;
+        }
+        .welcome-modal-card {
+            width: min(720px, 94vw);
+            background: #fff;
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 18px 40px rgba(2, 6, 23, 0.35);
+        }
+        .welcome-modal-card h3 { margin: 0 0 10px; color: #0f172a; }
+        .welcome-modal-card ol { margin: 8px 0 14px 18px; color: #334155; }
+        .arm-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid #dbe4ef;
+            background: #f8fbff;
+            color: #1e3a5f;
+            font-weight: 700;
+            margin-top: 8px;
+        }
+        .arm-toggle select { border-radius: 8px; padding: 4px 8px; }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    {% set has_class_assignment = (classes|length) > 0 %}
+    {% set active_tab = (request.args.get('tab', 'overview') or 'overview').strip().lower() %}
+    {% if active_tab not in ['overview', 'score', 'submission'] %}
+        {% set active_tab = 'overview' %}
+    {% endif %}
+    {% if not has_class_assignment and active_tab == 'submission' %}
+        {% set active_tab = 'overview' %}
+    {% endif %}
+    {% set active_page = 'score_entry' if active_tab == 'score' else 'dashboard' %}
+    {% set teacher_sidebar_profile_image = teacher_profile_image %}
+    {% set teacher_sidebar_display_name = teacher_name %}
+    {% set teacher_unread_notifications = unread_teacher_messages %}
+    {% set teacher_score_nav_tree = score_nav_tree %}
+    {% set teacher_selected_score_subject = selected_score_subject %}
+    {% set teacher_selected_score_class = selected_score_class %}
+    {% set teacher_has_class_assignment_nav = has_class_assignment %}
+    <div class="app-shell topbar-layout">
+        {% include 'teacher/_teacher_sidebar.html' %}
+        
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    {% set teacher_initial = ((teacher_name if teacher_name else 'T')[:1] or 'T')|upper %}
+                    <h1>
+                        <span class="teacher-title-row">
+                            {% if teacher_profile_image %}
+                            <img src="{{ teacher_profile_image }}" alt="{{ teacher_name }} Profile Picture" class="teacher-title-avatar" />
+                            {% else %}
+                            <span class="teacher-title-avatar-fallback"><i class="fas fa-user" aria-hidden="true"></i><span>{{ teacher_initial }}</span></span>
+                            {% endif %}
+                            <span><i class="fas fa-chalkboard-teacher"></i> Teacher Dashboard</span>
+                        </span>
+                    </h1>
+                    <p class="meta-line">
+                        <strong>School:</strong> {{ school.school_name if school else '-' }} |
+                        <strong>Teacher:</strong> {{ teacher_name }} |
+                        <strong>Phone:</strong> {{ teacher_phone or 'Not set' }} |
+                        <strong>Assigned Classes:</strong> {{ classes|join(', ') if classes else 'None' }} |
+                        <strong>{% if school and school.score_entry_mode == 'dean_led' %}Class Subjects{% else %}Subject Assignments{% endif %}:</strong> {{ subject_assignment_count or 0 }} |
+                        <strong>Mode:</strong> {% if school and school.score_entry_mode == 'dean_led' %}Simple Mode{% elif school and school.score_entry_mode == 'subject_sheet' %}Subject Sheet Mode{% else %}Advanced Mode{% endif %} |
+                        <strong>Last Login:</strong> {{ last_login_at }}
+                    </p>
+                    {% if school_access_state %}
+                    {% set access_status = (school_access_state.effective_status or '') %}
+                    {% set access_class = 'is-active' if access_status in ['trial_free', 'active_paid'] else ('is-warning' if access_status == 'pending_payment' else 'is-blocked') %}
+                    <div class="access-badge-row">
+                        <span class="access-badge {{ access_class }}">
+                            <i class="fas fa-shield-alt" aria-hidden="true"></i>
+                            Access: {{ access_status|replace('_', ' ')|title }}
+                        </span>
+                        {% if school_access_state.reason %}
+                        <p class="access-badge-note">{{ school_access_state.reason }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% set school_initial = ((school.school_name if school and school.school_name else 'S')[:1] or 'S')|upper %}
+                    {% if school and school.school_logo %}
+                    <img
+                        src="{{ url_for('school_logo_proxy', school_id=school.school_id, v=(school.updated_at|string if school and school.updated_at else '1')) }}"
+                        alt="School Logo"
+                        class="school-logo"
+                        onload="var fb=this.nextElementSibling;if(fb){fb.classList.add('is-hidden');fb.style.display='none';}"
+                        onerror="this.onerror=null;this.style.display='none';var fb=this.nextElementSibling;if(fb){fb.classList.remove('is-hidden');fb.style.display='flex';}"
+                    />
+                    <div class="school-logo-fallback is-hidden"><i class="fas fa-school" aria-hidden="true"></i><span>{{ school_initial }}</span></div>
+                    {% else %}
+                    <div class="school-logo-fallback"><i class="fas fa-school" aria-hidden="true"></i><span>{{ school_initial }}</span></div>
+                    {% endif %}
+                </div>
+
+                {% set arm_mode_value = (request.args.get('arm_mode') or (school.class_arm_ranking_mode if school else 'separate')) %}
+                <form method="GET" action="{{ url_for('teacher_dashboard') }}" class="arm-toggle">
+                    <i class="fas fa-layer-group" aria-hidden="true"></i>
+                    <span>Class Arm View:</span>
+                    <input type="hidden" name="tab" value="{{ active_tab }}">
+                    {% if request.args.get('score_class') %}<input type="hidden" name="score_class" value="{{ request.args.get('score_class') }}">{% endif %}
+                    {% if request.args.get('score_subject') %}<input type="hidden" name="score_subject" value="{{ request.args.get('score_subject') }}">{% endif %}
+                    {% if request.args.get('rank_class') %}<input type="hidden" name="rank_class" value="{{ request.args.get('rank_class') }}">{% endif %}
+                    {% if request.args.get('rank_subject') %}<input type="hidden" name="rank_subject" value="{{ request.args.get('rank_subject') }}">{% endif %}
+                    {% if request.args.get('rank_arm_mode') %}<input type="hidden" name="rank_arm_mode" value="{{ request.args.get('rank_arm_mode') }}">{% endif %}
+                    <select name="arm_mode" onchange="this.form.submit()">
+                        <option value="separate" {% if arm_mode_value == 'separate' %}selected{% endif %}>Separate Arms</option>
+                        <option value="together" {% if arm_mode_value == 'together' %}selected{% endif %}>Combine Arms</option>
+                    </select>
+                </form>
+        
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+        
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>{{ students|length }}</h3>
+                        <p>Total Students</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ classes|length }}</h3>
+                        <p>Your Classes</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ subject_assignment_subject_count or 0 }}</h3>
+                        <p>{% if school and school.score_entry_mode == 'dean_led' %}Class Subjects{% else %}Assigned Subjects{% endif %}</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><i class="fas fa-sliders"></i> Score Workflow Mode</h2>
+                    {% if school and school.score_entry_mode == 'dean_led' %}
+                    <p class="success-note">Simple Mode is active for your school.</p>
+                    <p class="note">As a class-assigned teacher, you can work with all subjects offered by students in your assigned classes from the Score Entry area.</p>
+                    {% elif school and school.score_entry_mode == 'subject_sheet' %}
+                    <p class="success-note">Subject Sheet Mode is active for your school.</p>
+                    <p class="note">Choose a subject and class to open one roster sheet showing only students who offer that subject.</p>
+                    {% else %}
+                    <p class="note"><strong>Advanced Mode</strong> is active for your school.</p>
+                    <p class="note">You can work only with the subjects assigned to you, and handoff to class teacher remains part of the workflow.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card" id="assignment-overview-card">
+                    <h2><i class="fas fa-link"></i> Assignment Overview</h2>
+                    <div class="assignment-overview">
+                        <div class="assignment-box">
+                            <h3>Class Teacher Assignment</h3>
+                            <div class="assignment-count">{{ classes|length }}</div>
+                            {% if classes %}
+                            <ul class="assignment-list">
+                                {% for cls in classes %}
+                                <li>{{ cls }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                                <p class="note">No class assignment yet.</p>
+                            {% endif %}
+                        </div>
+                        {% if not school or school.score_entry_mode != 'dean_led' %}
+                        <div class="assignment-box">
+                            <h3>Subject Teacher Assignment</h3>
+                            <div class="assignment-count">{{ subject_assignment_count or 0 }}</div>
+                            {% if subject_assignment_summary %}
+                            <ul class="assignment-list">
+                                {% for row in subject_assignment_summary %}
+                                <li><strong>{{ row.classname }}:</strong> {{ row.subjects|join(', ') }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <p class="note">No subject assignment yet.</p>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="assignment-box">
+                            <h3>Dean-led Score Entry</h3>
+                            <div class="assignment-count"><i class="fas fa-user-shield"></i></div>
+                            <p class="note">This school uses class-based score entry. Teachers can enter all subjects for assigned classes.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if school and school.score_entry_mode == 'dean_led' %}
+                    <p class="note" style="margin-top:10px;">Subject assignment is hidden for this school mode. Use Score Entry to work from class subjects.</p>
+                    {% endif %}
+                    <div class="assignment-table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Class</th>
+                                    <th>{% if school and school.score_entry_mode == 'dean_led' %}Class Subjects{% else %}Subjects You Teach{% endif %}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in subject_assignment_summary %}
+                                <tr>
+                                    <td>{{ row.classname }}</td>
+                                    <td>{{ row.subjects|join(', ') }}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="2" class="text-center">No subject assignment rows available for {{ current_term }}.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="dash-tabs">
+                    <a href="{{ url_for('teacher_dashboard', tab='overview') }}" class="dash-tab {{ 'active' if active_tab == 'overview' else '' }}"><i class="fas fa-compass"></i> Overview</a>
+                    <a href="{{ url_for('teacher_dashboard', tab='score') }}" class="dash-tab {{ 'active' if active_tab == 'score' else '' }}"><i class="fas fa-pen-to-square"></i> Score Entry</a>
+                    {% if has_class_assignment %}
+                    <a href="{{ url_for('teacher_dashboard', tab='submission') }}" class="dash-tab {{ 'active' if active_tab == 'submission' else '' }}"><i class="fas fa-paper-plane"></i> Submission</a>
+                    {% endif %}
+                </div>
+
+                <div class="layout-main {% if active_tab == 'overview' %}teacher-layout-overview{% else %}teacher-layout-single{% endif %}">
+                <div class="layout-side">
+                {% if active_tab == 'overview' %}
+                <div class="card">
+                    <h2><i class="fas fa-clock"></i> Period Notifications</h2>
+                    <p class="note">Shows your ongoing period and periods starting within the next 20 minutes.</p>
+                    {% if teacher_period_notifications_paused_reason %}
+                    <p class="note"><strong>Paused:</strong> {{ teacher_period_notifications_paused_reason }}.</p>
+                    <p class="success-note">Period alerts resume automatically when school is open.</p>
+                    {% elif teacher_period_notifications %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Class</th>
+                                <th>Period</th>
+                                <th>Subject</th>
+                                <th>Time</th>
+                                <th>Room</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in teacher_period_notifications %}
+                            <tr>
+                                <td>
+                                    {% if item.status == 'ongoing' %}
+                                    <span class="chip chip-success">Ongoing ({{ item.minutes_delta }} min left)</span>
+                                    {% else %}
+                                    <span class="chip chip-warning">Starts in {{ item.minutes_delta }} min</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.classname }}</td>
+                                <td>{{ item.period_label }}</td>
+                                <td>{{ item.subject }}</td>
+                                <td>{{ item.start_time }} - {{ item.end_time }}</td>
+                                <td>{{ item.room or '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="success-note">No period alert right now.</p>
+                    {% endif %}
+                </div>
+                <div class="card">
+                    <h2><i class="fas fa-circle-notch"></i> Term Open-Day Progress</h2>
+                    {% set pct = (term_open_progress.percentage if term_open_progress else 0) %}
+                    {% set circ = 283 %}
+                    {% set off = ((100 - pct) * circ / 100) %}
+                    <div class="term-progress-wrap">
+                        <svg class="term-progress-ring" viewBox="0 0 120 120" role="img" aria-label="Term progress {{ pct }} percent">
+                            <circle cx="60" cy="60" r="45" fill="none" stroke="#dbeafe" stroke-width="12"></circle>
+                            <circle cx="60" cy="60" r="45" fill="none" stroke="#0ea5e9" stroke-width="12"
+                                    stroke-linecap="round" transform="rotate(-90 60 60)"
+                                    stroke-dasharray="{{ circ }}" stroke-dashoffset="{{ off }}"></circle>
+                            <text x="60" y="66" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">{{ pct }}%</text>
+                        </svg>
+                        <div class="term-progress-meta">
+                            <div><strong>Status:</strong> {{ term_open_progress.status if term_open_progress else 'Calendar not set' }}</div>
+                            <div><strong>Elapsed:</strong> {{ term_open_progress.elapsed_open_days if term_open_progress else 0 }} / {{ term_open_progress.total_open_days if term_open_progress else 0 }} days</div>
+                            <div><strong>Remaining:</strong> {{ term_open_progress.remaining_open_days if term_open_progress else 0 }} days</div>
+                            <div><strong>Range:</strong> {{ term_open_progress.open_date if term_open_progress and term_open_progress.open_date else '-' }} to {{ term_open_progress.close_date if term_open_progress and term_open_progress.close_date else '-' }}</div>
+                        </div>
+                    </div>
+                    <p class="note">Counts official open days only (excludes Saturday, Sunday, and mid-term break).</p>
+                </div>
+                {% if has_class_assignment %}
+                <div class="card">
+                    <h2><i class="fas fa-signature"></i> Teacher Signature</h2>
+                    <p>
+                        Status:
+                        <strong class="chip {{ 'chip-success' if has_teacher_signature else 'chip-warning' }}">
+                            {{ 'Uploaded' if has_teacher_signature else 'Not Uploaded' }}
+                        </strong>
+                    </p>
+                    <p class="note">Signature is required only when submitting a class result for approval.</p>
+                    <form action="{{ url_for('teacher_upload_signature') }}" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <div class="form-group">
+                            <label for="teacher_signature">Upload Signature Image (PNG/JPG/WEBP, max 2MB)</label>
+                            <input type="file" id="teacher_signature" name="teacher_signature" accept=".png,.jpg,.jpeg,.webp,image/*" required />
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Signature</button>
+                    </form>
+                </div>
+                {% endif %}
+
+                <div class="card">
+                    <h2><i class="fas fa-image"></i> Profile Picture</h2>
+                    <p class="note">Upload your profile picture (PNG/JPG/WEBP, max 2MB).</p>
+                    <form action="{{ url_for('teacher_upload_profile_image') }}" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <div class="form-group">
+                            <label for="profile_image">Choose Image</label>
+                            <input type="file" id="profile_image" name="profile_image" accept=".png,.jpg,.jpeg,.webp,image/*" required />
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Picture</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2><i class="fas fa-phone"></i> Contact Number</h2>
+                    <p class="note">Update your phone number for school contact and result follow-up.</p>
+                    <form action="{{ url_for('teacher_update_profile') }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <div class="form-group">
+                            <label for="phone">Phone Number</label>
+                            <input type="text" id="phone" name="phone" value="{{ teacher_phone or '' }}" placeholder="+234..." />
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Number</button>
+                    </form>
+                </div>
+        
+                <div class="card">
+                    <h2><i class="fas fa-route"></i> Your Workflow</h2>
+                    {% if school and school.score_entry_mode == 'dean_led' %}
+                    <p class="workflow-step">1. Open Score Entry from the class list.</p>
+                    <p class="workflow-step">2. Enter scores for all subjects offered by the student.</p>
+                    <p class="workflow-step">3. If daily attendance was not marked, open Submission and enter Days Open plus Days Present.</p>
+                    <p class="workflow-step">4. Review and save before class result approval.</p>
+                    {% else %}
+                    <p class="workflow-step">1. Enter your assigned subject scores for students.</p>
+                    <p class="workflow-step">2. Submit completed subjects to the class teacher when your handoff is ready.</p>
+                    <p class="workflow-step">3. Class teacher waits for all subject handoffs, then submits the class result to school admin.</p>
+                    {% endif %}
+                </div>
+                <div class="card">
+                    <h2><i class="fas fa-calendar-check"></i> Term Programs (Visible to Teachers)</h2>
+                    {% if teacher_term_events %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Event</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Note</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in teacher_term_events %}
+                            <tr>
+                                <td>{{ event.label }}</td>
+                                <td>{{ event.date }}</td>
+                                <td>{{ event.status|title }}</td>
+                                <td>{{ event.note or '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="note">No term program event is currently visible to teachers.</p>
+                    {% endif %}
+                </div>
+
+                {% endif %}
+
+                </div>
+                <div class="layout-primary">
+                {% if active_tab == 'score' %}
+                {% if selected_score_subject %}
+                <div class="card">
+                    <h2><i class="fas fa-book"></i> Subject Score Entry</h2>
+                    <div class="info-grid" style="margin-bottom: 14px;">
+                        <div class="info-tile">
+                            <span class="info-tile-label">Current Term</span>
+                            <strong>{{ current_term }}</strong>
+                        </div>
+                        <div class="info-tile">
+                            <span class="info-tile-label">Selected Subject</span>
+                            <strong>{{ selected_score_subject }}</strong>
+                        </div>
+                        <div class="info-tile">
+                            <span class="info-tile-label">Class Filter</span>
+                            <strong>{{ selected_score_class or 'All assigned classes' }}</strong>
+                        </div>
+                        <div class="info-tile">
+                            <span class="info-tile-label">Students</span>
+                            <strong>{{ filtered_subject_student_rows|length }}</strong>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                        <p class="note" style="margin:0;">Subjects are already listed in the sidebar. This page now focuses on the selected subject only.</p>
+                        {% if selected_score_class and school and school.score_entry_mode == 'subject_sheet' %}
+                        <a href="{{ url_for('teacher_subject_score_sheet', class=selected_score_class, subject=selected_score_subject) }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-table-list"></i> Open Subject Sheet
+                        </a>
+                        {% endif %}
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Student ID</th>
+                                <th>Name</th>
+                                <th>Class</th>
+                                <th>Stream</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in filtered_subject_student_rows %}
+                                <tr class="student-row">
+                                    <td>{{ item.student_id }}</td>
+                                    <td>{{ item.firstname }}</td>
+                                    <td>{{ item.classname }}</td>
+                                    <td>{{ item.stream }}</td>
+                                    <td>
+                                        {% set class_locked_subjects = (locked_subjects_by_class.get(item.classname, []) if locked_subjects_by_class is defined else []) %}
+                                        {% if selected_score_subject in class_locked_subjects %}
+                                        <span class="chip chip-warning">
+                                            <i class="fas fa-lock"></i> Locked
+                                        </span>
+                                        {% else %}
+                                        <span class="chip chip-success">
+                                            <i class="fas fa-circle-check"></i> Ready
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if selected_score_subject in class_locked_subjects %}
+                                        <span class="btn btn-warning btn-sm" title="Locked until subject teacher submits to class teacher." style="opacity:0.78; cursor:not-allowed;">
+                                            <i class="fas fa-lock"></i> {{ selected_score_subject }}
+                                        </span>
+                                        {% else %}
+                                        <a href="{{ url_for('teacher_enter_subject_scores', student_id=item.student_id, subject=selected_score_subject) }}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-pen-to-square"></i> Enter {{ selected_score_subject }}
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center">
+                                        No students found for the selected subject/class.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% elif selected_score_class %}
+                <div class="card">
+                    <h2><i class="fas fa-book"></i> Subject Score Entry</h2>
+                    <p class="note">Class filter is active for <strong>{{ selected_score_class }}</strong>. Choose a subject from the left `Score Entry` menu to load the matching students.</p>
+                </div>
+                {% elif score_nav_tree %}
+                <div class="card">
+                    <h2><i class="fas fa-book"></i> Subject Score Entry</h2>
+                    <p class="note">Choose a subject and class from the left `Score Entry` menu to load only students offering that subject.</p>
+                </div>
+                {% endif %}
+
+                {% if rank_class_options %}
+                <div class="card">
+                    <h2><i class="fas fa-trophy"></i> Subject Ranking</h2>
+                    <p class="note">
+                        Rank students by one subject for a class, and choose whether class arms are ranked separately or together.
+                    </p>
+                    <form method="GET" action="{{ url_for('teacher_dashboard') }}" class="grid">
+                        <input type="hidden" name="tab" value="score" />
+                        <div class="form-group no-margin">
+                            <label for="rank_class">Class</label>
+                            <select id="rank_class" name="rank_class" required>
+                                <option value="">-- Select Class --</option>
+                                {% for cls in rank_class_options %}
+                                <option value="{{ cls }}" {% if cls == selected_rank_class %}selected{% endif %}>{{ cls }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group no-margin">
+                            <label for="rank_subject">Subject</label>
+                            <select id="rank_subject" name="rank_subject" required>
+                                <option value="">-- Select Subject --</option>
+                                {% for subj in rank_subject_options %}
+                                <option value="{{ subj }}" {% if subj == selected_rank_subject %}selected{% endif %}>{{ subj }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group no-margin">
+                            <label for="rank_arm_mode">Arm Ranking Mode</label>
+                            <select id="rank_arm_mode" name="rank_arm_mode">
+                                <option value="separate" {% if selected_rank_arm_mode == 'separate' %}selected{% endif %}>Rank each arm separately</option>
+                                <option value="together" {% if selected_rank_arm_mode == 'together' %}selected{% endif %}>Combine all arms of same class</option>
+                            </select>
+                        </div>
+                        <div class="form-group no-margin">
+                            <button type="submit" class="btn btn-primary full-width">Show Ranking</button>
+                        </div>
+                    </form>
+                    {% if selected_rank_class and selected_rank_subject %}
+                    <p class="mt-12">
+                        <strong>Class Scope:</strong>
+                        {% if selected_rank_group_classes %}
+                            {{ selected_rank_group_classes|join(', ') }}
+                        {% else %}
+                            {{ selected_rank_class }}
+                        {% endif %}
+                        |
+                        <strong>Subject:</strong> {{ selected_rank_subject }}
+                    </p>
+                    <p class="mt-10">
+                        <strong>Ranked:</strong> {{ subject_rank_summary.ranked_students }}
+                        /
+                        <strong>Eligible:</strong> {{ subject_rank_summary.available_students }}
+                        {% if subject_rank_summary.missing_scores %}
+                        |
+                        <strong>Missing Scores:</strong> {{ subject_rank_summary.missing_scores }}
+                        {% endif %}
+                    </p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Position</th>
+                                <th>Student ID</th>
+                                <th>Name</th>
+                                <th>Class</th>
+                                <th>Stream</th>
+                                <th>Subject Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in subject_rank_rows %}
+                            <tr class="student-row">
+                                <td>{{ row.position }}</td>
+                                <td>{{ row.student_id }}</td>
+                                <td>{{ row.firstname }}</td>
+                                <td>{{ row.classname }}</td>
+                                <td>{{ row.stream }}</td>
+                                <td>{{ '%.2f'|format(row.mark) }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center">No ranked students yet for this selection. Enter complete subject scores first.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="note">Select class and subject, then click "Show Ranking".</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% endif %}
+
+                {% if active_tab in ['overview', 'score'] %}
+                {% if active_tab == 'overview' %}
+                <div class="card">
+                    <h2><i class="fas fa-compass"></i> Classroom Actions</h2>
+                    <p class="note">Use dedicated pages for classroom work and messages.</p>
+                    <div class="toolbar">
+                        <a href="{{ url_for('teacher_class_list') }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-list"></i> Class List
+                        </a>
+                        <a href="{{ url_for('teacher_messages') }}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-bell"></i> Messages
+                            {% if unread_teacher_messages %}
+                            <span class="chip chip-warning" style="margin-left:6px;">{{ unread_teacher_messages }}</span>
+                            {% endif %}
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+                {% if subject_submit_rows and (not school or school.score_entry_mode != 'dean_led') %}
+                <div class="card">
+                    <h2><i class="fas fa-share-square"></i> Submit Subject Scores To Class Teacher</h2>
+                    <p class="note">Submission is now tracked per subject. Use one button per class after all your assigned subject scores for that class are complete.</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Class</th>
+                                <th>Your Subjects</th>
+                                <th>Pending Entries</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in subject_submit_rows %}
+                            <tr class="student-row">
+                                <td>{{ row.classname }}</td>
+                                <td>
+                                    <div>{{ row.subjects|join(', ') }}</div>
+                                    {% if row.submitted_subjects %}
+                                    <div class="note" style="margin-top:6px;">
+                                        Submitted: {{ row.submitted_subjects|join(', ') }}
+                                    </div>
+                                    {% endif %}
+                                    {% if row.pending_submit_subjects and not row.is_submitted %}
+                                    <div class="note" style="margin-top:4px;">
+                                        Waiting: {{ row.pending_submit_subjects|join(', ') }}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td>{{ row.pending_entries }}</td>
+                                <td>
+                                    {% if row.is_submitted %}
+                                    <span class="chip chip-success">Submitted{% if row.submitted_at %} ({{ row.submitted_at }}){% endif %}</span>
+                                    {% elif row.ready %}
+                                    <span class="chip chip-primary">Ready</span>
+                                    {% else %}
+                                    <span class="chip chip-warning">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('teacher_submit_to_class_teacher') }}" class="inline-form">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                        <input type="hidden" name="classname" value="{{ row.classname }}" />
+                                        <button type="submit" class="btn btn-primary btn-xs" {% if (not row.ready) or row.is_submitted %}disabled{% endif %}>
+                                            {% if row.is_submitted %}Submitted{% elif row.ready %}Submit{% else %}Incomplete{% endif %}
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+                {% endif %}
+
+                {% if active_tab == 'submission' %}
+                <div class="card">
+                    <h2><i class="fas fa-ranking-star"></i> Submit Results For Approval</h2>
+                    <p class="note">Only your assigned class(es) appear here. Subject-only teachers cannot submit class results. If you need manual attendance entry, open the Attendance page for that class.</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Class</th>
+                                <th>Term</th>
+                                <th>Completed</th>
+                                <th>Viewed</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for classname in classes %}
+                                {% set s = class_publish_status.get(classname, {}) %}
+                                <tr>
+                                    <td>{{ classname }}</td>
+                                    <td>{{ current_term }}</td>
+                                    <td>{{ s.completed or 0 }}/{{ s.total or 0 }}</td>
+                                    <td>{{ s.viewed_students or 0 }}/{{ s.published_students or 0 }}</td>
+                                    <td>
+                                        {% if s.published %}
+                                            <span class="chip chip-success">Published</span>
+                                        {% elif s.approval_status == 'pending' %}
+                                            <span class="chip chip-pending">Pending admin review</span>
+                                        {% elif s.approval_status == 'rejected' %}
+                                            <span class="chip chip-danger">Rejected{% if s.review_note %}: {{ s.review_note }}{% endif %}</span>
+                                        {% elif not s.attendance_ready %}
+                                            <span class="chip chip-warning">Attendance pending</span>
+                                        {% elif not s.behaviour_ready %}
+                                            <span class="chip chip-warning">Behaviour pending ({{ s.behaviour_missing_count or 0 }})</span>
+                                        {% elif s.ready %}
+                                            <span class="chip chip-primary">Ready</span>
+                                        {% else %}
+                                            <span class="chip chip-warning">Pending scores</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if school and school.score_entry_mode == 'dean_led' %}
+                                        <a href="{{ url_for('teacher_dashboard', tab='score') }}" class="btn btn-primary btn-xs">Open Shared Draft</a>
+                                        {% else %}
+                                        <a href="{{ url_for('teacher_behaviour_assessment', classname=classname) }}" class="btn btn-primary btn-xs">Behaviour</a>
+                                        {% endif %}
+                                        <form method="POST" action="{{ url_for('teacher_publish_results') }}" class="inline-form">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                            <input type="hidden" name="classname" value="{{ classname }}"/>
+                                            <button type="submit" class="btn btn-success btn-xs" {% if not s.ready or s.published or s.approval_status == 'pending' %}disabled{% endif %}>
+                                                Submit
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr><td colspan="6" class="text-center">No assigned classes.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <h2><i class="fas fa-list-check"></i> Subject Completion Tracker</h2>
+                    <p class="note">
+                        Class submission is enabled only when every subject has complete scores for all eligible students.
+                    </p>
+                    {% for classname in classes %}
+                        {% set s = class_publish_status.get(classname, {}) %}
+                        <div class="stack-card">
+                            <div class="stack-head">
+                                <strong>{{ classname }}</strong>
+                                {% if s.subject_ready %}
+                                    <span class="chip chip-success">All Subjects Complete</span>
+                                {% else %}
+                                    <span class="chip chip-warning">Pending Subjects: {{ s.subject_pending_count or 0 }}</span>
+                                {% endif %}
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Subject</th>
+                                        <th>Assigned Teacher(s)</th>
+                                        <th>Completed / Eligible</th>
+                                        <th>Pending</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in s.subject_progress or [] %}
+                                    <tr class="student-row">
+                                        <td>{{ row.subject }}</td>
+                                        <td>{{ row.assigned_teachers|join(', ') if row.assigned_teachers else '-' }}</td>
+                                        <td>{{ row.completed_students }}/{{ row.eligible_students }}</td>
+                                        <td>{{ row.pending_students }}</td>
+                                        <td>
+                                            {% if row.ready %}
+                                                <span class="chip chip-success">Complete</span>
+                                            {% else %}
+                                                <span class="chip chip-warning">Pending</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center">No subject progress found for this class.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="empty-note">No assigned classes.</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% if show_first_login_tutorial %}
+    <div class="welcome-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-tutorial-title">
+        <div class="welcome-modal-card">
+            <h3 id="welcome-tutorial-title">{{ first_login_tutorial.title }}</h3>
+            <p class="note">Quick start checklist for your first login:</p>
+            <ol>
+                {% for step in first_login_tutorial.steps %}
+                <li>{{ step }}</li>
+                {% endfor %}
+            </ol>
+            <form method="post" action="{{ url_for('complete_first_login_tutorial') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Got It, Continue</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard-enhanced.js', v='20260411b') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

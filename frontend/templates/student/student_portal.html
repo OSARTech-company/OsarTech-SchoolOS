@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Result Portal - Check Your Results</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #3a7bd5 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .portal-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .portal-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .portal-header i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .portal-header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .portal-header p {
+            font-size: 0.95rem;
+            opacity: 0.9;
+        }
+
+        .portal-body {
+            padding: 40px 30px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #2a5298;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(42, 82, 152, 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: #adb5bd;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(42, 82, 152, 0.3);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .back-link a {
+            color: #2a5298;
+            text-decoration: none;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: color 0.3s ease;
+        }
+
+        .back-link a:hover {
+            color: #1e3c72;
+            text-decoration: underline;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #2a5298;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .info-box p {
+            color: #5a6c7d;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+
+        .flash-error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #f5c6cb;
+        }
+
+        .flash-success {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #c3e6cb;
+        }
+
+        @media (max-width: 480px) {
+            .portal-header {
+                padding: 30px 20px;
+            }
+
+            .portal-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .portal-body {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="portal-container">
+        <div class="portal-header">
+            <i class="fas fa-graduation-cap"></i>
+            <h1>Student Result Portal</h1>
+            <p>Check your academic results online</p>
+        </div>
+
+        <div class="portal-body">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="flash-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="info-box">
+                <p>Enter your Student ID and password to view your result.</p>
+            </div>
+
+            <form method="POST" action="{{ url_for('check_result') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                <div class="form-group">
+                    <label for="student_id">
+                        <i class="fas fa-id-card"></i> Student ID
+                    </label>
+                    <input type="text" id="student_id" name="student_id" placeholder="Enter your student ID" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">
+                        <i class="fas fa-lock"></i> Password
+                    </label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="term">
+                        <i class="fas fa-calendar-alt"></i> Term (optional)
+                    </label>
+                    <select id="term" name="term">
+                        <option value="">Latest available published term</option>
+                        <option value="First Term">First Term</option>
+                        <option value="Second Term">Second Term</option>
+                        <option value="Third Term">Third Term</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    <i class="fas fa-search"></i>
+                    View Results
+                </button>
+            </form>
+
+            <div class="back-link">
+                <a href="{{ url_for('home') }}">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+

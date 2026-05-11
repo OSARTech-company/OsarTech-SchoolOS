@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Runtime Error Logs - Super Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'error_logs' %}
+    {% include 'super/_super_admin_sidebar.html' %}
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1><i class="fas fa-triangle-exclamation"></i> Runtime Error Logs</h1>
+                <p>Track production errors with context (role, school, page, endpoint).</p>
+            </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+            {% endwith %}
+            <div class="card">
+                <form method="get" class="toolbar">
+                    <div>
+                        <label>Role</label>
+                        <input type="text" name="role" value="{{ role_filter or '' }}" placeholder="teacher / school_admin">
+                    </div>
+                    <div>
+                        <label>Endpoint</label>
+                        <input type="text" name="endpoint" value="{{ endpoint_filter or '' }}" placeholder="assistant_guide">
+                    </div>
+                    <div>
+                        <label>Search</label>
+                        <input type="text" name="q" value="{{ text_filter or '' }}" placeholder="error text or path">
+                    </div>
+                    <div>
+                        <label>Rows</label>
+                        <select name="per_page">
+                            {% for opt in [20, 50, 100, 200] %}
+                            <option value="{{ opt }}" {% if per_page == opt %}selected{% endif %}>{{ opt }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" type="submit">Apply</button>
+                    <a class="btn" href="{{ url_for('super_admin_error_logs') }}">Reset</a>
+                </form>
+                <p class="muted" style="margin-top:8px;">Total: {{ total_rows }} log entries.</p>
+            </div>
+
+            <div class="card" style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Error UID</th>
+                            <th>Type</th>
+                            <th>Role/User</th>
+                            <th>School</th>
+                            <th>Endpoint</th>
+                            <th>Path</th>
+                            <th>Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in logs %}
+                        <tr>
+                            <td>{{ row.created_at }}</td>
+                            <td><code>{{ row.error_uid }}</code></td>
+                            <td>{{ row.error_type }}</td>
+                            <td>{{ row.role or '-' }} / {{ row.user_id or '-' }}</td>
+                            <td>{{ row.school_id or '-' }}</td>
+                            <td>{{ row.endpoint or '-' }}</td>
+                            <td>{{ row.path or '-' }}</td>
+                            <td style="max-width: 380px; white-space: normal;">{{ row.error_message }}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="8">
+                                <details>
+                                    <summary>Show details (method/source/meta/traceback)</summary>
+                                    <div style="margin-top:8px;">
+                                        <div><strong>Method:</strong> {{ row.method or '-' }}</div>
+                                        <div><strong>Source Page:</strong> {{ row.source_page or '-' }}</div>
+                                        {% if row.suggestion %}
+                                        <div style="margin-top:8px;">
+                                            <strong>Suggested Fix:</strong> {{ row.suggestion.summary }}
+                                            {% if row.suggestion.steps %}
+                                            <ol style="margin:6px 0 0 18px;">
+                                                {% for step in row.suggestion.steps %}
+                                                <li>{{ step }}</li>
+                                                {% endfor %}
+                                            </ol>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                        <div><strong>Request Meta:</strong> <code>{{ row.request_meta|tojson }}</code></div>
+                                        <pre style="white-space: pre-wrap; overflow:auto; max-height:260px;">{{ row.traceback_text }}</pre>
+                                    </div>
+                                </details>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="8">No error logs found for this filter.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if total_pages > 1 %}
+                <div class="pagination-bar" style="margin-top:14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    {% if page > 1 %}
+                    <a class="btn btn-sm" href="{{ url_for('super_admin_error_logs', role=role_filter, endpoint=endpoint_filter, q=text_filter, per_page=per_page, page=page-1) }}">Previous</a>
+                    {% endif %}
+                    <span>Page {{ page }} / {{ total_pages }}</span>
+                    {% if page < total_pages %}
+                    <a class="btn btn-sm" href="{{ url_for('super_admin_error_logs', role=role_filter, endpoint=endpoint_filter, q=text_filter, per_page=per_page, page=page+1) }}">Next</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+

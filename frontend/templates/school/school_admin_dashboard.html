@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>School Admin Dashboard - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css', v='20260228b') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308d') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body.rail-expanded .topbar-layout .side-link span { display: inline !important; }
+      body.rail-expanded .topbar-layout .side-brand span { display: inline !important; }
+      .school-logo,
+      .school-logo-fallback {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        object-fit: contain;
+        padding: 4px;
+      }
+      @media (max-width: 768px) {
+        .school-logo,
+        .school-logo-fallback {
+          width: 54px;
+          height: 54px;
+          top: 10px;
+          right: 10px;
+          font-size: 20px;
+        }
+      }
+      .term-progress-wrap { display: flex; align-items: center; gap: 16px; }
+      .term-progress-ring { width: 110px; height: 110px; flex: 0 0 auto; }
+      .term-progress-meta { font-size: 0.95rem; color: #475569; }
+      .term-progress-meta strong { color: #0f172a; }
+      .mini-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+      .mini-cal-cell { border: 1px solid #e2e8f0; border-radius: 7px; min-height: 44px; padding: 3px; background: #f8fafc; font-size: 10px; }
+      .mini-cal-cell.empty { background: transparent; border-style: dashed; }
+      .mini-cal-dot { display: block; border-radius: 4px; padding: 1px 3px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .layout-main { gap: 20px; grid-template-columns: minmax(290px, 0.9fr) minmax(0, 1.8fr); }
+      .section-title-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 4px 0 12px;
+        padding: 0 2px;
+      }
+      .section-title-bar h2 {
+        margin: 0;
+        font-size: 1.15rem;
+        color: #1a3556;
+      }
+      .section-title-bar p {
+        margin: 0;
+        color: #5b6475;
+        font-size: 0.9rem;
+      }
+      .quick-actions {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      }
+      .quick-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #d9e3ef;
+        background: #f7fbff;
+        color: #1e3b5f;
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .quick-link:hover {
+        background: #edf5ff;
+      }
+      .welcome-modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1200;
+      }
+      .welcome-modal-card {
+        width: min(760px, 94vw);
+        background: #fff;
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 18px 40px rgba(2, 6, 23, 0.35);
+      }
+      .welcome-modal-card h3 { margin: 0 0 10px; color: #0f172a; }
+      .welcome-modal-card ol { margin: 8px 0 14px 18px; color: #334155; }
+      @media (max-width: 900px) {
+        .layout-main { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% include 'school/_school_admin_sidebar.html' %}
+      
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-school"></i> {{ school.school_name if school and school.school_name else 'Osartech' }}</h1>
+            <p class="meta-line">
+              <strong>Location:</strong> {{ school.location if school and school.location else '-' }} |
+              <strong>Last Login:</strong> {{ last_login_at }}
+            </p>
+            {% if school_access_state %}
+            {% set access_status = (school_access_state.effective_status or '') %}
+            {% set access_class = 'is-active' if access_status in ['trial_free', 'active_paid'] else ('is-warning' if access_status == 'pending_payment' else 'is-blocked') %}
+            <div class="access-badge-row">
+              <span class="access-badge {{ access_class }}">
+                <i class="fas fa-shield-alt" aria-hidden="true"></i>
+                Access: {{ access_status|replace('_', ' ')|title }}
+              </span>
+              {% if school_access_state.reason %}
+              <p class="access-badge-note">{{ school_access_state.reason }}</p>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% set school_initial = ((school.school_name if school and school.school_name else 'S')[:1] or 'S')|upper %}
+            {% if school and school.school_logo %}
+            <img
+              src="{{ url_for('school_logo_proxy', school_id=school.school_id, v=(school.updated_at|string if school and school.updated_at else '1')) }}"
+              alt="School Logo"
+              class="school-logo"
+              onload="var fb=this.nextElementSibling;if(fb){fb.classList.add('is-hidden');fb.style.display='none';}"
+              onerror="this.onerror=null;this.style.display='none';var fb=this.nextElementSibling;if(fb){fb.classList.remove('is-hidden');fb.style.display='flex';}"
+            />
+            <div class="school-logo-fallback is-hidden"><i class="fas fa-school" aria-hidden="true"></i><span>{{ school_initial }}</span></div>
+            {% else %}
+            <div class="school-logo-fallback"><i class="fas fa-school" aria-hidden="true"></i><span>{{ school_initial }}</span></div>
+            {% endif %}
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %} {% if
+          messages %} {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %} {% endif %} {% endwith %}
+          {% if not approval_workflow_enabled %}
+          <div class="flash error">
+            Approval workflow is not enabled. Run <code>python migrate.py</code> or
+            set <code>ALLOW_RUNTIME_SCHEMA_HEAL=1</code> and restart to add the
+            required columns.
+          </div>
+          {% endif %}
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <h3>{{ total_students }}</h3>
+              <p>Total Students</p>
+            </div>
+            <div class="stat-card">
+              <h3>{{ class_counts|length }}</h3>
+              <p>Classes</p>
+            </div>
+            <div class="stat-card">
+              <h3>{{ parent_count }}</h3>
+              <p>Parents Linked</p>
+            </div>
+            <div class="stat-card">
+              <h3>{{ total_teachers }}</h3>
+              <p>Active Teachers</p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="section-title-bar">
+              <h2><i class="fas fa-list-check"></i> Setup & Plan Checklist</h2>
+              <p>Complete core setup before full rollout.</p>
+            </div>
+            <p class="note">Completion: <strong>{{ profile_checklist.percentage if profile_checklist else 0 }}%</strong></p>
+            {% if profile_checklist and profile_checklist.rows %}
+            <div class="quick-actions">
+              {% for item in profile_checklist.rows %}
+              <div class="quick-link" style="justify-content:flex-start;">
+                <i class="fas {{ 'fa-circle-check' if item.ok else 'fa-circle-xmark' }}"></i>
+                <span>{{ item.label }}</span>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+            <p class="note mt-10">
+              Plan Limits:
+              Students {{ plan_limits.max_students if plan_limits.max_students else 'Unlimited' }},
+              Teachers {{ plan_limits.max_teachers if plan_limits.max_teachers else 'Unlimited' }},
+              Storage {{ plan_limits.storage_quota_mb if plan_limits.storage_quota_mb else 'Unlimited' }} MB.
+            </p>
+            <p class="note">
+              Backup Status:
+              {{ backup_health.exports if backup_health else 0 }} export(s) in 30 days,
+              {{ backup_health.restore_dry_runs if backup_health else 0 }} dry-run restore(s),
+              {{ backup_health.auto_snapshots if backup_health else 0 }} auto snapshot(s),
+              {% if backup_health and backup_health.is_overdue %}
+              <strong class="op-off">schedule overdue</strong>.
+              {% else %}
+              <strong class="op-on">schedule on track</strong>.
+              {% endif %}
+            </p>
+            {% if not setup_wizard_completed %}
+            <div class="flash warning" style="margin-top:14px;">
+              First-time setup is still open. Use the guided wizard to complete branding, subjects, teachers, students, and timetable setup.
+            </div>
+            <div class="quick-actions" style="margin-top:12px;">
+              <a href="{{ url_for('school_admin_setup_wizard') }}" class="quick-link">
+                <i class="fas fa-wand-magic-sparkles"></i> Open Setup Wizard
+              </a>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="card">
+            <div class="section-title-bar">
+              <h2><i class="fas fa-bolt"></i> Quick Actions</h2>
+              <p>Open core school admin tasks fast.</p>
+            </div>
+            <div class="quick-actions">
+              <a href="{{ url_for('school_admin_add_students_by_class') }}" class="quick-link"><i class="fas fa-user-plus"></i> Add Students</a>
+              <a href="{{ url_for('school_admin_class_subjects') }}" class="quick-link"><i class="fas fa-book-open"></i> Class Subjects</a>
+              <a href="{{ url_for('school_admin_term_programs') }}" class="quick-link"><i class="fas fa-calendar-alt"></i> Term Programs</a>
+              <a href="{{ url_for('school_admin_settings_profile') }}" class="quick-link"><i class="fas fa-cogs"></i> School Settings</a>
+              <a href="{{ url_for('school_admin_analytics') }}" class="quick-link"><i class="fas fa-chart-line"></i> Analytics</a>
+              <a href="{{ url_for('school_admin_security') }}" class="quick-link"><i class="fas fa-shield-alt"></i> Security Logs</a>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="section-title-bar">
+              <h2><i class="fas fa-pen-to-square"></i> Score Entry Mode</h2>
+              <p>Choose the school-wide score workflow.</p>
+            </div>
+            <form id="scoreEntryModeForm" method="POST" action="{{ url_for('school_admin_update_score_entry_mode') }}" class="form-group" style="max-width: 520px;" data-async-submit="1">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <label for="dashboard_score_entry_mode">Current Mode</label>
+              <select id="dashboard_score_entry_mode" name="score_entry_mode">
+                <option value="teacher_subject" {% if not school or school.score_entry_mode == 'teacher_subject' %}selected{% endif %}>Advanced Mode</option>
+                <option value="dean_led" {% if school and school.score_entry_mode == 'dean_led' %}selected{% endif %}>Simple Mode</option>
+                <option value="subject_sheet" {% if school and school.score_entry_mode == 'subject_sheet' %}selected{% endif %}>Subject Sheet Mode</option>
+              </select>
+              <p id="scoreEntryModeHelp" class="note mt-10">
+                Advanced Mode keeps strict subject ownership.
+                Simple Mode lets class-assigned staff enter all subjects for a student/class.
+                Subject Sheet Mode opens subject-by-subject class rosters for bulk score entry.
+              </p>
+              <p id="scoreEntryModeStatus" class="note mt-10" hidden aria-live="polite"></p>
+              <button type="submit" id="scoreEntryModeSubmit" class="btn btn-primary"><i class="fas fa-save"></i> Save Mode</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="section-title-bar">
+              <h2><i class="fas fa-sitemap"></i> Admin Tools</h2>
+              <p>Review requests and keep data quality on track.</p>
+            </div>
+            <div class="quick-actions">
+              <a href="{{ url_for('school_admin_attendance_integrity') }}" class="quick-link"><i class="fas fa-user-check"></i> Attendance Integrity</a>
+              <a href="{{ url_for('school_admin_timetable_coverage') }}" class="quick-link"><i class="fas fa-table"></i> Timetable Coverage</a>
+              <a href="{{ url_for('school_admin_reports') }}" class="quick-link"><i class="fas fa-file-export"></i> Reports Export</a>
+              <a href="{{ url_for('school_admin_student_reset_requests') }}" class="quick-link"><i class="fas fa-key"></i> Reset Requests</a>
+              <a href="{{ url_for('school_admin_subject_requests') }}" class="quick-link"><i class="fas fa-list-check"></i> Subject Requests</a>
+              <a href="{{ url_for('school_admin_disputes') }}" class="quick-link"><i class="fas fa-comment-dots"></i> Dispute Threads</a>
+            </div>
+          </div>
+
+          <div class="layout-main">
+            <div class="layout-side">
+              <div class="section-title-bar">
+                <h2><i class="fas fa-sliders-h"></i> School Operations</h2>
+                <p>Core controls and calendar overview.</p>
+              </div>
+
+              <div class="card">
+                <h2><i class="fas fa-circle-notch"></i> Term Open-Day Progress</h2>
+                {% set pct = (term_open_progress.percentage if term_open_progress else 0) %}
+                {% set circ = 283 %}
+                {% set off = ((100 - pct) * circ / 100) %}
+                <div class="term-progress-wrap">
+                  <svg class="term-progress-ring" viewBox="0 0 120 120" role="img" aria-label="Term progress {{ pct }} percent">
+                    <circle cx="60" cy="60" r="45" fill="none" stroke="#dbeafe" stroke-width="12"></circle>
+                    <circle cx="60" cy="60" r="45" fill="none" stroke="#0ea5e9" stroke-width="12"
+                            stroke-linecap="round" transform="rotate(-90 60 60)"
+                            stroke-dasharray="{{ circ }}" stroke-dashoffset="{{ off }}"></circle>
+                    <text x="60" y="66" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">{{ pct }}%</text>
+                  </svg>
+                  <div class="term-progress-meta">
+                    <div><strong>Status:</strong> {{ term_open_progress.status if term_open_progress else 'Calendar not set' }}</div>
+                    <div><strong>Elapsed:</strong> {{ term_open_progress.elapsed_open_days if term_open_progress else 0 }} / {{ term_open_progress.total_open_days if term_open_progress else 0 }} days</div>
+                    <div><strong>Remaining:</strong> {{ term_open_progress.remaining_open_days if term_open_progress else 0 }} days</div>
+                    <div><strong>Range:</strong> {{ term_open_progress.open_date if term_open_progress and term_open_progress.open_date else '-' }} to {{ term_open_progress.close_date if term_open_progress and term_open_progress.close_date else '-' }}</div>
+                  </div>
+                </div>
+                <p class="note mt-10">Progress counts only official open days (excluding Saturday, Sunday, and mid-term break).</p>
+              </div>
+
+              <div class="card">
+                <h2><i class="fas fa-calendar-week"></i> Term Mini Calendar</h2>
+                <div class="form-group">
+                  <label for="miniCalMonth">Month</label>
+                  <input type="month" id="miniCalMonth" />
+                </div>
+                <div id="miniCalGrid" class="mini-cal-grid"></div>
+                <p class="note mt-10">Quick view of scheduled term events by day.</p>
+              </div>
+
+              <div class="card">
+                <h2><i class="fas fa-power-off"></i> Operations Control</h2>
+                <p>
+                  School Status:
+                  <strong
+                    class="{{ 'op-on' if school and school.operations_enabled else 'op-off' }}"
+                  >
+                    {{ 'ON' if school and school.operations_enabled else 'OFF' }}
+                  </strong>
+                </p>
+                <p class="note mt-10">
+                  Managed by Super Admin. When OFF: school admin is read-only and students can view only previously published results.
+                </p>
+              </div>
+            </div>
+
+            <div class="layout-primary">
+              <div class="section-title-bar">
+                <h2><i class="fas fa-clipboard-check"></i> Monitoring & Review</h2>
+                <p>Track data quality and publish readiness.</p>
+              </div>
+
+              <div class="card">
+                {% set leadership_label = 'Head Teacher' if school and school.leadership_title == 'head_teacher' else 'Principal' %}
+                <h2><i class="fas fa-signature"></i> {{ leadership_label }} Signature</h2>
+                <p>
+                  Status:
+                  <strong class="{{ 'op-on' if has_principal_signature else 'op-off' }}">
+                    {{ 'Uploaded' if has_principal_signature else 'Not Uploaded' }}
+                  </strong>
+                </p>
+                <p class="note mt-10">
+                  Result publishing requires {{ leadership_label|lower }} signature. Uploading signature requires your school admin password.
+                </p>
+                <form action="{{ url_for('school_admin_upload_principal_signature') }}" method="POST" enctype="multipart/form-data" class="mt-10">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <div class="form-group">
+                    <label for="principal_signature">{{ leadership_label }} Signature Image (PNG/JPG/WEBP, max 2MB)</label>
+                    <input type="file" id="principal_signature" name="principal_signature" accept=".png,.jpg,.jpeg,.webp,image/*" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="admin_password">School Admin Password</label>
+                    <input type="password" id="admin_password" name="admin_password" autocomplete="current-password" required />
+                  </div>
+                  <button type="submit" class="btn btn-primary">Save {{ leadership_label }} Signature</button>
+                </form>
+              </div>
+
+              <div class="card">
+                <h2><i class="fas fa-calendar-alt"></i> School Programs</h2>
+                <p class="note">Manage mid-term break, exams period, PTA, inter-house sports, graduation, CA deadlines, and events on a dedicated page.</p>
+                <a href="{{ url_for('school_admin_term_programs') }}" class="btn btn-primary">
+                  <i class="fas fa-external-link-alt"></i> Open Term Programs
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% if show_first_login_tutorial %}
+    <div class="welcome-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-tutorial-title">
+      <div class="welcome-modal-card">
+        <h3 id="welcome-tutorial-title">{{ first_login_tutorial.title }}</h3>
+        <p class="note">Quick start checklist for your first login:</p>
+        <ol>
+          {% for step in first_login_tutorial.steps %}
+          <li>{{ step }}</li>
+          {% endfor %}
+        </ol>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:0;">
+          <form method="post" action="{{ url_for('complete_first_login_tutorial') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Got It, Continue</button>
+          </form>
+          <a href="{{ url_for('school_admin_setup_wizard') }}" class="btn btn-secondary">
+            <i class="fas fa-wand-magic-sparkles"></i> Open Setup Wizard
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+      (function () {
+        var body = document.body;
+        if (window.innerWidth > 600) {
+          body.classList.add('rail-expanded');
+        }
+      })();
+    </script>
+    <script>
+      (function () {
+        var form = document.getElementById('scoreEntryModeForm');
+        var select = document.getElementById('dashboard_score_entry_mode');
+        var helpEl = document.getElementById('scoreEntryModeHelp');
+        if (!form || !select || !helpEl) return;
+
+        var helpByMode = {
+          teacher_subject: 'Advanced Mode keeps strict subject ownership. Simple Mode lets class-assigned staff enter all subjects for a student/class.',
+          dean_led: 'Simple Mode lets class-assigned staff enter all subjects for a student/class. Advanced Mode keeps strict subject ownership.',
+          subject_sheet: 'Subject Sheet Mode opens class-and-subject rosters so teachers or school admin can enter scores in one subject sheet at a time.'
+        };
+
+        function setModeUi(mode) {
+          helpEl.textContent = helpByMode[mode] || helpByMode.teacher_subject;
+          document.querySelectorAll('[data-score-entry-visible]').forEach(function (el) {
+            var visibleFor = (el.getAttribute('data-score-entry-visible') || '').trim();
+            if (!visibleFor) {
+              el.hidden = true;
+              return;
+            }
+            if (visibleFor === 'simple') {
+              el.hidden = mode !== 'dean_led';
+              return;
+            }
+            if (visibleFor === 'non_simple') {
+              el.hidden = mode === 'dean_led';
+              return;
+            }
+            if (visibleFor === 'admin_score') {
+              el.hidden = !(mode === 'dean_led' || mode === 'subject_sheet');
+              return;
+            }
+            el.hidden = true;
+          });
+        }
+
+        select.addEventListener('change', function () {
+          var statusEl = document.getElementById('scoreEntryModeStatus');
+          if (statusEl) {
+            statusEl.hidden = true;
+            statusEl.textContent = '';
+          }
+          setModeUi(select.value);
+        });
+
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          var statusEl = document.getElementById('scoreEntryModeStatus');
+          var submitBtn = document.getElementById('scoreEntryModeSubmit');
+          var formData = new FormData(form);
+          formData.set('score_entry_mode', select.value);
+          if (submitBtn) {
+            submitBtn.disabled = true;
+          }
+          if (statusEl) {
+            statusEl.hidden = false;
+            statusEl.textContent = 'Saving mode...';
+          }
+          fetch(form.action || window.location.href, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              'Accept': 'application/json'
+            },
+            credentials: 'same-origin'
+          })
+          .then(function (response) {
+            return response.json().catch(function () { return {}; }).then(function (data) {
+              return { ok: response.ok, status: response.status, data: data || {} };
+            });
+          })
+          .then(function (result) {
+            if (!result.ok || !result.data.ok) {
+              throw new Error(result.data.message || 'Could not update score entry mode.');
+            }
+            if (result.data.score_entry_mode) {
+              select.value = result.data.score_entry_mode;
+              setModeUi(result.data.score_entry_mode);
+            }
+            if (statusEl) {
+              statusEl.hidden = false;
+              statusEl.textContent = result.data.message || 'Saved.';
+            }
+            window.setTimeout(function () {
+              window.location.reload();
+            }, 450);
+          })
+          .catch(function (error) {
+            if (statusEl) {
+              statusEl.hidden = false;
+              statusEl.textContent = (error && error.message) ? error.message : 'Could not update score entry mode.';
+            }
+          })
+          .finally(function () {
+            if (submitBtn) {
+              submitBtn.disabled = false;
+            }
+          });
+        });
+
+        setModeUi(select.value);
+      })();
+    </script>
+    <script id="dashboardTermEventsPayload" type="application/json">{{ dashboard_term_events_payload|tojson }}</script>
+    <script>
+      (function () {
+        var payloadEl = document.getElementById('dashboardTermEventsPayload');
+        var events = [];
+        try {
+          events = JSON.parse((payloadEl && payloadEl.textContent) || '[]');
+          if (!Array.isArray(events)) events = [];
+        } catch (e) {
+          events = [];
+        }
+        var monthInput = document.getElementById('miniCalMonth');
+        var grid = document.getElementById('miniCalGrid');
+        if (!monthInput || !grid) return;
+        function statusColor(status) {
+          var s = (status || '').toLowerCase();
+          if (s === 'confirmed') return '#bbf7d0';
+          if (s === 'completed') return '#ddd6fe';
+          if (s === 'cancelled') return '#fecaca';
+          if (s === 'holiday') return '#fde68a';
+          return '#bae6fd';
+        }
+        function expand(ev) {
+          var out = [];
+          if (!ev || !ev.date_raw) return out;
+          var start = new Date(ev.date_raw + 'T00:00:00');
+          if (isNaN(start.getTime())) return out;
+          var end = ev.date_end_raw ? new Date(ev.date_end_raw + 'T00:00:00') : start;
+          if (isNaN(end.getTime()) || end < start) end = start;
+          var d = new Date(start.getTime());
+          var guard = 0;
+          while (d <= end && guard < 120) {
+            out.push(d.toISOString().slice(0, 10));
+            d.setDate(d.getDate() + 1);
+            guard += 1;
+          }
+          return out;
+        }
+        function draw(monthStr) {
+          var m = monthStr || monthInput.value || new Date().toISOString().slice(0, 7);
+          monthInput.value = m;
+          grid.innerHTML = '';
+          var year = parseInt(m.slice(0, 4), 10);
+          var mon = parseInt(m.slice(5, 7), 10);
+          var first = new Date(year, mon - 1, 1);
+          var last = new Date(year, mon, 0);
+          var offset = (first.getDay() + 6) % 7;
+          var byDay = {};
+          for (var i = 0; i < events.length; i++) {
+            var labels = expand(events[i]);
+            for (var j = 0; j < labels.length; j++) {
+              if (labels[j].slice(0, 7) !== m) continue;
+              if (!byDay[labels[j]]) byDay[labels[j]] = [];
+              byDay[labels[j]].push(events[i]);
+            }
+          }
+          for (var p = 0; p < offset; p++) {
+            var empty = document.createElement('div');
+            empty.className = 'mini-cal-cell empty';
+            grid.appendChild(empty);
+          }
+          for (var day = 1; day <= last.getDate(); day++) {
+            var key = year + '-' + String(mon).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+            var cell = document.createElement('div');
+            cell.className = 'mini-cal-cell';
+            var html = '<div style="font-weight:700;">' + day + '</div>';
+            var list = byDay[key] || [];
+            for (var k = 0; k < list.length && k < 2; k++) {
+              html += '<span class="mini-cal-dot" style="background:' + statusColor(list[k].status) + ';" title="' + (list[k].label || '') + '">' + (list[k].label || '') + '</span>';
+            }
+            if (list.length > 2) html += '<span class="mini-cal-dot" style="background:#e2e8f0;">+' + (list.length - 2) + '</span>';
+            cell.innerHTML = html;
+            grid.appendChild(cell);
+          }
+        }
+        monthInput.addEventListener('change', function () { draw(monthInput.value); });
+        draw();
+      })();
+    </script>
+    <script src="{{ url_for('static', filename='js/dashboard-enhanced.js', v='20260411b') }}"></script>
+      {% include "shared/_loading_overlay.html" %}
+</body>
+</html>

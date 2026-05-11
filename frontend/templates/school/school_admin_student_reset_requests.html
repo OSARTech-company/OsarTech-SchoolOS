@@ -1,0 +1,95 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Reset Requests</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'student_reset_requests' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Student Password Reset Requests</h1>
+        <p><a class="btn" href="{{ url_for('school_admin_dashboard') }}">Back to Dashboard</a></p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <form method="get" class="filters">
+            <label>Status</label>
+            <select name="status">
+                <option value="">All</option>
+                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+                <option value="denied" {% if status_filter == 'denied' %}selected{% endif %}>Denied</option>
+            </select>
+            <button class="btn" type="submit">Filter</button>
+        </form>
+    </div>
+
+    <div class="card">
+        {% if requests %}
+        <table class="list-table">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Class</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Requested</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in requests %}
+                <tr>
+                    <td>{{ row.student_name }} ({{ row.student_id }})</td>
+                    <td>{{ row.classname }}</td>
+                    <td>{{ row.reason or '-' }}</td>
+                    <td>{{ row.status|title }}</td>
+                    <td>{{ row.requested_at }}</td>
+                    <td>
+                        {% if row.status == 'pending' %}
+                        <form method="post" action="{{ url_for('school_admin_update_student_reset_request') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="request_id" value="{{ row.id }}">
+                            <select name="status" required>
+                                <option value="">Choose</option>
+                                <option value="approved">Approve</option>
+                                <option value="denied">Deny</option>
+                            </select>
+                            <input type="text" name="review_note" placeholder="Optional note" maxlength="800">
+                            <button class="btn btn-sm" type="submit">Update</button>
+                        </form>
+                        {% else %}
+                        {{ row.reviewed_at or '-' }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="muted">No reset requests found.</p>
+        {% endif %}
+    </div>
+</div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+

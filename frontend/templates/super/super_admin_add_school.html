@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add School - Super Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+        <div class="side-taskbar">
+            <div class="side-brand">
+                <img src="{{ url_for('static', filename='img/osartech-logo.png', v='20260411b') }}" alt="Osartech Logo" class="brand-logo">
+                <span>Super Admin</span>
+            </div>
+            <div class="side-links">
+                <a href="{{ url_for('super_admin_dashboard') }}" class="side-link">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('super_admin_add_school_page') }}" class="side-link active">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Add School</span>
+                </a>
+                <a href="{{ url_for('super_admin_view_schools') }}" class="side-link">
+                    <i class="fas fa-school"></i>
+                    <span>View Schools</span>
+                </a>
+                <a href="{{ url_for('super_admin_onboarding_requests') }}" class="side-link">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Onboarding Requests</span>
+                </a>
+                <a href="{{ url_for('super_admin_privacy_requests') }}" class="side-link">
+                    <i class="fas fa-user-shield"></i>
+                    <span>Privacy Requests</span>
+                </a>
+                <a href="{{ url_for('view_reports') }}" class="side-link">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Reported Issues</span>
+                </a>
+                <a href="{{ url_for('super_admin_error_logs') }}" class="side-link">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    <span>Error Logs</span>
+                </a>
+                <a href="{{ url_for('super_admin_system_settings') }}" class="side-link">
+                    <i class="fas fa-sliders-h"></i>
+                    <span>System Settings</span>
+                </a>
+                <a href="{{ url_for('super_admin_assistant_analytics') }}" class="side-link">
+                    <i class="fas fa-robot"></i>
+                    <span>Assistant Analytics</span>
+                </a>
+                <a href="{{ url_for('super_admin_webhook_setup') }}" class="side-link">
+                    <i class="fas fa-plug"></i>
+                    <span>Webhook Setup</span>
+                </a>
+                <form method="post" action="{{ url_for('logout') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="side-link side-link-logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-plus-circle"></i> Osartech</h1>
+                    <p class="meta-line">
+                        <strong>Last Login:</strong> {{ last_login_at }} |
+                        <strong>Total Schools:</strong> {{ overview.total_schools }}
+                    </p>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="card">
+                    <h2><i class="fas fa-school"></i> Create School and Admin Account</h2>
+                    <p class="note">School ID is auto-generated. Admin username must be an email.</p>
+                    <form action="{{ url_for('super_admin_add_school') }}" method="POST" class="super-admin-add-school-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <div class="grid super-admin-add-school-grid">
+                            <div class="form-group">
+                                <label for="school_name">School Name:</label>
+                                <input type="text" id="school_name" name="school_name" placeholder="e.g., King College" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="location">School Location:</label>
+                                <input type="text" id="location" name="location" placeholder="e.g., Lagos, Nigeria">
+                            </div>
+                            <div class="form-group">
+                                <label for="phone">School Phone:</label>
+                                <input type="text" id="phone" name="phone" placeholder="e.g., +2348012345678">
+                            </div>
+                            <div class="form-group">
+                                <label for="school_email">School Contact Email:</label>
+                                <input type="email" id="school_email" name="school_email" placeholder="e.g., info@school.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="principal_name">Principal Name:</label>
+                                <input type="text" id="principal_name" name="principal_name" placeholder="e.g., Rev. John Doe">
+                            </div>
+                            <div class="form-group">
+                                <label for="motto">School Motto:</label>
+                                <input type="text" id="motto" name="motto" placeholder="e.g., Excellence and Discipline">
+                            </div>
+                            <div class="form-group">
+                                <label for="class_arm_ranking_mode">Class Arm Ranking:</label>
+                                <select id="class_arm_ranking_mode" name="class_arm_ranking_mode">
+                                    <option value="separate" selected>Arms Separate</option>
+                                    <option value="together">Arms Together</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="access_status">Access Status:</label>
+                                <select id="access_status" name="access_status">
+                                    <option value="trial_free" selected>Trial Free</option>
+                                    <option value="active_paid">Active Paid</option>
+                                    <option value="pending_payment">Pending Payment</option>
+                                    <option value="suspended">Suspended</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="cbt_enabled">CBT Access:</label>
+                                <select id="cbt_enabled" name="cbt_enabled">
+                                    <option value="1" selected>Enabled</option>
+                                    <option value="0">Disabled</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="trial_start_date">Trial Start Date:</label>
+                                <input type="date" id="trial_start_date" name="trial_start_date">
+                            </div>
+                            <div class="form-group">
+                                <label for="trial_end_date">Trial End Date:</label>
+                                <input type="date" id="trial_end_date" name="trial_end_date">
+                            </div>
+                            <div class="form-group">
+                                <label for="subscription_plan">Subscription Plan:</label>
+                                <input type="text" id="subscription_plan" name="subscription_plan" placeholder="e.g., Standard">
+                            </div>
+                            <div class="form-group">
+                                <label for="subscription_start_date">Subscription Start Date:</label>
+                                <input type="date" id="subscription_start_date" name="subscription_start_date">
+                            </div>
+                            <div class="form-group">
+                                <label for="subscription_end_date">Subscription End Date:</label>
+                                <input type="date" id="subscription_end_date" name="subscription_end_date">
+                            </div>
+                            <div class="form-group">
+                                <label for="payment_due_date">Payment Due Date:</label>
+                                <input type="date" id="payment_due_date" name="payment_due_date">
+                            </div>
+                            <div class="form-group">
+                                <label for="payment_grace_days">Payment Grace (days):</label>
+                                <input type="number" id="payment_grace_days" name="payment_grace_days" min="0" max="365" value="14">
+                            </div>
+                            <div class="form-group">
+                                <label for="payment_reference">Payment Reference:</label>
+                                <input type="text" id="payment_reference" name="payment_reference" placeholder="Receipt/Txn ID">
+                            </div>
+                            <div class="form-group">
+                                <label for="plan_max_students">Plan Max Students (0 = unlimited):</label>
+                                <input type="number" id="plan_max_students" name="plan_max_students" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="plan_max_teachers">Plan Max Teachers (0 = unlimited):</label>
+                                <input type="number" id="plan_max_teachers" name="plan_max_teachers" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="plan_storage_quota_mb">Plan Storage Quota MB (0 = unlimited):</label>
+                                <input type="number" id="plan_storage_quota_mb" name="plan_storage_quota_mb" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="plan_features_json">Plan Features JSON:</label>
+                                <input type="text" id="plan_features_json" name="plan_features_json" value='{}' placeholder='{"attendance":true,"assistant":true}'>
+                            </div>
+                            <div class="form-group">
+                                <label for="access_note">Access Note:</label>
+                                <input type="text" id="access_note" name="access_note" placeholder="Optional internal note">
+                            </div>
+                            <div class="form-group">
+                                <label for="admin_username">School Admin Email (Username):</label>
+                                <input type="email" id="admin_username" name="admin_username" placeholder="e.g., admin@school.com" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="admin_password">School Admin Password:</label>
+                                <input type="password" id="admin_password" name="admin_password" placeholder="Enter password for school admin" autocomplete="new-password" required>
+                            </div>
+                        </div>
+                        <div class="mt-12 super-admin-add-school-actions">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Create School</button>
+                            <a href="{{ url_for('super_admin_view_schools') }}" class="btn btn-primary ml-10"><i class="fas fa-school"></i> View Schools</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+
+
+
+

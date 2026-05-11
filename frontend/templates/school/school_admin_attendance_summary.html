@@ -1,0 +1,93 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Attendance Summary - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      .container { width: min(1240px, 100%); margin: 0 auto; padding: 24px; }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .header h1 { margin: 0; font-size: 1.8rem; }
+      .table-scroll { width: 100%; overflow-x: auto; border: 1px solid #dde5f0; border-radius: 10px; }
+      .assignment-table { width: 100%; border-collapse: collapse; min-width: 860px; }
+      .assignment-table th, .assignment-table td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+      .assignment-table th { background: #f8fbff; color: #1f3b5c; font-weight: 700; }
+      .muted { color: #64748b; font-size: 0.9rem; }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-clipboard-check"></i> Attendance Summary</h1>
+            <a href="{{ url_for('school_admin_dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+          </div>
+
+          <div class="card">
+            <form method="get" class="toolbar">
+              <div>
+                <label>Term</label>
+                <select name="term">
+                  <option value="First Term" {% if selected_term == 'First Term' %}selected{% endif %}>First Term</option>
+                  <option value="Second Term" {% if selected_term == 'Second Term' %}selected{% endif %}>Second Term</option>
+                  <option value="Third Term" {% if selected_term == 'Third Term' %}selected{% endif %}>Third Term</option>
+                </select>
+              </div>
+              <div>
+                <label>Academic Year</label>
+                <input name="academic_year" value="{{ selected_year }}" placeholder="YYYY-YYYY" />
+              </div>
+              <button class="btn btn-secondary" type="submit">Filter</button>
+              <a class="btn" href="{{ url_for('school_admin_reports_export', kind='attendance_summary', term=selected_term, academic_year=selected_year) }}">Export CSV</a>
+            </form>
+          </div>
+
+          <div class="card">
+            {% if rows %}
+            <div class="table-scroll">
+              <table class="assignment-table">
+                <thead>
+                  <tr>
+                    <th>Class</th>
+                    <th>Total Marked</th>
+                    <th>Present</th>
+                    <th>Absent</th>
+                    <th>Late</th>
+                    <th>Excused</th>
+                    <th>Other</th>
+                    <th>Latest Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in rows %}
+                  <tr>
+                    <td><strong>{{ row.classname }}</strong></td>
+                    <td>{{ row.total }}</td>
+                    <td>{{ row.present }}</td>
+                    <td>{{ row.absent }}</td>
+                    <td>{{ row.late }}</td>
+                    <td>{{ row.excused }}</td>
+                    <td>{{ row.other }}</td>
+                    <td class="muted">{{ row.latest_date or '-' }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <p>No attendance records found for the selected term/year.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+      {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

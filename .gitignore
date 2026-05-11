@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+env/
+*.db
+*.sqlite
+*.sqlite3
+users.json
+students.json
+reports.json
+
+# VS Code
+.vscode/
+
+# Local secrets
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+*.db
+*.zip
+__pycache__/
+.pytest_cache/
+
+# Local logs and backups
+app.log
+backups/
+*.dump
+*.log
+*.pid
+logs/*.log
+
+# Local Postgres data dir (if created in repo)
+ssss/
+
+# Local installers/binaries
+ne/
+local_ai/artifacts/

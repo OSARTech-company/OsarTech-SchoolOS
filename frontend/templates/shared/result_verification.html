@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Result Verification</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <style>
+        body {
+            margin: 0;
+            padding: 24px;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: #f3f6fb;
+            color: #1f2937;
+        }
+        .card {
+            max-width: 720px;
+            margin: 0 auto;
+            background: #fff;
+            border: 1px solid #d8e0eb;
+            border-radius: 12px;
+            box-shadow: 0 8px 22px rgba(16, 24, 40, 0.08);
+            overflow: hidden;
+        }
+        .head {
+            padding: 18px 20px;
+            color: #fff;
+            background: linear-gradient(135deg, #1E3C72 0%, #2A5298 100%);
+        }
+        .ok { color: #166534; }
+        .bad { color: #991b1b; }
+        .body { padding: 18px 20px 20px; }
+        .status {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .reason {
+            margin: 0 0 14px;
+            color: #475569;
+        }
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+            min-width: 540px;
+        }
+        th, td {
+            border: 1px solid #e5ebf3;
+            padding: 9px 10px;
+            text-align: left;
+        }
+        th {
+            width: 36%;
+            background: #f8fbff;
+            color: #334155;
+            font-weight: 600;
+        }
+        @media (max-width: 640px) {
+            body {
+                padding: 12px;
+            }
+            .head {
+                padding: 14px 14px;
+            }
+            .body {
+                padding: 14px;
+            }
+            .status {
+                font-size: 0.98rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="card">
+        <div class="head">
+            <h2 style="margin:0;">Student Result Verification</h2>
+        </div>
+        <div class="body">
+            {% if verified %}
+                <div class="status ok">Verified: This is an authentic published result.</div>
+            {% else %}
+                <div class="status bad">Not Verified</div>
+            {% endif %}
+            {% if reason %}
+                <p class="reason">{{ reason }}</p>
+            {% endif %}
+
+            {% if details %}
+            <div class="table-wrap">
+            <table>
+                <tr><th>School</th><td>{{ details.school_name or details.school_id or '-' }}</td></tr>
+                <tr><th>Student Name</th><td>{{ details.student_name or '-' }}</td></tr>
+                <tr><th>Student ID</th><td>{{ details.student_id or '-' }}</td></tr>
+                <tr><th>Class</th><td>{{ details.class_name or '-' }}</td></tr>
+                <tr><th>Term</th><td>{{ details.term or '-' }}</td></tr>
+                <tr><th>Academic Year</th><td>{{ details.academic_year or '-' }}</td></tr>
+                <tr><th>Average</th><td>{{ "%.1f"|format(details.average_marks|float) if details.average_marks is not none else '-' }}</td></tr>
+                <tr><th>Grade</th><td>{{ details.grade or '-' }}</td></tr>
+                <tr><th>Status</th><td>{{ details.status or '-' }}</td></tr>
+                <tr><th>Published At</th><td>{{ details.published_at or '-' }}</td></tr>
+            </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
+

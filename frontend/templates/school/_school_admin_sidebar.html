@@ -1,0 +1,345 @@
+<div class="side-taskbar school-admin-sidebar">
+    <style>
+      .app-shell.topbar-layout .side-taskbar.school-admin-sidebar {
+        background: linear-gradient(180deg, #121b3f 0%, #0f1737 100%) !important;
+        border-right: 1px solid #233056 !important;
+        box-shadow: 2px 0 16px rgba(4, 10, 26, 0.4) !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.school-admin-sidebar .side-brand {
+        background: #162148 !important;
+        border-bottom: 1px solid #2a365f !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.school-admin-sidebar .side-brand .school-brand-meta {
+        display: none;
+      }
+      .app-shell.topbar-layout .side-taskbar.school-admin-sidebar .side-brand .school-brand-title {
+        color: #eff4ff !important;
+        font-size: 0.82rem;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+      .app-shell.topbar-layout .side-taskbar.school-admin-sidebar .side-brand .school-brand-org {
+        color: #c7d2fe !important;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        line-height: 1.15;
+        text-transform: uppercase;
+      }
+      body.rail-expanded .app-shell.topbar-layout .side-taskbar.school-admin-sidebar .side-brand .school-brand-meta {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+      }
+      .app-shell.topbar-layout .side-taskbar.school-admin-sidebar .side-group-toggle {
+        color: #8ea4d6 !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.school-admin-sidebar .side-link span {
+        color: #e8eeff !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.school-admin-sidebar .side-link i {
+        color: #eef2ff !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.school-admin-sidebar .side-link {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: rgba(148, 163, 184, 0.28) !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.school-admin-sidebar .side-link:hover {
+        background: rgba(255, 255, 255, 0.14) !important;
+        border-color: rgba(148, 163, 184, 0.45) !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.school-admin-sidebar .side-link.active {
+        background: rgba(99, 102, 241, 0.34) !important;
+        border-color: rgba(129, 140, 248, 0.62) !important;
+      }
+    </style>
+    <div class="side-brand">
+        <img src="{{ url_for('static', filename='img/osartech-logo.png', v='20260411b') }}" alt="Osartech Logo" class="brand-logo">
+        <div class="school-brand-meta">
+            <div class="school-brand-title">School Admin</div>
+            <div class="school-brand-org">OSARTECH</div>
+        </div>
+    </div>
+    {% if school_access_state %}
+    {% set access_status = (school_access_state.effective_status or school_access_state.status or '') %}
+    {% set access_class = 'is-active' if access_status in ['trial_free', 'active_paid'] else ('is-warning' if access_status == 'pending_payment' else 'is-blocked') %}
+    <div class="side-access-status">
+        <span class="label">Access</span>
+        <span class="status {{ access_class }}">{{ access_status|replace('_', ' ')|title }}</span>
+    </div>
+    {% endif %}
+    <div class="side-links">
+        <a href="{{ url_for('school_admin_dashboard') }}" class="side-link{% if active_page == 'dashboard' %} active{% endif %}">
+            <i class="fas fa-home"></i>
+            <span>Dashboard</span>
+        </a>
+
+        <details class="side-group">
+            <summary class="side-group-toggle">
+                <span>Student</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
+                <a href="{{ url_for('school_admin_view_students') }}" class="side-link{% if active_page == 'view_students' %} active{% endif %}">
+                    <i class="fas fa-users"></i>
+                    <span>View Students</span>
+                </a>
+                <a href="{{ url_for('school_admin_add_students_by_class') }}" class="side-link{% if active_page == 'add_students' %} active{% endif %}">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Add Students</span>
+                </a>
+                <a href="{{ url_for('school_admin_student_reset_requests') }}" class="side-link{% if active_page == 'student_reset_requests' %} active{% endif %}">
+                    <i class="fas fa-unlock-alt"></i>
+                    <span>Reset Requests</span>
+                </a>
+                <a href="{{ url_for('school_admin_subject_requests') }}" class="side-link{% if active_page == 'subject_requests' %} active{% endif %}">
+                    <i class="fas fa-book"></i>
+                    <span>Subject Requests</span>
+                </a>
+                <a href="{{ url_for('school_admin_view_parents') }}" class="side-link{% if active_page == 'parents' %} active{% endif %}">
+                    <i class="fas fa-user-friends"></i>
+                    <span>View Parents</span>
+                </a>
+                <a href="{{ url_for('school_admin_parent_directory') }}" class="side-link{% if active_page == 'parents_directory' %} active{% endif %}">
+                    <i class="fas fa-address-book"></i>
+                    <span>Parent Directory</span>
+                </a>
+            </div>
+        </details>
+
+        <details class="side-group">
+            <summary class="side-group-toggle">
+                <span>Teachers</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
+                <a href="{{ url_for('school_admin_teachers') }}" class="side-link{% if active_page == 'teachers' %} active{% endif %}">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                    <span>Teacher List</span>
+                </a>
+                <a
+                    href="{{ url_for('school_admin_teacher_assignments') }}"
+                    id="sidebar-teacher-assignments-link"
+                    data-score-entry-visible="non_simple"
+                    class="side-link{% if active_page == 'teacher_assignments' %} active{% endif %}"
+                    {% if school and school.score_entry_mode == 'dean_led' %}hidden{% endif %}
+                >
+                    <i class="fas fa-diagram-project"></i>
+                    <span>Assign Teacher</span>
+                </a>
+                <a href="{{ url_for('school_admin_teacher_workload') }}" class="side-link{% if active_page == 'teacher_workload' %} active{% endif %}">
+                    <i class="fas fa-user-gear"></i>
+                    <span>Teacher Workload</span>
+                </a>
+            </div>
+        </details>
+
+        <details class="side-group">
+            <summary class="side-group-toggle">
+                <span>Academics</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
+                <a
+                    href="{{ url_for('school_admin_score_entry') }}"
+                    id="sidebar-school-admin-score-entry-link"
+                    data-score-entry-visible="admin_score"
+                    class="side-link{% if active_page == 'score_entry' %} active{% endif %}"
+                    {% if school and school.score_entry_mode not in ['dean_led', 'subject_sheet'] %}hidden{% endif %}
+                >
+                    <i class="fas fa-pen-to-square"></i>
+                    <span>Enter Scores</span>
+                </a>
+                <a href="{{ url_for('school_admin_publish_results') }}" class="side-link{% if active_page == 'publish_results' %} active{% endif %}">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <span>Publish Results</span>
+                </a>
+                <a href="{{ url_for('school_admin_class_subjects') }}" class="side-link{% if active_page == 'class_subjects' %} active{% endif %}">
+                    <i class="fas fa-book-open"></i>
+                    <span>Class Subjects</span>
+                </a>
+                {% if school_cbt_enabled %}
+                <a href="{{ url_for('school_admin_cbt') }}" class="side-link{% if active_page == 'cbt' %} active{% endif %}">
+                    <i class="fas fa-laptop-code"></i>
+                    <span>CBT</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('school_admin_timetable') }}" class="side-link{% if active_page == 'timetable' %} active{% endif %}">
+                    <i class="fas fa-table"></i>
+                    <span>Timetable</span>
+                </a>
+                <a href="{{ url_for('school_admin_term_programs') }}" class="side-link{% if active_page == 'term_programs' %} active{% endif %}">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Term Programs</span>
+                </a>
+                <a href="{{ url_for('school_admin_new_term_wizard') }}" class="side-link{% if active_page == 'new_term_wizard' %} active{% endif %}">
+                    <i class="fas fa-flag-checkered"></i>
+                    <span>New Term Wizard</span>
+                </a>
+                <a href="{{ url_for('school_admin_promote') }}" class="side-link{% if active_page == 'promote' %} active{% endif %}">
+                    <i class="fas fa-arrow-up"></i>
+                    <span>Promote Students</span>
+                </a>
+            </div>
+        </details>
+
+        <details class="side-group">
+            <summary class="side-group-toggle">
+                <span>Settings</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
+                <a href="{{ url_for('school_admin_settings_profile') }}" class="side-link{% if active_page == 'settings' and (active_settings_section|default('profile')) == 'profile' %} active{% endif %}">
+                    <i class="fas fa-school"></i>
+                    <span>School Profile</span>
+                </a>
+                <a href="{{ url_for('school_admin_settings_academic') }}" class="side-link{% if active_page == 'settings' and active_settings_section == 'academic' %} active{% endif %}">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>Academic Settings</span>
+                </a>
+                <a href="{{ url_for('school_admin_settings_results') }}" class="side-link{% if active_page == 'settings' and active_settings_section == 'results' %} active{% endif %}">
+                    <i class="fas fa-square-poll-vertical"></i>
+                    <span>Result Settings</span>
+                </a>
+                <a href="{{ url_for('school_admin_settings_branding') }}" class="side-link{% if active_page == 'settings' and active_settings_section == 'branding' %} active{% endif %}">
+                    <i class="fas fa-palette"></i>
+                    <span>Branding</span>
+                </a>
+            </div>
+        </details>
+
+        <details class="side-group">
+            <summary class="side-group-toggle">
+                <span>Monitoring</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
+                <a href="{{ url_for('school_admin_analytics') }}" class="side-link{% if active_page == 'analytics' %} active{% endif %}">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Analytics</span>
+                </a>
+                <a href="{{ url_for('school_admin_data_integrity') }}" class="side-link{% if active_page == 'data_integrity' %} active{% endif %}">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Data Integrity</span>
+                </a>
+                <a href="{{ url_for('school_admin_score_audit') }}" class="side-link{% if active_page == 'score_audit' %} active{% endif %}">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Score Audit Log</span>
+                </a>
+                <a href="{{ url_for('school_admin_attendance_integrity') }}" class="side-link{% if active_page == 'attendance_integrity' %} active{% endif %}">
+                    <i class="fas fa-check-double"></i>
+                    <span>Attendance Integrity</span>
+                </a>
+                <a href="{{ url_for('school_admin_attendance_summary') }}" class="side-link{% if active_page == 'attendance_summary' %} active{% endif %}">
+                    <i class="fas fa-clipboard-check"></i>
+                    <span>Attendance Summary</span>
+                </a>
+                <a href="{{ url_for('school_admin_timetable_coverage') }}" class="side-link{% if active_page == 'timetable_coverage' %} active{% endif %}">
+                    <i class="fas fa-calendar-week"></i>
+                    <span>Timetable Coverage</span>
+                </a>
+                <a href="{{ url_for('school_admin_disputes') }}" class="side-link{% if active_page == 'disputes' %} active{% endif %}">
+                    <i class="fas fa-balance-scale"></i>
+                    <span>Result Disputes</span>
+                </a>
+                <a href="{{ url_for('school_admin_reports') }}" class="side-link{% if active_page == 'reports' %} active{% endif %}">
+                    <i class="fas fa-file-export"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="{{ url_for('school_admin_promotion_audit') }}" class="side-link{% if active_page == 'promotion_audit' %} active{% endif %}">
+                    <i class="fas fa-history"></i>
+                    <span>Promotion Audit</span>
+                </a>
+            </div>
+        </details>
+
+        <details class="side-group">
+            <summary class="side-group-toggle">
+                <span>Communication</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
+                <a href="{{ url_for('school_admin_messages') }}" class="side-link{% if active_page == 'messages' %} active{% endif %}">
+                    <i class="fas fa-bell"></i>
+                    <span>Messages</span>
+                    {% if school_message_total|default(0) %}
+                    <span class="notif-badge">{{ school_message_total }}</span>
+                    {% endif %}
+                </a>
+                <a href="{{ url_for('school_admin_sms_health') }}" class="side-link{% if active_page == 'sms_health' %} active{% endif %}">
+                    <i class="fas fa-sms"></i>
+                    <span>SMS Health</span>
+                </a>
+                <a href="{{ url_for('school_admin_sms_logs') }}" class="side-link{% if active_page == 'sms_logs' %} active{% endif %}">
+                    <i class="fas fa-list"></i>
+                    <span>SMS Logs</span>
+                </a>
+            </div>
+        </details>
+
+        <details class="side-group">
+            <summary class="side-group-toggle">
+                <span>System</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
+                {% if not school_setup_wizard or not school_setup_wizard.completed %}
+                <a href="{{ url_for('school_admin_setup_wizard') }}" class="side-link{% if active_page == 'setup_wizard' %} active{% endif %}">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                    <span>Setup Wizard</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('school_admin_bulk_tools') }}" class="side-link{% if active_page == 'bulk' %} active{% endif %}">
+                    <i class="fas fa-database"></i>
+                    <span>Bulk/Backup</span>
+                </a>
+                <a href="{{ url_for('school_admin_security') }}" class="side-link{% if active_page == 'security' %} active{% endif %}">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Security Logs</span>
+                </a>
+                <a href="{{ url_for('school_admin_action_audit') }}" class="side-link{% if active_page == 'action_audit' %} active{% endif %}">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Action Audit</span>
+                </a>
+                <a href="{{ url_for('school_admin_health') }}" class="side-link{% if active_page == 'health' %} active{% endif %}">
+                    <i class="fas fa-heartbeat"></i>
+                    <span>System Health</span>
+                </a>
+                <a href="{{ url_for('school_admin_disaster_recovery_drill') }}" class="side-link{% if active_page == 'recovery_drill' %} active{% endif %}">
+                    <i class="fas fa-first-aid"></i>
+                    <span>Recovery Drill</span>
+                </a>
+            </div>
+        </details>
+
+        <details class="side-group">
+            <summary class="side-group-toggle">
+                <span>Support</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
+                <a href="{{ url_for('report_issue') }}" class="side-link">
+                    <i class="fas fa-bug"></i>
+                    <span>Report Issue</span>
+                </a>
+                <a href="{{ url_for('school_admin_privacy_requests') }}" class="side-link{% if active_page == 'privacy_requests' %} active{% endif %}">
+                    <i class="fas fa-user-shield"></i>
+                    <span>Data Requests</span>
+                    {% if school_pending_privacy_review_count|default(0) %}
+                    <span class="notif-badge">{{ school_pending_privacy_review_count }}</span>
+                    {% endif %}
+                </a>
+                <a href="{{ url_for('help', role='school_admin') }}" class="side-link">
+                    <i class="fas fa-question-circle"></i>
+                    <span>Help</span>
+                </a>
+                <a href="{{ url_for('school_admin_change_password') }}" class="side-link">
+                    <i class="fas fa-key"></i>
+                    <span>Change Password</span>
+                </a>
+            </div>
+        </details>
+
+        <form method="post" action="{{ url_for('logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="side-link side-link-logout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </form>
+    </div>
+</div>
+{% include 'shared/_ai_assistant_widget.html' %}

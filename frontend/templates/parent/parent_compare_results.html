@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Terms - Parent</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(1100px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.7rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .delta-up { color: #15803d; font-weight: 700; }
+        .delta-down { color: #b91c1c; font-weight: 700; }
+        .delta-flat { color: #475569; font-weight: 700; }
+    </style>
+</head>
+<body style="--accent: {{ parent_theme_accent if parent_theme_accent else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'compare' %}
+        {% include 'parent/_parent_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-chart-line"></i> Compare Terms - {{ student.firstname }} ({{ student.student_id }})</h1>
+                    <a href="{{ url_for('parent_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="card">
+                    <h3 class="no-margin"><i class="fas fa-sliders-h"></i> Select Terms</h3>
+                    <form method="get" action="{{ url_for('parent_compare_results') }}" class="mt-10">
+                        <input type="hidden" name="student_key" value="{{ student_key }}">
+                        <div class="grid">
+                            <div>
+                                <label for="term_a">From Term</label>
+                                <select id="term_a" name="term_a" required>
+                                    {% for t in published_terms %}
+                                    <option value="{{ t.token }}" {% if selected_a and selected_a.token == t.token %}selected{% endif %}>{{ t.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="term_b">To Term</label>
+                                <select id="term_b" name="term_b" required>
+                                    {% for t in published_terms %}
+                                    <option value="{{ t.token }}" {% if selected_b and selected_b.token == t.token %}selected{% endif %}>{{ t.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-10">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-sync"></i> Compare</button>
+                            <a href="{{ url_for('parent_view_result', student_key=student_key, term=selected_b.token if selected_b else '') }}" class="btn btn-secondary">Open Result</a>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3 class="no-margin"><i class="fas fa-percentage"></i> Overall Average</h3>
+                    <p class="muted mt-10">
+                        <strong>{{ selected_a.label if selected_a else '' }}:</strong> {{ '%.2f'|format(avg_a) }}%
+                        |
+                        <strong>{{ selected_b.label if selected_b else '' }}:</strong> {{ '%.2f'|format(avg_b) }}%
+                        |
+                        <strong>Delta:</strong>
+                        <span class="{% if avg_delta > 0 %}delta-up{% elif avg_delta < 0 %}delta-down{% else %}delta-flat{% endif %}">
+                            {% if avg_delta > 0 %}+{% endif %}{{ '%.2f'|format(avg_delta) }}
+                        </span>
+                    </p>
+                </div>
+
+                <div class="card">
+                    <h3 class="no-margin"><i class="fas fa-book-open"></i> Subject Comparison</h3>
+                    {% if rows %}
+                    <div class="table-scroll mt-10">
+                        <table class="assignment-table">
+                            <thead>
+                                <tr>
+                                    <th>Subject</th>
+                                    <th>{{ selected_a.label if selected_a else 'Term A' }} Score</th>
+                                    <th>{{ selected_a.label if selected_a else 'Term A' }} Grade</th>
+                                    <th>{{ selected_b.label if selected_b else 'Term B' }} Score</th>
+                                    <th>{{ selected_b.label if selected_b else 'Term B' }} Grade</th>
+                                    <th>Delta</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in rows %}
+                                <tr>
+                                    <td>{{ row.subject }}</td>
+                                    <td>{{ '%.2f'|format(row.score_a) if row.score_a is not none else '-' }}</td>
+                                    <td>{{ row.grade_a or '-' }}</td>
+                                    <td>{{ '%.2f'|format(row.score_b) if row.score_b is not none else '-' }}</td>
+                                    <td>{{ row.grade_b or '-' }}</td>
+                                    <td>
+                                        {% if row.delta is none %}
+                                        -
+                                        {% else %}
+                                        <span class="{% if row.delta > 0 %}delta-up{% elif row.delta < 0 %}delta-down{% else %}delta-flat{% endif %}">
+                                            {% if row.delta > 0 %}+{% endif %}{{ '%.2f'|format(row.delta) }}
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="muted mt-10">No subject records available to compare.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+
+

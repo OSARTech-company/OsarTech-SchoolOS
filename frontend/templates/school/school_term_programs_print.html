@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Term Programs Print</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
+      h1, h2 { margin: 0 0 10px 0; }
+      .meta { margin-bottom: 16px; font-size: 14px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; vertical-align: top; }
+      th { background: #f1f5f9; }
+      .muted { color: #475569; }
+      @media print {
+        .no-print { display: none; }
+        body { margin: 10mm; }
+      }
+    </style>
+  </head>
+  <body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="no-print">
+      <button onclick="window.print()">Print</button>
+    </div>
+    <h1>School Term Programs</h1>
+    <div class="meta">
+      <strong>School:</strong> {{ school.school_name if school and school.school_name else '-' }} |
+      <strong>Year:</strong> {{ selected_program_year }} |
+      <strong>Term:</strong> {{ selected_program_term }} |
+      <strong>Generated:</strong> {{ generated_at.strftime('%Y-%m-%d %H:%M:%S') }}
+    </div>
+
+    <h2>Programs</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Event</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Tags</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in events %}
+        <tr>
+          <td>{{ row.label }}</td>
+          <td>{{ row.date }}</td>
+          <td>{{ row.status|title }}</td>
+          <td>{{ row.tags|join(', ') if row.tags else '-' }}</td>
+          <td>{{ row.note or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="muted">No term programs saved for this term.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>
+

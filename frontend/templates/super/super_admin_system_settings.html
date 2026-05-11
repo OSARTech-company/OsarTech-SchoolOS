@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Settings - Super Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .settings-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+        .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-weight: 600; }
+        .pill.ok { background: #dcfce7; color: #166534; }
+        .pill.warn { background: #fee2e2; color: #991b1b; }
+        .toggle-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'system_settings' %}
+        {% include 'super/_super_admin_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-sliders-h"></i> System Settings</h1>
+                    <p class="meta-line">Global messaging delivery controls for email and SMS.</p>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="card">
+                    <h3 class="no-margin">Messaging Delivery</h3>
+                    <p class="note">These toggles override environment defaults. Use this to disable or re-enable delivery without editing server env vars.</p>
+                    <form method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="settings-grid mt-12">
+                            <div class="card">
+                                <div class="toggle-row">
+                                    <input type="checkbox" id="email_sending_enabled" name="email_sending_enabled" value="1" {% if email_enabled %}checked{% endif %}>
+                                    <label for="email_sending_enabled"><strong>Email Sending</strong></label>
+                                </div>
+                                <div class="mt-10">
+                                    <span class="pill {% if email_enabled %}ok{% else %}warn{% endif %}">
+                                        <i class="fas fa-envelope"></i>
+                                        {{ 'Enabled' if email_enabled else 'Disabled' }}
+                                    </span>
+                                </div>
+                                <p class="note mt-10">
+                                    Env default: {{ 'Enabled' if email_env_enabled else 'Disabled' }}.
+                                    Override: {{ 'Set' if email_override_set else 'Not set' }}.
+                                </p>
+                            </div>
+                            <div class="card">
+                                <div class="toggle-row">
+                                    <input type="checkbox" id="sms_sending_enabled" name="sms_sending_enabled" value="1" {% if sms_enabled %}checked{% endif %}>
+                                    <label for="sms_sending_enabled"><strong>SMS Sending</strong></label>
+                                </div>
+                                <div class="mt-10">
+                                    <span class="pill {% if sms_enabled %}ok{% else %}warn{% endif %}">
+                                        <i class="fas fa-comment-dots"></i>
+                                        {{ 'Enabled' if sms_enabled else 'Disabled' }}
+                                    </span>
+                                </div>
+                                <p class="note mt-10">
+                                    Env default: {{ 'Enabled' if sms_env_enabled else 'Disabled' }}.
+                                    Override: {{ 'Set' if sms_override_set else 'Not set' }}.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="mt-12">
+                            <button type="submit" class="btn btn-primary">Save Settings</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3 class="no-margin">Notes</h3>
+                    <ul class="note mt-10">
+                        <li>Delivery requires SMTP (email) or Twilio/SMS provider credentials.</li>
+                        <li>When disabled, the app will show a “disabled by admin” notice instead of sending.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+

@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CBT Questions - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .container { width: min(1220px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.8rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 16px; }
+        .meta-item { background: #f8fbff; border: 1px solid #dbe5f2; border-radius: 10px; padding: 10px; }
+        .meta-label { color: #5b6475; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+        .meta-value { color: #0f2f53; font-size: 1rem; font-weight: 700; margin-top: 4px; }
+        .table-wrap { overflow-x: auto; border: 1px solid #dbe5f2; border-radius: 10px; }
+        .table-wrap table { width: 100%; min-width: 1120px; border-collapse: collapse; }
+        .table-wrap th, .table-wrap td { border-bottom: 1px solid #e7edf7; padding: 10px 12px; text-align: left; vertical-align: top; }
+        .table-wrap th { background: #f7fbff; color: #1e3a5f; font-weight: 700; }
+        .status-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.8rem; text-transform: capitalize; }
+        .status-pill.draft { background: #edf2f7; color: #334155; }
+        .status-pill.published { background: #dcfce7; color: #166534; }
+        .status-pill.closed { background: #fee2e2; color: #991b1b; }
+        .inline-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .question-block { line-height: 1.45; }
+        .option-list { margin-top: 6px; color: #334155; font-size: 0.93rem; }
+        .option-list div { margin-bottom: 4px; }
+        .muted { color: #64748b; font-size: 0.9rem; }
+        .is-hidden { display: none; }
+        .q-thumb {
+            width: 56px;
+            height: 56px;
+            border-radius: 8px;
+            border: 1px solid #dbe5f2;
+            object-fit: cover;
+            display: block;
+            margin-bottom: 6px;
+        }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+<div class="app-shell topbar-layout">
+    {% set active_page = 'cbt' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1><i class="fas fa-edit"></i> CBT Questions</h1>
+                <a href="{{ url_for('school_admin_cbt') }}" class="back"><i class="fas fa-arrow-left"></i> Back to CBT</a>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <h2>{{ test.title }}</h2>
+                <div class="meta-grid">
+                    <div class="meta-item">
+                        <div class="meta-label">Class</div>
+                        <div class="meta-value">{{ test.classname }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Subject</div>
+                        <div class="meta-value">{{ test.subject }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Term / Year</div>
+                        <div class="meta-value">{{ test.term }} / {{ test.academic_year or '-' }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Duration</div>
+                        <div class="meta-value">{{ test.duration_minutes }} mins</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Question Pool</div>
+                        <div class="meta-value">{{ test.total_questions }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Students Answer</div>
+                        <div class="meta-value">{{ test.questions_to_answer if (test.questions_to_answer or 0) > 0 else test.total_questions }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Total Marks</div>
+                        <div class="meta-value">{{ '%.2f'|format(test.total_marks or 0) }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Attempts</div>
+                        <div class="meta-value">{{ attempt_counts.total }} (submitted: {{ attempt_counts.submitted }})</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Status</div>
+                        <div class="meta-value"><span class="status-pill {{ test.status|lower }}">{{ test.status }}</span></div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Strict Mode</div>
+                        <div class="meta-value">{{ 'On' if (test.strict_mode or 0)|int == 1 else 'Off' }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Fullscreen</div>
+                        <div class="meta-value">{{ 'Required' if (test.fullscreen_required or 0)|int == 1 else 'Optional' }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Focus Leave Limit</div>
+                        <div class="meta-value">{{ test.tab_switch_limit if test.tab_switch_limit is not none else 3 }}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Copy/Paste</div>
+                        <div class="meta-value">{{ 'Blocked' if (test.block_clipboard or 0)|int == 1 else 'Allowed' }}</div>
+                    </div>
+                </div>
+                {% if test.instructions %}
+                <p class="muted"><strong>Instructions:</strong> {{ test.instructions }}</p>
+                {% endif %}
+
+                <div class="inline-actions" style="margin-top: 10px;">
+                    <form method="post" action="{{ url_for('school_admin_cbt_set_status', test_id=test.test_id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="status" value="draft">
+                        <button type="submit" class="btn">Set Draft</button>
+                    </form>
+                    <form method="post" action="{{ url_for('school_admin_cbt_set_status', test_id=test.test_id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="status" value="published">
+                        <button type="submit" class="btn btn-primary">Publish</button>
+                    </form>
+                    <form method="post" action="{{ url_for('school_admin_cbt_set_status', test_id=test.test_id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="status" value="closed">
+                        <button type="submit" class="btn btn-danger">Close</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-plus-circle"></i> Add Question</h2>
+                {% if attempt_counts.submitted > 0 %}
+                <p class="muted">Editing is locked because students already submitted this test.</p>
+                {% elif test.status|lower == 'published' %}
+                <p class="muted">Set this test to Draft before adding or deleting questions.</p>
+                {% else %}
+                <form method="post" action="{{ url_for('school_admin_cbt_add_question', test_id=test.test_id) }}" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="form-group">
+                        <label>Question Type</label>
+                        <select name="question_type" id="questionTypeSelect" required>
+                            <option value="mcq4">Multiple Choice (A-D)</option>
+                            <option value="true_false">True / False</option>
+                            <option value="fill_blank">Fill in the Gap</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Question</label>
+                        <textarea name="question_text" rows="4" maxlength="2500" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Question Image URL (optional)</label>
+                        <input type="url" name="question_image_url" maxlength="2000" placeholder="https://...">
+                    </div>
+                    <div class="form-group">
+                        <label>Or Upload Question Image (optional)</label>
+                        <input type="file" name="question_image_file" accept=".png,.jpg,.jpeg,.webp,image/*">
+                    </div>
+                    <div class="form-group option-field">
+                        <label>Option A</label>
+                        <input type="text" name="option_a" id="optionA" maxlength="1000" required>
+                    </div>
+                    <div class="form-group option-field">
+                        <label>Option B</label>
+                        <input type="text" name="option_b" id="optionB" maxlength="1000" required>
+                    </div>
+                    <div class="form-group option-field option-cd">
+                        <label>Option C</label>
+                        <input type="text" name="option_c" id="optionC" maxlength="1000" required>
+                    </div>
+                    <div class="form-group option-field option-cd">
+                        <label>Option D</label>
+                        <input type="text" name="option_d" id="optionD" maxlength="1000" required>
+                    </div>
+                    <div class="form-group" id="correctOptionGroup">
+                        <label>Correct Option</label>
+                        <select name="correct_option" id="correctOptionSelect" required>
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                            <option value="D">D</option>
+                        </select>
+                    </div>
+                    <div class="form-group is-hidden" id="correctTextGroup">
+                        <label>Correct Fill-in Answer</label>
+                        <input type="text" name="correct_text" id="correctTextInput" maxlength="500" placeholder="Enter expected exact answer">
+                    </div>
+                    <div class="form-group is-hidden" id="acceptedAnswersGroup">
+                        <label>Other Accepted Answers (optional)</label>
+                        <textarea name="accepted_answers" id="acceptedAnswersInput" rows="2" maxlength="2000" placeholder="Use | or new line between accepted variants, e.g. H2O | Water"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Points</label>
+                        <input type="number" min="0.25" step="0.25" max="100" name="points" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Time (seconds)</label>
+                        <input type="number" min="5" max="1800" name="time_seconds" value="60" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Explanation (optional)</label>
+                        <textarea name="explanation" rows="3" maxlength="1500"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Add Question</button>
+                </form>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-list"></i> Questions ({{ questions|length }})</h2>
+                {% if questions %}
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Type</th>
+                                <th>Image</th>
+                                <th>Question</th>
+                                <th>Correct</th>
+                                <th>Points</th>
+                                <th>Time</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for q in questions %}
+                            <tr>
+                                <td><strong>{{ q.question_no }}</strong></td>
+                                <td>{{ (q.question_type or 'mcq4')|replace('_', ' ')|title }}</td>
+                                <td>
+                                    {% if q.question_image_url %}
+                                    {% if q.question_image_url.startswith('data:image/') %}
+                                    <img src="{{ q.question_image_url }}" alt="Q{{ q.question_no }} image" class="q-thumb">
+                                    {% endif %}
+                                    <a href="{{ q.question_image_url }}" target="_blank" rel="noopener">View</a>
+                                    {% else %}
+                                    <span class="muted">No image</span>
+                                    {% endif %}
+                                </td>
+                                <td class="question-block">
+                                    {{ q.question_text }}
+                                    <div class="option-list">
+                                        {% if (q.question_type or 'mcq4') == 'fill_blank' %}
+                                        <div><strong>Answer Input:</strong> Student types answer text.</div>
+                                        {% elif (q.question_type or 'mcq4') == 'true_false' %}
+                                        <div><strong>A:</strong> {{ q.option_a or 'True' }}</div>
+                                        <div><strong>B:</strong> {{ q.option_b or 'False' }}</div>
+                                        {% else %}
+                                        <div><strong>A:</strong> {{ q.option_a }}</div>
+                                        <div><strong>B:</strong> {{ q.option_b }}</div>
+                                        <div><strong>C:</strong> {{ q.option_c }}</div>
+                                        <div><strong>D:</strong> {{ q.option_d }}</div>
+                                        {% endif %}
+                                        {% if q.explanation %}
+                                        <div class="muted"><strong>Explanation:</strong> {{ q.explanation }}</div>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if (q.question_type or 'mcq4') == 'fill_blank' %}
+                                        {{ q.correct_text or '-' }}
+                                        {% if q.accepted_answers %}<div class="muted">Also: {{ q.accepted_answers }}</div>{% endif %}
+                                    {% else %}
+                                        {{ q.correct_option }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ '%.2f'|format(q.points or 0) }}</td>
+                                <td>{{ q.time_seconds or 60 }}s</td>
+                                <td>
+                                    {% if attempt_counts.submitted > 0 or test.status|lower == 'published' %}
+                                    <span class="muted">Locked</span>
+                                    {% else %}
+                                    <form method="post" action="{{ url_for('school_admin_cbt_delete_question', test_id=test.test_id) }}" onsubmit="return confirm('Delete question {{ q.question_no }}?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="question_no" value="{{ q.question_no }}">
+                                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="muted">No questions yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+<script>
+    (function () {
+        var typeSelect = document.getElementById('questionTypeSelect');
+        if (!typeSelect) return;
+        var optionFields = document.querySelectorAll('.option-field');
+        var optionCD = document.querySelectorAll('.option-cd');
+        var correctOptionGroup = document.getElementById('correctOptionGroup');
+        var correctOptionSelect = document.getElementById('correctOptionSelect');
+        var correctTextGroup = document.getElementById('correctTextGroup');
+        var correctTextInput = document.getElementById('correctTextInput');
+        var acceptedAnswersGroup = document.getElementById('acceptedAnswersGroup');
+        var optionA = document.getElementById('optionA');
+        var optionB = document.getElementById('optionB');
+        var optionC = document.getElementById('optionC');
+        var optionD = document.getElementById('optionD');
+        function applyType() {
+            var t = (typeSelect.value || 'mcq4').toLowerCase();
+            if (t === 'fill_blank') {
+                optionFields.forEach(function (el) { el.classList.add('is-hidden'); });
+                if (correctOptionGroup) correctOptionGroup.classList.add('is-hidden');
+                if (correctTextGroup) correctTextGroup.classList.remove('is-hidden');
+                if (acceptedAnswersGroup) acceptedAnswersGroup.classList.remove('is-hidden');
+                if (correctTextInput) correctTextInput.required = true;
+                if (correctOptionSelect) correctOptionSelect.required = false;
+                if (optionA) optionA.required = false;
+                if (optionB) optionB.required = false;
+                if (optionC) optionC.required = false;
+                if (optionD) optionD.required = false;
+            } else if (t === 'true_false') {
+                optionFields.forEach(function (el) { el.classList.remove('is-hidden'); });
+                optionCD.forEach(function (el) { el.classList.add('is-hidden'); });
+                if (correctOptionGroup) correctOptionGroup.classList.remove('is-hidden');
+                if (correctTextGroup) correctTextGroup.classList.add('is-hidden');
+                if (acceptedAnswersGroup) acceptedAnswersGroup.classList.add('is-hidden');
+                if (correctTextInput) correctTextInput.required = false;
+                if (correctOptionSelect) {
+                    correctOptionSelect.required = true;
+                    correctOptionSelect.innerHTML = '<option value="A">A (True)</option><option value="B">B (False)</option>';
+                }
+                if (optionA) { optionA.required = true; if (!optionA.value) optionA.value = 'True'; }
+                if (optionB) { optionB.required = true; if (!optionB.value) optionB.value = 'False'; }
+                if (optionC) optionC.required = false;
+                if (optionD) optionD.required = false;
+            } else {
+                optionFields.forEach(function (el) { el.classList.remove('is-hidden'); });
+                optionCD.forEach(function (el) { el.classList.remove('is-hidden'); });
+                if (correctOptionGroup) correctOptionGroup.classList.remove('is-hidden');
+                if (correctTextGroup) correctTextGroup.classList.add('is-hidden');
+                if (acceptedAnswersGroup) acceptedAnswersGroup.classList.add('is-hidden');
+                if (correctTextInput) correctTextInput.required = false;
+                if (correctOptionSelect) {
+                    correctOptionSelect.required = true;
+                    correctOptionSelect.innerHTML = '<option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>';
+                }
+                if (optionA) optionA.required = true;
+                if (optionB) optionB.required = true;
+                if (optionC) optionC.required = true;
+                if (optionD) optionD.required = true;
+            }
+        }
+        typeSelect.addEventListener('change', applyType);
+        applyType();
+    })();
+</script>
+{% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

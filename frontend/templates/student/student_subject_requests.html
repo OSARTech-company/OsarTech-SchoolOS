@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subject Requests - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(1080px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.85rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .request-shell { display: grid; gap: 18px; }
+        .page-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 22px;
+            padding: 26px;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 32%),
+                linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 58%, var(--accent) 100%);
+            color: #fff;
+            box-shadow: 0 20px 40px rgba(15, 76, 129, 0.22);
+        }
+        .page-hero::after {
+            content: "";
+            position: absolute;
+            inset: auto -60px -80px auto;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+        }
+        .hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.55fr) minmax(220px, 0.8fr);
+            gap: 18px;
+            align-items: end;
+        }
+        .hero-topline {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            font-size: 0.82rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .hero-title { margin: 14px 0 0; font-size: clamp(1.8rem, 3.8vw, 2.6rem); line-height: 1.08; }
+        .hero-text { margin: 12px 0 0; color: rgba(255,255,255,0.88); line-height: 1.6; max-width: 680px; }
+        .hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+        .hero-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            color: #fff;
+            font-weight: 600;
+        }
+        .summary-card {
+            border-radius: 18px;
+            padding: 16px;
+            background: rgba(255,255,255,0.13);
+            border: 1px solid rgba(255,255,255,0.16);
+            backdrop-filter: blur(6px);
+        }
+        .summary-card .label {
+            display: block;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.72);
+            margin-bottom: 6px;
+        }
+        .summary-card .value { font-size: 1.8rem; font-weight: 800; line-height: 1.1; }
+        .summary-card .meta { margin-top: 6px; color: rgba(255,255,255,0.84); }
+        .request-card {
+            border: 1px solid #dbe7f3;
+            border-radius: 20px;
+            padding: 22px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+        }
+        .request-card h2 { margin-top: 0; color: #12314d; }
+        .request-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+            gap: 18px;
+        }
+        .request-help {
+            display: grid;
+            gap: 16px;
+            align-content: start;
+        }
+        .mini-panel {
+            border: 1px solid #dbe7f3;
+            border-radius: 18px;
+            padding: 18px;
+            background: #fff;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
+        }
+        .mini-panel h3 {
+            margin: 0 0 10px;
+            color: #12314d;
+            font-size: 1rem;
+        }
+        .mini-list {
+            margin: 0;
+            padding-left: 18px;
+            color: #516072;
+            display: grid;
+            gap: 8px;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .stat-card {
+            border: 1px solid #dbe7f3;
+            border-radius: 18px;
+            padding: 18px;
+            background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+        }
+        .stat-card .label {
+            display: block;
+            font-size: 0.78rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #66758a;
+            margin-bottom: 8px;
+        }
+        .stat-card .value {
+            font-size: 1.7rem;
+            font-weight: 800;
+            color: #102f4a;
+            line-height: 1.1;
+        }
+        .stat-card .meta {
+            margin-top: 6px;
+            color: #5d6d82;
+            font-size: 0.92rem;
+        }
+        .list-table-wrap {
+            overflow-x: auto;
+            border: 1px solid #dbe7f3;
+            border-radius: 16px;
+        }
+        .list-table-wrap table {
+            width: 100%;
+            min-width: 560px;
+            border-collapse: collapse;
+        }
+        .list-table-wrap th,
+        .list-table-wrap td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #e5edf6;
+        }
+        .list-table-wrap thead th {
+            background: #eff6ff;
+            color: #1e3a5f;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .request-status {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: capitalize;
+        }
+        .request-status.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .request-status.approved {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .request-status.rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .request-status.processing {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        @media (max-width: 900px) {
+            .hero-grid { grid-template-columns: 1fr; }
+            .request-grid,
+            .stat-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 640px) {
+            .container { padding: 16px; }
+            .page-hero { padding: 22px 18px; border-radius: 18px; }
+            .hero-chip { width: 100%; justify-content: center; }
+        }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+        <div class="side-taskbar">
+            <div class="side-brand">
+                <img src="{{ url_for('static', filename='img/osartech-logo.png', v='20260411b') }}" alt="Osartech Logo" class="brand-logo">
+                <span>Student</span>
+            </div>
+            <div class="side-links">
+                <a href="{{ url_for('student_dashboard') }}" class="side-link">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('student_messages') }}" class="side-link">
+                    <i class="fas fa-bell"></i>
+                    <span>Messages</span>
+                </a>
+                <a href="{{ url_for('student_view_result') }}" class="side-link">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>View Results</span>
+                </a>
+                {% if school_cbt_enabled %}
+                <a href="{{ url_for('student_cbt') }}" class="side-link">
+                    <i class="fas fa-laptop-code"></i>
+                    <span>CBT</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('student_profile') }}" class="side-link">
+                    <i class="fas fa-user"></i>
+                    <span>Profile</span>
+                </a>
+                <a href="{{ url_for('student_subject_requests') }}" class="side-link active">
+                    <i class="fas fa-book"></i>
+                    <span>Subject Requests</span>
+                </a>
+                <a href="{{ url_for('student_change_password') }}" class="side-link">
+                    <i class="fas fa-key"></i>
+                    <span>Change Password</span>
+                </a>
+                <a href="{{ url_for('help', role='student') }}" class="side-link">
+                    <i class="fas fa-question-circle"></i>
+                    <span>Help</span>
+                </a>
+                <form method="post" action="{{ url_for('logout') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="side-link side-link-logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-book"></i> Subject Requests</h1>
+                    <a href="{{ url_for('student_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="request-shell">
+                <section class="page-hero">
+                    <div class="hero-grid">
+                        <div>
+                            <span class="hero-topline"><i class="fas fa-book"></i> Subject Requests</span>
+                            <h2 class="hero-title">Request subject updates with a clear record of what you need.</h2>
+                            <p class="hero-text">Use this page when you need to add, remove, or change subjects. Your recent requests stay visible here so you can track the school’s response.</p>
+                            <div class="hero-meta">
+                                <span class="hero-chip"><i class="fas fa-id-card"></i> {{ student.student_id }}</span>
+                                <span class="hero-chip"><i class="fas fa-users"></i> {{ student.classname or '-' }}</span>
+                                <span class="hero-chip"><i class="fas fa-list"></i> {{ student.subjects|length if student.subjects else 0 }} Current Subjects</span>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <span class="label">Recent Requests</span>
+                            <div class="value">{{ requests|length if requests else 0 }}</div>
+                            <div class="meta">Submitted subject change records</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="stat-grid">
+                    <div class="stat-card">
+                        <span class="label">Current Subjects</span>
+                        <div class="value">{{ student.subjects|length if student.subjects else 0 }}</div>
+                        <div class="meta">Subjects already assigned to your profile</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">Pending Requests</span>
+                        <div class="value">{{ requests|selectattr('status', 'equalto', 'pending')|list|length if requests else 0 }}</div>
+                        <div class="meta">Requests still waiting for school action</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">Approved Requests</span>
+                        <div class="value">{{ requests|selectattr('status', 'equalto', 'approved')|list|length if requests else 0 }}</div>
+                        <div class="meta">Requests already accepted by the school</div>
+                    </div>
+                </section>
+
+                <section class="request-grid">
+                    <div class="request-card">
+                        <h2>Request Subject Change</h2>
+                        <p class="note">Current subjects: {{ student.subjects|join(', ') if student.subjects else 'None set' }}</p>
+                        <form method="post">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="form-group">
+                                <label>Request Type</label>
+                                <select name="request_type" required>
+                                    <option value="">Select</option>
+                                    <option value="add">Add Subject(s)</option>
+                                    <option value="remove">Remove Subject(s)</option>
+                                    <option value="change">Change To These Subjects</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Subjects (comma or line separated)</label>
+                                <textarea name="subjects" rows="4" placeholder="e.g. Biology, Chemistry" required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Reason (optional)</label>
+                                <textarea name="reason" rows="3" maxlength="800"></textarea>
+                            </div>
+                            <button class="btn btn-primary" type="submit">Submit Request</button>
+                        </form>
+                    </div>
+
+                    <div class="request-help">
+                        <div class="mini-panel">
+                            <h3>Current Subject List</h3>
+                            <p class="muted">{{ student.subjects|join(', ') if student.subjects else 'No subjects have been added yet.' }}</p>
+                        </div>
+                        <div class="mini-panel">
+                            <h3>Before You Submit</h3>
+                            <ol class="mini-list">
+                                <li>Choose the request type that matches what you need.</li>
+                                <li>List subjects clearly so the school can process them faster.</li>
+                                <li>Add a short reason when your class combination is changing.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="request-card">
+                    <h2>Recent Requests</h2>
+                    {% if requests %}
+                    <div class="list-table-wrap">
+                    <table class="list-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Subjects</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in requests %}
+                            <tr>
+                                <td>{{ row.created_at }}</td>
+                                <td>{{ row.request_type|title }}</td>
+                                <td>{{ row.subjects|join(', ') }}</td>
+                                <td><span class="request-status {{ row.status|lower }}">{{ row.status|title }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    </div>
+                    {% else %}
+                    <p class="muted">No subject requests yet.</p>
+                    {% endif %}
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+
+

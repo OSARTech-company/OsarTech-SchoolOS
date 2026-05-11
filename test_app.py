@@ -1,0 +1,1791 @@
+import contextlib
+import importlib
+import json
+from datetime import datetime, timedelta
+
+import pytest
+
+
+def test_db_execute_transaction_resets(monkeypatch):
+    import student_scor
+    # ensure db_execute rolls back on error and commits on success so a
+    # failed migration statement doesn't abort the entire startup sequence
+    class DummyConn:
+        def __init__(self):
+            self.committed = False
+            self.rolled = False
+        def commit(self):
+            self.committed = True
+        def rollback(self):
+            self.rolled = True
+    class DummyCursor:
+        def __init__(self, conn):
+            self.connection = conn
+            self.queries = []
+        def execute(self, query, params=None):
+            self.queries.append(query)
+            if 'fail' in query:
+                raise RuntimeError('simulated error')
+    conn = DummyConn()
+    c = DummyCursor(conn)
+
+    with pytest.raises(RuntimeError):
+        student_scor.db_execute(c, 'please fail')
+    assert conn.rolled, "db_execute should rollback after error"
+
+    student_scor.db_execute(c, 'all good')
+    assert conn.committed, "db_execute should commit after successful statement"
+
+
+@pytest.fixture
+def app_module(monkeypatch):
+    monkeypatch.setenv("SECRET_KEY", "x" * 40)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/testdb")
+    monkeypatch.setenv("DEFAULT_STUDENT_PASSWORD", "password123")
+    monkeypatch.setenv("SUPER_ADMIN_PASSWORD", "supersecurepassword")
+    monkeypatch.setenv("RUN_STARTUP_DDL", "0")
+    monkeypatch.setenv("RUN_STARTUP_BOOTSTRAP", "0")
+    monkeypatch.setenv("ALLOW_RUNTIME_SCHEMA_HEAL", "0")
+
+    import student_scor
+
+    mod = importlib.reload(student_scor)
+    mod.app.config["TESTING"] = True
+    mod.app.config["WTF_CSRF_ENABLED"] = False
+    return mod
+
+
+@pytest.fixture
+def client(app_module):
+    return app_module.app.test_client()
+
+
+def test_build_subjects_from_config_ss1_combined_merges_all_tracks(app_module):
+    m = app_module
+    config = {
+        "core_subjects": ["English Language", "Mathematics"],
+        "science_subjects": ["Biology"],
+        "art_subjects": ["Literature in English"],
+        "commercial_subjects": ["Economics"],
+        "optional_subjects": ["French"],
+    }
+    school = {"ss1_stream_mode": "combined"}
+    subjects, final_stream, err = m.build_subjects_from_config(
+        classname="SS1",
+        stream="N/A",
+        config=config,
+        selected_optional_subjects=[],
+        school=school,
+    )
+    assert err is None
+    assert final_stream == "N/A"
+    assert subjects == [
+        "English Language",
+        "Mathematics",
+        "Biology",
+        "Literature in English",
+        "Economics",
+        "French",
+    ]
+
+
+def test_secondary_class_normalization_accepts_jss_aliases(app_module):
+    m = app_module
+    assert m.canonicalize_classname("JSS 1A") == "JSS1A"
+    assert m.canonicalize_classname("JS1") == "JSS1"
+    assert m.canonicalize_classname("Junior Secondary 2B") == "JSS2B"
+    assert m.is_secondary_classname("Junior Secondary 2B") is True
+    assert m.is_secondary_classname("JSS3") is True
+
+
+def test_cbt_test_score_pair_split_even_and_odd(app_module):
+    m = app_module
+    assert m._split_cbt_test_score_pair(14) == (7.0, 7.0)
+    assert m._split_cbt_test_score_pair(15) == (7.0, 8.0)
+
+
+def test_cbt_target_test_slots_prefers_next_slot(app_module):
+    m = app_module
+    assert m._cbt_target_test_slots(1, 3) == [1, 2]
+    assert m._cbt_target_test_slots(3, 3) == [3, 2]
+
+
+def test_load_published_student_result_combines_three_terms(app_module, monkeypatch):
+    m = app_module
+    # prepare fake DB connection that returns predetermined rows by term
+    def fake_db_connection(commit=False):
+        class FakeCursor:
+            def __init__(self):
+                self.last_params = None
+            def execute(self, query, params=None):
+                self.last_params = params
+            def fetchone(self):
+                term = self.last_params[2] if self.last_params and len(self.last_params) >= 3 else None
+                if term == 'First Term':
+                    return ('Aka','JSS1','2025-2026','First Term','S',1,'["Math"]','{"Math": {"overall_mark": 50}}','',50,'C','Pass')
+                if term == 'Second Term':
+                    return ('Aka','JSS1','2025-2026','Second Term','S',1,'["Math"]','{"Math": {"overall_mark": 70}}','',70,'B','Pass')
+                if term == 'Third Term':
+                    return ('Aka','JSS1','2025-2026','Third Term','S',1,'["Math"]','{"Math": {"overall_mark": 90}}','',90,'A','Pass')
+                return None
+        class FakeConn:
+            def cursor(self):
+                return FakeCursor()
+        @contextlib.contextmanager
+        def ctx(commit=False):
+            yield FakeConn()
+        return ctx(commit)
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "get_school", lambda sid: {"combine_third_term_results": 1})
+    monkeypatch.setattr(m, "get_grade_config", lambda sid: {"pass_mark": 0, "grade_a_min": 70, "grade_b_min": 60, "grade_c_min": 50, "grade_d_min": 40})
+    snapshot = m.load_published_student_result("SCH", "STU", "Third Term", "2025-2026", "JSS1")
+    assert snapshot is not None
+    assert snapshot['average_marks'] == pytest.approx((50 + 70 + 90) / 3)
+    assert snapshot['scores']['Math']['overall_mark'] == pytest.approx((50 + 70 + 90) / 3)
+
+
+def test_load_published_class_results_combines_terms(app_module, monkeypatch):
+    m = app_module
+    # fake cursor returns three rows for one student when asked for IN clause
+    def fake_db_connection(commit=False):
+        class FakeCursor:
+            def __init__(self):
+                self.last_query = ''
+                self.last_params = None
+            def execute(self, query, params=None):
+                self.last_query = query
+                self.last_params = params
+            def fetchall(self):
+                # return three rows if combining; otherwise mimic single term
+                if "IN ('First Term'" in self.last_query:
+                    return [
+                        ('S1','C','S',50,'["Math"]','{"Math": {"overall_mark": 50}}','First Term'),
+                        ('S1','C','S',70,'["Math"]','{"Math": {"overall_mark": 70}}','Second Term'),
+                        ('S1','C','S',90,'["Math"]','{"Math": {"overall_mark": 90}}','Third Term'),
+                    ]
+                # fallback
+                return []
+        class FakeConn:
+            def cursor(self):
+                return FakeCursor()
+        @contextlib.contextmanager
+        def ctx(commit=False):
+            yield FakeConn()
+        return ctx(commit)
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "get_school", lambda sid: {"combine_third_term_results": 1, "class_arm_ranking_mode": "separate"})
+    results = m.load_published_class_results("SCH", "C", "Third Term", "2025-2026", school={"combine_third_term_results":1, "class_arm_ranking_mode":"separate"})
+    assert len(results) == 1
+    assert results[0]['average_marks'] == pytest.approx((50 + 70 + 90) / 3)
+    assert results[0]['scores']['Math']['overall_mark'] == pytest.approx((50 + 70 + 90) / 3)
+
+
+def test_subject_overall_mark_prefers_numeric_components_over_stale_explicit(app_module):
+    m = app_module
+    score_block = {
+        "overall_mark": "0",
+        "test_1": "12",
+        "test_2": "8",
+        "exam_score": "60",
+    }
+    assert m.subject_overall_mark(score_block) == pytest.approx(80.0)
+
+
+def test_compute_average_marks_ignores_stale_non_subject_score_keys(app_module):
+    m = app_module
+    scores = {
+        "Mathematics": {"overall_mark": 80},
+        "Old Subject": {"overall_mark": 20},
+    }
+    avg = m.compute_average_marks_from_scores(scores, subjects=["Mathematics"])
+    assert avg == pytest.approx(80.0)
+
+
+def test_is_score_complete_for_subject_requires_numeric_values(app_module):
+    m = app_module
+    school = {"test_enabled": 1, "exam_enabled": 1}
+    assert m.is_score_complete_for_subject(
+        {"overall_mark": "75", "total_test": "20", "total_exam": "55"},
+        school,
+    ) is True
+    assert m.is_score_complete_for_subject(
+        {"overall_mark": "", "total_test": "20", "total_exam": "55"},
+        school,
+    ) is False
+    assert m.is_score_complete_for_subject(
+        {"overall_mark": "75", "total_test": "", "total_exam": "55"},
+        school,
+    ) is False
+
+
+def test_build_subjects_from_config_stream_rejects_invalid_optional(app_module):
+    m = app_module
+    config = {
+        "core_subjects": ["English Language", "Mathematics"],
+        "science_subjects": ["Biology", "Chemistry"],
+        "art_subjects": [],
+        "commercial_subjects": [],
+        "optional_subjects": ["French", "Data Processing"],
+    }
+    subjects, final_stream, err = m.build_subjects_from_config(
+        classname="SS2",
+        stream="Science",
+        config=config,
+        selected_optional_subjects=["French", "Invalid Subject"],
+        school={"ss1_stream_mode": "separate"},
+    )
+    assert subjects is None
+    assert final_stream is None
+    assert err == "Invalid optional subject selection."
+
+
+def test_build_subjects_from_config_stream_accepts_multiple_optional_without_limit(app_module):
+    m = app_module
+    config = {
+        "core_subjects": ["English Language", "Mathematics"],
+        "science_subjects": ["Biology", "Chemistry"],
+        "art_subjects": [],
+        "commercial_subjects": [],
+        "optional_subjects": ["French", "Data Processing", "Agricultural Science"],
+    }
+    subjects, final_stream, err = m.build_subjects_from_config(
+        classname="SS3",
+        stream="Science",
+        config=config,
+        selected_optional_subjects=["French", "Data Processing", "Agricultural Science"],
+        school={},
+    )
+    assert err is None
+    assert final_stream == "Science"
+    assert "French" in subjects
+    assert "Data Processing" in subjects
+    assert "Agricultural Science" in subjects
+
+
+def test_review_result_approval_request_approve_path(app_module, monkeypatch):
+    m = app_module
+    called = {}
+
+    monkeypatch.setattr(m, "ensure_result_publication_approval_columns", lambda: True)
+    monkeypatch.setattr(
+        m,
+        "get_result_publication_row",
+        lambda *args, **kwargs: {"approval_status": "pending", "is_published": False, "teacher_id": "teacher1"},
+    )
+
+    def fake_publish_results_for_class_atomic(**kwargs):
+        called.update(kwargs)
+
+    monkeypatch.setattr(m, "publish_results_for_class_atomic", fake_publish_results_for_class_atomic)
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"academic_year": "2025-2026"})
+    monkeypatch.setattr(
+        m,
+        "get_class_attendance_publish_readiness",
+        lambda **kwargs: {"ready": True, "days_open": 0, "missing_rows": [], "message": ""},
+    )
+
+    ok, message = m.review_result_approval_request(
+        school_id="SCH1",
+        classname="SS2",
+        term="First Term",
+        academic_year="2025-2026",
+        admin_user_id="admin1",
+        approve=True,
+        review_note="Looks good",
+    )
+
+    assert ok is True
+    assert "approved" in message.lower()
+    assert called["teacher_id"] == "teacher1"
+    assert called["classname"] == "SS2"
+
+
+def test_review_result_approval_request_reject_requires_columns(app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(m, "ensure_result_publication_approval_columns", lambda: True)
+    monkeypatch.setattr(
+        m,
+        "get_result_publication_row",
+        lambda *args, **kwargs: {"approval_status": "pending", "is_published": False, "teacher_id": "teacher1"},
+    )
+    monkeypatch.setattr(m, "result_publication_has_approval_columns", lambda: False)
+
+    ok, message = m.review_result_approval_request(
+        school_id="SCH1",
+        classname="SS2",
+        term="First Term",
+        academic_year="2025-2026",
+        admin_user_id="admin1",
+        approve=False,
+        review_note="Fix issues",
+    )
+
+    assert ok is False
+    assert "approval columns are missing" in message.lower()
+
+
+def test_promote_students_repeat_path_updates_promoted_without_nameerror(app_module, monkeypatch):
+    m = app_module
+    captured_updates = []
+
+    class FakeCursor:
+        def fetchall(self):
+            return [("STU1", "Aka", "JSS1", "JSS1", "[]")]
+
+    class FakeConn:
+        def __init__(self):
+            self._cursor = FakeCursor()
+
+        def cursor(self):
+            return self._cursor
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    def fake_db_execute(_cursor, query, params=None):
+        if "SET promoted" in query:
+            captured_updates.append(params)
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", fake_db_execute)
+    monkeypatch.setattr(m, "get_school", lambda school_id: {})
+    monkeypatch.setattr(m, "normalize_promoted_db_value", lambda value: 1 if value else 0)
+
+    m.promote_students(
+        school_id="SCH1",
+        from_class="JSS1",
+        to_class="JSS2",
+        action_by_student={},
+        term="",
+    )
+
+    assert len(captured_updates) == 1
+    assert captured_updates[0][0] == 0
+
+
+def test_is_login_blocked_returns_wait_time_when_lock_active(app_module, monkeypatch):
+    m = app_module
+
+    class FakeCursor:
+        def fetchone(self):
+            return (4, datetime.now() + timedelta(seconds=61))
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    monkeypatch.setattr(m, "purge_old_login_attempts", lambda: None)
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", lambda *args, **kwargs: None)
+
+    blocked, wait_minutes = m.is_login_blocked("login", "User1", "127.0.0.1")
+    assert blocked is True
+    assert wait_minutes >= 2
+
+
+def test_register_failed_login_locks_when_threshold_reached(app_module, monkeypatch):
+    m = app_module
+    updates = []
+
+    class FakeCursor:
+        def fetchone(self):
+            return (m.LOGIN_MAX_ATTEMPTS - 1, datetime.now(), None)
+
+    class FakeConn:
+        def __init__(self):
+            self._cursor = FakeCursor()
+
+        def cursor(self):
+            return self._cursor
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    def fake_db_execute(_cursor, query, params=None):
+        if "UPDATE login_attempts" in query:
+            updates.append(params)
+
+    monkeypatch.setattr(m, "purge_old_login_attempts", lambda: None)
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", fake_db_execute)
+
+    m.register_failed_login("login", "User1", "127.0.0.1")
+    assert len(updates) == 1
+    assert updates[0][0] == m.LOGIN_MAX_ATTEMPTS
+    assert updates[0][2] is not None
+
+
+def test_get_school_publication_statuses_uses_approval_columns_when_present(app_module, monkeypatch):
+    m = app_module
+
+    class FakeCursor:
+        def fetchall(self):
+            return [
+                (
+                    "JSS1",
+                    "T1",
+                    "Mr T",
+                    1,
+                    "2026-02-26T10:00:00",
+                    "approved",
+                    "2026-02-26T09:50:00",
+                    "teacher1",
+                    "2026-02-26T09:55:00",
+                    "admin1",
+                    "ok",
+                )
+            ]
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    monkeypatch.setattr(m, "ensure_result_publication_approval_columns", lambda: None)
+    monkeypatch.setattr(m, "result_publication_has_approval_columns", lambda: True)
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "get_term_edit_lock_status", lambda *args, **kwargs: {"enabled": True, "locked": False})
+    monkeypatch.setattr(
+        m,
+        "get_class_published_view_counts",
+        lambda *args, **kwargs: {"JSS1": {"published_count": 20, "viewed_count": 12}},
+    )
+
+    assignments = [{"classname": "JSS1", "teacher_name": "Mr T", "teacher_id": "T1", "term": "First Term", "academic_year": "2025-2026"}]
+    rows = m.get_school_publication_statuses("SCH1", "First Term", "2025-2026", assignments=assignments)
+    assert len(rows) == 1
+    assert rows[0]["approval_status"] == "approved"
+    assert rows[0]["is_published"] is True
+    assert rows[0]["published_count"] == 20
+    assert rows[0]["viewed_count"] == 12
+
+
+def test_get_school_publication_statuses_fallback_when_approval_columns_missing(app_module, monkeypatch):
+    m = app_module
+
+    class FakeCursor:
+        def fetchall(self):
+            return [("JSS2", "T2", "Mrs T", 0, "")]
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    monkeypatch.setattr(m, "ensure_result_publication_approval_columns", lambda: None)
+    monkeypatch.setattr(m, "result_publication_has_approval_columns", lambda: False)
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "get_term_edit_lock_status", lambda *args, **kwargs: {"enabled": True, "locked": False})
+    monkeypatch.setattr(m, "get_class_published_view_counts", lambda *args, **kwargs: {})
+
+    assignments = [{"classname": "JSS2", "teacher_name": "Mrs T", "teacher_id": "T2", "term": "First Term", "academic_year": "2025-2026"}]
+    rows = m.get_school_publication_statuses("SCH1", "First Term", "2025-2026", assignments=assignments)
+    assert len(rows) == 1
+    assert rows[0]["approval_status"] == "not_submitted"
+    assert rows[0]["is_published"] is False
+
+
+def test_teacher_publish_results_route_submits_for_approval(client, app_module, monkeypatch):
+    m = app_module
+    called = {}
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"academic_year": "2025-2026", "principal_signature_image": "sig"})
+    monkeypatch.setattr(m, "get_teachers", lambda school_id: {"T1": {"signature_image": "sig"}})
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "teacher_has_class_access", lambda *args, **kwargs: True)
+    monkeypatch.setattr(m, "is_result_published", lambda *args, **kwargs: False)
+    monkeypatch.setattr(m, "get_result_publication_row", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "load_students", lambda *args, **kwargs: {"S1": {"firstname": "Aka"}})
+    monkeypatch.setattr(m, "compute_class_subject_completion", lambda *args, **kwargs: {"ready": True, "rows": []})
+    monkeypatch.setattr(m, "is_student_score_complete", lambda *args, **kwargs: True)
+    monkeypatch.setattr(m, "class_behaviour_completion", lambda *args, **kwargs: {"ready": True, "missing_count": 0})
+    monkeypatch.setattr(
+        m,
+        "get_class_attendance_publish_readiness",
+        lambda **kwargs: {"ready": True, "days_open": 0, "missing_rows": [], "message": ""},
+    )
+
+    def fake_submit(school_id, classname, term, academic_year, teacher_id):
+        called.update(
+            {
+                "school_id": school_id,
+                "classname": classname,
+                "term": term,
+                "academic_year": academic_year,
+                "teacher_id": teacher_id,
+            }
+        )
+
+    monkeypatch.setattr(m, "submit_result_approval_request", fake_submit)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "T1"
+
+    resp = client.post("/teacher/publish-results", data={"classname": "JSS1"})
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/teacher")
+    assert called["classname"] == "JSS1"
+    assert called["teacher_id"] == "T1"
+
+
+def test_school_admin_approve_results_route_calls_review(client, app_module, monkeypatch):
+    m = app_module
+    called = {}
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"academic_year": "2025-2026"})
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+
+    def fake_review(**kwargs):
+        called.update(kwargs)
+        return True, "approved"
+
+    monkeypatch.setattr(m, "review_result_approval_request", fake_review)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "A1"
+
+    resp = client.post("/school-admin/approve-results", data={"classname": "JSS1", "review_note": "ok"})
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/school-admin/publish-results")
+    assert called["approve"] is True
+    assert called["classname"] == "JSS1"
+    assert called["admin_user_id"] == "A1"
+
+
+def test_school_admin_reject_results_route_calls_review(client, app_module, monkeypatch):
+    m = app_module
+    called = {}
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"academic_year": "2025-2026"})
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+
+    def fake_review(**kwargs):
+        called.update(kwargs)
+        return True, "rejected"
+
+    monkeypatch.setattr(m, "review_result_approval_request", fake_review)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "A1"
+
+    resp = client.post("/school-admin/reject-results", data={"classname": "JSS1", "review_note": "needs fix"})
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/school-admin/publish-results")
+    assert called["approve"] is False
+    assert called["classname"] == "JSS1"
+    assert called["admin_user_id"] == "A1"
+    assert called["review_note"] == "needs fix"
+
+
+def test_school_admin_dashboard_passes_assignments_to_publication_statuses(client, app_module, monkeypatch):
+    m = app_module
+    captured = {}
+    assignments = [{"classname": "JSS1", "teacher_name": "Mr T", "teacher_id": "T1", "term": "First Term", "academic_year": "2025-2026"}]
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"academic_year": "2025-2026", "principal_signature_image": ""})
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "get_total_student_count", lambda school_id: 1)
+    monkeypatch.setattr(m, "get_teachers", lambda school_id, include_archived=False: {})
+    monkeypatch.setattr(m, "get_student_count_by_class", lambda school_id: {})
+    monkeypatch.setattr(m, "get_class_assignments", lambda school_id: assignments)
+    monkeypatch.setattr(m, "get_last_login_at", lambda user_id: None)
+    monkeypatch.setattr(m, "format_timestamp", lambda value: "")
+    monkeypatch.setattr(m, "render_template", lambda *args, **kwargs: "OK")
+
+    def fake_statuses(school_id, term, academic_year, assignments=None):
+        captured["assignments"] = assignments
+        return []
+
+    monkeypatch.setattr(m, "get_school_publication_statuses", fake_statuses)
+
+    # also verify approval workflow flag passed through
+    monkeypatch.setattr(m, "result_publication_has_approval_columns", lambda: False)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "A1"
+
+    # patch render_template to capture its keyword args
+    captured_render = {}
+    def fake_render(template, **kwargs):
+        captured_render.update(kwargs)
+        return "OK"
+    monkeypatch.setattr(m, "render_template", fake_render)
+
+    resp = client.get("/school-admin")
+    assert resp.status_code == 200
+    assert captured["assignments"] is assignments
+    # ensure the flag is passed and reflects the mocked approval column state
+    assert captured_render.get("approval_workflow_enabled") is False
+    # dashboard should include the flag even though render_template is stubbed
+    # (check second argument of render_template)
+    # since render_template returns "OK" we can't inspect output easily; instead
+    # monkeypatch render_template to capture kwargs
+    
+
+def test_teacher_enter_scores_does_not_carry_previous_term_scores(client, app_module, monkeypatch):
+    m = app_module
+    saved_rows = []
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: {
+        "academic_year": "2025-2026",
+        "current_term": "First Term",
+        "test_enabled": 1,
+        "exam_enabled": 0,
+        "max_tests": 1,
+        "test_score_max": 10,
+    })
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "load_student", lambda school_id, student_id: {
+        "student_id": "ST1",
+        "firstname": "Aka",
+        "classname": "JSS1",
+        "term": "Second Term",
+        "subjects": ["Mathematics"],
+        "scores": {"Old Subject": {"overall_mark": 55}},
+        "teacher_comment": "",
+        "stream": "S",
+        "number_of_subject": 1,
+    })
+    monkeypatch.setattr(m, "teacher_has_class_access", lambda *args, **kwargs: True)
+    monkeypatch.setattr(m, "get_teacher_subjects_for_class_term", lambda *args, **kwargs: ["Mathematics"])
+    monkeypatch.setattr(m, "class_uses_stream_for_school", lambda *args, **kwargs: False)
+    monkeypatch.setattr(m, "sync_student_subjects_to_class_config", lambda *args, **kwargs: (False, None))
+    monkeypatch.setattr(m, "is_result_published", lambda *args, **kwargs: False)
+    monkeypatch.setattr(m, "get_assessment_config_for_class", lambda *args, **kwargs: {"exam_mode": "combined", "exam_score_max": 70})
+    monkeypatch.setattr(m, "get_latest_score_audit_map_for_student", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "get_teachers", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "get_teacher_subject_assignments", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "get_subject_submission_teacher_ids_for_class", lambda *args, **kwargs: set())
+    monkeypatch.setattr(m, "audit_student_score_changes_with_cursor", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "set_result_published", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "save_student_with_cursor", lambda c, school_id, student_id, student_data: saved_rows.append(json.loads(json.dumps(student_data))))
+
+    def fake_db_connection(commit=False):
+        class FakeCursor:
+            def execute(self, query, params=None):
+                return None
+            def fetchone(self):
+                return ("Second Term", json.dumps({"Old Subject": {"overall_mark": 55}}))
+        class FakeConn:
+            def cursor(self):
+                return FakeCursor()
+        @contextlib.contextmanager
+        def ctx(commit=False):
+            yield FakeConn()
+        return ctx(commit)
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "T1"
+
+    resp = client.post(
+        "/teacher/enter-scores?student_id=ST1",
+        data={"test_1_mathematics": "8", "subject_comment_mathematics": "", "teacher_comment": ""},
+        follow_redirects=False,
+    )
+
+    assert resp.status_code in (302, 303)
+    assert saved_rows, "Expected score save to be called"
+    saved = saved_rows[-1]
+    assert saved.get("term") == "First Term"
+    assert "Mathematics" in (saved.get("scores") or {})
+    assert "Old Subject" not in (saved.get("scores") or {})
+
+
+def test_publish_results_behaviour_uses_publish_year(app_module, monkeypatch):
+    m = app_module
+    captured = {}
+
+    monkeypatch.setattr(m, "ensure_result_publication_approval_columns", lambda: True)
+    monkeypatch.setattr(m, "result_publication_has_approval_columns", lambda: False)
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"academic_year": "2025-2026", "principal_name": "Principal"})
+    monkeypatch.setattr(m, "get_grade_config", lambda school_id: {"pass_mark": 50, "grade_a_min": 70, "grade_b_min": 60, "grade_c_min": 50, "grade_d_min": 40})
+    monkeypatch.setattr(m, "get_teachers", lambda school_id: {"T1": {"firstname": "T", "lastname": "One"}})
+    monkeypatch.setattr(
+        m,
+        "load_students",
+        lambda school_id, class_filter="", term_filter="": {
+            "ST1": {
+                "firstname": "Aka",
+                "classname": "JSS1",
+                "stream": "S",
+                "number_of_subject": 1,
+                "subjects": ["Mathematics"],
+                "scores": {"Mathematics": {"overall_mark": 80}},
+                "teacher_comment": "",
+                "principal_comment": "",
+            }
+        },
+    )
+    monkeypatch.setattr(m, "get_class_attendance_publish_readiness", lambda **kwargs: {"ready": True, "missing_rows": [], "days_open": 0, "message": ""})
+
+    def fake_behaviour(school_id, classname, term, academic_year=''):
+        captured["year"] = academic_year
+        return {"ST1": {}}
+
+    monkeypatch.setattr(m, "get_class_behaviour_assessments", fake_behaviour)
+
+    def fake_db_connection(commit=False):
+        class FakeCursor:
+            def execute(self, query, params=None):
+                return None
+            def fetchall(self):
+                return []
+        class FakeConn:
+            def cursor(self):
+                return FakeCursor()
+        @contextlib.contextmanager
+        def ctx(commit=False):
+            yield FakeConn()
+        return ctx(commit)
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+
+    m.publish_results_for_class_atomic("SCH1", "JSS1", "First Term", "T1", academic_year="2025-2026")
+    assert captured.get("year") == "2025-2026"
+
+
+def test_filter_visible_terms_for_student_hides_current_term_when_operations_off(app_module):
+    m = app_module
+    school = {"operations_enabled": 0, "current_term": "Second Term", "academic_year": "2025-2026"}
+    terms = [
+        {"term": "First Term", "academic_year": "2025-2026", "token": "2025-2026::First Term"},
+        {"term": "Second Term", "academic_year": "2025-2026", "token": "2025-2026::Second Term"},
+        {"term": "Third Term", "academic_year": "2024-2025", "token": "2024-2025::Third Term"},
+    ]
+    visible = m.filter_visible_terms_for_student(school, terms)
+    visible_tokens = [row.get("token") for row in visible]
+    assert "2025-2026::Second Term" not in visible_tokens
+    assert "2025-2026::First Term" in visible_tokens
+    assert "2024-2025::Third Term" in visible_tokens
+
+
+def test_rate_limit_consume_blocks_after_limit(app_module, monkeypatch):
+    m = app_module
+    m._RATE_LIMIT_EVENTS.clear()
+    monkeypatch.setattr(m.time, "time", lambda: 1000.0)
+
+    ok1, retry1 = m._rate_limit_consume("login:1.2.3.4", 2, 60)
+    ok2, retry2 = m._rate_limit_consume("login:1.2.3.4", 2, 60)
+    ok3, retry3 = m._rate_limit_consume("login:1.2.3.4", 2, 60)
+
+    assert ok1 is True and retry1 == 0
+    assert ok2 is True and retry2 == 0
+    assert ok3 is False
+    assert retry3 >= 1
+
+
+def test_rate_limit_consume_allows_after_window(app_module, monkeypatch):
+    m = app_module
+    m._RATE_LIMIT_EVENTS.clear()
+    now = {"t": 1000.0}
+    monkeypatch.setattr(m.time, "time", lambda: now["t"])
+
+    assert m._rate_limit_consume("check_result:1.2.3.4", 1, 60)[0] is True
+    assert m._rate_limit_consume("check_result:1.2.3.4", 1, 60)[0] is False
+
+    now["t"] = 1062.0
+    assert m._rate_limit_consume("check_result:1.2.3.4", 1, 60)[0] is True
+
+
+def test_timetable_time_ranges_overlap_logic(app_module):
+    m = app_module
+    assert m.timetable_time_ranges_overlap("08:00", "08:40", "08:20", "09:00") is True
+    assert m.timetable_time_ranges_overlap("08:00", "08:40", "08:40", "09:00") is False
+    assert m.timetable_time_ranges_overlap("09:00", "08:40", "08:00", "09:00") is False
+
+
+def test_find_timetable_time_conflicts_detects_overlap(app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(
+        m,
+        "get_school_timetable_rows",
+        lambda school_id, classname='': [
+            {
+                "id": 22,
+                "classname": "JSS1",
+                "day_of_week": 1,
+                "period_label": "Period 1",
+                "subject": "Mathematics",
+                "start_time": "08:00",
+                "end_time": "08:40",
+            }
+        ],
+    )
+    rows = m.find_timetable_time_conflicts("SCH", "JSS1", 1, "08:20", "08:50")
+    assert rows and rows[0]["id"] == 22
+
+
+def test_parent_timetable_filters_to_child_subjects_only(client, app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(m, "_parent_allowed_student_keys", lambda: {"SCH::STU1"})
+    monkeypatch.setattr(
+        m,
+        "get_school",
+        lambda school_id: {
+            "school_id": school_id,
+            "school_name": "Alpha School",
+            "theme_accent_color": "#1F7A8C",
+            "parent_timetable_show_teacher": 1,
+        },
+    )
+    monkeypatch.setattr(
+        m,
+        "load_students_for_student_ids",
+        lambda school_id, ids: {
+            "STU1": {
+                "firstname": "Aka",
+                "classname": "JSS1",
+                "stream": "Science",
+                "subjects": ["Mathematics"],
+                "scores": {},
+            }
+        },
+    )
+    monkeypatch.setattr(
+        m,
+        "get_school_timetable_rows",
+        lambda school_id, classname='': [
+            {
+                "id": 1,
+                "classname": "JSS1",
+                "day_of_week": 1,
+                "day_name": "Monday",
+                "period_label": "Period 1",
+                "subject": "Mathematics",
+                "teacher_id": "T1",
+                "start_time": "08:00",
+                "end_time": "08:40",
+                "room": "A1",
+            },
+            {
+                "id": 2,
+                "classname": "JSS1",
+                "day_of_week": 1,
+                "day_name": "Monday",
+                "period_label": "Period 2",
+                "subject": "French",
+                "teacher_id": "T2",
+                "start_time": "08:40",
+                "end_time": "09:20",
+                "room": "A1",
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        m,
+        "get_teachers",
+        lambda school_id: {"T1": {"firstname": "Grace", "lastname": "Doe"}, "T2": {"firstname": "John", "lastname": "Roe"}},
+    )
+    monkeypatch.setattr(m, "get_parent_messages_for_children", lambda **kwargs: [])
+    monkeypatch.setattr(m, "get_class_subject_config", lambda school_id, classname: {})
+
+    with client.session_transaction() as sess:
+        sess["role"] = "parent"
+        sess["parent_phone"] = "+234000000000"
+
+    resp = client.get("/parent/timetable?student_key=SCH::STU1")
+    body = resp.data.decode("utf-8")
+    assert resp.status_code == 200
+    assert "Mathematics" in body
+    assert "French" not in body
+
+def test_teacher_allocate_stream_post_updates_and_redirects_dashboard(client, app_module, monkeypatch):
+    m = app_module
+    update_calls = []
+
+    monkeypatch.setattr(
+        m,
+        "get_user",
+        lambda username: {"username": (username or "").lower(), "role": "teacher", "school_id": "SCH1"},
+    )
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"academic_year": "2025-2026", "ss1_stream_mode": "separate"})
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(
+        m,
+        "load_student",
+        lambda school_id, student_id: {
+            "student_id": student_id,
+            "firstname": "Aka",
+            "classname": "SS2",
+            "stream": "N/A",
+            "subjects": ["English Language", "Mathematics"],
+            "scores": {"English Language": {"overall_mark": 65}},
+            "number_of_subject": 2,
+        },
+    )
+    monkeypatch.setattr(m, "teacher_has_class_access", lambda *args, **kwargs: True)
+    monkeypatch.setattr(m, "class_uses_stream_for_school", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        m,
+        "get_class_subject_config",
+        lambda school_id, classname: {
+            "core_subjects": ["English Language", "Mathematics"],
+            "science_subjects": ["Biology"],
+            "art_subjects": ["Literature in English"],
+            "commercial_subjects": ["Commerce"],
+            "optional_subjects": [],
+        },
+    )
+    monkeypatch.setattr(
+        m,
+        "build_subjects_from_config",
+        lambda **kwargs: (["English Language", "Mathematics", "Biology"], "Science", None),
+    )
+
+    def fake_db_connection(commit=False):
+        class FakeCursor:
+            def __init__(self):
+                self.rowcount = 0
+
+        class FakeConn:
+            def __init__(self):
+                self._cursor = FakeCursor()
+
+            def cursor(self):
+                return self._cursor
+
+        @contextlib.contextmanager
+        def ctx(commit=False):
+            yield FakeConn()
+
+        return ctx(commit)
+
+    def fake_db_execute(cursor, query, params=None):
+        if "UPDATE students" in str(query):
+            cursor.rowcount = 1
+            update_calls.append((query, params))
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", fake_db_execute)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "T1"
+
+    resp = client.post(
+        "/teacher/allocate-stream",
+        data={"student_id": "ST1", "stream": "Science"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/teacher")
+    assert update_calls, "Expected UPDATE students call for stream allocation"
+    _, params = update_calls[-1]
+    assert params[0] == "Science"
+    assert params[4] == "SCH1"
+    assert params[5] == "ST1"
+
+
+def test_teacher_allocate_stream_post_handles_zero_updated_rows(client, app_module, monkeypatch):
+    m = app_module
+
+    monkeypatch.setattr(
+        m,
+        "get_user",
+        lambda username: {"username": (username or "").lower(), "role": "teacher", "school_id": "SCH1"},
+    )
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"academic_year": "2025-2026", "ss1_stream_mode": "separate"})
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(
+        m,
+        "load_student",
+        lambda school_id, student_id: {
+            "student_id": student_id,
+            "firstname": "Aka",
+            "classname": "SS2",
+            "stream": "N/A",
+            "subjects": ["English Language", "Mathematics"],
+            "scores": {},
+            "number_of_subject": 2,
+        },
+    )
+    monkeypatch.setattr(m, "teacher_has_class_access", lambda *args, **kwargs: True)
+    monkeypatch.setattr(m, "class_uses_stream_for_school", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        m,
+        "get_class_subject_config",
+        lambda school_id, classname: {
+            "core_subjects": ["English Language", "Mathematics"],
+            "science_subjects": ["Biology"],
+            "art_subjects": [],
+            "commercial_subjects": [],
+            "optional_subjects": [],
+        },
+    )
+    monkeypatch.setattr(
+        m,
+        "build_subjects_from_config",
+        lambda **kwargs: (["English Language", "Mathematics", "Biology"], "Science", None),
+    )
+
+    def fake_db_connection(commit=False):
+        class FakeCursor:
+            def __init__(self):
+                self.rowcount = 0
+
+        class FakeConn:
+            def __init__(self):
+                self._cursor = FakeCursor()
+
+            def cursor(self):
+                return self._cursor
+
+        @contextlib.contextmanager
+        def ctx(commit=False):
+            yield FakeConn()
+
+        return ctx(commit)
+
+    def fake_db_execute(cursor, query, params=None):
+        if "UPDATE students" in str(query):
+            cursor.rowcount = 0
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", fake_db_execute)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "T1"
+
+    resp = client.post(
+        "/teacher/allocate-stream",
+        data={"student_id": "ST1", "stream": "Science"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert "/teacher/allocate-stream?student_id=ST1" in resp.headers["Location"]
+
+
+def test_teacher_upload_csv_form_includes_csrf_token(client, app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(
+        m,
+        "get_school",
+        lambda school_id: {"academic_year": "2025/2026", "exam_enabled": 1, "max_tests": 2},
+    )
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(
+        m,
+        "get_teacher_classes",
+        lambda school_id, teacher_id, term="", academic_year="": ["JSS1"],
+    )
+    monkeypatch.setattr(
+        m,
+        "get_teacher_subject_assignments",
+        lambda school_id, teacher_id=None, term="", academic_year="": [],
+    )
+    monkeypatch.setattr(
+        m,
+        "get_assessment_config_for_class",
+        lambda school_id, classname: {"exam_mode": "combined"},
+    )
+    monkeypatch.setattr(
+        m,
+        "get_teachers",
+        lambda school_id: {"T1": {"firstname": "Test", "lastname": "Teacher"}},
+    )
+    monkeypatch.setattr(
+        m,
+        "get_teacher",
+        lambda school_id, teacher_id: {"firstname": "Test", "lastname": "Teacher"},
+    )
+
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "T1"
+
+    resp = client.get("/teacher/upload-csv")
+    assert resp.status_code == 200
+    assert 'name="csrf_token"' in resp.get_data(as_text=True)
+
+
+def test_school_admin_settings_academic_save_preserves_result_configuration(client, app_module, monkeypatch):
+    m = app_module
+    saved_settings = {}
+    assessment_saves = []
+
+    current_school = {
+        "school_name": "Demo School",
+        "location": "City",
+        "academic_year": "2025-2026",
+        "current_term": "First Term",
+        "test_enabled": 1,
+        "exam_enabled": 1,
+        "max_tests": 4,
+        "test_score_max": 35,
+        "exam_objective_max": 30,
+        "exam_theory_max": 40,
+        "grade_a_min": 75,
+        "grade_b_min": 65,
+        "grade_c_min": 55,
+        "grade_d_min": 45,
+        "grade_label_a": "A1",
+        "grade_label_b": "B2",
+        "grade_label_c": "B3",
+        "grade_label_d": "C4",
+        "grade_label_f": "F9",
+        "performance_remark_a": "Excellent",
+        "performance_remark_b": "Very good",
+        "performance_remark_c": "Good",
+        "performance_remark_d": "Fair",
+        "performance_remark_f": "Needs improvement",
+        "pass_mark": 50,
+        "show_positions": 1,
+        "ss_ranking_mode": "separate",
+        "class_arm_ranking_mode": "together",
+        "combine_third_term_results": 1,
+        "ss1_stream_mode": "combined",
+        "ss_arm_mode": "drop",
+        "parent_timetable_show_teacher": 0,
+        "theme_primary_color": "#1E3C72",
+        "theme_secondary_color": "#2A5298",
+        "theme_accent_color": "#1F7A8C",
+        "leadership_title": "principal",
+        "score_entry_mode": "dean_led",
+    }
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: dict(current_school))
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "get_school_term_calendar", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "get_school_term_program", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "build_school_settings_version_token", lambda *args, **kwargs: "v1")
+    monkeypatch.setattr(m, "ensure_school_access_schema", lambda: True)
+    monkeypatch.setattr(m, "ensure_school_term_calendar_schema", lambda: True)
+    monkeypatch.setattr(m, "ensure_extended_features_schema", lambda: True)
+    monkeypatch.setattr(m, "save_school_term_calendar_with_cursor", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "invalidate_school_cache", lambda school_id='': None)
+    monkeypatch.setattr(m, "record_admin_action_audit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "mark_user_first_login_tutorial_seen", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "get_all_assessment_configs", lambda school_id: {
+        "jss": {"exam_mode": "combined", "objective_max": 0, "theory_max": 0, "exam_score_max": 65},
+        "ss": {"exam_mode": "separate", "objective_max": 30, "theory_max": 40, "exam_score_max": 70},
+    })
+    monkeypatch.setattr(m, "list_school_term_calendars", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "rollover_school_term_data_with_cursor", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(m, "save_assessment_config_with_cursor", lambda *args, **kwargs: assessment_saves.append(kwargs))
+
+    def fake_update_school_settings_with_cursor(c, school_id, settings):
+        saved_settings.update(settings)
+
+    monkeypatch.setattr(m, "update_school_settings_with_cursor", fake_update_school_settings_with_cursor)
+
+    def fake_db_connection(commit=False):
+        class FakeCursor:
+            pass
+
+        class FakeConn:
+            def cursor(self):
+                return FakeCursor()
+
+        @contextlib.contextmanager
+        def ctx(commit=False):
+            yield FakeConn()
+
+        return ctx(commit)
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "A1"
+
+    resp = client.post(
+        "/school-admin/settings?section=academic",
+        data={
+            "settings_section": "academic",
+            "settings_version": "v1",
+            "school_name": "Demo School",
+            "academic_year": "2025-2026",
+            "current_term": "First Term",
+            "test_enabled": "1",
+            "exam_enabled": "1",
+        },
+        follow_redirects=False,
+    )
+
+    assert resp.status_code == 302
+    assert saved_settings["max_tests"] == 4
+    assert saved_settings["test_score_max"] == 35
+    assert saved_settings["grade_a_min"] == 75
+    assert saved_settings["grade_label_a"] == "A1"
+    assert saved_settings["grade_label_f"] == "F9"
+    assert saved_settings["performance_remark_a"] == "Excellent"
+    assert saved_settings["performance_remark_f"] == "Needs improvement"
+    assert saved_settings["ss_ranking_mode"] == "separate"
+    assert saved_settings["score_entry_mode"] == "dean_led"
+    assert assessment_saves == []
+
+
+def test_school_admin_settings_results_validation_preserves_posted_score_values(client, app_module, monkeypatch):
+    m = app_module
+    saved_settings = {}
+
+    current_school = {
+        "school_name": "Demo School",
+        "location": "City",
+        "academic_year": "2025-2026",
+        "current_term": "First Term",
+        "test_enabled": 1,
+        "exam_enabled": 1,
+        "max_tests": 3,
+        "test_score_max": 30,
+        "exam_objective_max": 30,
+        "exam_theory_max": 40,
+        "grade_a_min": 70,
+        "grade_b_min": 60,
+        "grade_c_min": 50,
+        "grade_d_min": 40,
+        "grade_label_a": "A",
+        "grade_label_b": "B",
+        "grade_label_c": "C",
+        "grade_label_d": "D",
+        "grade_label_f": "F",
+        "performance_remark_a": "A remark",
+        "performance_remark_b": "B remark",
+        "performance_remark_c": "C remark",
+        "performance_remark_d": "D remark",
+        "performance_remark_f": "F remark",
+        "pass_mark": 50,
+        "show_positions": 1,
+        "ss_ranking_mode": "together",
+        "class_arm_ranking_mode": "separate",
+        "combine_third_term_results": 0,
+        "ss1_stream_mode": "separate",
+        "ss_arm_mode": "preserve",
+        "parent_timetable_show_teacher": 1,
+        "theme_primary_color": "#1E3C72",
+        "theme_secondary_color": "#2A5298",
+        "theme_accent_color": "#1F7A8C",
+        "leadership_title": "principal",
+        "score_entry_mode": "teacher_subject",
+    }
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: dict(current_school))
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "get_school_term_calendar", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "get_school_term_program", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "build_school_settings_version_token", lambda *args, **kwargs: "v1")
+    monkeypatch.setattr(m, "ensure_school_access_schema", lambda: True)
+    monkeypatch.setattr(m, "ensure_school_term_calendar_schema", lambda: True)
+    monkeypatch.setattr(m, "ensure_extended_features_schema", lambda: True)
+    monkeypatch.setattr(m, "save_school_term_calendar_with_cursor", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "invalidate_school_cache", lambda school_id='': None)
+    monkeypatch.setattr(m, "record_admin_action_audit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "mark_user_first_login_tutorial_seen", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "get_all_assessment_configs", lambda school_id: {
+        "jss": {"exam_mode": "separate", "objective_max": 30, "theory_max": 40, "exam_score_max": 70},
+        "ss": {"exam_mode": "separate", "objective_max": 30, "theory_max": 40, "exam_score_max": 70},
+    })
+    monkeypatch.setattr(m, "list_school_term_calendars", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "save_assessment_config_with_cursor", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("assessment config should not save on validation error")))
+
+    def fake_update_school_settings_with_cursor(c, school_id, settings):
+        saved_settings.update(settings)
+
+    monkeypatch.setattr(m, "update_school_settings_with_cursor", fake_update_school_settings_with_cursor)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "A1"
+
+    resp = client.post(
+        "/school-admin/settings?section=results",
+        data={
+            "settings_section": "results",
+            "settings_version": "v1",
+            "max_tests": "4",
+            "test_score_max": "40",
+            "grade_a_min": "70",
+            "grade_b_min": "60",
+            "grade_c_min": "50",
+            "grade_d_min": "40",
+            "grade_label_a": "A+",
+            "grade_label_b": "A",
+            "grade_label_c": "B+",
+            "grade_label_d": "B",
+            "grade_label_f": "C",
+            "performance_remark_a": "A remark",
+            "performance_remark_b": "B remark",
+            "performance_remark_c": "C remark",
+            "performance_remark_d": "D remark",
+            "performance_remark_f": "F remark",
+            "pass_mark": "50",
+            "show_positions": "1",
+            "ss_ranking_mode": "together",
+            "class_arm_ranking_mode": "separate",
+            "ss1_stream_mode": "separate",
+            "ss_arm_mode": "preserve",
+            "combine_third_term_results": "0",
+            "parent_timetable_show_teacher": "1",
+            "exam_mode_jss": "separate",
+            "objective_max_jss": "35",
+            "theory_max_jss": "30",
+            "exam_score_max_jss": "65",
+            "exam_mode_ss": "combined",
+            "objective_max_ss": "0",
+            "theory_max_ss": "0",
+            "exam_score_max_ss": "65",
+        },
+        follow_redirects=False,
+    )
+
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert saved_settings == {}
+    assert 'value="4"' in body
+    assert 'value="40"' in body
+    assert 'value="35"' in body
+    assert 'value="65"' in body
+    assert 'objective + theory must add up to 60 because total test score is 40' in body
+
+
+def test_school_admin_settings_results_combined_mode_derives_exam_total_from_test_total(client, app_module, monkeypatch):
+    m = app_module
+    saved_settings = {}
+    assessment_saves = []
+
+    current_school = {
+        "school_name": "Demo School",
+        "location": "City",
+        "academic_year": "2025-2026",
+        "current_term": "First Term",
+        "test_enabled": 1,
+        "exam_enabled": 1,
+        "max_tests": 3,
+        "test_score_max": 30,
+        "exam_objective_max": 30,
+        "exam_theory_max": 40,
+        "grade_a_min": 70,
+        "grade_b_min": 60,
+        "grade_c_min": 50,
+        "grade_d_min": 40,
+        "grade_label_a": "A",
+        "grade_label_b": "B",
+        "grade_label_c": "C",
+        "grade_label_d": "D",
+        "grade_label_f": "F",
+        "performance_remark_a": "",
+        "performance_remark_b": "",
+        "performance_remark_c": "",
+        "performance_remark_d": "",
+        "performance_remark_f": "",
+        "pass_mark": 50,
+        "show_positions": 1,
+        "ss_ranking_mode": "together",
+        "class_arm_ranking_mode": "separate",
+        "combine_third_term_results": 0,
+        "ss1_stream_mode": "separate",
+        "ss_arm_mode": "preserve",
+        "parent_timetable_show_teacher": 1,
+        "theme_primary_color": "#1E3C72",
+        "theme_secondary_color": "#2A5298",
+        "theme_accent_color": "#1F7A8C",
+        "leadership_title": "principal",
+        "score_entry_mode": "teacher_subject",
+        "school_logo": "",
+    }
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: dict(current_school))
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "get_school_term_calendar", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "get_school_term_program", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "build_school_settings_version_token", lambda *args, **kwargs: "v1")
+    monkeypatch.setattr(m, "ensure_school_access_schema", lambda: True)
+    monkeypatch.setattr(m, "ensure_school_term_calendar_schema", lambda: True)
+    monkeypatch.setattr(m, "ensure_extended_features_schema", lambda: True)
+    monkeypatch.setattr(m, "save_school_term_calendar_with_cursor", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "invalidate_school_cache", lambda school_id='': None)
+    monkeypatch.setattr(m, "record_admin_action_audit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "mark_user_first_login_tutorial_seen", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "get_all_assessment_configs", lambda school_id: {
+        "jss": {"exam_mode": "combined", "objective_max": 0, "theory_max": 0, "exam_score_max": 70},
+        "ss": {"exam_mode": "combined", "objective_max": 0, "theory_max": 0, "exam_score_max": 70},
+    })
+    monkeypatch.setattr(m, "list_school_term_calendars", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "rollover_school_term_data_with_cursor", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(m, "save_assessment_config_with_cursor", lambda *args, **kwargs: assessment_saves.append(kwargs))
+
+    def fake_update_school_settings_with_cursor(c, school_id, settings):
+        saved_settings.update(settings)
+
+    monkeypatch.setattr(m, "update_school_settings_with_cursor", fake_update_school_settings_with_cursor)
+
+    def fake_db_connection(commit=False):
+        class FakeCursor:
+            pass
+
+        class FakeConn:
+            def cursor(self):
+                return FakeCursor()
+
+        @contextlib.contextmanager
+        def ctx(commit=False):
+            yield FakeConn()
+
+        return ctx(commit)
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "A1"
+
+    resp = client.post(
+        "/school-admin/settings?section=results",
+        data={
+            "settings_section": "results",
+            "settings_version": "v1",
+            "school_name": "Demo School",
+            "academic_year": "2025-2026",
+            "current_term": "First Term",
+            "max_tests": "4",
+            "test_score_max": "40",
+            "grade_a_min": "70",
+            "grade_b_min": "60",
+            "grade_c_min": "50",
+            "grade_d_min": "40",
+            "grade_label_a": "A1",
+            "grade_label_b": "B2",
+            "grade_label_c": "B3",
+            "grade_label_d": "C4",
+            "grade_label_f": "F9",
+            "performance_remark_a": "Excellent work",
+            "performance_remark_b": "Good effort",
+            "performance_remark_c": "Keep improving",
+            "performance_remark_d": "Work harder",
+            "performance_remark_f": "Urgent support needed",
+            "pass_mark": "50",
+            "show_positions": "1",
+            "ss_ranking_mode": "together",
+            "class_arm_ranking_mode": "separate",
+            "ss1_stream_mode": "separate",
+            "ss_arm_mode": "preserve",
+            "combine_third_term_results": "0",
+            "parent_timetable_show_teacher": "1",
+            "exam_mode_jss": "combined",
+            "exam_score_max_jss": "15",
+            "objective_max_jss": "0",
+            "theory_max_jss": "0",
+            "exam_mode_ss": "combined",
+            "exam_score_max_ss": "20",
+            "objective_max_ss": "0",
+            "theory_max_ss": "0",
+        },
+        follow_redirects=False,
+    )
+
+    assert resp.status_code == 302
+    assert saved_settings["max_tests"] == 4
+    assert saved_settings["test_score_max"] == 40
+    assert saved_settings["grade_label_a"] == "A1"
+    assert saved_settings["grade_label_f"] == "F9"
+    assert saved_settings["performance_remark_a"] == "Excellent work"
+    assert saved_settings["performance_remark_f"] == "Urgent support needed"
+    assert len(assessment_saves) == 2
+    assert all(item["exam_score_max"] == 60 for item in assessment_saves)
+
+
+def test_school_admin_settings_results_separate_mode_requires_split_to_match_derived_exam_total(client, app_module, monkeypatch):
+    m = app_module
+
+    current_school = {
+        "school_name": "Demo School",
+        "location": "City",
+        "academic_year": "2025-2026",
+        "current_term": "First Term",
+        "test_enabled": 1,
+        "exam_enabled": 1,
+        "max_tests": 3,
+        "test_score_max": 30,
+        "exam_objective_max": 30,
+        "exam_theory_max": 40,
+        "grade_a_min": 70,
+        "grade_b_min": 60,
+        "grade_c_min": 50,
+        "grade_d_min": 40,
+        "grade_label_a": "A",
+        "grade_label_b": "B",
+        "grade_label_c": "C",
+        "grade_label_d": "D",
+        "grade_label_f": "F",
+        "pass_mark": 50,
+        "show_positions": 1,
+        "ss_ranking_mode": "together",
+        "class_arm_ranking_mode": "separate",
+        "combine_third_term_results": 0,
+        "ss1_stream_mode": "separate",
+        "ss_arm_mode": "preserve",
+        "parent_timetable_show_teacher": 1,
+        "theme_primary_color": "#1E3C72",
+        "theme_secondary_color": "#2A5298",
+        "theme_accent_color": "#1F7A8C",
+        "leadership_title": "principal",
+        "score_entry_mode": "teacher_subject",
+        "school_logo": "",
+    }
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: dict(current_school))
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "get_school_term_calendar", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "get_school_term_program", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "build_school_settings_version_token", lambda *args, **kwargs: "v1")
+    monkeypatch.setattr(m, "ensure_school_access_schema", lambda: True)
+    monkeypatch.setattr(m, "ensure_school_term_calendar_schema", lambda: True)
+    monkeypatch.setattr(m, "ensure_extended_features_schema", lambda: True)
+    monkeypatch.setattr(m, "get_all_assessment_configs", lambda school_id: {
+        "jss": {"exam_mode": "separate", "objective_max": 30, "theory_max": 40, "exam_score_max": 70},
+        "ss": {"exam_mode": "separate", "objective_max": 30, "theory_max": 40, "exam_score_max": 70},
+    })
+    monkeypatch.setattr(m, "list_school_term_calendars", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "update_school_settings_with_cursor", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("settings should not save on validation error")))
+    monkeypatch.setattr(m, "save_assessment_config_with_cursor", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("assessment settings should not save on validation error")))
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "A1"
+
+    resp = client.post(
+        "/school-admin/settings?section=results",
+        data={
+            "settings_section": "results",
+            "settings_version": "v1",
+            "max_tests": "4",
+            "test_score_max": "40",
+            "grade_a_min": "70",
+            "grade_b_min": "60",
+            "grade_c_min": "50",
+            "grade_d_min": "40",
+            "grade_label_a": "A1",
+            "grade_label_b": "B2",
+            "grade_label_c": "B3",
+            "grade_label_d": "C4",
+            "grade_label_f": "F9",
+            "pass_mark": "50",
+            "show_positions": "1",
+            "ss_ranking_mode": "together",
+            "class_arm_ranking_mode": "separate",
+            "ss1_stream_mode": "separate",
+            "ss_arm_mode": "preserve",
+            "combine_third_term_results": "0",
+            "parent_timetable_show_teacher": "1",
+            "exam_mode_jss": "separate",
+            "objective_max_jss": "20",
+            "theory_max_jss": "30",
+            "exam_score_max_jss": "50",
+            "exam_mode_ss": "separate",
+            "objective_max_ss": "30",
+            "theory_max_ss": "30",
+            "exam_score_max_ss": "60",
+        },
+        follow_redirects=False,
+    )
+
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert 'JSS objective + theory must add up to 60 because total test score is 40.' in body
+    assert 'value="4"' in body
+    assert 'value="40"' in body
+
+
+def test_school_admin_settings_custom_grade_scale_saves_separately(client, app_module, monkeypatch):
+    m = app_module
+    saved_settings = {}
+    assessment_saves = []
+
+    current_school = {
+        "school_name": "Demo School",
+        "location": "City",
+        "academic_year": "2025-2026",
+        "current_term": "First Term",
+        "test_enabled": 1,
+        "exam_enabled": 1,
+        "max_tests": 4,
+        "test_score_max": 40,
+        "exam_objective_max": 30,
+        "exam_theory_max": 30,
+        "grade_a_min": 70,
+        "grade_b_min": 60,
+        "grade_c_min": 50,
+        "grade_d_min": 40,
+        "grade_label_a": "A",
+        "grade_label_b": "B",
+        "grade_label_c": "C",
+        "grade_label_d": "D",
+        "grade_label_f": "F",
+        "grade_scale_json": "",
+        "performance_remark_a": "",
+        "performance_remark_b": "",
+        "performance_remark_c": "",
+        "performance_remark_d": "",
+        "performance_remark_f": "",
+        "pass_mark": 50,
+        "show_positions": 1,
+        "ss_ranking_mode": "together",
+        "class_arm_ranking_mode": "separate",
+        "combine_third_term_results": 0,
+        "ss1_stream_mode": "separate",
+        "ss_arm_mode": "preserve",
+        "parent_timetable_show_teacher": 1,
+        "theme_primary_color": "#1E3C72",
+        "theme_secondary_color": "#2A5298",
+        "theme_accent_color": "#1F7A8C",
+        "leadership_title": "principal",
+        "score_entry_mode": "teacher_subject",
+        "school_logo": "",
+    }
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: dict(current_school))
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "get_school_term_calendar", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "get_school_term_program", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "build_school_settings_version_token", lambda *args, **kwargs: "v1")
+    monkeypatch.setattr(m, "ensure_school_access_schema", lambda: True)
+    monkeypatch.setattr(m, "ensure_school_term_calendar_schema", lambda: True)
+    monkeypatch.setattr(m, "ensure_extended_features_schema", lambda: True)
+    monkeypatch.setattr(m, "save_school_term_calendar_with_cursor", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "invalidate_school_cache", lambda school_id='': None)
+    monkeypatch.setattr(m, "record_admin_action_audit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "mark_user_first_login_tutorial_seen", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "get_all_assessment_configs", lambda school_id: {
+        "jss": {"exam_mode": "combined", "objective_max": 0, "theory_max": 0, "exam_score_max": 60},
+        "ss": {"exam_mode": "combined", "objective_max": 0, "theory_max": 0, "exam_score_max": 60},
+    })
+    monkeypatch.setattr(m, "list_school_term_calendars", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "rollover_school_term_data_with_cursor", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(m, "save_assessment_config_with_cursor", lambda *args, **kwargs: assessment_saves.append(kwargs))
+
+    def fake_update_school_settings_with_cursor(c, school_id, settings):
+        saved_settings.update(settings)
+
+    monkeypatch.setattr(m, "update_school_settings_with_cursor", fake_update_school_settings_with_cursor)
+
+    def fake_db_connection(commit=False):
+        class FakeCursor:
+            pass
+
+        class FakeConn:
+            def cursor(self):
+                return FakeCursor()
+
+        @contextlib.contextmanager
+        def ctx(commit=False):
+            yield FakeConn()
+
+        return ctx(commit)
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "A1"
+
+    resp = client.post(
+        "/school-admin/settings?section=results",
+        data={
+            "settings_section": "results",
+            "results_card": "grade_scale",
+            "settings_version": "v1",
+            "grade_scale_label_1": "A+",
+            "grade_scale_min_1": "90",
+            "grade_scale_label_2": "A",
+            "grade_scale_min_2": "70",
+            "grade_scale_label_3": "B+",
+            "grade_scale_min_3": "60",
+            "grade_scale_label_4": "B",
+            "grade_scale_min_4": "50",
+            "grade_scale_label_5": "C",
+            "grade_scale_min_5": "40",
+            "grade_scale_label_6": "F9",
+            "grade_scale_min_6": "0",
+        },
+        follow_redirects=False,
+    )
+
+    assert resp.status_code == 302
+    assert assessment_saves == []
+    saved_scale = json.loads(saved_settings["grade_scale_json"])
+    assert saved_scale[0] == {"label": "A+", "min_score": 90}
+    assert saved_scale[-1] == {"label": "F9", "min_score": 0}
+    assert saved_settings["grade_a_min"] == 90
+    assert saved_settings["grade_b_min"] == 70
+    assert saved_settings["grade_c_min"] == 60
+    assert saved_settings["grade_d_min"] == 50
+    assert saved_settings["grade_label_a"] == "A+"
+    assert saved_settings["grade_label_b"] == "A"
+    assert saved_settings["grade_label_c"] == "B+"
+    assert saved_settings["grade_label_d"] == "B"
+    assert saved_settings["grade_label_f"] == "F9"
+
+
+def test_display_grade_label_uses_school_custom_labels(app_module):
+    m = app_module
+    school = {
+        "grade_label_a": "A1",
+        "grade_label_b": "B2",
+        "grade_label_c": "B3",
+        "grade_label_d": "C4",
+        "grade_label_f": "F9",
+    }
+
+    assert m.display_grade_label("A", school) == "A1"
+    assert m.display_grade_label("B", school) == "B2"
+    assert m.display_grade_label("F", school) == "F9"
+    assert m.normalize_grade_band("B3", school) == "C"
+
+
+def test_grade_from_score_uses_custom_grade_scale_json(app_module):
+    m = app_module
+    school = {
+        "grade_scale_json": json.dumps([
+            {"label": "A+", "min_score": 90},
+            {"label": "A", "min_score": 70},
+            {"label": "B+", "min_score": 60},
+            {"label": "B", "min_score": 50},
+            {"label": "C", "min_score": 40},
+            {"label": "F9", "min_score": 0},
+        ])
+    }
+
+    assert m.grade_from_score(95, school) == "A+"
+    assert m.grade_from_score(75, school) == "A"
+    assert m.grade_from_score(62, school) == "B+"
+    assert m.grade_from_score(54, school) == "B"
+    assert m.grade_from_score(12, school) == "F9"
+    assert m.normalize_grade_band("A+", school) == "A"
+    assert m.normalize_grade_band("B", school) == "D"

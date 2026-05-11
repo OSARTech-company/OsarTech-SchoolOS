@@ -1,0 +1,1096 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Publish Results - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      :root {
+        --page-bg: linear-gradient(180deg, #eef4ff 0%, #f8fbff 46%, #f3f7ff 100%);
+        --ink: #10233f;
+        --muted: #5d708f;
+        --panel: rgba(255, 255, 255, 0.96);
+        --shadow: 0 24px 54px rgba(15, 34, 67, 0.12);
+      }
+
+      body {
+        min-height: 100vh;
+        background: var(--page-bg);
+        color: var(--ink);
+      }
+
+      .container {
+        width: min(1280px, 100%);
+        margin: 0 auto;
+        padding: 28px 24px 42px;
+        min-width: 0;
+      }
+
+      .publish-shell {
+        display: grid;
+        gap: 22px;
+        min-width: 0;
+      }
+
+      .publish-hero {
+        position: relative;
+        overflow: hidden;
+        border-radius: 28px;
+        padding: 28px 30px;
+        background:
+          radial-gradient(circle at top right, rgba(255,255,255,0.20) 0, rgba(255,255,255,0) 32%),
+          linear-gradient(135deg, color-mix(in srgb, var(--brand) 92%, #0b1730 8%) 0%, color-mix(in srgb, var(--brand-2) 88%, #081220 12%) 100%);
+        box-shadow: var(--shadow);
+        color: #fff;
+      }
+
+      .publish-hero::after {
+        content: "";
+        position: absolute;
+        right: -90px;
+        top: -90px;
+        width: 280px;
+        height: 280px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .hero-top {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      .hero-copy {
+        max-width: 760px;
+      }
+
+      .hero-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.16);
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .hero-title {
+        margin: 0;
+        font-size: clamp(2rem, 2.6vw, 2.55rem);
+        line-height: 1.08;
+      }
+
+      .hero-text {
+        margin: 12px 0 0;
+        max-width: 62ch;
+        color: rgba(255,255,255,0.86);
+        font-size: 1rem;
+        line-height: 1.6;
+      }
+
+      .hero-actions {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .back-link,
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        padding: 11px 16px;
+        border-radius: 999px;
+        text-decoration: none;
+        font-weight: 700;
+      }
+
+      .back-link {
+        color: #fff;
+        background: rgba(255,255,255,0.14);
+        border: 1px solid rgba(255,255,255,0.18);
+      }
+
+      .hero-badge {
+        background: rgba(255,255,255,0.10);
+        color: rgba(255,255,255,0.84);
+        border: 1px solid rgba(255,255,255,0.14);
+      }
+
+      .stats-grid {
+        position: relative;
+        z-index: 1;
+        margin-top: 22px;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .stat-card {
+        padding: 18px 18px 16px;
+        border-radius: 20px;
+        background: rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.14);
+        backdrop-filter: blur(8px);
+      }
+
+      .stat-label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.76);
+      }
+
+      .stat-value {
+        font-size: clamp(1.35rem, 2vw, 1.9rem);
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .stat-meta {
+        display: block;
+        margin-top: 7px;
+        color: rgba(255,255,255,0.76);
+        font-size: 0.92rem;
+      }
+
+      .panel-card {
+        background: var(--panel);
+        border: 1px solid rgba(208, 220, 240, 0.9);
+        border-radius: 26px;
+        box-shadow: 0 18px 42px rgba(24, 44, 79, 0.08);
+      }
+
+      .filters-card,
+      .table-card {
+        padding: 22px 24px;
+        min-width: 0;
+      }
+
+      .filters-top,
+      .table-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+      }
+
+      .section-title {
+        margin: 0;
+        font-size: 1.28rem;
+        font-weight: 800;
+        color: #15325b;
+      }
+
+      .section-text,
+      .table-note {
+        margin: 6px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .workflow-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border-radius: 18px;
+        font-weight: 800;
+        font-size: 0.92rem;
+        color: #143357;
+        background: #edf4ff;
+        border: 1px solid #cfe0fb;
+      }
+
+      .workflow-chip.simple {
+        color: #0f5132;
+        background: #ecfdf3;
+        border-color: #bfe8ce;
+      }
+
+      .filter-form {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        align-items: end;
+      }
+
+      .field-block {
+        display: grid;
+        gap: 8px;
+      }
+
+      .field-block label {
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: #4b6184;
+      }
+
+      .field-block select {
+        min-height: 48px;
+        border-radius: 16px;
+        border: 1px solid #cfdbef;
+        background: #fff;
+        padding: 0 14px;
+        font-weight: 700;
+        color: #123056;
+      }
+
+      .filter-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .btn-soft {
+        background: #edf4ff;
+        color: #123865;
+        border: 1px solid #d2e1f6;
+      }
+
+      .table-title-wrap {
+        display: grid;
+        gap: 6px;
+      }
+
+      .table-scroll {
+        width: 100%;
+        max-width: 100%;
+        border: 1px solid #dbe6f5;
+        border-radius: 22px;
+        overflow: auto;
+        background: #fff;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .assignment-table {
+        width: 100%;
+        min-width: 980px;
+        border-collapse: collapse;
+        table-layout: auto;
+      }
+
+      .assignment-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 16px 14px;
+        text-align: left;
+        background: linear-gradient(180deg, #f4f8ff 0%, #eaf1fb 100%);
+        color: #153457;
+        font-size: 0.8rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        border-bottom: 1px solid #dbe6f5;
+        box-sizing: border-box;
+        white-space: nowrap;
+      }
+
+      .assignment-table tbody td {
+        padding: 18px 14px;
+        vertical-align: top;
+        border-bottom: 1px solid #e6eef9;
+        box-sizing: border-box;
+      }
+
+      .assignment-table tbody tr:nth-child(even) td {
+        background: #fbfdff;
+      }
+
+      .assignment-table tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .class-cell {
+        min-width: 110px;
+      }
+
+      .class-name,
+      .teacher-name {
+        display: block;
+        font-weight: 800;
+        color: #133256;
+        word-break: normal;
+      }
+
+      .class-meta,
+      .teacher-meta,
+      .tiny-note {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.88rem;
+        word-break: normal;
+      }
+
+      .stack-cell {
+        min-width: 150px;
+      }
+
+      .assignment-table td.stack-cell > * + * {
+        margin-top: 8px;
+      }
+
+      .status-line {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: nowrap;
+      }
+
+      .status-label,
+      .publish-meta {
+        color: #143458;
+        font-size: 0.8rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .publish-meta {
+        min-width: 120px;
+        white-space: nowrap;
+      }
+
+      .teacher-name,
+      .view-pill {
+        white-space: nowrap;
+      }
+
+      .teacher-meta {
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+
+      .compact-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 30px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 0.9rem;
+        font-weight: 800;
+        line-height: 1;
+        border: 1px solid transparent;
+      }
+
+      .compact-badge.success {
+        color: #166534;
+        background: #ecfdf3;
+        border-color: #b7ebc7;
+      }
+
+      .compact-badge.warning {
+        color: #c76800;
+        background: #fff6e9;
+        border-color: #ffd7a7;
+      }
+
+      .compact-badge.info {
+        color: #1d5fa8;
+        background: #eef5ff;
+        border-color: #cfe0fb;
+      }
+
+      .compact-badge.pending {
+        color: #7c4d00;
+        background: #fff7d8;
+        border-color: #f4d475;
+      }
+
+      .compact-badge.danger {
+        color: #b42318;
+        background: #fff0ef;
+        border-color: #f0c1bc;
+      }
+
+      .compact-badge.muted {
+        color: #51627f;
+        background: #f1f5fb;
+        border-color: #d7e3f3;
+      }
+
+      .view-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #16385f;
+        font-weight: 800;
+      }
+
+      .action-stack {
+        min-width: 170px;
+        vertical-align: top;
+      }
+
+      .assignment-table td.action-stack > * + * {
+        margin-top: 12px;
+      }
+
+      .action-main,
+      .action-group,
+      .action-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .action-main {
+        justify-content: flex-start;
+      }
+
+      .action-form {
+        width: 100%;
+      }
+
+      .action-form .btn {
+        white-space: nowrap;
+      }
+
+      .action-main > .action-form,
+      .action-main > .btn {
+        flex: 0 1 auto;
+        min-width: 0;
+      }
+
+      .action-main .btn,
+      .action-main > .btn,
+      .action-main > .action-form .btn {
+        width: auto;
+        min-width: 120px;
+        justify-content: center;
+      }
+
+      .action-stack .chip {
+        justify-self: start;
+      }
+
+      .assignment-table td.class-cell,
+      .assignment-table td.stack-cell,
+      .assignment-table td.action-stack,
+      .assignment-table td.publish-meta {
+        display: table-cell;
+      }
+
+      .action-menu {
+        position: relative;
+      }
+
+      .action-menu summary {
+        list-style: none;
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        border: 1px solid #d2def0;
+        background: #f6f9ff;
+        color: #16385f;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1.15rem;
+        font-weight: 800;
+      }
+
+      .action-menu summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .action-menu[open] summary {
+        background: #edf4ff;
+        border-color: #bdd4f3;
+      }
+
+      .action-menu-panel {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 8px);
+        z-index: 5;
+        width: min(260px, 80vw);
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 16px;
+        border: 1px solid #d7e3f3;
+        background: rgba(255, 255, 255, 0.98);
+        box-shadow: 0 18px 40px rgba(24, 44, 79, 0.14);
+      }
+
+      .menu-title {
+        margin: 0;
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #61738f;
+      }
+
+      .menu-form {
+        display: grid;
+        gap: 10px;
+      }
+
+      .menu-form .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .cell-label {
+        display: none;
+      }
+
+      .status-label {
+        display: none;
+      }
+
+      .review-note-input,
+      .admin-pass-input,
+      .unlock-minutes-input {
+        min-height: 42px;
+        border-radius: 14px;
+        border: 1px solid #cfdbef;
+        background: #fff;
+        padding: 0 12px;
+        color: #123056;
+      }
+
+      .review-note-input { flex: 1 1 220px; min-width: 220px; }
+      .admin-pass-input { flex: 1 1 170px; min-width: 170px; }
+      .unlock-minutes-input { width: 94px; }
+
+      .empty-state {
+        padding: 36px 24px;
+        text-align: center;
+        color: var(--muted);
+      }
+
+      .scroll-hint {
+        display: none;
+        margin: 0 0 12px;
+        color: #5d708f;
+        font-size: 0.92rem;
+        font-weight: 700;
+      }
+
+      .flash {
+        border-radius: 18px;
+        padding: 14px 16px;
+      }
+
+      @media (max-width: 1240px) {
+        .scroll-hint {
+          display: block;
+        }
+
+        .table-scroll {
+          display: block;
+          max-width: 100%;
+          min-width: 0;
+          overflow-x: auto;
+          overflow-y: visible;
+          border: 1px solid #dbe6f5;
+          border-radius: 22px;
+          background: #fff;
+        }
+
+        .assignment-table {
+          width: 1080px;
+          min-width: 1080px;
+          table-layout: fixed;
+        }
+
+        .action-menu-panel {
+          right: 0;
+          left: auto;
+        }
+      }
+
+      @media (max-width: 1100px) {
+        .stats-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .filter-form {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .container {
+          padding: 18px 14px 28px;
+        }
+
+        .publish-hero,
+        .filters-card,
+        .table-card {
+          border-radius: 22px;
+          padding: 20px 18px;
+        }
+
+        .hero-top,
+        .filters-top,
+        .table-top {
+          flex-direction: column;
+        }
+
+        .stats-grid,
+        .filter-form {
+          grid-template-columns: 1fr;
+        }
+
+        .table-scroll {
+          margin: 0 -6px;
+          padding-bottom: 6px;
+        }
+
+        .assignment-table {
+          width: 1200px;
+          min-width: 1200px;
+          table-layout: fixed;
+        }
+
+        .assignment-table thead th,
+        .assignment-table tbody td {
+          white-space: nowrap;
+        }
+
+        .cell-label {
+          display: none;
+        }
+
+        .status-label {
+          display: inline;
+        }
+
+        .action-main > .action-form,
+        .action-main > .btn {
+          flex: 1 1 0;
+        }
+
+        .action-main .btn,
+        .action-main > .btn,
+        .action-main > .action-form .btn {
+          width: 100%;
+          min-width: 0;
+        }
+
+        .action-menu-panel {
+          position: fixed;
+          right: 14px;
+          left: 14px;
+          top: auto;
+          width: auto;
+          max-width: none;
+        }
+
+        .review-note-input,
+        .admin-pass-input {
+          min-width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% set active_page = 'publish_results' %}
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+        <div class="container">
+          {% set ns = namespace(total=0, published=0, pending=0, unpublished=0, viewed=0, expected=0) %}
+          {% for p in publication_statuses or [] %}
+            {% set ns.total = ns.total + 1 %}
+            {% set ns.viewed = ns.viewed + (p.viewed_count or 0) %}
+            {% set ns.expected = ns.expected + (p.published_count or 0) %}
+            {% if p.is_published %}
+              {% set ns.published = ns.published + 1 %}
+            {% elif p.approval_status == 'pending' %}
+              {% set ns.pending = ns.pending + 1 %}
+            {% else %}
+              {% set ns.unpublished = ns.unpublished + 1 %}
+            {% endif %}
+          {% endfor %}
+
+          <div class="publish-shell">
+            <section class="publish-hero">
+              <div class="hero-top">
+                <div class="hero-copy">
+                  <div class="hero-eyebrow"><i class="fas fa-cloud-upload-alt"></i> Result Control Centre</div>
+                  <h1 class="hero-title">Publish Results</h1>
+                  <p class="hero-text">
+                    Review class readiness, track approval progress, and move completed results to students in a cleaner flow for
+                    {{ selected_term or current_term }}{% if selected_year or current_year %} {{ selected_year or current_year }}{% endif %}.
+                  </p>
+                </div>
+                <div class="hero-actions">
+                  <span class="hero-badge">
+                    <i class="fas fa-layer-group"></i>
+                    {% if school and school.score_entry_mode == 'dean_led' %}Simple Mode{% elif school and school.score_entry_mode == 'subject_sheet' %}Subject Sheet Mode{% else %}Advanced Mode{% endif %}
+                  </span>
+                  <a href="{{ url_for('school_admin_dashboard') }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+              </div>
+
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <span class="stat-label">Classes Tracked</span>
+                  <span class="stat-value">{{ ns.total }}</span>
+                  <span class="stat-meta">Available class result lanes</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label">Published</span>
+                  <span class="stat-value">{{ ns.published }}</span>
+                  <span class="stat-meta">Classes already live to students</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label">{{ 'Ready For Admin Action' if dean_led_mode else 'Pending Approval' }}</span>
+                  <span class="stat-value">{{ ns.pending if not dean_led_mode else ns.unpublished }}</span>
+                  <span class="stat-meta">{{ 'Waiting for review' if not dean_led_mode else 'Classes you can work through from here' }}</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label">Student Views</span>
+                  <span class="stat-value">{{ ns.viewed }}</span>
+                  <span class="stat-meta">{{ ns.expected }} total published result views recorded</span>
+                </div>
+              </div>
+            </section>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+            <section class="panel-card filters-card">
+              <div class="filters-top">
+                <div>
+                  <h2 class="section-title">Filter Result Window</h2>
+                  <p class="section-text">Switch between terms quickly and keep the publishing team focused on the exact result cycle they are reviewing.</p>
+                </div>
+                <div class="workflow-chip {{ 'simple' if dean_led_mode else '' }}">
+                  <i class="fas {{ 'fa-bolt' if dean_led_mode else ('fa-table-list' if school and school.score_entry_mode == 'subject_sheet' else 'fa-diagram-project') }}"></i>
+                  {% if dean_led_mode %}
+                  Simple Mode: direct admin publishing is available
+                  {% elif school and school.score_entry_mode == 'subject_sheet' %}
+                  Subject Sheet Mode: score entry happens on subject roster sheets before publishing review.
+                  {% else %}
+                  Advanced Mode: teacher and approval workflow is active
+                  {% endif %}
+                </div>
+              </div>
+
+              <form method="get" action="{{ url_for('school_admin_publish_results') }}" class="filter-form">
+                <div class="field-block">
+                  <label for="term">Term</label>
+                  <select id="term" name="term">
+                    {% for t in (term_options or ['First Term', 'Second Term', 'Third Term']) %}
+                    <option value="{{ t }}" {% if (selected_term or current_term) == t %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="field-block">
+                  <label for="academic_year">Academic Year</label>
+                  <select id="academic_year" name="academic_year">
+                    {% if year_options %}
+                      {% for y in year_options %}
+                      <option value="{{ y }}" {% if (selected_year or current_year) == y %}selected{% endif %}>{{ y }}</option>
+                      {% endfor %}
+                    {% else %}
+                      <option value="{{ current_year }}">{{ current_year }}</option>
+                    {% endif %}
+                  </select>
+                </div>
+                <div class="field-block">
+                  <label>View Scope</label>
+                  <div class="workflow-chip {{ 'simple' if dean_led_mode else '' }}">
+                    <i class="fas fa-calendar-alt"></i>
+                    {{ selected_term or current_term }}{% if selected_year or current_year %} - {{ selected_year or current_year }}{% endif %}
+                  </div>
+                </div>
+                <div class="field-block">
+                  <label>Actions</label>
+                  <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">Load</button>
+                    {% if can_load_previous %}
+                    <a href="{{ url_for('school_admin_publish_results', term=prev_term, academic_year=prev_year) }}" class="btn btn-soft">Previous Term</a>
+                    {% endif %}
+                    <a href="{{ url_for('school_admin_publish_results') }}" class="btn btn-soft">Current Term</a>
+                  </div>
+                </div>
+              </form>
+            </section>
+
+            <section class="panel-card table-card">
+              <div class="table-top">
+                <div class="table-title-wrap">
+                  <h2 class="section-title">
+                    <i class="fas fa-clipboard-check"></i>
+                    {{ 'Admin Publishing Queue' if dean_led_mode else 'Teacher Upload Status' }}
+                  </h2>
+                  <p class="table-note">
+                    {% if dean_led_mode %}
+                    Direct publishing is enabled here. A class becomes publishable when scores, attendance, behaviour records, and signatures are complete.
+                    {% else %}
+                    Review what teachers have submitted, approve ready classes, and return incomplete ones with a clear reason.
+                    {% endif %}
+                  </p>
+                </div>
+                <div class="workflow-chip {{ 'simple' if dean_led_mode else '' }}">
+                  <i class="fas fa-clock"></i>
+                  {{ selected_term or current_term }}{% if selected_year or current_year %} | {{ selected_year or current_year }}{% endif %}
+                </div>
+              </div>
+              {% if dean_led_mode %}
+              <div class="flash success">
+                Simple Mode is active. School admin can publish directly from this page once class scores, behaviour assessment, attendance, and signatures are complete.
+              </div>
+              {% endif %}
+              {% if not approval_workflow_enabled %}
+              <div class="flash error">
+                Approval workflow columns are missing. Run migration and reload this page.
+              </div>
+              {% endif %}
+              {% if publication_statuses %}
+              <p class="scroll-hint"><i class="fas fa-arrows-left-right"></i> Scroll sideways to view all columns on smaller screens.</p>
+              <div class="table-scroll">
+                <table class="assignment-table">
+                <thead>
+                  <tr>
+                    <th>Class</th>
+                    <th>Teacher</th>
+                    <th>Upload Status</th>
+                    <th>Approval</th>
+                    <th>Published At</th>
+                    <th>Viewed</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for p in publication_statuses %}
+                  <tr>
+                    <td class="class-cell">
+                      <span class="cell-label">Class</span>
+                      <span class="class-name">{{ p.classname }}</span>
+                    </td>
+                    <td>
+                      <span class="cell-label">Teacher</span>
+                      <span class="teacher-name">{{ p.teacher_name }}</span>
+                      <span class="teacher-meta">{{ p.teacher_id }}</span>
+                    </td>
+                    <td class="stack-cell">
+                      <span class="cell-label">Upload Status</span>
+                      <div class="status-line">
+                        <span class="status-label">Upload</span>
+                        {% if p.is_published %}
+                        <span class="compact-badge success">Published</span>
+                        {% else %}
+                        <span class="compact-badge warning">Not Uploaded</span>
+                        {% endif %}
+                      </div>
+                    </td>
+                    <td class="stack-cell">
+                      <span class="cell-label">Approval</span>
+                      <div class="status-line">
+                        <span class="status-label">Approval</span>
+                        {% if p.is_published %}
+                        <span class="compact-badge success">Approved</span>
+                        {% elif dean_led_mode %}
+                        <span class="compact-badge info">Admin Direct</span>
+                        {% elif p.approval_status == 'pending' %}
+                        <span class="compact-badge pending">Pending</span>
+                        {% elif p.approval_status == 'rejected' %}
+                        <span class="compact-badge danger">Rejected</span>
+                        {% else %}
+                        <span class="compact-badge muted">Not Submitted</span>
+                        {% endif %}
+                      </div>
+                      {% if p.approval_status == 'pending' and p.submitted_at %}
+                      <span class="tiny-note">Submitted: {{ p.submitted_at }}</span>
+                      {% elif p.approval_status == 'rejected' and p.review_note %}
+                      <span class="tiny-note">{{ p.review_note }}</span>
+                      {% endif %}
+                    </td>
+                    <td class="publish-meta">
+                      <span class="cell-label">Published At</span>
+                      {{ p.published_at or '-' }}
+                    </td>
+                    <td>
+                      <span class="cell-label">Viewed</span>
+                      <span class="view-pill"><i class="fas fa-eye"></i> {{ p.viewed_count or 0 }}/{{ p.published_count or 0 }}</span>
+                    </td>
+                    <td class="action-stack">
+                      <span class="cell-label">Action</span>
+                      {% if dean_led_mode and not p.is_published and p.approval_status != 'pending' %}
+                      <div class="action-main">
+                        <form action="{{ url_for('school_admin_publish_results_direct') }}" method="POST" class="action-form">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                          <input type="hidden" name="classname" value="{{ p.classname }}" />
+                          <input type="hidden" name="term" value="{{ p.term }}" />
+                          <input type="hidden" name="academic_year" value="{{ p.academic_year }}" />
+                          <button type="submit" class="btn btn-success btn-sm">Publish Now</button>
+                        </form>
+                        <details class="action-menu">
+                          <summary aria-label="More actions">&hellip;</summary>
+                          <div class="action-menu-panel">
+                            <p class="menu-title">Secondary Action</p>
+                            <form action="{{ url_for('school_admin_reset_class_student_passwords') }}" method="POST" class="menu-form" onsubmit="return confirm('Reset all ACTIVE student passwords in {{ p.classname }} to default student password?');">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                              <input type="hidden" name="classname" value="{{ p.classname }}" />
+                              <button type="submit" class="btn btn-warning btn-sm">Reset Class Passwords</button>
+                            </form>
+                          </div>
+                        </details>
+                      </div>
+                      {% elif p.approval_status == 'pending' and not p.is_published %}
+                      <div class="action-main">
+                        <form action="{{ url_for('school_admin_approve_results') }}" method="POST" class="action-form">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                          <input type="hidden" name="classname" value="{{ p.classname }}" />
+                          <input type="hidden" name="term" value="{{ p.term }}" />
+                          <input type="hidden" name="academic_year" value="{{ p.academic_year }}" />
+                          <button type="submit" class="btn btn-success btn-sm">Approve</button>
+                        </form>
+                        <details class="action-menu">
+                          <summary aria-label="More actions">&hellip;</summary>
+                          <div class="action-menu-panel">
+                            <p class="menu-title">Review Action</p>
+                            <form action="{{ url_for('school_admin_reject_results') }}" method="POST" class="menu-form">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                              <input type="hidden" name="classname" value="{{ p.classname }}" />
+                              <input type="hidden" name="term" value="{{ p.term }}" />
+                              <input type="hidden" name="academic_year" value="{{ p.academic_year }}" />
+                              <input type="text" name="review_note" placeholder="Reason (required)" required class="review-note-input" />
+                              <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+                            </form>
+                          </div>
+                        </details>
+                      </div>
+                      {% elif p.is_published %}
+                      <div class="action-group">
+                        {% if p.term_locked %}
+                        <span class="compact-badge danger">Edit Locked</span>
+                        {% else %}
+                        <span class="compact-badge success">Edit Open</span>
+                        {% endif %}
+                      </div>
+                      <div class="action-main">
+                        <a
+                          href="{{ url_for('school_admin_publish_results_corrections', classname=p.classname, term=p.term, academic_year=p.academic_year) }}"
+                          class="btn btn-primary btn-sm"
+                        >
+                          Correct Result
+                        </a>
+                        <details class="action-menu">
+                          <summary aria-label="More actions">&hellip;</summary>
+                          <div class="action-menu-panel">
+                            <p class="menu-title">Manage Published Result</p>
+                            {% if p.term_locked %}
+                            <form action="{{ url_for('school_admin_unlock_term_edit') }}" method="POST" class="menu-form">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                              <input type="hidden" name="classname" value="{{ p.classname }}" />
+                              <input type="hidden" name="term" value="{{ p.term }}" />
+                              <input type="hidden" name="academic_year" value="{{ p.academic_year }}" />
+                              <input id="unlock_minutes_{{ loop.index0 }}" type="number" name="unlock_minutes" min="5" max="240" value="30" class="unlock-minutes-input" title="Unlock Duration (minutes)" />
+                              <input type="text" name="unlock_reason" placeholder="Unlock reason (required)" required class="review-note-input" />
+                              <button type="submit" class="btn btn-warning btn-sm">Unlock Edit</button>
+                            </form>
+                            {% else %}
+                            <form action="{{ url_for('school_admin_relock_term_edit') }}" method="POST" class="menu-form">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                              <input type="hidden" name="classname" value="{{ p.classname }}" />
+                              <input type="hidden" name="term" value="{{ p.term }}" />
+                              <input type="hidden" name="academic_year" value="{{ p.academic_year }}" />
+                              <button type="submit" class="btn btn-warning btn-sm">Re-Lock Edit</button>
+                            </form>
+                            {% endif %}
+                            <form action="{{ url_for('school_admin_unpublish_results') }}" method="POST" class="menu-form">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                              <input type="hidden" name="classname" value="{{ p.classname }}" />
+                              <input type="hidden" name="term_token" value="{{ p.academic_year }}::{{ p.term }}" />
+                              <input type="password" name="admin_password" placeholder="Admin password" required class="admin-pass-input" />
+                              <button type="submit" class="btn btn-danger btn-sm">Unpublish</button>
+                            </form>
+                            <form action="{{ url_for('school_admin_reset_class_student_passwords') }}" method="POST" class="menu-form" onsubmit="return confirm('Reset all ACTIVE student passwords in {{ p.classname }} to default student password?');">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                              <input type="hidden" name="classname" value="{{ p.classname }}" />
+                              <button type="submit" class="btn btn-warning btn-sm">Reset Class Passwords</button>
+                            </form>
+                          </div>
+                        </details>
+                      </div>
+                      {% else %}
+                      <span class="compact-badge muted">No Action</span>
+                      {% endif %}
+                      {% if not p.is_published and p.approval_status != 'pending' and not dean_led_mode %}
+                      <details class="action-menu">
+                        <summary aria-label="More actions">&hellip;</summary>
+                        <div class="action-menu-panel">
+                          <p class="menu-title">Secondary Action</p>
+                          <form action="{{ url_for('school_admin_reset_class_student_passwords') }}" method="POST" class="menu-form" onsubmit="return confirm('Reset all ACTIVE student passwords in {{ p.classname }} to default student password?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                            <input type="hidden" name="classname" value="{{ p.classname }}" />
+                            <button type="submit" class="btn btn-warning btn-sm">Reset Class Passwords</button>
+                          </form>
+                        </div>
+                      </details>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+              <p>No class assignments or publication records were found for {{ selected_term or current_term }}{% if selected_year or current_year %} - {{ selected_year or current_year }}{% endif %}.</p>
+            </div>
+            {% endif %}
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+      (function () {
+        var body = document.body;
+        if (window.innerWidth > 600) {
+          body.classList.add('rail-expanded');
+        }
+      })();
+    </script>
+      {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

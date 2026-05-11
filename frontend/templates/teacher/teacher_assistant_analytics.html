@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistant Analytics - Teacher</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .mini-chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 14px;
+        }
+        .mini-chart {
+            border: 1px solid #dbe4ef;
+            border-radius: 10px;
+            background: #f8fbff;
+            padding: 12px;
+        }
+        .mini-chart h4 {
+            margin: 0 0 10px;
+            color: #1e3a5f;
+            font-size: 0.98rem;
+        }
+        .chart-row {
+            margin-bottom: 10px;
+        }
+        .chart-row:last-child {
+            margin-bottom: 0;
+        }
+        .chart-label-line {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 0.82rem;
+            color: #334155;
+            margin-bottom: 5px;
+        }
+        .chart-label-line .label {
+            max-width: 75%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .bar-track {
+            height: 8px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #1e3a8a, #0f4c81);
+        }
+        .bar-fill.warn {
+            background: linear-gradient(90deg, #b91c1c, #ef4444);
+        }
+        .bar-fill.good {
+            background: linear-gradient(90deg, #0f766e, #10b981);
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'assistant_analytics' %}
+        {% include 'teacher/_teacher_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-robot"></i> Assistant Analytics</h1>
+                    <p class="meta-line">
+                        <strong>Teacher:</strong> {{ teacher_name or '-' }} |
+                        <strong>School:</strong> {{ (school.school_name if school else '-') }}
+                    </p>
+                </div>
+
+                <div class="card">
+                    <form method="get" class="toolbar">
+                        <div>
+                            <label>Window</label>
+                            <select name="assistant_days">
+                                <option value="7" {% if assistant_days == 7 %}selected{% endif %}>Last 7 days</option>
+                                <option value="30" {% if assistant_days == 30 %}selected{% endif %}>Last 30 days</option>
+                                <option value="90" {% if assistant_days == 90 %}selected{% endif %}>Last 90 days</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-secondary" type="submit">Load</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Your Assistant Usage</h2>
+                    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                        <div class="stat-card"><div class="stat-label">Questions</div><div class="stat-value">{{ assistant_usage_mine.total if assistant_usage_mine else 0 }}</div></div>
+                        <div class="stat-card"><div class="stat-label">LLM Answers</div><div class="stat-value">{{ assistant_usage_mine.llm_total if assistant_usage_mine else 0 }}</div></div>
+                        <div class="stat-card"><div class="stat-label">Helpful</div><div class="stat-value">{{ assistant_feedback_mine.helpful if assistant_feedback_mine else 0 }}</div></div>
+                        <div class="stat-card"><div class="stat-label">Not Helpful</div><div class="stat-value">{{ assistant_feedback_mine.not_helpful if assistant_feedback_mine else 0 }}</div></div>
+                        <div class="stat-card"><div class="stat-label">Avg Confidence</div><div class="stat-value">{{ ('%.2f'|format(assistant_usage_mine.avg_confidence|default(0))) if assistant_usage_mine else '0.00' }}</div></div>
+                        <div class="stat-card"><div class="stat-label">Unresolved</div><div class="stat-value">{{ assistant_usage_mine.unresolved_total if assistant_usage_mine else 0 }}</div></div>
+                    </div>
+                    <p class="muted mt-10">
+                        Low-confidence rate: <strong>{{ assistant_quality_mine.low_confidence_rate if assistant_quality_mine else 0 }}%</strong> |
+                        Unresolved rate: <strong>{{ assistant_quality_mine.unresolved_rate if assistant_quality_mine else 0 }}%</strong>
+                    </p>
+                </div>
+
+                <div class="card">
+                    <h2>Your Top Questions</h2>
+                    <table>
+                        <thead><tr><th>Question</th><th>Count</th></tr></thead>
+                        <tbody>
+                        {% for row in (assistant_usage_mine.top_questions if assistant_usage_mine else []) %}
+                        <tr><td>{{ row.question }}</td><td>{{ row.count }}</td></tr>
+                        {% else %}
+                        <tr><td colspan="2">No assistant questions logged yet.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    <h3 style="margin-top: 14px;">Response Modes</h3>
+                    <table>
+                        <thead><tr><th>Mode</th><th>Count</th></tr></thead>
+                        <tbody>
+                        {% for row in (assistant_usage_mine.response_mode_rows if assistant_usage_mine else []) %}
+                        <tr><td>{{ row.mode }}</td><td>{{ row.count }}</td></tr>
+                        {% else %}
+                        <tr><td colspan="2">No response mode pattern yet.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    <h3 style="margin-top: 14px;">Answer Versions</h3>
+                    <table>
+                        <thead><tr><th>Version</th><th>Count</th></tr></thead>
+                        <tbody>
+                        {% for row in (assistant_usage_mine.answer_version_rows if assistant_usage_mine else []) %}
+                        <tr><td>{{ row.version }}</td><td>{{ row.count }}</td></tr>
+                        {% else %}
+                        <tr><td colspan="2">No answer-version data yet.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <h2>Visual Trends</h2>
+                    <div class="mini-chart-grid mt-10">
+                        <div class="mini-chart">
+                            <h4>Top Questions</h4>
+                            {% set q_ns = namespace(max=1) %}
+                            {% for row in (assistant_usage_mine.top_questions if assistant_usage_mine else []) %}
+                                {% if (row.count or 0) > q_ns.max %}{% set q_ns.max = (row.count or 0) %}{% endif %}
+                            {% endfor %}
+                            {% for row in (assistant_usage_mine.top_questions if assistant_usage_mine else []) %}
+                            {% set pct = ((row.count or 0) * 100 / q_ns.max)|round(1) %}
+                            <div class="chart-row">
+                                <div class="chart-label-line">
+                                    <span class="label" title="{{ row.question }}">{{ row.question }}</span>
+                                    <strong>{{ row.count }}</strong>
+                                </div>
+                                <div class="bar-track"><div class="bar-fill" style="width: {{ pct }}%;"></div></div>
+                            </div>
+                            {% else %}
+                            <p class="muted">No chart data yet.</p>
+                            {% endfor %}
+                        </div>
+                        <div class="mini-chart">
+                            <h4>Response Modes</h4>
+                            {% set m_ns = namespace(max=1) %}
+                            {% for row in (assistant_usage_mine.response_mode_rows if assistant_usage_mine else []) %}
+                                {% if (row.count or 0) > m_ns.max %}{% set m_ns.max = (row.count or 0) %}{% endif %}
+                            {% endfor %}
+                            {% for row in (assistant_usage_mine.response_mode_rows if assistant_usage_mine else []) %}
+                            {% set pct = ((row.count or 0) * 100 / m_ns.max)|round(1) %}
+                            <div class="chart-row">
+                                <div class="chart-label-line">
+                                    <span class="label">{{ row.mode|title }}</span>
+                                    <strong>{{ row.count }}</strong>
+                                </div>
+                                <div class="bar-track"><div class="bar-fill" style="width: {{ pct }}%;"></div></div>
+                            </div>
+                            {% else %}
+                            <p class="muted">No chart data yet.</p>
+                            {% endfor %}
+                        </div>
+                        <div class="mini-chart">
+                            <h4>Answer Versions</h4>
+                            {% set v_ns = namespace(max=1) %}
+                            {% for row in (assistant_usage_mine.answer_version_rows if assistant_usage_mine else []) %}
+                                {% if (row.count or 0) > v_ns.max %}{% set v_ns.max = (row.count or 0) %}{% endif %}
+                            {% endfor %}
+                            {% for row in (assistant_usage_mine.answer_version_rows if assistant_usage_mine else []) %}
+                            {% set pct = ((row.count or 0) * 100 / v_ns.max)|round(1) %}
+                            <div class="chart-row">
+                                <div class="chart-label-line">
+                                    <span class="label">{{ row.version }}</span>
+                                    <strong>{{ row.count }}</strong>
+                                </div>
+                                <div class="bar-track"><div class="bar-fill" style="width: {{ pct }}%;"></div></div>
+                            </div>
+                            {% else %}
+                            <p class="muted">No chart data yet.</p>
+                            {% endfor %}
+                        </div>
+                        <div class="mini-chart">
+                            <h4>School Unresolved Questions</h4>
+                            {% set u_ns = namespace(max=1) %}
+                            {% for row in (assistant_usage_role.top_unresolved_questions if assistant_usage_role else []) %}
+                                {% if (row.count or 0) > u_ns.max %}{% set u_ns.max = (row.count or 0) %}{% endif %}
+                            {% endfor %}
+                            {% for row in (assistant_usage_role.top_unresolved_questions if assistant_usage_role else []) %}
+                            {% set pct = ((row.count or 0) * 100 / u_ns.max)|round(1) %}
+                            <div class="chart-row">
+                                <div class="chart-label-line">
+                                    <span class="label" title="{{ row.question }}">{{ row.question }}</span>
+                                    <strong>{{ row.count }}</strong>
+                                </div>
+                                <div class="bar-track"><div class="bar-fill warn" style="width: {{ pct }}%;"></div></div>
+                            </div>
+                            {% else %}
+                            <p class="muted">No unresolved chart data yet.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>All Teachers in This School (Role View)</h2>
+                    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                        <div class="stat-card"><div class="stat-label">Questions</div><div class="stat-value">{{ assistant_usage_role.total if assistant_usage_role else 0 }}</div></div>
+                        <div class="stat-card"><div class="stat-label">Low Confidence</div><div class="stat-value">{{ assistant_usage_role.low_confidence if assistant_usage_role else 0 }}</div></div>
+                        <div class="stat-card"><div class="stat-label">Unresolved</div><div class="stat-value">{{ assistant_usage_role.unresolved_total if assistant_usage_role else 0 }}</div></div>
+                    </div>
+                    <h3 style="margin-top: 14px;">Top Unresolved Questions</h3>
+                    <table>
+                        <thead><tr><th>Question</th><th>Count</th></tr></thead>
+                        <tbody>
+                        {% for row in (assistant_usage_role.top_unresolved_questions if assistant_usage_role else []) %}
+                        <tr><td>{{ row.question }}</td><td>{{ row.count }}</td></tr>
+                        {% else %}
+                        <tr><td colspan="2">No unresolved pattern yet.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+

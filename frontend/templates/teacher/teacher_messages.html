@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Messages - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(1100px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.85rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .student-message-card { border: 1px solid #dbe4ef; border-radius: 10px; padding: 12px; background: #f8fbff; margin-bottom: 10px; }
+        .student-message-card.is-unread { border-left: 4px solid #0F4C81; background: #eef6ff; }
+        .student-message-card h4 { margin: 0 0 6px; font-size: 1rem; color: #1e3a5f; }
+        .student-message-meta { color: #5b6475; font-size: 0.86rem; margin-bottom: 6px; }
+        .student-message-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'messages' %}
+        {% include 'teacher/_teacher_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-bell"></i> Messages</h1>
+                    <a href="{{ url_for('teacher_dashboard', tab='overview') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="card">
+                    <h2><i class="fas fa-bell"></i> School Notifications</h2>
+                    {% if unread_teacher_messages %}
+                    <div class="student-message-actions">
+                        <span class="chip chip-warning">Unread: {{ unread_teacher_messages }}</span>
+                        <form method="post" action="{{ url_for('teacher_mark_all_messages_read') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-primary btn-xs">
+                                <i class="fas fa-check-double"></i> Mark All Read
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                    {% if teacher_messages %}
+                        {% for msg in teacher_messages %}
+                        <div class="student-message-card {% if not msg.is_read %}is-unread{% endif %}">
+                            <h4>{{ msg.title }}</h4>
+                            <div class="student-message-meta">
+                                Target:
+                                {% if msg.target_classname and msg.target_subject %}
+                                    {{ msg.target_classname }} - {{ msg.target_subject }}
+                                {% elif msg.target_classname %}
+                                    {{ msg.target_classname }} (all subjects)
+                                {% elif msg.target_subject %}
+                                    {{ msg.target_subject }} (all classes)
+                                {% else %}
+                                    All Teachers
+                                {% endif %}
+                                | Deadline: {{ msg.deadline_date if msg.deadline_date else 'None' }}
+                                {% if msg.is_expired %}
+                                    | <span class="chip chip-danger">Expired</span>
+                                {% elif msg.is_due_soon %}
+                                    | <span class="chip chip-warning">Due Soon</span>
+                                {% endif %}
+                                {% if msg.is_read %}
+                                    | <span class="chip chip-success">Read</span>
+                                {% else %}
+                                    | <span class="chip chip-warning">Unread</span>
+                                {% endif %}
+                                | Sent: {{ msg.created_at }}
+                            </div>
+                            <div>{{ msg.message }}</div>
+                            {% if msg.attachment_url %}
+                            <div class="mt-10">
+                                {% if msg.attachment_mime and msg.attachment_mime.startswith('image/') %}
+                                <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">
+                                    <i class="fas fa-image"></i> Open Attached Image
+                                </a>
+                                <div class="mt-10">
+                                    <img src="{{ msg.attachment_url }}" alt="Attachment" style="max-width:100%; max-height:260px; border-radius:10px; border:1px solid #dbe4ef;">
+                                </div>
+                                {% else %}
+                                <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">
+                                    <i class="fas fa-file"></i> Download Attachment
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            {% if not msg.is_read %}
+                            <div class="student-message-actions">
+                                <form method="post" action="{{ url_for('teacher_mark_message_read') }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="message_id" value="{{ msg.id }}">
+                                    <button type="submit" class="btn btn-primary btn-xs">
+                                        <i class="fas fa-check"></i> Mark as Read
+                                    </button>
+                                </form>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <p class="note">No teacher notifications yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+
+

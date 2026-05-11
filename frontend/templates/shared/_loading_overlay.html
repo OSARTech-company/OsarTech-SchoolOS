@@ -1,0 +1,175 @@
+<!-- Loading Overlay with Spinning Animation -->
+<div id="loading-overlay" class="loading-overlay">
+    <div class="loading-spinner-container">
+        <div class="loading-spinner-ring"></div>
+        <div class="loading-spinner-ring"></div>
+        <div class="loading-spinner-ring"></div>
+        <img src="{{ url_for('static', filename='img/osartech-logo-brand.png', v='20260411b') }}" alt="OSARtech SchoolOS loading brand" class="loading-logo">
+    </div>
+    <p class="loading-text">Loading OSARtech SchoolOS...</p>
+</div>
+
+<style>
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.95);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        z-index: 99999;
+        backdrop-filter: blur(2px);
+    }
+
+    .loading-overlay.show {
+        display: flex;
+    }
+
+    .loading-spinner-container {
+        position: relative;
+        width: 160px;
+        height: 160px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 30px;
+    }
+
+    .loading-spinner-ring {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: 3px solid transparent;
+        border-radius: 50%;
+        box-sizing: border-box;
+    }
+
+    .loading-spinner-ring:nth-child(1) {
+        border-top-color: #0f4c81;
+        border-right-color: #0f4c81;
+        animation: spin-1 2s linear infinite;
+    }
+
+    .loading-spinner-ring:nth-child(2) {
+        border-right-color: #1f7a8c;
+        border-bottom-color: #1f7a8c;
+        width: 80%;
+        height: 80%;
+        top: 10%;
+        left: 10%;
+        animation: spin-2 1.8s linear infinite reverse;
+    }
+
+    .loading-spinner-ring:nth-child(3) {
+        border-bottom-color: #2a9ba8;
+        border-left-color: #2a9ba8;
+        width: 60%;
+        height: 60%;
+        top: 20%;
+        left: 20%;
+        animation: spin-3 1.6s linear infinite;
+    }
+
+    .loading-logo {
+        width: 100px;
+        height: 100px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        object-fit: contain;
+        border-radius: 50%;
+        background: white;
+        padding: 8px;
+        box-shadow: 0 4px 15px rgba(15, 76, 129, 0.2);
+        z-index: 10;
+    }
+
+    @keyframes spin-1 {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    @keyframes spin-2 {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    @keyframes spin-3 {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+        font-size: 16px;
+        color: #0f4c81;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: 1px;
+        animation: pulse-text 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-text {
+        0%, 100% { opacity: 0.8; }
+        50% { opacity: 1; }
+    }
+
+</style>
+
+<script>
+    // Show loading overlay on page start
+    function showLoadingOverlay() {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.classList.add('show');
+        }
+    }
+
+    // Hide loading overlay when page is ready
+    function hideLoadingOverlay() {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.classList.remove('show');
+        }
+    }
+
+    // Show overlay when page starts loading
+    window.addEventListener('beforeunload', showLoadingOverlay);
+
+    // Hide overlay when page finishes loading
+    window.addEventListener('load', function() {
+        hideLoadingOverlay();
+    });
+
+    // Also hide after a short delay to ensure page is rendered
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(hideLoadingOverlay, 300);
+    });
+
+    // Show loading on form submission (for form pages)
+    document.addEventListener('submit', function(e) {
+        if (e.target && e.target.getAttribute && e.target.getAttribute('data-async-submit') === '1') {
+            return;
+        }
+        if (e.target.method && e.target.method.toLowerCase() === 'post') {
+            showLoadingOverlay();
+        }
+    }, true);
+
+    // Show loading on link clicks (optional, for slower connections)
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('a');
+        if (link && link.href && !link.href.startsWith('#') && !link.target) {
+            // Only show for internal navigation
+            if (link.href.includes(window.location.hostname)) {
+                showLoadingOverlay();
+            }
+        }
+    }, true);
+</script>

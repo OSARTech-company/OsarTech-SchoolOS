@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Attendance - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(1100px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.85rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: end; }
+        .filters label { display: block; font-weight: 600; margin-bottom: 4px; }
+        .filters select { width: 100%; }
+        .term-nav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+        .term-nav .chip { display: inline-block; padding: 8px 12px; border-radius: 999px; text-decoration: none; font-weight: 700; border: 1px solid rgba(31,122,140,.28); color: var(--accent, #1F7A8C); background: #fff; }
+        .term-nav .chip.active { background: var(--accent, #1F7A8C); color: #fff; border-color: transparent; }
+        .term-nav .chip.disabled { opacity: .5; pointer-events: none; }
+        @media (max-width: 860px) {
+            .filters { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body style="--accent: {{ parent_theme_accent if parent_theme_accent else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'attendance' %}
+        {% include 'parent/_parent_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-calendar-check"></i> Period Attendance</h1>
+                    <a href="{{ url_for('parent_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="card">
+                    <form method="get" action="{{ url_for('parent_period_attendance') }}" class="filters">
+                        <div>
+                            <label>Student</label>
+                            <select name="student_key" required>
+                                {% for child in children %}
+                                <option value="{{ child.key }}" {% if child.key == selected_key %}selected{% endif %}>
+                                    {{ child.firstname }} ({{ child.student_id }}) - {{ child.school_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label>Term</label>
+                            <select name="term">
+                                <option value="">All Terms</option>
+                                {% for t in term_options %}
+                                <option value="{{ t }}" {% if selected_term == t %}selected{% endif %}>{{ t }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label>Academic Year</label>
+                            <select name="academic_year">
+                                <option value="">All Years</option>
+                                {% for y in year_options %}
+                                <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Load</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3 class="no-margin">
+                        {{ selected_student.firstname }} ({{ selected_student.student_id }})
+                        - {{ selected_student.classname }}{% if selected_student.stream %} ({{ selected_student.stream }}){% endif %}
+                    </h3>
+                    <p class="muted mt-10">
+                        School: {{ selected_school.school_name if selected_school and selected_school.school_name else selected_school.school_id }}
+                    </p>
+                    <div class="mt-10">
+                        <strong>Comment Context:</strong>
+                        {{ comment_term or '-' }}{% if comment_year %} ({{ comment_year }}){% endif %}
+                    </div>
+                    <div class="mt-10">
+                        <strong>Class Teacher Comment:</strong>
+                        <div class="muted mt-10">
+                            {% if class_teacher_comment %}
+                                {{ class_teacher_comment }}
+                            {% else %}
+                                No class teacher comment for selected term/year.
+                            {% endif %}
+                        </div>
+                    </div>
+                    <p class="muted mt-12">Subject teacher comments are available on the Subject Comments page.</p>
+                </div>
+
+                <div class="card">
+                    <h3 class="no-margin"><i class="fas fa-list-check"></i> Period Attendance Records</h3>
+                    {% if available_attendance_terms %}
+                    <div class="term-nav">
+                        {% if prev_attendance_term %}
+                        <a
+                            href="{{ url_for('parent_period_attendance', student_key=selected_key, term=prev_attendance_term.term, academic_year=prev_attendance_term.academic_year) }}"
+                            class="chip"
+                        >
+                            <i class="fas fa-chevron-left"></i> Prev
+                        </a>
+                        {% else %}
+                        <span class="chip disabled"><i class="fas fa-chevron-left"></i> Prev</span>
+                        {% endif %}
+                        {% for item in available_attendance_terms %}
+                        <a
+                            href="{{ url_for('parent_period_attendance', student_key=selected_key, term=item.term, academic_year=item.academic_year) }}"
+                            class="chip {% if item.token == current_attendance_term_token %}active{% endif %}"
+                        >
+                            {{ item.label }}
+                        </a>
+                        {% endfor %}
+                        {% if next_attendance_term %}
+                        <a
+                            href="{{ url_for('parent_period_attendance', student_key=selected_key, term=next_attendance_term.term, academic_year=next_attendance_term.academic_year) }}"
+                            class="chip"
+                        >
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                        {% else %}
+                        <span class="chip disabled">Next <i class="fas fa-chevron-right"></i></span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if attendance_rows %}
+                    <table class="mt-10">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Period</th>
+                                <th>Subject</th>
+                                <th>Status</th>
+                                <th>Class</th>
+                                <th>Term</th>
+                                <th>Year</th>
+                                <th>Note</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in attendance_rows %}
+                            <tr>
+                                <td>{{ row.attendance_date }}</td>
+                                <td>{{ row.period_label or '-' }}</td>
+                                <td>{{ row.subject or '-' }}</td>
+                                <td>{{ row.status or '-' }}</td>
+                                <td>{{ row.classname or '-' }}</td>
+                                <td>{{ row.term or '-' }}</td>
+                                <td>{{ row.academic_year or '-' }}</td>
+                                <td>{{ row.note or '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="muted mt-10">No period attendance records found for the selected filters.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+
+

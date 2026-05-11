@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispute Thread - Parent Portal</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(980px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.85rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .thread { display: grid; gap: 10px; }
+        .bubble { padding: 12px 14px; border-radius: 12px; background: #f8fbff; border: 1px solid #dbe4ef; }
+        .bubble.admin { background: #eef2ff; border-color: #c7d2fe; }
+        .bubble .meta { font-size: 0.8rem; color: #64748b; margin-bottom: 6px; }
+        .pagination { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+        .pagination .page-state { font-size: 0.9rem; color: #475569; }
+        .pagination .is-disabled { pointer-events: none; opacity: 0.5; }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'disputes' %}
+    {% include 'parent/_parent_sidebar.html' %}
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1><i class="fas fa-comment-dots"></i> Dispute Thread</h1>
+                <a href="{{ url_for('parent_disputes') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Disputes</a>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <h3 class="no-margin">{{ dispute.title }}</h3>
+                <p class="muted">{{ dispute.term }} {{ dispute.academic_year }} | {{ dispute.classname }} | Status: {{ dispute.status|title }}</p>
+                <p>{{ dispute.details }}</p>
+                {% if dispute.resolution_note %}
+                <div class="flash warning">Resolution: {{ dispute.resolution_note }}</div>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <h3>Comments</h3>
+                <div class="thread">
+                    {% if comments %}
+                        {% for row in comments %}
+                        <div class="bubble {% if row.author_role == 'school_admin' %}admin{% endif %}">
+                            <div class="meta">{{ row.author_role|title }} • {{ row.created_at }}</div>
+                            <div>{{ row.comment }}</div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="muted">No comments yet.</p>
+                    {% endif %}
+                </div>
+                {% if total_pages and total_pages > 1 %}
+                <div class="pagination">
+                    <a class="btn btn-secondary btn-xs {% if page <= 1 %}is-disabled{% endif %}" href="{{ url_for('parent_dispute_thread', dispute_id=dispute_id, page=page-1) }}">
+                        <i class="fas fa-chevron-left"></i> Prev
+                    </a>
+                    <span class="page-state">Page {{ page }} of {{ total_pages }} · {{ total_comments }} comments</span>
+                    <a class="btn btn-secondary btn-xs {% if page >= total_pages %}is-disabled{% endif %}" href="{{ url_for('parent_dispute_thread', dispute_id=dispute_id, page=page+1) }}">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <h3>Send a reply</h3>
+                <form method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <textarea name="comment" rows="4" maxlength="1200" required placeholder="Type your reply"></textarea>
+                    <button class="btn btn-primary" type="submit">Send</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+</body>
+</html>
+

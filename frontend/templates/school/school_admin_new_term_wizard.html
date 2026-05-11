@@ -1,0 +1,138 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>New Term Wizard - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      .container { width: min(960px, 100%); margin: 0 auto; padding: 24px; }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .header h1 { margin: 0; font-size: 1.8rem; }
+      .wizard-steps { margin: 10px 0 0; color: #64748b; }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-flag-checkered"></i> New Term Wizard</h1>
+            <a href="{{ url_for('school_admin_dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+          </div>
+          <p class="wizard-steps">
+            Use this wizard to advance the active term/year, copy teacher assignments to the new term,
+            and reset working scores.
+          </p>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          <div class="card">
+            <h2>Current Term</h2>
+            <p><strong>{{ current_term }}</strong>{% if current_year %} ({{ current_year }}){% endif %}</p>
+            <p class="note" style="margin-top:8px;">
+              Suggested next: <strong>{{ suggested_term }}</strong> ({{ suggested_year }})
+            </p>
+          </div>
+
+          <div class="card">
+            <h2>Rollover Readiness</h2>
+            <p>
+              Classes tracked: <strong>{{ rollover_readiness.total_classes if rollover_readiness else 0 }}</strong> |
+              Published: <strong>{{ rollover_readiness.published_classes if rollover_readiness else 0 }}</strong> |
+              Unpublished: <strong>{{ rollover_readiness.unpublished_classes if rollover_readiness else 0 }}</strong> |
+              Pending Review: <strong>{{ rollover_readiness.pending_review_classes if rollover_readiness else 0 }}</strong>
+            </p>
+            {% if rollover_readiness and rollover_readiness.blocking_reason %}
+              <p class="note" style="color:#b42318; font-weight:700;">{{ rollover_readiness.blocking_reason }}</p>
+            {% endif %}
+            {% if rollover_readiness and rollover_readiness.unpublished_classnames %}
+              <p class="note">Unpublished classes: {{ rollover_readiness.unpublished_classnames|join(', ') }}</p>
+            {% endif %}
+          </div>
+
+          <div class="card">
+            <h2>Advance to New Term</h2>
+            <form method="post" action="{{ url_for('school_admin_new_term_wizard') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <div class="form-group">
+                <label>
+                  <input type="checkbox" name="use_suggested_target" value="1" checked>
+                  Use suggested next term/year automatically (recommended)
+                </label>
+              </div>
+              <div class="form-group">
+                <label for="new_term">New Term</label>
+                <select id="new_term" name="new_term" required>
+                  <option value="First Term" {% if suggested_term == 'First Term' %}selected{% endif %}>First Term</option>
+                  <option value="Second Term" {% if suggested_term == 'Second Term' %}selected{% endif %}>Second Term</option>
+                  <option value="Third Term" {% if suggested_term == 'Third Term' %}selected{% endif %}>Third Term</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="new_year">Academic Year (YYYY-YYYY)</label>
+                <input id="new_year" name="new_year" value="{{ suggested_year }}" placeholder="2026-2027" required />
+              </div>
+              <div class="form-group">
+                <label>
+                  <input type="checkbox" name="lock_previous_term" value="1" checked>
+                  Lock previous term edits after rollover
+                </label>
+                <p class="note">This prevents accidental edits in the old term.</p>
+              </div>
+              <div class="form-group">
+                <label>
+                  <input type="checkbox" name="confirm_rollover_effects" value="1" required>
+                  I confirm rollover resets working scores and moves active students to the new term.
+                </label>
+              </div>
+              <div class="form-group">
+                <label>
+                  <input type="checkbox" name="allow_custom_target" value="1">
+                  Allow custom term/year target (not the suggested next step)
+                </label>
+              </div>
+              <div class="form-group">
+                <label>
+                  <input type="checkbox" name="allow_unpublished_rollover" value="1">
+                  Allow rollover with unpublished classes
+                </label>
+                <p class="note">Leave unchecked to enforce publishing discipline before rollover.</p>
+              </div>
+              <button class="btn btn-primary" type="submit">
+                <i class="fas fa-rocket"></i> Start New Term
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+      (function() {
+        const useSuggestedEl = document.querySelector('input[name="use_suggested_target"]');
+        const termEl = document.getElementById('new_term');
+        const yearEl = document.getElementById('new_year');
+        if (!useSuggestedEl || !termEl || !yearEl) return;
+        const sync = () => {
+          const locked = !!useSuggestedEl.checked;
+          termEl.disabled = locked;
+          yearEl.disabled = locked;
+        };
+        useSuggestedEl.addEventListener('change', sync);
+        sync();
+      })();
+    </script>
+      {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

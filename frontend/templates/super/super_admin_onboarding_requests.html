@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onboarding Requests - Super Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'onboarding_requests' %}
+    {% include 'super/_super_admin_sidebar.html' %}
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1><i class="fas fa-user-plus"></i> Onboarding Requests</h1>
+                <p class="meta-line">
+                    <strong>Last Login:</strong> {{ last_login_at }} |
+                    <strong>Pending Requests:</strong> {{ overview.pending_onboarding_requests }}
+                </p>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <form method="GET" class="toolbar">
+                    <div>
+                        <label>Status</label>
+                        <select name="status">
+                            <option value="" {% if not status_filter %}selected{% endif %}>All</option>
+                            <option value="pending_verification" {% if status_filter == 'pending_verification' %}selected{% endif %}>Pending Verification</option>
+                            <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+                            <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+                            <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Search</label>
+                        <input type="text" name="q" value="{{ text_filter or '' }}" placeholder="request ID / school / admin email">
+                    </div>
+                    <div>
+                        <label>Rows</label>
+                        <select name="per_page">
+                            {% for opt in [10, 25, 50, 100] %}
+                            <option value="{{ opt }}" {% if per_page == opt %}selected{% endif %}>{{ opt }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" type="submit">Apply</button>
+                    <a href="{{ url_for('super_admin_onboarding_requests') }}" class="btn">Reset</a>
+                </form>
+                <p class="muted" style="margin-top:8px;">Total requests: {{ total_rows }}</p>
+            </div>
+
+            {% if onboarding_requests %}
+                {% for item in onboarding_requests %}
+                    <div class="school-card">
+                        <div class="school-card-main">
+                            <div class="school-name">{{ item.school_name }}</div>
+                            <div class="school-id">Request: {{ item.request_id }}</div>
+                            <div class="school-meta">
+                                Status:
+                                <strong class="{% if item.status == 'approved' %}op-on{% elif item.status in ['pending', 'pending_verification'] %}chip-warning{% else %}op-off{% endif %}">
+                                    {{ item.status|replace('_', ' ')|title }}
+                                </strong>
+                                | Created: {{ item.created_at }}
+                                {% if item.reviewed_at %}| Reviewed: {{ item.reviewed_at }}{% endif %}
+                            </div>
+                            <div class="school-meta">
+                                Admin: {{ item.admin_name or '-' }} | {{ item.admin_email }}
+                                | School Email: {{ item.school_email or '-' }}
+                                | Phone: {{ item.phone or '-' }}
+                                | Location: {{ item.location or '-' }}
+                            </div>
+                            <div class="school-meta">
+                                Principal: {{ item.principal_name or '-' }}
+                                | Expected Students: {{ item.expected_students }}
+                                | Source IP: {{ item.source_ip or '-' }}
+                            </div>
+                            <div class="school-meta">
+                                Website/Social: {{ item.website_url or '-' }}
+                                | School Email Verified:
+                                <strong class="{{ 'op-on' if item.school_email_verified else 'op-off' }}">{{ 'Yes' if item.school_email_verified else 'No' }}</strong>
+                                | Phone Verified:
+                                <strong class="{{ 'op-on' if item.phone_verified else 'op-off' }}">{{ 'Yes' if item.phone_verified else 'No' }}</strong>
+                                | Document Verified:
+                                <strong class="{{ 'op-on' if item.document_verified else 'op-off' }}">{{ 'Yes' if item.document_verified else 'No' }}</strong>
+                                | Payment Proof:
+                                <strong class="{{ 'op-on' if item.payment_proof_path else 'op-off' }}">{{ 'Yes' if item.payment_proof_path else 'No' }}</strong>
+                            </div>
+                            {% if item.verification_meta and item.verification_meta.get('generic_email_domain') %}
+                            <div class="school-meta"><strong>Risk Flag:</strong> School email is on a generic public domain. Keep stricter manual verification.</div>
+                            {% endif %}
+                            <div class="school-meta">
+                                Proof Document:
+                                {% if item.proof_document_path %}
+                                <a href="{{ url_for('super_admin_onboarding_download_proof', request_id=item.request_id) }}" target="_blank" rel="noopener">Download</a>
+                                {% else %}
+                                Not uploaded
+                                {% endif %}
+                            </div>
+                            {% if item.payment_proof_path %}
+                            <div class="school-meta">
+                                Payment Proof:
+                                <a href="{{ url_for('super_admin_onboarding_download_proof', request_id=item.request_id) }}?payment=1" target="_blank" rel="noopener">Download</a>
+                                {% if item.payment_reference %}| Ref: {{ item.payment_reference }}{% endif %}
+                                {% if item.payment_amount %}| Amount: {{ item.payment_amount }}{% endif %}
+                            </div>
+                            {% endif %}
+                            {% if item.note %}
+                            <div class="school-meta"><strong>Note:</strong> {{ item.note }}</div>
+                            {% endif %}
+                            {% if item.review_note %}
+                            <div class="school-meta"><strong>Review Note:</strong> {{ item.review_note }}</div>
+                            {% endif %}
+                            {% if item.linked_school_id %}
+                            <div class="school-meta"><strong>Linked School ID:</strong> {{ item.linked_school_id }}</div>
+                            {% endif %}
+
+                            {% if item.status != 'approved' and item.status != 'cancelled' %}
+                            <form action="{{ url_for('super_admin_onboarding_set_verification') }}" method="POST" class="inline-form super-admin-inline-form super-admin-inline-form-compact">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="request_id" value="{{ item.request_id }}">
+                                <label><input type="checkbox" name="phone_verified" {% if item.phone_verified %}checked{% endif %}> Phone callback done</label>
+                                <label><input type="checkbox" name="document_verified" {% if item.document_verified %}checked{% endif %}> Proof document reviewed</label>
+                                <button type="submit" class="btn btn-secondary"><i class="fas fa-check-double"></i> Save Verification Checklist</button>
+                            </form>
+
+                            <form action="{{ url_for('super_admin_onboarding_approve') }}" method="POST" class="inline-form super-admin-inline-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="request_id" value="{{ item.request_id }}">
+                                <input type="email" name="admin_username" value="{{ item.admin_email }}" placeholder="Admin email">
+                                <select name="access_status" title="Access status">
+                                    <option value="trial_free">Trial Free</option>
+                                    <option value="active_paid" {% if not item.payment_proof_path %}disabled{% endif %} title="Upload payment proof to enable Active Paid">Active Paid</option>
+                                    <option value="pending_payment">Pending Payment</option>
+                                    <option value="suspended">Suspended</option>
+                                </select>
+                                <select name="cbt_enabled" title="CBT access">
+                                    <option value="1" selected>CBT Enabled</option>
+                                    <option value="0">CBT Disabled</option>
+                                </select>
+                                {% if not item.payment_proof_path %}
+                                <div class="flash error" style="margin-top:6px; padding:6px 10px; display:inline-block;">
+                                    Active Paid is locked until payment proof is uploaded.
+                                </div>
+                                {% endif %}
+                                <select name="class_arm_ranking_mode" title="Class arm ranking mode">
+                                    <option value="separate">Arms Separate</option>
+                                    <option value="together">Arms Together</option>
+                                </select>
+                                <input type="date" name="trial_end_date" title="Trial end date">
+                                <input type="text" name="subscription_plan" placeholder="Plan (optional)">
+                                <input type="date" name="payment_due_date" title="Payment due date">
+                                <input type="text" name="review_note" placeholder="Approval note">
+                                <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> Approve & Send Invite</button>
+                            </form>
+
+                            <form action="{{ url_for('super_admin_onboarding_reject') }}" method="POST" class="inline-form super-admin-inline-form super-admin-inline-form-compact">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="request_id" value="{{ item.request_id }}">
+                                <input type="text" name="review_note" placeholder="Reason for rejection" required>
+                                <button type="submit" class="btn btn-danger"><i class="fas fa-times"></i> Reject</button>
+                            </form>
+                            {% endif %}
+
+                            {% if item.status == 'approved' %}
+                            <form action="{{ url_for('super_admin_onboarding_resend_invite') }}" method="POST" class="inline-form super-admin-inline-form super-admin-inline-form-compact">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="request_id" value="{{ item.request_id }}">
+                                <button type="submit" class="btn btn-secondary"><i class="fas fa-envelope"></i> Re-send Invite Link</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="card">
+                    <p class="no-margin">No onboarding requests found for this filter.</p>
+                </div>
+            {% endif %}
+
+            {% if total_pages > 1 %}
+            <div class="card">
+                <div class="pagination-bar" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    {% if page > 1 %}
+                    <a class="btn btn-sm" href="{{ url_for('super_admin_onboarding_requests', status=status_filter, q=text_filter, per_page=per_page, page=page-1) }}">Previous</a>
+                    {% endif %}
+                    <span>Page {{ page }} / {{ total_pages }}</span>
+                    {% if page < total_pages %}
+                    <a class="btn btn-sm" href="{{ url_for('super_admin_onboarding_requests', status=status_filter, q=text_filter, per_page=per_page, page=page+1) }}">Next</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+

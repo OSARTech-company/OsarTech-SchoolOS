@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Issue - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .issue-form {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        .issue-form h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        .form-group textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 16px;
+            min-height: 150px;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+        }
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        .btn-submit {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+        }
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .back-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .back-link a:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 640px) {
+            .container {
+                margin: 16px auto;
+                padding: 12px;
+            }
+            .issue-form {
+                padding: 16px;
+                border-radius: 12px;
+            }
+            .form-group textarea {
+                min-height: 130px;
+                padding: 12px;
+                font-size: 15px;
+            }
+            .btn-submit {
+                padding: 12px 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="container">
+        <div class="issue-form">
+            <h2><i class="fas fa-exclamation-triangle"></i> Report an Issue</h2>
+            <p style="text-align: center; color: #7f8c8d; margin-bottom: 30px;">
+                Help us improve by reporting any issues or bugs you encounter.
+            </p>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div style="margin-bottom: 12px; padding: 10px; border-radius: 8px; {% if category == 'success' %}background:#d4edda;color:#155724;border:1px solid #c3e6cb;{% else %}background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="source_page" id="source_page" value="{{ source_page or '' }}">
+                <div class="form-group">
+                    <label for="issue_description">
+                        <i class="fas fa-comment"></i> Describe the Issue
+                    </label>
+                    <textarea
+                        id="issue_description"
+                        name="description"
+                        placeholder="Please provide as much detail as possible about the issue you're experiencing..."
+                        maxlength="2000"
+                        required
+                    ></textarea>
+                </div>
+
+                <button type="submit" class="btn-submit">
+                    <i class="fas fa-paper-plane"></i> Submit Report
+                </button>
+            </form>
+            <p style="margin-top:12px; color:#6c757d; font-size:14px;">
+                Your report includes your role, school, and page context for faster support.
+            </p>
+        </div>
+
+        <div class="back-link">
+            <a href="{{ url_for('menu') }}">
+                <i class="fas fa-arrow-left"></i> Back to Menu
+            </a>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var sourceInput = document.getElementById('source_page');
+            if (!sourceInput) return;
+            var current = (sourceInput.value || '').trim();
+            if (!current) {
+                sourceInput.value = (document.referrer || window.location.pathname || '').trim();
+            }
+        })();
+    </script>
+</body>
+</html>
+
+

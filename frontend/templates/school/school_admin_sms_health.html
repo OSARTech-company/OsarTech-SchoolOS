@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SMS Health - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      body { min-height: 100vh; }
+      .container { width: min(1100px, 100%); margin: 0 auto; padding: 24px; }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .header h1 { margin: 0; font-size: 1.85rem; }
+      .header .back { color: white; text-decoration: none; font-weight: 700; }
+      .status-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+      .status-item { border: 1px solid #dbe4ef; border-radius: 12px; padding: 14px; background: #f8fbff; }
+      .status-item h3 { margin: 0 0 8px; font-size: 1rem; color: #1e3a5f; }
+      .status-value { font-weight: 800; color: #0f172a; }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% set active_page = 'sms_health' %}
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-sms"></i> SMS Health</h1>
+            <a href="{{ url_for('school_admin_messages') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Messages</a>
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          <div class="status-grid">
+            <div class="status-item">
+              <h3>Provider</h3>
+              <div class="status-value">{{ sms_provider|default('not configured') }}</div>
+            </div>
+            <div class="status-item">
+              <h3>Configured</h3>
+              <div class="status-value">{{ 'Yes' if twilio_ready else 'No' }}</div>
+            </div>
+            <div class="status-item">
+              <h3>Default Country</h3>
+              <div class="status-value">{{ sms_default_country }}</div>
+            </div>
+          </div>
+
+          <div class="card mt-20">
+            <h2><i class="fas fa-check-circle"></i> Provider Check</h2>
+            <p class="note">This checks Twilio API credentials. Twilio balance is not exposed here; use Twilio Console for billing.</p>
+            <form method="post" action="{{ url_for('school_admin_sms_health') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-rotate"></i> Check Twilio Status
+              </button>
+            </form>
+
+            {% if check_result %}
+            <div class="mt-10">
+              <p class="note"><strong>Status:</strong> {{ check_result.status }}</p>
+              <p class="note"><strong>Account Name:</strong> {{ check_result.account_name }}</p>
+              <p class="note"><strong>Account Status:</strong> {{ check_result.account_status }}</p>
+              {% if check_result.error %}
+              <p class="note"><strong>Error:</strong> {{ check_result.error }}</p>
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+      {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

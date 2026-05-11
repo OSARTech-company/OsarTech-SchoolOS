@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subject Rank History</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .rank-table-wrap { width: 100%; overflow-x: auto; }
+        .trend-chart-wrap { width: 100%; max-width: 760px; margin-top: 14px; }
+        .arm-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid #dbe4ef;
+            background: #f8fbff;
+            color: #1e3a5f;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .arm-toggle select { border-radius: 8px; padding: 4px 8px; }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'subject_ranks' %}
+    {% include 'teacher/_teacher_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Subject Rank History</h1>
+        <p><a class="btn" href="{{ url_for('teacher_dashboard', arm_mode=(request.args.get('arm_mode') or '')) }}">Back to Dashboard</a></p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% set arm_mode_value = (request.args.get('arm_mode') or (school.class_arm_ranking_mode if school else 'separate')) %}
+    <form method="get" class="arm-toggle">
+        <i class="fas fa-layer-group" aria-hidden="true"></i>
+        <span>Class Arm View:</span>
+        <select name="arm_mode" onchange="this.form.submit()">
+            <option value="separate" {% if arm_mode_value == 'separate' %}selected{% endif %}>Separate Arms</option>
+            <option value="together" {% if arm_mode_value == 'together' %}selected{% endif %}>Combine Arms</option>
+        </select>
+        {% if selected_year %}<input type="hidden" name="academic_year" value="{{ selected_year }}">{% endif %}
+        {% if selected_term %}<input type="hidden" name="term" value="{{ selected_term }}">{% endif %}
+        {% if selected_class %}<input type="hidden" name="classname" value="{{ selected_class }}">{% endif %}
+        {% if selected_subject %}<input type="hidden" name="subject" value="{{ selected_subject }}">{% endif %}
+        {% if trend_student_id %}<input type="hidden" name="trend_student_id" value="{{ trend_student_id }}">{% endif %}
+    </form>
+
+    <div class="card">
+        <form method="get" class="toolbar">
+            {% if arm_mode_value %}<input type="hidden" name="arm_mode" value="{{ arm_mode_value }}">{% endif %}
+            <div>
+                <label>Academic Year</label>
+                <select name="academic_year" required>
+                    {% for y in year_options %}
+                    <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>Term</label>
+                <select name="term" required>
+                    {% for t in term_options %}
+                    <option value="{{ t }}" {% if t == selected_term %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>Class</label>
+                <select name="classname" required>
+                    {% for c in class_options %}
+                    <option value="{{ c }}" {% if c == selected_class %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>Subject</label>
+                <select name="subject" required>
+                    {% for s in subject_options %}
+                    <option value="{{ s }}" {% if s == selected_subject %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="align-self:end;">
+                <button class="btn btn-secondary" type="submit">Load Ranks</button>
+                {% if selected_year and selected_term and selected_class and selected_subject %}
+                <a class="btn btn-primary ml-10" href="{{ url_for('teacher_subject_rank_export', academic_year=selected_year, term=selected_term, classname=selected_class, subject=selected_subject) }}">Export CSV</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>{{ summary.subject or '-' }} - {{ summary.classname or '-' }}</h2>
+        <p class="muted">Ranked Students: {{ summary.ranked_students }}</p>
+        <div class="rank-table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Position</th>
+                        <th>Student Name</th>
+                        <th>Student ID</th>
+                        <th>Subject Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rank_rows %}
+                    <tr>
+                        <td>{{ row.position }}</td>
+                        <td>{{ row.firstname or '-' }}</td>
+                        <td>{{ row.student_id }}</td>
+                        <td>{{ row.mark }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4">No published ranking data found for selected filters.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Student Trend ({{ selected_subject or '-' }})</h2>
+        <form method="get" class="toolbar">
+            <input type="hidden" name="academic_year" value="{{ selected_year }}">
+            <input type="hidden" name="term" value="{{ selected_term }}">
+            <input type="hidden" name="classname" value="{{ selected_class }}">
+            <input type="hidden" name="subject" value="{{ selected_subject }}">
+            {% if arm_mode_value %}<input type="hidden" name="arm_mode" value="{{ arm_mode_value }}">{% endif %}
+            <label>Student</label>
+            <select name="trend_student_id">
+                <option value="">Select student</option>
+                {% for row in rank_rows %}
+                <option value="{{ row.student_id }}" {% if trend_student_id == row.student_id %}selected{% endif %}>{{ row.firstname }} ({{ row.student_id }})</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-secondary" type="submit">Load Trend</button>
+        </form>
+        <div class="trend-chart-wrap">
+            <canvas id="subjectTrendChart"></canvas>
+        </div>
+    </div>
+</div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+<script>
+const trendRows = {{ trend_points|tojson }};
+const ctx = document.getElementById('subjectTrendChart');
+if (ctx && trendRows.length) {
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: trendRows.map(r => r.label),
+      datasets: [{
+        label: 'Subject Score Trend',
+        data: trendRows.map(r => r.score),
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37, 99, 235, 0.15)',
+        fill: true,
+        tension: 0.25
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: { y: { min: 0, max: 100 } }
+    }
+  });
+}
+</script>
+</body>
+</html>
+
+

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin OTP Verification</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .otp-shell {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .otp-card {
+            width: 100%;
+            max-width: 460px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            box-shadow: 0 24px 50px rgba(0, 0, 0, 0.18);
+            overflow: hidden;
+            animation: otpSlideIn 0.45s ease-out;
+        }
+
+        .otp-head {
+            padding: 34px 28px 22px;
+            text-align: center;
+            color: #fff;
+            background: linear-gradient(145deg, #1f6feb, #0f3d91);
+        }
+
+        .otp-head .shield {
+            width: 62px;
+            height: 62px;
+            border-radius: 50%;
+            margin: 0 auto 12px;
+            display: grid;
+            place-items: center;
+            font-size: 1.4rem;
+            background: rgba(255, 255, 255, 0.16);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+        }
+
+        .otp-head h1 {
+            margin: 0;
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+
+        .otp-head p {
+            margin: 10px 0 0;
+            opacity: 0.95;
+            font-size: 0.95rem;
+        }
+
+        .otp-body {
+            padding: 24px 24px 26px;
+        }
+
+        .otp-meta {
+            margin-bottom: 18px;
+            padding: 12px 14px;
+            border: 1px solid #dbe5f6;
+            border-radius: 12px;
+            background: #f7faff;
+            color: #1c2e4a;
+            font-size: 0.92rem;
+            line-height: 1.45;
+        }
+
+        .otp-meta strong {
+            word-break: break-word;
+        }
+
+        .flash-wrap {
+            margin-bottom: 14px;
+        }
+
+        .flash {
+            border-radius: 10px;
+            padding: 11px 13px;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .flash.success {
+            background: #e6f8ee;
+            border: 1px solid #b6e3c9;
+            color: #0d6b34;
+        }
+
+        .flash.error {
+            background: #fdebec;
+            border: 1px solid #f4c2c5;
+            color: #86242d;
+        }
+
+        .flash.warning,
+        .flash.info {
+            background: #fff7df;
+            border: 1px solid #f5df9a;
+            color: #7b5a00;
+        }
+
+        .otp-field {
+            margin-bottom: 16px;
+        }
+
+        .otp-field label {
+            display: block;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .otp-input-wrap {
+            position: relative;
+        }
+
+        .otp-input-wrap i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #5f7fb9;
+        }
+
+        #otp_code {
+            width: 100%;
+            height: 52px;
+            border: 2px solid #d7e2f3;
+            border-radius: 12px;
+            background: #fbfdff;
+            font-size: 1.12rem;
+            font-weight: 700;
+            letter-spacing: 0.35em;
+            text-align: center;
+            padding: 0 16px 0 40px;
+            transition: border-color 0.22s ease, box-shadow 0.22s ease;
+        }
+
+        #otp_code:focus {
+            outline: none;
+            border-color: #1f6feb;
+            box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.16);
+            background: #fff;
+        }
+
+        .otp-actions {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .otp-btn {
+            height: 46px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .otp-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .otp-btn.primary {
+            color: #fff;
+            background: linear-gradient(140deg, #1f6feb, #0f3d91);
+            box-shadow: 0 10px 22px rgba(31, 111, 235, 0.28);
+        }
+
+        .otp-btn.secondary {
+            color: #20417a;
+            background: #eaf1ff;
+            border: 1px solid #c8dafd;
+        }
+
+        .otp-btn.danger {
+            color: #87242d;
+            background: #fef1f2;
+            border: 1px solid #f4c8cc;
+        }
+
+        .otp-note {
+            margin-top: 14px;
+            text-align: center;
+            color: #5e6b7b;
+            font-size: 0.84rem;
+        }
+
+        @keyframes otpSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(18px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (min-width: 520px) {
+            .otp-actions {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .otp-actions .danger {
+                grid-column: span 2;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .otp-shell {
+                padding: 14px;
+            }
+
+            .otp-head {
+                padding: 26px 18px 20px;
+            }
+
+            .otp-body {
+                padding: 18px;
+            }
+
+            #otp_code {
+                letter-spacing: 0.28em;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <main class="otp-shell">
+        <section class="otp-card" aria-labelledby="otp-title">
+            <header class="otp-head">
+                <div class="shield"><i class="fas fa-shield-alt" aria-hidden="true"></i></div>
+                <h1 id="otp-title">Two-Step Verification</h1>
+                <p>Enter the 6-digit code to continue your admin login.</p>
+            </header>
+
+            <div class="otp-body">
+                <div class="otp-meta">
+                    OTP destination: <strong>{{ masked_recipient }}</strong><br>
+                    Expires in {{ expiry_minutes }} minute(s).
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flash-wrap" aria-live="polite">
+                            {% for category, message in messages %}
+                                <div class="flash {{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <form method="post" autocomplete="off">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="otp-field">
+                        <label for="otp_code">OTP Code</label>
+                        <div class="otp-input-wrap">
+                            <input
+                                type="text"
+                                id="otp_code"
+                                name="otp_code"
+                                maxlength="6"
+                                inputmode="numeric"
+                                pattern="[0-9]{6}"
+                                autocomplete="one-time-code"
+                                placeholder="000000"
+                                required
+                            >
+                            <i class="fas fa-key" aria-hidden="true"></i>
+                        </div>
+                    </div>
+
+                    <div class="otp-actions">
+                        <button type="submit" name="action" value="verify" class="otp-btn primary">
+                            <i class="fas fa-check-circle" aria-hidden="true"></i>
+                            Verify and Continue
+                        </button>
+                        {% if mode == 'email' %}
+                            <button type="submit" name="action" value="resend" class="otp-btn secondary">
+                                <i class="fas fa-paper-plane" aria-hidden="true"></i>
+                                Resend OTP
+                            </button>
+                        {% endif %}
+                        <a href="{{ url_for('login') }}" class="otp-btn danger">
+                            <i class="fas fa-arrow-left" aria-hidden="true"></i>
+                            Back to Login
+                        </a>
+                    </div>
+
+                    <p class="otp-note">Keep this code private. It secures administrator access.</p>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const otpInput = document.getElementById('otp_code');
+            if (!otpInput) return;
+
+            otpInput.focus();
+            otpInput.addEventListener('input', function () {
+                this.value = this.value.replace(/\D/g, '').slice(0, 6);
+            });
+        });
+    </script>
+</body>
+</html>
+

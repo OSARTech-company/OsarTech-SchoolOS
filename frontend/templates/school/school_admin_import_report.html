@@ -1,0 +1,76 @@
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Validation Report</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'bulk' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1>Import Validation Report</h1>
+                <p>
+                    <a class="btn" href="{{ url_for('school_admin_bulk_tools') }}">Back to Bulk Tools</a>
+                    <a class="btn btn-danger ml-10" href="{{ url_for('school_admin_import_csv_error_rows', token=error_token) }}">Download Error CSV</a>
+                </p>
+            </div>
+            <div class="card">
+                <p class="note">
+                    {% if last_import_target %}
+                    <strong>Target:</strong> {{ last_import_target|replace('_', ' ')|title }} |
+                    {% endif %}
+                    <strong>Failed Rows:</strong> {{ total_rows or 0 }}
+                    {% if last_import_at %} | <strong>Generated:</strong> {{ last_import_at }}{% endif %}
+                </p>
+            </div>
+            <div class="card">
+                {% if error_rows %}
+                <div class="table-wrap">
+                    <table class="list-table">
+                        <thead>
+                            <tr>
+                                {% for header in error_headers %}
+                                <th>{{ header }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in error_rows %}
+                            <tr>
+                                {% for header in error_headers %}
+                                <td>{{ row.get(header, '') }}</td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p>No error rows available.</p>
+                {% endif %}
+            </div>
+            <div class="card">
+                <div class="toolbar">
+                    {% if page > 1 %}
+                    <a class="btn btn-secondary" href="{{ url_for('school_admin_import_report', page=page-1, per_page=per_page) }}">Previous</a>
+                    {% endif %}
+                    <span>Rows {{ start_index }} - {{ end_index }} of {{ total_rows }}</span>
+                    {% if page < total_pages %}
+                    <a class="btn btn-secondary" href="{{ url_for('school_admin_import_report', page=page+1, per_page=per_page) }}">Next</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Something Went Wrong</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css') }}">
+    <style>
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: linear-gradient(135deg, #eef2f7, #e6edf6);
+            color: #0f172a;
+        }
+        .error-shell {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 18px;
+        }
+        .error-card {
+            width: min(720px, 92vw);
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+            padding: 32px 30px;
+        }
+        .error-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #fee2e2;
+            color: #991b1b;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 999px;
+            margin-bottom: 18px;
+            font-size: 0.9rem;
+        }
+        h1 {
+            margin: 0 0 10px;
+            font-size: 1.9rem;
+            color: #0f172a;
+        }
+        p {
+            margin: 8px 0;
+            line-height: 1.6;
+            color: #334155;
+        }
+        .ref-row {
+            margin-top: 16px;
+            padding: 12px 14px;
+            background: #f1f5f9;
+            border-radius: 12px;
+            font-family: "Consolas", "Courier New", monospace;
+            color: #0f172a;
+            font-size: 0.95rem;
+        }
+        .action-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 22px;
+        }
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: #1e3c72;
+            color: #fff;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            border: none;
+        }
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: #e2e8f0;
+            color: #0f172a;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .hint {
+            margin-top: 14px;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+        @media (max-width: 560px) {
+            .error-card {
+                padding: 26px 22px;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="error-shell">
+        <div class="error-card">
+            <div class="error-badge">Error 500</div>
+            <h1>We hit a problem while loading this page.</h1>
+            <p>Please try again in a moment. If this keeps happening, share the error reference with support.</p>
+            <div class="ref-row">
+                Reference: {{ error_uid or 'ERR-UNKNOWN' }}
+            </div>
+            <div class="action-row">
+                <a class="btn-primary" href="{{ back_url }}">Go Back</a>
+                <a class="btn-secondary" href="{{ url_for('report_issue') }}">Report Issue</a>
+                {% if role == 'super_admin' %}
+                <a class="btn-secondary" href="{{ url_for('super_admin_error_logs') }}">View Error Logs</a>
+                {% endif %}
+            </div>
+            <div class="hint">Tip: include your role, the page you were on, and the reference above.</div>
+        </div>
+    </div>
+</body>
+</html>
+

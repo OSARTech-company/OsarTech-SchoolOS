@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Use Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            margin: 0;
+            padding: 0;
+        }
+
+        .help-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .help-header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .help-header h1 {
+            font-size: 2.5rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .help-header p {
+            font-size: 1.2rem;
+            color: #7f8c8d;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .help-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .help-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+        }
+
+        .help-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .help-section h2 i {
+            color: #667eea;
+        }
+
+        .help-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .help-section li {
+            margin-bottom: 15px;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .help-section li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .help-section p {
+            color: #5a6c7d;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-content h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 1.1rem;
+        }
+
+        .step-content p {
+            margin: 0;
+            color: #5a6c7d;
+        }
+
+        .video-tutorial {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .video-tutorial h2 {
+            margin-bottom: 20px;
+            font-size: 2rem;
+        }
+
+        .video-tutorial p {
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+        }
+
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(67, 233, 123, 0.3);
+        }
+
+        .btn-back:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(67, 233, 123, 0.4);
+        }
+
+        .faq-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .faq-item {
+            border-bottom: 1px solid #e9ecef;
+            padding: 20px 0;
+        }
+
+        .faq-item:last-child {
+            border-bottom: none;
+        }
+
+        .faq-question {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .faq-answer {
+            color: #5a6c7d;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .help-container {
+                padding: 20px 15px;
+            }
+
+            .help-header h1 {
+                font-size: 2rem;
+            }
+
+            .help-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .help-section {
+                padding: 20px;
+            }
+
+            .video-tutorial {
+                padding: 30px 20px;
+            }
+
+            .video-tutorial h2 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="help-container">
+        <div class="help-header">
+            <h1><i class="fas fa-question-circle"></i> How to Use Student Score Management System</h1>
+            <p>Role-based guide for Super Admin, School Admin, Teacher, Student, and Parent usage in the current app version.</p>
+        </div>
+
+        <div class="video-tutorial">
+            <h2><i class="fas fa-route"></i> Quick Workflow</h2>
+            <p>Super Admin dashboard shows system overview only (analytics and quick actions).</p>
+            <p>Use <strong>Add School</strong> page to create schools and school-admin accounts.</p>
+            <p>Use <strong>View Schools</strong> page to update schools, update admin accounts, and toggle operations.</p>
+            <p>School Admin configures settings, subjects, teachers, and students.</p>
+            <p>Teacher enters or uploads scores, then submits class results for approval.</p>
+            <p>School Admin approves/rejects submission; students/parents view only approved published results.</p>
+        </div>
+
+        <div class="help-grid">
+            <div class="help-section">
+                <h2><i class="fas fa-crown"></i> Super Admin Tasks</h2>
+                <ul>
+                    <li><strong>Dashboard:</strong> View school-level usage summary and key system numbers.</li>
+                    <li><strong>Add School:</strong> Create school profile and school-admin login in one flow.</li>
+                    <li><strong>View Schools:</strong> Edit school profile, update admin account, and toggle school operations ON/OFF.</li>
+                    <li><strong>Reports:</strong> Review issue reports from schools and users.</li>
+                </ul>
+            </div>
+
+            <div class="help-section">
+                <h2><i class="fas fa-user-plus"></i> Access & Login</h2>
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div style="display: flex; align-items: flex-start;">
+                        <span class="step-number">1</span>
+                        <div class="step-content">
+                            <h3>Login Only</h3>
+                            <p>Users do not self-sign-up. Accounts are created by admin workflows in the app.</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: flex-start;">
+                        <span class="step-number">2</span>
+                        <div class="step-content">
+                            <h3>Use Role Dashboard</h3>
+                            <p>After login, each role sees only allowed pages and actions for that role.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="help-section" id="school-admin-handbook" tabindex="-1" style="scroll-margin-top: 24px;">
+                <h2><i class="fas fa-user-graduate"></i> School Admin Handbook</h2>
+                <p><strong>Role summary:</strong> The school admin manages one school tenant. They handle setup, people, academics, communication, monitoring, and recovery for that school.</p>
+                <h3>Can Do</h3>
+                <ul>
+                    <li>Manage students, teachers, parents, subjects, timetable, and school settings.</li>
+                    <li>Publish results, approve or reject submissions, and correct result records where allowed.</li>
+                    <li>Send messages to students and teachers.</li>
+                    <li>Review disputes, data requests, audits, analytics, and system health.</li>
+                    <li>Run backups, restore checks, and disaster recovery drills.</li>
+                    <li>Control school-specific operations and access state.</li>
+                </ul>
+                <h3>Cannot Do</h3>
+                <ul>
+                    <li>Manage other schools.</li>
+                    <li>Use super-admin-only global controls.</li>
+                    <li>Bypass access restrictions or locked-school states.</li>
+                    <li>Edit platform-wide settings for every tenant.</li>
+                </ul>
+                <h3>Main Menu Guide</h3>
+                <ul>
+                    <li><strong>Dashboard:</strong> School overview, alerts, and shortcuts.</li>
+                    <li><strong>Student:</strong> View Students, Add Students, Reset Requests, Subject Requests, Parent records, Parent Directory.</li>
+                    <li><strong>Teachers:</strong> Teacher List, Assign Teacher, Teacher Workload.</li>
+                    <li><strong>Academics:</strong> Publish Results, Class Subjects, CBT, Timetable, Term Programs, New Term Wizard, Promote Students.</li>
+                    <li><strong>Monitoring:</strong> Analytics, Data Integrity, Score Audit Log, Attendance Integrity, Attendance Summary, Timetable Coverage, Result Disputes, Reports, Promotion Audit.</li>
+                    <li><strong>Communication:</strong> Messages, SMS Health, SMS Logs.</li>
+                    <li><strong>System:</strong> School Settings, Bulk/Backup, Security Logs, Action Audit, System Health, Recovery Drill.</li>
+                    <li><strong>Support:</strong> Report Issue, Data Requests, Help, Change Password, Logout.</li>
+                </ul>
+                <h3>Recommended Setup Order</h3>
+                <ul>
+                    <li>Open School Profile and Academic Settings to confirm school details, term/year, and access state.</li>
+                    <li>Configure Class Subjects and Timetable.</li>
+                    <li>Add Teachers and assign class/subject roles.</li>
+                    <li>Add Students and confirm class placement.</li>
+                    <li>Test Messages and then review Analytics/Data Integrity.</li>
+                    <li>Take a Backup before major changes.</li>
+                </ul>
+            </div>
+
+            <div class="help-section">
+                <h2><i class="fas fa-chalkboard-teacher"></i> Teacher Tasks</h2>
+                <ul>
+                    <li><strong>Allocate Stream:</strong> For stream-based SS classes, assign stream before scoring.</li>
+                    <li><strong>Enter Scores:</strong> Use score page per student with strict max validation.</li>
+                    <li><strong>Upload CSV:</strong> Upload class score updates using in-app template only.</li>
+                    <li><strong>Submit for Approval:</strong> Class teacher submits only when all assigned subjects are complete.</li>
+                    <li><strong>Signature Required:</strong> Only class teacher submission for approval requires teacher signature.</li>
+                </ul>
+            </div>
+
+            <div class="help-section">
+                <h2><i class="fas fa-file-csv"></i> CSV Upload (Critical Rules)</h2>
+                <ul>
+                    <li><strong>Use Template First:</strong> Always download the in-app CSV template before editing.</li>
+                    <li><strong>Required Columns:</strong> <code>Student ID</code> and <code>Subject</code> must exist and must match existing student records.</li>
+                    <li><strong>Class Access Check:</strong> Teacher can upload only for classes currently assigned to that teacher.</li>
+                    <li><strong>Published Lock:</strong> If a class is already published for the current term/year, upload is blocked.</li>
+                    <li><strong>Exam Mode Strictness:</strong> Combined mode accepts only <code>Exam Score</code>. Separate mode accepts only <code>Objective</code> and <code>Theory</code>.</li>
+                    <li><strong>Score Validation:</strong> Every test/exam value is validated against school limits (no negative scores, no values above maximum).</li>
+                    <li><strong>Atomic Save:</strong> Upload is all-or-nothing. If one row fails, no row is saved.</li>
+                    <li><strong>Blank Value Behavior:</strong> If a score field is blank, the system keeps current value for that student/subject field.</li>
+                    <li><strong>Summary Screen:</strong> After upload, check processed rows, updated students, and exact failure reason.</li>
+                    <li><strong>Error Rows Download:</strong> On failure, use "Download Error Rows CSV" to fix and retry quickly.</li>
+                </ul>
+            </div>
+
+            <div class="help-section">
+                <h2><i class="fas fa-chart-bar"></i> Results & Visibility</h2>
+                <ul>
+                    <li><strong>Publish Gate:</strong> Students/parents can view only approved and published class results.</li>
+                    <li><strong>Approval Stage:</strong> Teacher submission is reviewed by school admin before publication.</li>
+                    <li><strong>Term Navigation:</strong> Student and admin views can switch among published terms.</li>
+                    <li><strong>Operations Toggle:</strong> School-wide operation switches affect visibility/editing behavior.</li>
+                    <li><strong>View Tracking:</strong> Published result views are counted for monitoring.</li>
+                </ul>
+            </div>
+
+            <div class="help-section">
+                <h2><i class="fas fa-trophy"></i> Ranking & Positions</h2>
+                <p>Ranking is automatic based on average marks and school configuration:</p>
+                <ul>
+                    <li>Class ranking supports SS stream-separated or together mode (as configured).</li>
+                    <li>Tie handling uses same-score position behavior.</li>
+                    <li>Per-subject positions are also calculated in published results.</li>
+                    <li>Any score edit requires re-publish before students can see updated result.</li>
+                </ul>
+            </div>
+
+            <div class="help-section">
+                <h2><i class="fas fa-bug"></i> Reporting Issues</h2>
+                <ul>
+                    <li>Use the "Report Issue" page to submit technical problems.</li>
+                    <li>Include role, page, action, and exact error message for faster fix.</li>
+                    <li>Super admin reviews reports from the in-app report viewer page.</li>
+                    <li>For CSV problems, attach the row details and validation message.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="faq-section">
+            <h2 style="text-align: center; margin-bottom: 30px;"><i class="fas fa-question-circle"></i> Frequently Asked Questions</h2>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    Who creates user accounts in this system?
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="faq-answer">
+                    Super admin creates schools and school-admin accounts. School admin creates teacher/student records through admin workflows.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    What score ranges are valid?
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="faq-answer">
+                    Test scores: 0 to school-configured test maximum per test<br>
+                    Objective and Theory: 0 to school-configured maximums<br>
+                    Combined exam mode uses a single exam score with school-configured maximum<br>
+                    The system will validate and prevent invalid score entries.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    How are grades calculated?
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="faq-answer">
+                    Grades are based on overall marks (tests + exams):<br>
+                    Grade bands and pass mark are configured by each school admin in School Settings.<br>
+                    The system applies those configured thresholds automatically.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    Why did my CSV upload fail on one row and nothing was saved?
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="faq-answer">
+                    CSV upload now uses atomic save for data integrity. This means one invalid row stops the upload and rolls back all pending changes. Fix the exact row shown in the upload summary and retry.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    Can students view results before teacher publishes?
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="faq-answer">
+                    No. Student portal reads only published snapshots. If teacher edits scores after publish, class must be published again.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    How do I reset a student's scores?
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="faq-answer">
+                    Go to "Enter Scores" for the student and submit new scores. The system will automatically update and recalculate grades.
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center;">
+            <a href="{{ back_url }}" class="btn-back">
+                <i class="fas fa-arrow-left"></i>
+                Back
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Simple FAQ toggle functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const helpFocusAnchor = {{ help_focus_anchor|tojson }};
+            const faqQuestions = document.querySelectorAll('.faq-question');
+
+            faqQuestions.forEach(question => {
+                question.addEventListener('click', function() {
+                    const answer = this.nextElementSibling;
+                    const icon = this.querySelector('i');
+
+                    if (answer.style.display === 'block') {
+                        answer.style.display = 'none';
+                        icon.style.transform = 'rotate(0deg)';
+                    } else {
+                        answer.style.display = 'block';
+                        icon.style.transform = 'rotate(180deg)';
+                    }
+                });
+            });
+
+            if (helpFocusAnchor) {
+                const target = document.getElementById(helpFocusAnchor);
+                if (target) {
+                    window.requestAnimationFrame(function() {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        if (typeof target.focus === 'function') {
+                            target.focus({ preventScroll: true });
+                        }
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
+

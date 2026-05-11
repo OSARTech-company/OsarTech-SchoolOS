@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reported Issues - Report Viewer</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #3a7bd5 100%);
+            --secondary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --accent-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --success-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            --danger-gradient: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            --text-primary: #2c3e50;
+            --text-secondary: #5a6c7d;
+            --text-light: #6c757d;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --shadow-light: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --shadow-medium: 0 8px 32px rgba(0, 0, 0, 0.12);
+            --shadow-heavy: 0 16px 48px rgba(0, 0, 0, 0.15);
+            --border-radius: 16px;
+            --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--primary-gradient);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.2) 0%, transparent 50%);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-radius: var(--border-radius);
+            padding: 50px 40px;
+            margin-bottom: 40px;
+            box-shadow: var(--shadow-heavy);
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .logo {
+            display: block;
+            margin: 0 auto 25px;
+            max-width: 160px;
+            height: auto;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+        }
+
+        .header h1 {
+            color: var(--text-primary);
+            margin-bottom: 15px;
+            font-size: clamp(2rem, 4vw, 2.8rem);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            font-weight: 400;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: var(--border-radius);
+            padding: 30px 25px;
+            text-align: center;
+            box-shadow: var(--shadow-medium);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            transition: var(--transition);
+            animation: statFadeIn 0.6s ease-out forwards;
+            opacity: 0;
+        }
+
+        .stat-card:nth-child(1) { animation-delay: 0.1s; }
+        .stat-card:nth-child(2) { animation-delay: 0.2s; }
+        .stat-card:nth-child(3) { animation-delay: 0.3s; }
+        .stat-card:nth-child(4) { animation-delay: 0.4s; }
+
+        .stat-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-heavy);
+        }
+
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 800;
+            background: var(--secondary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: block;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .reports-section {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-radius: var(--border-radius);
+            padding: 50px 40px;
+            box-shadow: var(--shadow-heavy);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .reports-section h2 {
+            color: var(--text-primary);
+            margin-bottom: 30px;
+            font-size: 2rem;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: -0.01em;
+        }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .toolbar form {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .toolbar input, .toolbar select {
+            padding: 10px 12px;
+            border: 1px solid #d0d7de;
+            border-radius: 8px;
+            min-width: 140px;
+        }
+        .btn-mini {
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #fff;
+            text-decoration: none;
+        }
+        .btn-blue { background: #2a5298; }
+        .btn-gray { background: #6c757d; }
+        .btn-red { background: #c0392b; }
+        .item-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .flash {
+            padding: 12px 14px;
+            border-radius: 10px;
+            margin-bottom: 14px;
+            font-weight: 600;
+        }
+        .flash.success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+        .flash.error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
+
+        .report-item {
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            padding: 25px 30px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .report-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--secondary-gradient);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .report-item:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-medium);
+            border-color: rgba(102, 126, 234, 0.2);
+        }
+
+        .report-item:hover::before {
+            opacity: 1;
+        }
+
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .report-user {
+            font-weight: 700;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .report-user i {
+            color: #667eea;
+        }
+
+        .report-timestamp {
+            color: var(--text-light);
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .report-timestamp i {
+            color: #adb5bd;
+        }
+
+        .report-description {
+            color: var(--text-secondary);
+            line-height: 1.7;
+            font-size: 1rem;
+        }
+        .report-meta {
+            margin-top: 10px;
+            display: grid;
+            gap: 6px;
+            color: #4b5563;
+            font-size: 0.95rem;
+        }
+        .report-meta span i {
+            margin-right: 6px;
+            color: #64748b;
+        }
+
+        .no-reports {
+            text-align: center;
+            color: var(--text-light);
+            font-style: italic;
+            padding: 80px 40px;
+            font-size: 1.2rem;
+        }
+
+        .no-reports i {
+            font-size: 3rem;
+            color: #dee2e6;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .logout-btn {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            background: var(--danger-gradient);
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            box-shadow: var(--shadow-medium);
+            transition: var(--transition);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .logout-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: var(--shadow-heavy);
+        }
+
+        .logout-btn i {
+            font-size: 1rem;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes statFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            .stats {
+                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                gap: 25px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 40px 30px;
+                margin-bottom: 30px;
+            }
+
+            .header h1 {
+                font-size: 2.2rem;
+            }
+
+            .reports-section {
+                padding: 40px 30px;
+            }
+
+            .reports-section h2 {
+                font-size: 1.6rem;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+                margin-bottom: 40px;
+            }
+
+            .stat-card {
+                padding: 25px 20px;
+            }
+
+            .stat-number {
+                font-size: 2.5rem;
+            }
+
+            .report-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .logout-btn {
+                top: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                font-size: 0.8rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px 15px;
+            }
+
+            .header {
+                padding: 30px 20px;
+            }
+
+            .logo {
+                max-width: 120px;
+                margin-bottom: 20px;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .stat-card {
+                padding: 20px 15px;
+            }
+
+            .stat-number {
+                font-size: 2rem;
+            }
+
+            .reports-section {
+                padding: 30px 20px;
+            }
+
+            .report-item {
+                padding: 20px 25px;
+            }
+        }
+
+        /* Accessibility */
+        .logout-btn:focus {
+            outline: 2px solid #e74c3c;
+            outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+    {% set active_page = 'reports' %}
+    {% include 'super/_super_admin_sidebar.html' %}
+    <div class="main-content">
+    <a href="{{ url_for('super_admin_dashboard') }}" class="logout-btn">
+        <i class="fas fa-arrow-left"></i> Back to Super Admin Page
+    </a>
+
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-clipboard-list"></i> Reported Issues</h1>
+            <p>View and manage all reported issues from the Student Score Management System</p>
+        </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="stats">
+            <div class="stat-card">
+                <span class="stat-number">{{ total_rows or 0 }}</span>
+                <span class="stat-label">Total Reports</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number">{{ reports|selectattr('status', 'equalto', 'unread')|list|length }}</span>
+                <span class="stat-label">Unread (This Page)</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number">{{ reports|selectattr('status', 'equalto', 'read')|list|length }}</span>
+                <span class="stat-label">Read (This Page)</span>
+            </div>
+        </div>
+
+        <div class="reports-section">
+            <h2><i class="fas fa-list"></i> All Reports</h2>
+            <div class="toolbar">
+                <form method="GET" action="{{ url_for('view_reports') }}">
+                    <select name="status">
+                        <option value="" {% if not status_filter %}selected{% endif %}>All Status</option>
+                        <option value="unread" {% if status_filter == 'unread' %}selected{% endif %}>Unread</option>
+                        <option value="read" {% if status_filter == 'read' %}selected{% endif %}>Read</option>
+                    </select>
+                    <input type="text" name="user" value="{{ user_filter or '' }}" placeholder="Filter by user id">
+                    <input type="text" name="q" value="{{ text_filter or '' }}" placeholder="Search description">
+                    <select name="per_page">
+                        {% for opt in [20, 40, 80, 120, 200] %}
+                        <option value="{{ opt }}" {% if per_page == opt %}selected{% endif %}>{{ opt }} rows</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn-mini btn-blue">Apply</button>
+                    <a href="{{ url_for('view_reports') }}" class="btn-mini btn-gray">Reset</a>
+                </form>
+                <form method="POST" action="{{ url_for('view_reports_mark_all_read') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn-mini btn-blue">Mark All Read</button>
+                </form>
+            </div>
+            {% if reports %}
+                {% for report in reports %}
+                <div class="report-item">
+                    <div class="report-header">
+                        <span class="report-user">
+                            <i class="fas fa-user"></i> {{ report.user_id }}
+                        </span>
+                        <span class="report-timestamp">
+                            <i class="fas fa-clock"></i> {{ report.timestamp }}
+                        </span>
+                    </div>
+                    <div class="report-description">
+                        {{ report.description }}
+                    </div>
+                    <div class="report-meta">
+                        <span><i class="fas fa-user-tag"></i> Role: {{ report.reporter_role or 'Unknown' }}</span>
+                        <span><i class="fas fa-school"></i> School: {{ report.reporter_school_name or report.reporter_school_id or 'N/A' }}</span>
+                        <span><i class="fas fa-location-arrow"></i> Reported from: {{ report.source_page or 'N/A' }}</span>
+                    </div>
+                    <div class="item-actions">
+                        {% if report.status != 'read' %}
+                        <form method="POST" action="{{ url_for('view_reports_mark_read') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="report_id" value="{{ report.id }}">
+                            <button type="submit" class="btn-mini btn-blue">Mark Read</button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="{{ url_for('view_reports_mark_unread') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="report_id" value="{{ report.id }}">
+                            <button type="submit" class="btn-mini btn-gray">Mark Unread</button>
+                        </form>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('view_reports_delete') }}" onsubmit="return confirm('Delete this report?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="report_id" value="{{ report.id }}">
+                            <button type="submit" class="btn-mini btn-red">Delete</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="no-reports">
+                    <i class="fas fa-inbox"></i>
+                    <p>No reports have been submitted yet.</p>
+                </div>
+            {% endif %}
+            {% if total_pages > 1 %}
+            <div class="toolbar" style="justify-content:center; margin-top: 14px;">
+                {% if page > 1 %}
+                <a class="btn-mini btn-gray" href="{{ url_for('view_reports', status=status_filter, user=user_filter, q=text_filter, per_page=per_page, page=page-1) }}">Previous</a>
+                {% endif %}
+                <span style="font-weight:700; color:#334155;">Page {{ page }} / {{ total_pages }}</span>
+                {% if page < total_pages %}
+                <a class="btn-mini btn-gray" href="{{ url_for('view_reports', status=status_filter, user=user_filter, q=text_filter, per_page=per_page, page=page+1) }}">Next</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+
+
+

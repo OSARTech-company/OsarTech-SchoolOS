@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Behaviour Assessment - {{ classname }}</title>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    .behaviour-layout { display: grid; gap: 18px; }
+    .behaviour-hero { display: grid; gap: 18px; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); }
+    .behaviour-panel { border: 1px solid #d8e3ef; border-radius: 16px; padding: 18px; background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); }
+    .behaviour-panel h2 { margin: 0 0 10px; font-size: 1.08rem; color: #16324f; }
+    .behaviour-panel p { margin: 0; color: #526377; }
+    .scale-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; background: #e0f2fe; color: #0f4c81; font-weight: 700; margin: 12px 0 16px; }
+    .legend-grid { display: grid; gap: 10px; }
+    .legend-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; align-items: center; padding: 12px; border-radius: 12px; background: #fff; border: 1px solid #dbe7f3; }
+    .legend-code { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; border-radius: 12px; background: #0f4c81; color: #fff; font-size: 1.1rem; font-weight: 800; }
+    .legend-meaning strong { display: block; color: #16324f; margin-bottom: 4px; }
+    .table-card-head { display: flex; justify-content: space-between; align-items: start; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+    .table-card-head p { max-width: 760px; }
+    .behaviour-table th, .behaviour-table td { vertical-align: middle; }
+    .behaviour-table select { width: 100%; min-width: 96px; }
+    .student-cell strong { color: #102a43; }
+    .student-cell small { color: #64748b; }
+    @media (max-width: 900px) {
+      .behaviour-hero { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  {% include "shared/_loading_overlay.html" %}
+  <div class="app-shell topbar-layout">
+    {% set active_page = 'behaviour' %}
+    {% include 'teacher/_teacher_sidebar.html' %}
+    <div class="main-content">
+      <div class="container">
+        <div class="header">
+          <h1><i class="fas fa-user-check"></i> Behaviour Assessment</h1>
+          <p class="meta-line">
+            <strong>Class:</strong> {{ classname }} |
+            <strong>Term:</strong> {{ current_term }} ({{ current_year or '-' }})
+          </p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <div class="behaviour-layout">
+          <div class="behaviour-hero">
+            <div class="behaviour-panel">
+              <h2><i class="fas fa-award"></i> Grades And Meaning</h2>
+              <p>Use the school's configured grading scale for every trait before saving the class assessment.</p>
+              <div class="scale-badge">
+                <i class="fas fa-sliders-h"></i>
+                {{ behaviour_grade_mode_option.title }}: {{ behaviour_grade_mode_option.label }}
+              </div>
+              <div class="legend-grid">
+                {% for code, label in grade_scale.items() %}
+                <div class="legend-row">
+                  <div class="legend-code">{{ code }}</div>
+                  <div class="legend-meaning">
+                    <strong>{{ label }}</strong>
+                    <span>{{ code }} means {{ label|lower }} for the selected behaviour trait.</span>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="behaviour-panel">
+              <h2><i class="fas fa-list-check"></i> Traits And Grading</h2>
+              <p>Each student must have a grade for every trait. The assessment uses the same scale that appears on published result sheets.</p>
+              <div class="scale-badge" style="background:#ecfeff; color:#155e75;">
+                <i class="fas fa-circle-info"></i>
+                School admin can change this scale in Result Settings.
+              </div>
+              <p>
+                <strong>Traits covered:</strong>
+                {{ traits|join(', ') }}
+              </p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="table-card-head">
+              <div>
+                <h2 style="margin:0 0 8px;"><i class="fas fa-table"></i> Trait Grading Sheet</h2>
+                <p>Assign a grade across all behaviour traits for each student in {{ classname }}.</p>
+              </div>
+            </div>
+            <form method="post" action="{{ url_for('teacher_behaviour_assessment', classname=classname) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="table-wrap">
+                <table class="behaviour-table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      {% for trait in traits %}
+                      <th>{{ trait }}</th>
+                      {% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in student_rows %}
+                    <tr>
+                      <td class="student-cell">
+                        <strong>{{ row.firstname }}</strong><br>
+                        <small>{{ row.student_id }}{% if row.stream %} ({{ row.stream }}){% endif %}</small>
+                      </td>
+                      {% for trait in traits %}
+                      {% set value = row.assessment.get(trait, '') %}
+                      <td>
+                        <select name="{{ row.student_id }}__{{ trait }}" required>
+                          <option value="">Select</option>
+                          {% for code, label in grade_scale.items() %}
+                          <option value="{{ code }}" {% if value == code %}selected{% endif %}>{{ code }} - {{ label }}</option>
+                          {% endfor %}
+                        </select>
+                      </td>
+                      {% endfor %}
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              <div class="mt-12">
+                <button type="submit" class="btn btn-primary">Save Behaviour Assessment</button>
+                <a href="{{ url_for('teacher_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>

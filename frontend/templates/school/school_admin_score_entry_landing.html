@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Admin Score Entry</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(59, 130, 246, 0.10), transparent 28%),
+                linear-gradient(180deg, #eef4ff 0%, #f8fbff 100%);
+        }
+        .container {
+            width: min(1220px, 100%);
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .score-entry-shell {
+            display: grid;
+            gap: 18px;
+        }
+        .page-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            padding: 28px;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 34%),
+                linear-gradient(135deg, #143a63 0%, #1f5f8b 58%, #27827b 100%);
+            color: #fff;
+            box-shadow: 0 22px 44px rgba(15, 76, 129, 0.22);
+        }
+        .page-hero::after {
+            content: "";
+            position: absolute;
+            right: -70px;
+            bottom: -90px;
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+        }
+        .hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.45fr) minmax(240px, 0.8fr);
+            gap: 20px;
+            align-items: end;
+        }
+        .hero-topline {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            font-size: 0.82rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .hero-title {
+            margin: 14px 0 0;
+            font-size: clamp(1.9rem, 4vw, 2.7rem);
+            line-height: 1.08;
+        }
+        .hero-text {
+            margin: 12px 0 0;
+            max-width: 680px;
+            color: rgba(255,255,255,0.88);
+            line-height: 1.6;
+        }
+        .hero-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 18px;
+        }
+        .hero-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            color: #fff;
+            font-weight: 600;
+        }
+        .summary-card {
+            border-radius: 18px;
+            padding: 18px;
+            background: rgba(255,255,255,0.13);
+            border: 1px solid rgba(255,255,255,0.16);
+            backdrop-filter: blur(6px);
+        }
+        .summary-card .label {
+            display: block;
+            font-size: 0.76rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.72);
+            margin-bottom: 8px;
+        }
+        .summary-card .value {
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1.05;
+        }
+        .summary-card .meta {
+            margin-top: 8px;
+            color: rgba(255,255,255,0.86);
+        }
+        .card {
+            border: 1px solid #dbe7f3;
+            border-radius: 22px;
+            padding: 22px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+        }
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            align-items: end;
+        }
+        .class-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+        }
+        .class-card {
+            display: block;
+            text-decoration: none;
+            border: 1px solid #dbe7f3;
+            border-radius: 18px;
+            padding: 18px;
+            background: #fff;
+            color: #163a5a;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+        .class-card:hover {
+            transform: translateY(-3px);
+            border-color: #8fb7e8;
+            box-shadow: 0 16px 28px rgba(15, 23, 42, 0.08);
+        }
+        .class-card.active {
+            background: linear-gradient(135deg, #eaf3ff 0%, #f8fbff 100%);
+            border-color: #4a89d8;
+        }
+        .class-card .name {
+            font-size: 1.05rem;
+            font-weight: 800;
+        }
+        .class-card .meta {
+            margin-top: 8px;
+            color: #607086;
+        }
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .section-head h2 {
+            margin: 0;
+            color: #163a5a;
+            font-size: 1.2rem;
+        }
+        .student-table-wrap {
+            overflow-x: auto;
+            border: 1px solid #dbe7f3;
+            border-radius: 16px;
+        }
+        table {
+            width: 100%;
+            min-width: 760px;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #e5edf6;
+            text-align: left;
+        }
+        thead th {
+            background: #eff6ff;
+            color: #1d3f65;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .student-name {
+            font-weight: 700;
+            color: #163a5a;
+        }
+        .muted {
+            color: #64748b;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 34px 18px;
+            border: 1px dashed #c6d7ea;
+            border-radius: 18px;
+            background: #fbfdff;
+            color: #5f6f83;
+        }
+        @media (max-width: 900px) {
+            .hero-grid,
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (max-width: 640px) {
+            .container {
+                padding: 16px;
+            }
+            .page-hero {
+                padding: 22px 18px;
+                border-radius: 18px;
+            }
+            .hero-chip {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'score_entry' %}
+        {% include 'school/_school_admin_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="score-entry-shell">
+                    <section class="page-hero">
+                        <div class="hero-grid">
+                            <div>
+                                <span class="hero-topline"><i class="fas fa-pen-to-square"></i> School Admin Score Entry</span>
+                                <h1 class="hero-title">Pick a class, open a student, and enter scores without leaving the admin flow.</h1>
+                                <p class="hero-text">This page gives school admin a dedicated starting point for score entry in Simple Mode, so you no longer need to begin from the general student directory.</p>
+                                <div class="hero-chip-row">
+                                    <span class="hero-chip"><i class="fas fa-calendar-alt"></i> {{ selected_term or current_term }}</span>
+                                    <span class="hero-chip"><i class="fas fa-users"></i> {{ total_students }} Student{{ '' if total_students == 1 else 's' }}</span>
+                                    <span class="hero-chip"><i class="fas fa-layer-group"></i> {{ available_classes|length }} Class{{ '' if available_classes|length == 1 else 'es' }}</span>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <span class="label">Current Selection</span>
+                                <div class="value">{{ selected_class or 'All Classes' }}</div>
+                                <div class="meta">Choose a class below, then open a student to start score entry.</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <div class="section-head">
+                            <h2><i class="fas fa-filter"></i> Score Entry Filters</h2>
+                        </div>
+                        <form method="get" class="filter-grid">
+                            <div class="form-group">
+                                <label for="score_entry_class">Class</label>
+                                <select id="score_entry_class" name="class">
+                                    <option value="">All Classes</option>
+                                    {% for classname in available_classes %}
+                                    <option value="{{ classname }}" {% if selected_class == classname %}selected{% endif %}>{{ classname }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="score_entry_term">Term</label>
+                                <select id="score_entry_term" name="term">
+                                    {% for term_name in available_terms %}
+                                    <option value="{{ term_name }}" {% if selected_term == term_name %}selected{% endif %}>{{ term_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-sliders-h"></i> Apply Filters</button>
+                                <a href="{{ url_for('school_admin_score_entry') }}" class="btn btn-secondary" style="margin-left:10px;">Reset</a>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section class="card">
+                        <div class="section-head">
+                            <h2><i class="fas fa-school"></i> Pick A Class</h2>
+                        </div>
+                        <div class="class-grid">
+                            {% for item in class_cards %}
+                            <a href="{{ url_for('school_admin_score_entry', class=item.classname, term=selected_term or current_term) }}" class="class-card {% if item.is_selected %}active{% endif %}">
+                                <div class="name">{{ item.classname }}</div>
+                                <div class="meta">{{ item.count }} student{{ '' if item.count == 1 else 's' }}</div>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <div class="section-head">
+                            <h2><i class="fas fa-user-graduate"></i> Students Ready For Score Entry</h2>
+                            <div class="muted">{{ total_students }} student{{ '' if total_students == 1 else 's' }} shown</div>
+                        </div>
+                        {% if student_rows %}
+                        <div class="student-table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Student ID</th>
+                                        <th>Class</th>
+                                        <th>Term</th>
+                                        <th>Subjects</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in student_rows %}
+                                    <tr>
+                                        <td>
+                                            <div class="student-name">{{ row.fullname }}</div>
+                                            <div class="muted">{{ row.stream or 'No stream' }}</div>
+                                        </td>
+                                        <td>{{ row.student_id }}</td>
+                                        <td>{{ row.classname }}</td>
+                                        <td>{{ row.term or '-' }}</td>
+                                        <td>{{ row.subjects_count }}</td>
+                                        <td>
+                                            <a href="{{ url_for('teacher_enter_scores', student_id=row.student_id) }}" class="btn btn-primary btn-xs">
+                                                <i class="fas fa-pen"></i> Enter Scores
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="empty-state">
+                            <p>No students matched the current class and term filters.</p>
+                            <p>Try another class or reset the filters.</p>
+                        </div>
+                        {% endif %}
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+</body>
+</html>

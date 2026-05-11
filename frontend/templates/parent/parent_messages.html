@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Messages - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(1100px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.85rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .messages-shell { display: grid; gap: 18px; }
+        .page-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 22px;
+            padding: 26px;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 32%),
+                linear-gradient(135deg, #0f4c81 0%, #1f7a8c 58%, #2d8a7d 100%);
+            color: #fff;
+            box-shadow: 0 20px 40px rgba(15, 76, 129, 0.22);
+        }
+        .page-hero::after {
+            content: "";
+            position: absolute;
+            inset: auto -60px -80px auto;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+        }
+        .hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(220px, 0.8fr);
+            gap: 18px;
+            align-items: end;
+        }
+        .hero-topline {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            font-size: 0.82rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .hero-title { margin: 14px 0 0; font-size: clamp(1.8rem, 3.8vw, 2.6rem); line-height: 1.08; }
+        .hero-text { margin: 12px 0 0; color: rgba(255,255,255,0.88); line-height: 1.6; max-width: 680px; }
+        .summary-card {
+            border-radius: 18px;
+            padding: 16px;
+            background: rgba(255,255,255,0.13);
+            border: 1px solid rgba(255,255,255,0.16);
+            backdrop-filter: blur(6px);
+        }
+        .summary-card .label {
+            display: block;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.72);
+            margin-bottom: 6px;
+        }
+        .summary-card .value { font-size: 1.8rem; font-weight: 800; line-height: 1.1; }
+        .summary-card .meta { margin-top: 6px; color: rgba(255,255,255,0.84); }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .stat-card {
+            border: 1px solid #dbe7f3;
+            border-radius: 18px;
+            padding: 18px;
+            background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+        }
+        .stat-card .label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.76rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+        .stat-card .value {
+            font-size: 1.7rem;
+            font-weight: 800;
+            color: #14365e;
+            line-height: 1.1;
+        }
+        .stat-card .meta {
+            margin-top: 6px;
+            color: #5d6b7d;
+            font-size: 0.92rem;
+        }
+        .message-list-card {
+            border: 1px solid #dbe7f3;
+            border-radius: 20px;
+            padding: 22px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+        }
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .section-head h3 { margin: 0; color: #12314d; }
+        .parent-message-card { border: 1px solid #dbe4ef; border-radius: 16px; padding: 16px; background: #f8fbff; margin-bottom: 12px; box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04); }
+        .parent-message-card.is-unread { border-left: 4px solid #0F4C81; background: #eef6ff; }
+        .parent-message-card h4 { margin: 0 0 6px; font-size: 1rem; color: #1e3a5f; }
+        .parent-message-meta { color: #5b6475; font-size: 0.86rem; margin-bottom: 8px; line-height: 1.5; }
+        .parent-message-actions { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        @media (max-width: 900px) {
+            .hero-grid { grid-template-columns: 1fr; }
+            .stat-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 640px) {
+            .container { padding: 16px; }
+            .page-hero { padding: 22px 18px; border-radius: 18px; }
+        }
+    </style>
+</head>
+<body style="--accent: {{ parent_theme_accent if parent_theme_accent else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'messages' %}
+        {% include 'parent/_parent_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-bell"></i> Messages</h1>
+                    <a href="{{ url_for('parent_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="messages-shell">
+                <section class="page-hero">
+                    <div class="hero-grid">
+                        <div>
+                            <span class="hero-topline"><i class="fas fa-bell"></i> Parent Messages</span>
+                            <h2 class="hero-title">Stay informed about notices, deadlines, and updates from your child’s school.</h2>
+                            <p class="hero-text">This page keeps school communication in one stream, including targeted messages, attachments, and unread notices that still need your attention.</p>
+                        </div>
+                        <div class="summary-card">
+                            <span class="label">Unread Messages</span>
+                            <div class="value">{{ unread_parent_messages or 0 }}</div>
+                            <div class="meta">Notifications that still need review</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="stat-grid">
+                    <div class="stat-card">
+                        <span class="label">Total Messages</span>
+                        <div class="value">{{ parent_messages|length if parent_messages else 0 }}</div>
+                        <div class="meta">Notifications available in your inbox</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">Unread</span>
+                        <div class="value">{{ unread_parent_messages or 0 }}</div>
+                        <div class="meta">Messages that still need attention</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">Attachments</span>
+                        <div class="value">{{ parent_messages|selectattr('attachment_url')|list|length if parent_messages else 0 }}</div>
+                        <div class="meta">Messages that include files or images</div>
+                    </div>
+                </section>
+
+                <div class="message-list-card" id="parent-messages-card">
+                    <div class="section-head">
+                    <h3 class="no-margin"><i class="fas fa-bell"></i> School Notifications</h3>
+                    {% if unread_parent_messages %}
+                    <div class="parent-message-actions">
+                        <span class="chip chip-warning">Unread: {{ unread_parent_messages }}</span>
+                        <form method="post" action="{{ url_for('parent_mark_all_messages_read') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-primary btn-xs">
+                                <i class="fas fa-check-double"></i> Mark All Read
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                    </div>
+                    {% if parent_messages %}
+                        {% for msg in parent_messages %}
+                        <div class="parent-message-card {% if not msg.is_read %}is-unread{% endif %}">
+                            <h4>{{ msg.title }}</h4>
+                            <div class="parent-message-meta">
+                                School: {{ msg.school_name }}
+                                |
+                                Target:
+                                {% if msg.target_classname and msg.target_stream %}
+                                    {{ msg.target_classname }} - {{ msg.target_stream }}
+                                {% elif msg.target_classname %}
+                                    {{ msg.target_classname }} (all streams)
+                                {% else %}
+                                    All students/parents
+                                {% endif %}
+                                | Deadline: {{ msg.deadline_date if msg.deadline_date else 'None' }}
+                                {% if msg.is_expired %}
+                                    | <span class="chip chip-danger">Expired</span>
+                                {% elif msg.is_due_soon %}
+                                    | <span class="chip chip-warning">Due Soon</span>
+                                {% endif %}
+                                {% if msg.is_read %}
+                                    | <span class="chip chip-success">Read</span>
+                                {% else %}
+                                    | <span class="chip chip-warning">Unread</span>
+                                {% endif %}
+                                | Sent: {{ msg.created_at }}
+                            </div>
+                            <div>{{ msg.message }}</div>
+                            {% if msg.attachment_url %}
+                            <div class="mt-10">
+                                {% if msg.attachment_mime and msg.attachment_mime.startswith('image/') %}
+                                <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">
+                                    <i class="fas fa-image"></i> Open Attached Image
+                                </a>
+                                <div class="mt-10">
+                                    <img src="{{ msg.attachment_url }}" alt="Attachment" style="max-width:100%; max-height:260px; border-radius:10px; border:1px solid #dbe4ef;">
+                                </div>
+                                {% else %}
+                                <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">
+                                    <i class="fas fa-file"></i> Download Attachment
+                                </a>
+                                {% if msg.attachment_name %}
+                                <p class="note mt-10">File: {{ msg.attachment_name }}</p>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            {% if not msg.is_read %}
+                            <div class="parent-message-actions">
+                                <form method="post" action="{{ url_for('parent_mark_message_read') }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="school_id" value="{{ msg.school_id }}">
+                                    <input type="hidden" name="message_id" value="{{ msg.id }}">
+                                    <button type="submit" class="btn btn-primary btn-xs">
+                                        <i class="fas fa-check"></i> Mark as Read
+                                    </button>
+                                </form>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <p class="muted mt-10">No notifications yet.</p>
+                    {% endif %}
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+
+

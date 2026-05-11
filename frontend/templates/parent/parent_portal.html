@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Portal</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260309a') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --portal-bg: #f3f6fa;
+            --portal-card: #ffffff;
+            --portal-line: #d8e0ea;
+            --portal-text: #0f172a;
+            --portal-muted: #5b6475;
+            --portal-brand: #0f4c81;
+            --portal-brand-2: #1f7a8c;
+        }
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--portal-text);
+            background:
+                radial-gradient(circle at 8% 10%, rgba(31, 122, 140, 0.08), transparent 34%),
+                radial-gradient(circle at 90% 2%, rgba(15, 76, 129, 0.08), transparent 30%),
+                var(--portal-bg);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 14px;
+        }
+        .container {
+            width: min(880px, 100%);
+            margin: 0;
+            padding: 0;
+        }
+        .portal-shell {
+            display: grid;
+            grid-template-columns: minmax(260px, 0.88fr) minmax(340px, 1.12fr);
+            border-radius: 28px;
+            overflow: hidden;
+            border: 1px solid var(--portal-line);
+            background: var(--portal-card);
+            box-shadow: 0 24px 50px rgba(15, 23, 42, 0.13);
+        }
+        .portal-info {
+            position: relative;
+            overflow: hidden;
+            padding: clamp(24px, 3vw, 34px);
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 34%),
+                linear-gradient(165deg, #0f4c81 0%, #1f7a8c 100%);
+            color: #eff6ff;
+            display: grid;
+            align-content: center;
+            gap: 14px;
+        }
+        .portal-info::after {
+            content: "";
+            position: absolute;
+            right: -70px;
+            bottom: -90px;
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+        }
+        .portal-brand {
+            position: relative;
+            z-index: 1;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            font-size: 1.05rem;
+        }
+        .portal-brand .logo {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+            border-radius: 14px;
+            background: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.55);
+            padding: 6px;
+        }
+        .portal-info h1 {
+            position: relative;
+            z-index: 1;
+            margin: 6px 0 0;
+            line-height: 1.2;
+            font-size: clamp(1.55rem, 2.4vw, 2rem);
+        }
+        .portal-info p {
+            position: relative;
+            z-index: 1;
+            margin: 0;
+            color: rgba(239, 246, 255, 0.88);
+            font-size: 0.95rem;
+        }
+        .portal-pill-row {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .portal-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.86rem;
+        }
+        .portal-info ul {
+            position: relative;
+            z-index: 1;
+            margin: 4px 0 0;
+            padding-left: 18px;
+            display: grid;
+            gap: 6px;
+            font-size: 0.9rem;
+        }
+        .card {
+            background: #fff;
+            padding: clamp(22px, 3vw, 34px);
+        }
+        .portal-title {
+            margin: 0 0 10px;
+            font-size: clamp(1.35rem, 2.6vw, 1.7rem);
+            line-height: 1.25;
+            color: var(--portal-text);
+        }
+        .portal-subtitle {
+            margin: 0 0 16px;
+            color: var(--portal-muted);
+            font-size: 0.95rem;
+        }
+        .portal-note-card {
+            margin: 0 0 18px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid #dbe7f3;
+            background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+        }
+        .portal-note-card strong {
+            color: var(--portal-brand);
+        }
+        .flash {
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 14px;
+            word-break: break-word;
+        }
+        .flash.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+        .input {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            margin-top: 6px;
+            margin-bottom: 12px;
+            font-size: 16px;
+            line-height: 1.25;
+            background: #fff;
+        }
+        .input:focus {
+            border-color: var(--portal-brand);
+            box-shadow: 0 0 0 3px rgba(31, 122, 140, 0.15);
+            outline: none;
+        }
+        .portal-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+        .btn {
+            background: linear-gradient(140deg, var(--portal-brand) 0%, var(--portal-brand-2) 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 11px 16px;
+            cursor: pointer;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn:hover {
+            filter: brightness(1.03);
+            transform: translateY(-1px);
+        }
+        .btn.btn-secondary {
+            background: #fff;
+            color: var(--portal-brand);
+            border: 1px solid #b7c7dc;
+        }
+        @media (max-width: 640px) {
+            body {
+                align-items: flex-start;
+                padding: 14px 10px;
+            }
+            .portal-shell {
+                grid-template-columns: 1fr;
+            }
+            .portal-info {
+                border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            }
+            .portal-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .portal-actions .btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <div class="portal-shell">
+            <aside class="portal-info">
+                <div class="portal-brand">
+                    <img class="logo" src="{{ url_for('static', filename='img/osartech-logo.png', v='20260411b') }}" alt="Osartech">
+                    <span>OSARTECH</span>
+                </div>
+                <h1>Parent Access Portal</h1>
+                <p>Secure sign-in for parents to monitor student progress and school updates.</p>
+                <div class="portal-pill-row">
+                    <span class="portal-pill"><i class="fas fa-chart-line"></i> Results</span>
+                    <span class="portal-pill"><i class="fas fa-bell"></i> Alerts</span>
+                    <span class="portal-pill"><i class="fas fa-calendar-week"></i> Timetable</span>
+                </div>
+                <ul>
+                    <li>View results per child</li>
+                    <li>Check timetable and attendance</li>
+                    <li>Receive school notifications</li>
+                </ul>
+            </aside>
+            <section class="card">
+                <h2 class="portal-title"><i class="fas fa-users"></i> Parent Portal Login</h2>
+                <p class="portal-subtitle">Login with parent phone and password. If multiple children are linked, you can access each child separately from your dashboard.</p>
+                <div class="portal-note-card">
+                    <strong>Use the parent phone number</strong> already linked to your child's school record. After login, you can open each child's results, timetable, attendance, and school messages from one dashboard.
+                </div>
+                <form method="post" action="{{ url_for('parent_portal') }}">
+                    <div class="form-grid">
+                        <label for="parent_phone">Parent Phone</label>
+                        <input class="input" id="parent_phone" name="parent_phone" type="text" autocomplete="username" required>
+                        <label for="password">Password</label>
+                        <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
+                    </div>
+                    <div class="portal-actions">
+                        <button class="btn" type="submit"><i class="fas fa-sign-in-alt"></i> Login</button>
+                        <a class="btn btn-secondary" href="{{ url_for('login') }}">Back to Main Login</a>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </div>
+</body>
+</html>
+
+
+

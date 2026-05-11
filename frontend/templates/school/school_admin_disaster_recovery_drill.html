@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recovery Drill</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app-assistant.css') }}">
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+        {% include 'school/_school_admin_sidebar.html' %}
+        <main class="main-content">
+            <div class="container">
+            <section class="panel">
+                <h1>Disaster Recovery Drill</h1>
+                <p class="text-muted">Run a safe backup/read-validate drill to confirm data recovery readiness.</p>
+            </section>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <section class="panel">
+                    {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </section>
+            {% endif %}
+            {% endwith %}
+
+            <section class="panel">
+                <h3>Backup Health</h3>
+                <p><strong>Last Backup:</strong> {{ backup_schedule.last_backup_at if backup_schedule else 'Not recorded' }}</p>
+                <p><strong>Next Due:</strong> {{ backup_schedule.next_due_at if backup_schedule and backup_schedule.next_due_at else 'Not scheduled' }}</p>
+                <p><strong>Frequency:</strong> Every {{ backup_schedule.frequency_days if backup_schedule else 7 }} day(s)</p>
+                {% if backup_health and backup_health.is_overdue %}
+                <div class="flash-message warning">Backup is overdue. Run backup now.</div>
+                {% endif %}
+            </section>
+
+            <section class="panel">
+                <form method="post" action="{{ url_for('school_admin_disaster_recovery_drill') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-primary">Run Drill Now</button>
+                </form>
+            </section>
+
+            <section class="panel">
+                <h3>Backup / Restore Actions</h3>
+                <div class="actions-row" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+                    <a class="btn btn-secondary" href="{{ url_for('school_admin_backup', return_to='recovery_drill') }}">Download Full JSON Backup</a>
+                    <form method="post" action="{{ url_for('school_admin_backup_snapshot') }}" style="display:inline-flex; gap:8px; align-items:center;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="return_to" value="recovery_drill">
+                        <button type="submit" class="btn btn-secondary">Create Manual Snapshot</button>
+                    </form>
+                </div>
+                <form method="post" action="{{ url_for('school_admin_backup_encrypted') }}" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="return_to" value="recovery_drill">
+                    <input type="password" name="backup_passphrase" placeholder="Backup passphrase (min 8 chars)" minlength="8" required>
+                    <button class="btn btn-secondary" type="submit">Download Encrypted Backup</button>
+                </form>
+                <form method="post" action="{{ url_for('school_admin_restore') }}" enctype="multipart/form-data" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="return_to" value="recovery_drill">
+                    <input type="file" name="backup_file" accept=".json,application/json" required>
+                    <input type="password" name="backup_passphrase" placeholder="Passphrase (encrypted backup only)">
+                    <select name="mode">
+                        <option value="merge">Restore Mode: Merge</option>
+                        <option value="replace">Restore Mode: Replace</option>
+                    </select>
+                    <label style="display:inline-flex; gap:6px; align-items:center;">
+                        <input type="checkbox" name="dry_run" value="1" checked>
+                        Dry run only
+                    </label>
+                    <button class="btn btn-danger" type="submit">Run Restore</button>
+                </form>
+            </section>
+
+            {% if result %}
+            <section class="panel">
+                <h3>Latest Drill Result</h3>
+                <p><strong>Status:</strong> {{ 'Passed' if result.ok else 'Failed / Warning' }}</p>
+                <p><strong>Checked At:</strong> {{ result.checked_at or '-' }}</p>
+                <p><strong>Duration:</strong> {{ result.duration_ms or 0 }} ms</p>
+                <p><strong>Backup Size:</strong> {{ '%.2f'|format((result.backup_size_bytes or 0) / 1048576) }} MB</p>
+                {% if result.missing_sections %}
+                <p><strong>Missing Sections:</strong> {{ result.missing_sections | join(', ') }}</p>
+                {% endif %}
+                {% if result.error %}
+                <p><strong>Error:</strong> {{ result.error }}</p>
+                {% endif %}
+            </section>
+            {% endif %}
+
+            <section class="panel">
+                <h3>Recent Drill History</h3>
+                {% if recent_drills %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <th>Duration (ms)</th>
+                            <th>Backup Size (MB)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in recent_drills %}
+                        <tr>
+                            <td>{{ row.created_at }}</td>
+                            <td>{{ 'Passed' if row.ok else 'Failed / Warning' }}</td>
+                            <td>{{ row.duration_ms }}</td>
+                            <td>{{ '%.2f'|format((row.backup_size_bytes or 0) / 1048576) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p>No drill history yet.</p>
+                {% endif %}
+            </section>
+
+            <section class="panel">
+                <h3>Recent Auto/Manual Snapshots</h3>
+                {% if recent_auto_backups %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Trigger</th>
+                            <th>Size (MB)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in recent_auto_backups %}
+                        <tr>
+                            <td>{{ row.created_at }}</td>
+                            <td>{{ row.trigger_reason|replace('_', ' ')|title }}</td>
+                            <td>{{ '%.2f'|format((row.backup_size_bytes or 0) / 1048576) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p>No snapshots recorded yet.</p>
+                {% endif %}
+            </section>
+            </div>
+        </main>
+    </div>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+
+

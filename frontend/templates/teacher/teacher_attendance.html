@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Attendance - Teacher</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .toolbar { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+        .toolbar .form-group { min-width: 180px; }
+        .attendance-table th, .attendance-table td { vertical-align: middle; }
+        .attendance-table select, .attendance-table input[type="text"] { width: 100%; }
+        .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .pill-present { background: #dcfce7; color: #166534; }
+        .pill-absent { background: #fee2e2; color: #991b1b; }
+        .pill-late { background: #fef3c7; color: #92400e; }
+        .pill-excused { background: #dbeafe; color: #1e3a8a; }
+        .summary-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin-bottom: 14px; }
+        .summary-box { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #fff; text-align: center; }
+        .summary-box h4 { margin: 0 0 6px; font-size: 0.9rem; color: #475569; }
+        .summary-box p { margin: 0; font-size: 1.35rem; font-weight: 800; color: #0f172a; }
+        .manual-attendance-card { border: 1px solid #dbe4ef; border-radius: 12px; padding: 14px; background: #f8fbff; }
+        .manual-attendance-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+        .manual-attendance-form table { min-width: 640px; }
+        .manual-attendance-form input[type="number"] { width: 110px; }
+        .manual-attendance-note { margin: 0; color: #475569; }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'attendance' %}
+        {% include 'teacher/_teacher_sidebar.html' %}
+
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-user-check"></i> Class Attendance</h1>
+                    <p class="meta-line">
+                        <strong>Class:</strong> {{ selected_class }} |
+                        <strong>Term:</strong> {{ current_term }} |
+                        <strong>Academic Year:</strong> {{ current_year or '-' }} |
+                        <strong>Date:</strong> {{ selected_date }}
+                    </p>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="card">
+                    <form method="get" class="toolbar">
+                        <div class="form-group">
+                            <label for="classname">Class</label>
+                            <select id="classname" name="classname" required>
+                                {% for c in classes %}
+                                <option value="{{ c }}" {% if c == selected_class %}selected{% endif %}>{{ c }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="attendance_date">Attendance Date</label>
+                            <input type="date" id="attendance_date" name="attendance_date" value="{{ selected_date }}" min="{{ attendance_min_date or '' }}" max="{{ attendance_max_date or '' }}" required>
+                        </div>
+                        <button type="submit" id="loadAttendanceBtn" class="btn btn-secondary"><i class="fas fa-filter"></i> Load</button>
+                    </form>
+                    <p id="attendance-date-hint" class="muted mt-8">
+                        {% if attendance_min_date and attendance_max_date %}
+                        Valid attendance dates: {{ attendance_min_date }} to {{ attendance_max_date }} (instructional days only).
+                        {% else %}
+                        Attendance dates are available only for instructional days in the current term calendar.
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div class="card">
+                    <div class="summary-grid">
+                        <div class="summary-box">
+                            <h4>Total Students</h4>
+                            <p>{{ total_students }}</p>
+                        </div>
+                        <div class="summary-box">
+                            <h4>Present</h4>
+                            <p>{{ status_counts.get('present', 0) }}</p>
+                        </div>
+                        <div class="summary-box">
+                            <h4>Absent</h4>
+                            <p>{{ status_counts.get('absent', 0) }}</p>
+                        </div>
+                        <div class="summary-box">
+                            <h4>Late</h4>
+                            <p>{{ status_counts.get('late', 0) }}</p>
+                        </div>
+                        <div class="summary-box">
+                            <h4>Excused</h4>
+                            <p>{{ status_counts.get('excused', 0) }}</p>
+                        </div>
+                    </div>
+                    <p class="muted">
+                        <strong>All-time records for {{ selected_class }}:</strong>
+                        {{ summary.total_marked }} marked entries{% if summary.latest_date %}, latest on {{ summary.latest_date }}{% endif %}.
+                    </p>
+                </div>
+
+                {% if manual_attendance_allowed %}
+                <div class="card">
+                    <div class="manual-attendance-card">
+                        <div class="manual-attendance-head">
+                            <div>
+                                <h3 style="margin:0 0 6px;"><i class="fas fa-calendar-check"></i> Manual Attendance Entry</h3>
+                                <p class="manual-attendance-note">
+                                    If daily attendance was not marked for {{ selected_class }}, enter Days Open and Days Present here.
+                                    Days Absent is calculated automatically.
+                                </p>
+                            </div>
+                            <span class="pill pill-late">Pending manual attendance{% if manual_attendance_missing_count %} ({{ manual_attendance_missing_count }}){% endif %}</span>
+                        </div>
+                        {% if manual_attendance_message %}
+                        <p class="muted" style="margin-bottom:12px;">{{ manual_attendance_message }}</p>
+                        {% endif %}
+                        <form method="post" action="{{ url_for('teacher_manual_attendance_summary') }}" class="manual-attendance-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="classname" value="{{ selected_class }}">
+                            <div class="table-wrap">
+                                <table class="attendance-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 36%;">Student</th>
+                                            <th style="width: 18%;">Days Open</th>
+                                            <th style="width: 18%;">Days Present</th>
+                                            <th style="width: 18%;">Days Absent</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in manual_attendance_rows %}
+                                        <tr>
+                                            <td>{{ row.student_name }}<br><small>{{ row.student_id }}</small></td>
+                                            <td><input type="number" min="1" name="days_open_{{ row.student_id }}" value="{{ row.days_open or manual_attendance_days_open or '' }}" data-manual-open></td>
+                                            <td><input type="number" min="0" name="days_present_{{ row.student_id }}" value="{{ row.days_present if row.days_present != '' else '' }}" data-manual-present></td>
+                                            <td><input type="number" value="{{ row.days_absent if row.days_absent != '' else '' }}" data-manual-absent readonly></td>
+                                        </tr>
+                                        {% else %}
+                                        <tr><td colspan="4" class="text-center">No students found for manual attendance entry.</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-12">
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Manual Attendance</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="card">
+                    <div class="toolbar">
+                        <button type="button" class="btn btn-success" onclick="setAllStatus('present')">Mark All Present</button>
+                        <button type="button" class="btn btn-warning" onclick="setAllStatus('late')">Mark All Late</button>
+                        <button type="button" class="btn btn-danger" onclick="setAllStatus('absent')">Mark All Absent</button>
+                        <button type="button" class="btn btn-secondary" onclick="setAllStatus('excused')">Mark All Excused</button>
+                    </div>
+                    <form method="post" class="mt-12">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="classname" value="{{ selected_class }}">
+                        <input type="hidden" name="attendance_date" value="{{ selected_date }}">
+                        <div class="table-wrap">
+                            <table class="attendance-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 9%;">S/N</th>
+                                        <th style="width: 22%;">Student ID</th>
+                                        <th style="width: 24%;">Name</th>
+                                        <th style="width: 16%;">Status</th>
+                                        <th style="width: 29%;">Note (optional)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for sid, student in student_rows %}
+                                    {% set row = attendance_map.get(sid, {}) %}
+                                    {% set row_status = row.get('status', '') %}
+                                    <tr>
+                                        <td>{{ loop.index }}</td>
+                                        <td>{{ sid }}</td>
+                                        <td>
+                                            {{ student.firstname }}
+                                            {% if row_status %}
+                                                <span class="pill pill-{{ row_status }} ml-8">{{ row_status|title }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <select name="status_{{ sid }}" class="status-field" required>
+                                                <option value="">Select</option>
+                                                {% for key, label in status_options %}
+                                                <option value="{{ key }}" {% if row_status == key %}selected{% endif %}>{{ label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="text" name="note_{{ sid }}" maxlength="250" placeholder="Optional note" value="{{ row.get('note', '') }}">
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr><td colspan="5" class="text-center">No students found for this class and term.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-12">
+                            <button type="submit" id="saveAttendanceBtn" class="btn btn-primary"><i class="fas fa-save"></i> Save Attendance</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const validAttendanceDates = new Set({{ valid_attendance_dates|tojson }});
+        const attendanceDateInput = document.getElementById('attendance_date');
+        const attendanceHint = document.getElementById('attendance-date-hint');
+        const loadBtn = document.getElementById('loadAttendanceBtn');
+        const saveBtn = document.getElementById('saveAttendanceBtn');
+
+        function validateAttendanceDate() {
+            if (!attendanceDateInput) return true;
+            const picked = (attendanceDateInput.value || '').trim();
+            const isValid = !picked || validAttendanceDates.has(picked);
+            if (attendanceHint) {
+                if (!isValid) {
+                    attendanceHint.textContent = 'Selected date is not an instructional day for this term. Pick a valid date.';
+                    attendanceHint.style.color = '#b91c1c';
+                } else {
+                    attendanceHint.style.color = '';
+                }
+            }
+            if (loadBtn) loadBtn.disabled = !isValid;
+            if (saveBtn) saveBtn.disabled = !isValid;
+            return isValid;
+        }
+
+        if (attendanceDateInput) {
+            attendanceDateInput.addEventListener('change', validateAttendanceDate);
+            validateAttendanceDate();
+        }
+
+        function setAllStatus(statusValue) {
+            const fields = document.querySelectorAll('.status-field');
+            fields.forEach(function (el) {
+                el.value = statusValue;
+            });
+        }
+
+        document.querySelectorAll('.manual-attendance-form').forEach(function (form) {
+            const recalc = function (row) {
+                const openInput = row.querySelector('[data-manual-open]');
+                const presentInput = row.querySelector('[data-manual-present]');
+                const absentInput = row.querySelector('[data-manual-absent]');
+                if (!openInput || !presentInput || !absentInput) return;
+                let daysOpen = parseInt(openInput.value || '0', 10);
+                let daysPresent = parseInt(presentInput.value || '0', 10);
+                if (Number.isNaN(daysOpen) || daysOpen < 0) daysOpen = 0;
+                if (Number.isNaN(daysPresent) || daysPresent < 0) daysPresent = 0;
+                if (daysPresent > daysOpen) daysPresent = daysOpen;
+                absentInput.value = String(Math.max(0, daysOpen - daysPresent));
+            };
+            form.querySelectorAll('tbody tr').forEach(function (row) {
+                row.querySelectorAll('[data-manual-open], [data-manual-present]').forEach(function (input) {
+                    input.addEventListener('input', function () { recalc(row); });
+                    input.addEventListener('change', function () { recalc(row); });
+                });
+                recalc(row);
+            });
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

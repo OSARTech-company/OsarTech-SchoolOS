@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Period Attendance</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'period_attendance' %}
+    {% include 'teacher/_teacher_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Period Attendance</h1>
+        <p><a class="btn" href="{{ url_for('teacher_dashboard') }}">Back to Dashboard</a></p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+    <div class="card">
+        <form method="get" class="toolbar">
+            <div><label>Class</label><select name="classname">{% for c in classes %}<option value="{{ c }}" {% if c == selected_class %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></div>
+            <div><label>Subject</label><select name="subject">{% for s in subject_options %}<option value="{{ s }}" {% if s == selected_subject %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+            <div><label>Period</label><select name="period_label">{% for p in periods %}<option value="{{ p }}" {% if p == selected_period %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></div>
+            <div><label>Date</label><input type="date" id="attendance_date" name="attendance_date" value="{{ selected_date }}"></div>
+            <div><button class="btn btn-secondary" type="submit">Load</button></div>
+        </form>
+    </div>
+    <div class="card">
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="classname" value="{{ selected_class }}">
+            <input type="hidden" name="subject" value="{{ selected_subject }}">
+            <input type="hidden" name="period_label" value="{{ selected_period }}">
+            <input type="hidden" name="attendance_date" value="{{ selected_date }}">
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Note</th></tr></thead>
+                    <tbody>
+                    {% for sid, student in student_rows %}
+                        {% set row = attendance_map.get(sid, {}) %}
+                        <tr>
+                            <td>{{ sid }}</td>
+                            <td>{{ student.firstname }}</td>
+                            <td>
+                                <select name="status_{{ sid }}">
+                                    <option value="">Select</option>
+                                    {% for key, label in status_options %}
+                                    <option value="{{ key }}" {% if row.get('status') == key %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td><input type="text" name="note_{{ sid }}" value="{{ row.get('note','') }}"></td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="4">No students found.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-12"><button class="btn btn-primary" type="submit">Save Period Attendance</button></div>
+        </form>
+    </div>
+</div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+<script>
+const validDates = new Set({{ valid_attendance_dates|tojson }});
+const dateField = document.getElementById('attendance_date');
+if (dateField) {
+  dateField.addEventListener('change', function () {
+    if (dateField.value && !validDates.has(dateField.value)) {
+      alert('Select a valid instructional date for this term.');
+      dateField.value = '';
+    }
+  });
+}
+</script>
+</body>
+</html>
+
+

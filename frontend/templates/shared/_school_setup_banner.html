@@ -1,0 +1,24 @@
+{% if school_setup_wizard and school_setup_wizard.show_banner %}
+<div class="flash warning" style="margin-bottom:14px;">
+  <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+    <div>
+      <strong><i class="fas fa-wand-magic-sparkles"></i> Continue School Setup</strong>
+      <div style="margin-top:4px;">
+        Step {{ school_setup_wizard.current_index }} of {{ school_setup_wizard.total_steps }}:
+        {{ school_setup_wizard.current_title }}
+      </div>
+      <div style="margin-top:4px; color:#6b7280;">
+        Finish the setup wizard before full rollout. This banner will stay until the wizard is completed.
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <a href="{{ url_for('school_admin_setup_wizard', step=school_setup_wizard.current_key) }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-right"></i> Continue Setup
+      </a>
+      <a href="{{ url_for('school_admin_setup_wizard') }}" class="btn btn-primary">
+        <i class="fas fa-list-check"></i> Open Wizard
+      </a>
+    </div>
+  </div>
+</div>
+{% endif %}

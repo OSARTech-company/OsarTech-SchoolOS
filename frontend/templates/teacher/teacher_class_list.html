@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class List - Teacher</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .school-logo, .school-logo-fallback { position: absolute; top: 14px; right: 14px; object-fit: contain; padding: 4px; }
+        .teacher-title-row { display: inline-flex; align-items: center; gap: 10px; }
+        .teacher-title-avatar, .teacher-title-avatar-fallback {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1px solid #cfe0f3;
+            background: #f8fbff;
+            box-shadow: 0 2px 6px rgba(2, 6, 23, 0.12);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #1e3a5f;
+            font-weight: 800;
+            flex: 0 0 40px;
+        }
+        .teacher-title-avatar { object-fit: cover; }
+        .teacher-title-avatar-fallback i { font-size: 15px; }
+        .teacher-title-avatar-fallback span { font-size: 13px; line-height: 1; margin-left: 3px; }
+        @media (max-width: 768px) {
+            .school-logo, .school-logo-fallback { width: 54px; height: 54px; top: 10px; right: 10px; font-size: 20px; }
+            .teacher-title-avatar, .teacher-title-avatar-fallback { width: 34px; height: 34px; flex-basis: 34px; }
+        }
+        .arm-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid #dbe4ef;
+            background: #f8fbff;
+            color: #1e3a5f;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .arm-toggle select { border-radius: 8px; padding: 4px 8px; }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    {% set teacher_sidebar_profile_image = teacher_profile_image %}
+    {% set teacher_sidebar_display_name = teacher_name %}
+    {% set teacher_unread_notifications = unread_teacher_messages %}
+    {% set teacher_score_nav_tree = [] %}
+    {% set teacher_selected_score_subject = '' %}
+    {% set teacher_selected_score_class = '' %}
+    {% set teacher_has_class_assignment_nav = has_class_assignment %}
+    <div class="app-shell topbar-layout">
+        {% include 'teacher/_teacher_sidebar.html' %}
+
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    {% set teacher_initial = ((teacher_name if teacher_name else 'T')[:1] or 'T')|upper %}
+                    <h1>
+                        <span class="teacher-title-row">
+                            {% if teacher_profile_image %}
+                            <img src="{{ teacher_profile_image }}" alt="{{ teacher_name }} Profile Picture" class="teacher-title-avatar" />
+                            {% else %}
+                            <span class="teacher-title-avatar-fallback"><i class="fas fa-user" aria-hidden="true"></i><span>{{ teacher_initial }}</span></span>
+                            {% endif %}
+                            <span><i class="fas fa-list"></i> Class List</span>
+                        </span>
+                    </h1>
+                    <p class="meta-line">
+                        <strong>School:</strong> {{ school.school_name if school else '-' }} |
+                        <strong>Teacher:</strong> {{ teacher_name }} |
+                        <strong>Phone:</strong> {{ teacher_phone or 'Not set' }} |
+                        <strong>Assigned Classes:</strong> {{ classes|join(', ') if classes else 'None' }} |
+                        <strong>Current Term:</strong> {{ current_term }} |
+                        <strong>Last Login:</strong> {{ last_login_at }}
+                    </p>
+                    {% set school_initial = ((school.school_name if school and school.school_name else 'S')[:1] or 'S')|upper %}
+                    {% if school and school.school_logo %}
+                    <img
+                        src="{{ url_for('school_logo_proxy', school_id=school.school_id, v=(school.updated_at|string if school and school.updated_at else '1')) }}"
+                        alt="School Logo"
+                        class="school-logo"
+                        onload="var fb=this.nextElementSibling;if(fb){fb.classList.add('is-hidden');fb.style.display='none';}"
+                        onerror="this.onerror=null;this.style.display='none';var fb=this.nextElementSibling;if(fb){fb.classList.remove('is-hidden');fb.style.display='flex';}"
+                    />
+                    <div class="school-logo-fallback is-hidden"><i class="fas fa-school" aria-hidden="true"></i><span>{{ school_initial }}</span></div>
+                    {% else %}
+                    <div class="school-logo-fallback"><i class="fas fa-school" aria-hidden="true"></i><span>{{ school_initial }}</span></div>
+                    {% endif %}
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                {% set arm_mode_value = (request.args.get('arm_mode') or (school.class_arm_ranking_mode if school else 'separate')) %}
+                <form method="GET" action="{{ url_for('teacher_class_list') }}" class="arm-toggle">
+                    <i class="fas fa-layer-group" aria-hidden="true"></i>
+                    <span>Class Arm View:</span>
+                    <select name="arm_mode" onchange="this.form.submit()">
+                        <option value="separate" {% if arm_mode_value == 'separate' %}selected{% endif %}>Separate Arms</option>
+                        <option value="together" {% if arm_mode_value == 'together' %}selected{% endif %}>Combine Arms</option>
+                    </select>
+                </form>
+
+                <div class="card">
+                    <h2><i class="fas fa-user-graduate"></i> Students Under Your Scope</h2>
+                    <p class="note">
+                        This page shows students from your class-teacher assignments and students offering your assigned subjects.
+                    </p>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0;">
+                        <button type="button" id="view-filter-all" class="btn btn-secondary btn-xs">All ({{ recent_students|length }})</button>
+                        <button type="button" id="view-filter-pending" class="btn btn-warning btn-xs">Not Viewed ({{ pending_view_count }})</button>
+                        <span class="chip chip-info">Viewed: {{ viewed_count }}</span>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Student ID</th>
+                                    <th>Name</th>
+                                    <th>Class</th>
+                                    <th>Stream</th>
+                                    <th>Scope</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-students-tbody">
+                                {% for student_id, student in recent_students %}
+                                <tr class="student-row" data-viewed="{{ '1' if student_id in viewed_student_ids else '0' }}">
+                                    <td>{{ student_id }}</td>
+                                    <td>
+                                        {{ student.firstname }}
+                                        {% if student_id in viewed_student_ids %}
+                                        <span class="chip chip-info ml-8">Viewed</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ student.classname }}</td>
+                                    <td>{{ student.stream }}</td>
+                                    <td>
+                                        {% if student.is_class_owner %}
+                                        <span class="chip chip-primary">Class Teacher</span>
+                                        {% else %}
+                                        <span class="chip chip-muted">Subject Teacher</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if student.scope_complete %}
+                                        <span class="chip chip-success">Completed</span>
+                                        {% else %}
+                                        <span class="chip chip-warning">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if student.is_class_owner and student_id in stream_managed_students %}
+                                        <a href="{{ url_for('teacher_allocate_stream', student_id=student_id) }}" class="btn {% if student_id in pending_stream_students %}btn-warning{% else %}btn-secondary{% endif %} btn-xs">
+                                            {% if student_id in pending_stream_students %}Allocate{% else %}Change Stream{% endif %}
+                                        </a>
+                                        {% endif %}
+                                        {% if student.is_class_owner %}
+                                        <a href="{{ url_for('teacher_enter_scores', student_id=student_id) }}" class="btn btn-primary btn-xs">Scores</a>
+                                        {% elif student.matched_subjects %}
+                                            {% for subject in student.matched_subjects %}
+                                            <a href="{{ url_for('teacher_enter_subject_scores', student_id=student_id, subject=subject) }}" class="btn btn-primary btn-xs">{{ subject }}</a>
+                                            {% endfor %}
+                                        {% else %}
+                                        <span class="chip chip-muted">No assigned subject</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center">No students found for your class/subject scope in {{ current_term }}.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+        (function () {
+            const allBtn = document.getElementById('view-filter-all');
+            const pendingBtn = document.getElementById('view-filter-pending');
+            const tbody = document.getElementById('recent-students-tbody');
+            if (!allBtn || !pendingBtn || !tbody) return;
+
+            const rows = Array.from(tbody.querySelectorAll('tr[data-viewed]'));
+            function applyFilter(mode) {
+                rows.forEach((row) => {
+                    const viewed = row.getAttribute('data-viewed') === '1';
+                    const show = (mode === 'all') || (mode === 'pending' && !viewed);
+                    row.style.display = show ? '' : 'none';
+                });
+                if (mode === 'pending') {
+                    pendingBtn.classList.remove('btn-secondary');
+                    pendingBtn.classList.add('btn-warning');
+                    allBtn.classList.remove('btn-primary');
+                    allBtn.classList.add('btn-secondary');
+                } else {
+                    allBtn.classList.remove('btn-secondary');
+                    allBtn.classList.add('btn-primary');
+                    pendingBtn.classList.remove('btn-primary');
+                    pendingBtn.classList.add('btn-warning');
+                }
+            }
+
+            allBtn.addEventListener('click', function () { applyFilter('all'); });
+            pendingBtn.addEventListener('click', function () { applyFilter('pending'); });
+            applyFilter('all');
+        })();
+    </script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+

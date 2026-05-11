@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Score Audit Log - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css', v='20260228b') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      .container {
+        width: min(1320px, 100%);
+        margin: 0 auto;
+        padding: 24px;
+      }
+      .header {
+        border-radius: 14px;
+        padding: 22px;
+        margin-bottom: 20px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+      }
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1150px;
+      }
+      .table th,
+      .table td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px;
+        vertical-align: top;
+        text-align: left;
+      }
+      .table th {
+        background: #eff5fb;
+      }
+      .muted {
+        color: #6b7280;
+        font-size: 0.9rem;
+      }
+      .table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+      @media (max-width: 768px) {
+        .table {
+          font-size: 0.9rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+      {% set active_page = 'score_audit' %}
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+    <div class="container">
+      <div class="header">
+        <h1 style="margin: 0 0 8px">Score Audit Log</h1>
+        <div>
+          <strong>School:</strong> {{ school.school_name if school else '-' }}
+        </div>
+        <div style="margin-top: 10px">
+          <a href="{{ url_for('school_admin_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+        </div>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %}
+      {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %} {% endif %} {% endwith %}
+
+      <div class="card">
+        <h2 style="margin-top: 0">Filters</h2>
+        <form method="GET" action="{{ url_for('school_admin_score_audit') }}">
+          <div class="grid">
+            <div class="form-group">
+              <label for="classname">Class</label>
+              <select id="classname" name="classname">
+                <option value="">All</option>
+                {% for c in class_options %}
+                <option value="{{ c }}" {% if selected.classname == c %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="term">Term</label>
+              <select id="term" name="term">
+                <option value="">All</option>
+                {% for t in term_options %}
+                <option value="{{ t }}" {% if selected.term == t %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="academic_year">Academic Year</label>
+              <select id="academic_year" name="academic_year">
+                <option value="">All</option>
+                {% for y in year_options %}
+                <option value="{{ y }}" {% if selected.academic_year == y %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="subject">Subject</label>
+              <select id="subject" name="subject">
+                <option value="">All</option>
+                {% for s in subject_options %}
+                <option value="{{ s }}" {% if selected.subject == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="teacher_id">Teacher</label>
+              <select id="teacher_id" name="teacher_id">
+                <option value="">All</option>
+                {% for tid, tdata in teachers.items() %}
+                {% set tname = (tdata.firstname ~ ' ' ~ tdata.lastname).strip() %}
+                <option value="{{ tid }}" {% if selected.teacher_id == tid %}selected{% endif %}>
+                  {{ tname if tname else tid }} ({{ tid }})
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="student_id">Student ID</label>
+              <input type="text" id="student_id" name="student_id" value="{{ selected.student_id }}" placeholder="e.g., 26/school/001/26" />
+            </div>
+            <div class="form-group">
+              <label for="date_from">From Date</label>
+              <input type="date" id="date_from" name="date_from" value="{{ selected.date_from }}" />
+            </div>
+            <div class="form-group">
+              <label for="date_to">To Date</label>
+              <input type="date" id="date_to" name="date_to" value="{{ selected.date_to }}" />
+            </div>
+            <div class="form-group">
+              <label for="limit">Limit</label>
+              <input type="number" id="limit" name="limit" min="50" max="1000" value="{{ limit }}" />
+            </div>
+          </div>
+          <div style="margin-top: 12px">
+            <button class="btn btn-primary" type="submit">Apply Filters</button>
+            <a class="btn btn-secondary" href="{{ url_for('school_admin_score_audit') }}">Reset</a>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-top: 0">Audit Entries ({{ rows|length }})</h2>
+        <p class="muted" style="margin-top:0;">Showing page {{ page }} of {{ total_pages }} ({{ total_rows }} total entries)</p>
+        {% if rows %}
+        <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Student / Class</th>
+              <th>Subject</th>
+              <th>Changed By</th>
+              <th>Source</th>
+              <th>Reason</th>
+              <th>Changed Fields</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr>
+              <td>
+                {{ row.changed_at or '-' }}<br />
+                <span class="muted">{{ row.term }}{% if row.academic_year %} ({{ row.academic_year }}){% endif %}</span>
+              </td>
+              <td>
+                <strong>{{ row.student_id }}</strong><br />
+                <span class="muted">{{ row.classname }}</span>
+              </td>
+              <td>{{ row.subject }}</td>
+              <td>
+                {% set tdata = teachers.get(row.changed_by) %}
+                {% if tdata %}
+                  {% set tname = (tdata.firstname ~ ' ' ~ tdata.lastname).strip() %}
+                  {{ tname if tname else row.changed_by }}<br />
+                  <span class="muted">{{ row.changed_by }}</span>
+                {% else %}
+                  {{ row.changed_by }}
+                {% endif %}
+                <br />
+                <span class="muted">{{ row.changed_by_role }}</span>
+              </td>
+              <td>{{ row.change_source }}</td>
+              <td>{{ row.change_reason or '-' }}</td>
+              <td>
+                {% if row.changes %}
+                  {% for ch in row.changes %}
+                    <div>
+                      <strong>{{ ch.field }}</strong>:
+                      <span class="muted">{{ ch.old }} -> {{ ch.new }}</span>
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <span class="muted">No parsed field details</span>
+                {% endif %}
+              </td>
+              <td>
+                <form method="POST" action="{{ url_for('school_admin_revert_score_audit') }}" onsubmit="return confirm('Revert this subject change for the student? This will create a new audit entry.');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <input type="hidden" name="audit_id" value="{{ row.id }}" />
+                  <button type="submit" class="btn btn-primary" style="padding:8px 12px;">Revert</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        <div style="margin-top: 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          {% if prev_page_url %}
+          <a class="btn btn-secondary" href="{{ prev_page_url }}">Previous</a>
+          {% endif %}
+          <span class="muted">Page {{ page }} / {{ total_pages }}</span>
+          {% if next_page_url %}
+          <a class="btn btn-secondary" href="{{ next_page_url }}">Next</a>
+          {% endif %}
+        </div>
+        {% else %}
+        <p class="muted">No audit entries found for the selected filters.</p>
+        {% endif %}
+      </div>
+    </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+  </body>
+</html>
+
+
+

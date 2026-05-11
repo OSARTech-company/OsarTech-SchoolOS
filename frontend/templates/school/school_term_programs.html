@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>School Term Programs</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+  <style>
+    .badge-status{padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .status-planned{background:#bae6fd;color:#075985}.status-confirmed{background:#bbf7d0;color:#166534}
+    .status-completed{background:#ddd6fe;color:#5b21b6}.status-cancelled{background:#fecaca;color:#991b1b}
+    .status-holiday{background:#fde68a;color:#92400e}.chip-line{display:flex;gap:10px;flex-wrap:wrap}
+    .month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+    .month-cell{border:1px solid #e2e8f0;border-radius:8px;padding:6px;min-height:70px;background:#f8fafc}
+    .month-cell.empty{background:transparent;border-style:dashed}.event-dot{display:block;font-size:10px;border-radius:6px;padding:2px 4px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+  {% include 'school/_school_admin_sidebar.html' %}
+  <div class="main-content">
+    <div class="container">
+      <div class="header">
+        <h1><i class="fas fa-calendar-alt"></i> School Term Programs</h1>
+        <p class="meta-line"><strong>School:</strong> {{ school.school_name if school else '-' }} | <strong>Current:</strong> {{ current_term }} ({{ current_year or '-' }})</p>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}{% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}{% endif %}{% endwith %}
+
+      {% set meta = term_program.program_meta_json if term_program and term_program.program_meta_json is mapping else {} %}
+      {% set visibility = meta.visibility if meta.visibility is mapping else {} %}
+      {% set statuses = meta.event_status if meta.event_status is mapping else {} %}
+      {% set tags = meta.event_tags if meta.event_tags is mapping else {} %}
+      {% set notes = meta.event_notes if meta.event_notes is mapping else {} %}
+      {% set attachments = meta.event_attachments if meta.event_attachments is mapping else {} %}
+      {% set event_visibility = meta.event_visibility if meta.event_visibility is mapping else {} %}
+      {% set ext_programs = meta.external_programs if meta and meta.external_programs is defined and meta.external_programs is sequence else [] %}
+      {% set holidays = meta.holidays if meta and meta.holidays is defined and meta.holidays is sequence else [] %}
+      {% set reminder_channels_data = reminder_channels if reminder_channels is mapping else {} %}
+      {% set reminder_contacts_data = reminder_contacts if reminder_contacts is mapping else {} %}
+
+      <div class="card">
+        <h2><i class="fas fa-pen"></i> Set Programs For Term</h2>
+        <form action="{{ url_for('school_admin_save_term_programs') }}" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <div class="grid">
+            <div class="form-group"><label>Academic Year</label><input type="text" name="program_year" value="{{ selected_program_year or current_year }}" /></div>
+            <div class="form-group"><label>Term</label><select name="program_term"><option value="First Term" {% if selected_program_term=='First Term' %}selected{% endif %}>First Term</option><option value="Second Term" {% if selected_program_term=='Second Term' %}selected{% endif %}>Second Term</option><option value="Third Term" {% if selected_program_term=='Third Term' %}selected{% endif %}>Third Term</option></select></div>
+            <div class="form-group"><label>Mid-term Break Start</label><input type="date" name="midterm_break_start" value="{{ term_program.midterm_break_start if term_program else '' }}" /></div>
+            <div class="form-group"><label>Mid-term Break End</label><input type="date" name="midterm_break_end" value="{{ term_program.midterm_break_end if term_program else '' }}" /></div>
+            <div class="form-group"><label>Exams Start</label><input type="date" name="exams_period_start" value="{{ term_program.exams_period_start if term_program else '' }}" /></div>
+            <div class="form-group"><label>Exams End</label><input type="date" name="exams_period_end" value="{{ term_program.exams_period_end if term_program else '' }}" /></div>
+            <div class="form-group"><label>PTA Date</label><input type="date" name="pta_meeting_date" value="{{ term_program.pta_meeting_date if term_program else '' }}" /></div>
+            <div class="form-group"><label>Inter-house Date</label><input type="date" name="interhouse_sports_date" value="{{ term_program.interhouse_sports_date if term_program else '' }}" /></div>
+            <div class="form-group"><label>Graduation Date</label><input type="date" name="graduation_ceremony_date" value="{{ term_program.graduation_ceremony_date if term_program else '' }}" /></div>
+            <div class="form-group"><label>CA Deadline</label><input type="date" name="continuous_assessment_deadline" value="{{ term_program.continuous_assessment_deadline if term_program else '' }}" /></div>
+            <div class="form-group"><label>School Event Date</label><input type="date" name="school_events_date" value="{{ term_program.school_events_date if term_program else '' }}" /></div>
+            <div class="form-group"><label>Next Term Begins</label><input type="date" name="next_term_begin_date" value="{{ term_program.next_term_begin_date if term_program else '' }}" /></div>
+          </div>
+          <div class="form-group"><label>School Events Notes</label><textarea name="school_events" rows="3">{{ term_program.school_events if term_program else '' }}</textarea></div>
+
+          <div class="stack-card mt-10">
+            <strong>Reminder + Visibility</strong>
+            <div class="grid mt-10">
+              <div class="form-group"><label>Reminder window (days)</label><input type="number" name="reminder_days_before" min="0" max="90" value="{{ meta.reminder_days_before if meta and meta.reminder_days_before is defined else 7 }}" /></div>
+              <div class="form-group"><label>Channels</label><div class="chip-line"><label><input type="checkbox" checked disabled>In-app</label><label><input type="checkbox" name="reminder_channel_email" value="1" {% if reminder_channels_data.get('email') %}checked{% endif %}>Email</label><label><input type="checkbox" name="reminder_channel_sms" value="1" {% if reminder_channels_data.get('sms') %}checked{% endif %}>SMS</label></div></div>
+              <div class="form-group"><label>Email recipients</label><input type="text" name="reminder_emails" value="{{ reminder_contacts_data.get('emails', [])|join(', ') if reminder_contacts_data else '' }}" /></div>
+              <div class="form-group"><label>SMS recipients</label><input type="text" name="reminder_phones" value="{{ reminder_contacts_data.get('phones', [])|join(', ') if reminder_contacts_data else '' }}" /></div>
+              <div class="form-group"><label>Global audience</label><div class="chip-line"><label><input type="checkbox" name="visible_to_teachers" value="1" {% if visibility.get('teachers', true) %}checked{% endif %}>Teachers</label><label><input type="checkbox" name="visible_to_parents" value="1" {% if visibility.get('parents', true) %}checked{% endif %}>Parents</label><label><input type="checkbox" name="visible_to_students" value="1" {% if visibility.get('students', true) %}checked{% endif %}>Students</label></div></div>
+            </div>
+          </div>
+
+          <div class="stack-card mt-10">
+            <strong>Per-Event Audience/Status</strong>
+            {% for key, label in [('midterm_break','Mid-term Break'),('exams_period','Exams Period'),('pta_meeting_date','PTA Meeting'),('interhouse_sports_date','Inter-house Sports'),('graduation_ceremony_date','Graduation Ceremony'),('continuous_assessment_deadline','CA Deadline'),('school_events_date','School Event'),('next_term_begin_date','Next Term Begins')] %}
+            {% set ev_vis = event_visibility.get(key, {}) if event_visibility.get(key) is mapping else {} %}
+            <div class="grid mt-10" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px;">
+              <div><strong>{{ label }}</strong></div>
+              <div><select name="{{ key }}_status"><option value="planned" {% if statuses.get(key,'planned')=='planned' %}selected{% endif %}>Planned</option><option value="confirmed" {% if statuses.get(key)=='confirmed' %}selected{% endif %}>Confirmed</option><option value="completed" {% if statuses.get(key)=='completed' %}selected{% endif %}>Completed</option><option value="cancelled" {% if statuses.get(key)=='cancelled' %}selected{% endif %}>Cancelled</option></select></div>
+              <div><input type="text" name="{{ key }}_tags" value="{{ (tags.get(key, [])|join(', ')) if tags.get(key) else '' }}" placeholder="tags" /></div>
+              <div><input type="text" name="{{ key }}_note" value="{{ notes.get(key, '') }}" placeholder="note" /></div>
+              <div><input type="text" name="{{ key }}_attachment" value="{{ attachments.get(key, '') }}" placeholder="attachment link" /></div>
+              <div class="chip-line"><label><input type="checkbox" name="{{ key }}_visible_teachers" value="1" {% if ev_vis.get('teachers', visibility.get('teachers', true)) %}checked{% endif %}>Teachers</label><label><input type="checkbox" name="{{ key }}_visible_parents" value="1" {% if ev_vis.get('parents', visibility.get('parents', true)) %}checked{% endif %}>Parents</label><label><input type="checkbox" name="{{ key }}_visible_students" value="1" {% if ev_vis.get('students', visibility.get('students', true)) %}checked{% endif %}>Students</label></div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="stack-card mt-10">
+            <strong>Holidays / Non-Instruction Days</strong>
+            <div id="holidayList">
+              {% for h in holidays %}
+              <div class="grid mt-10 holiday-row"><input type="text" name="holiday_name[]" value="{{ h.name if h and h.name is defined else '' }}" placeholder="Name" /><input type="date" name="holiday_start[]" value="{{ h.start if h and h.start is defined else '' }}" /><input type="date" name="holiday_end[]" value="{{ h.end if h and h.end is defined else '' }}" /><input type="text" name="holiday_type[]" value="{{ h.type if h and h.type is defined else 'holiday' }}" placeholder="Type" /><button type="button" class="btn btn-danger holiday-remove-btn">Remove</button></div>
+              {% endfor %}
+            </div>
+            <button type="button" id="addHolidayBtn" class="btn btn-secondary mt-10">Add Holiday</button>
+          </div>
+
+          <div class="stack-card mt-10">
+            <strong>External Programs (Recurring Supported)</strong>
+            <div id="externalProgramsList">
+              {% for ext in ext_programs %}
+              {% set vis = ext.visibility if ext and ext.visibility is mapping else {'teachers':true,'parents':true,'students':true} %}
+              {% set vis_key = 'all' %}{% if vis.get('teachers') and not vis.get('parents') and not vis.get('students') %}{% set vis_key='teachers' %}{% endif %}{% if (not vis.get('teachers')) and vis.get('parents') and not vis.get('students') %}{% set vis_key='parents' %}{% endif %}{% if (not vis.get('teachers')) and (not vis.get('parents')) and vis.get('students') %}{% set vis_key='students' %}{% endif %}{% if vis.get('teachers') and (not vis.get('parents')) and vis.get('students') %}{% set vis_key='staff' %}{% endif %}{% if (not vis.get('teachers')) and vis.get('parents') and vis.get('students') %}{% set vis_key='parents_students' %}{% endif %}
+              <div class="grid mt-10 external-row"><input type="text" name="external_program_name[]" value="{{ ext.name if ext and ext.name is defined else '' }}" placeholder="Program" /><input type="date" name="external_program_date[]" value="{{ ext.date if ext and ext.date is defined else '' }}" /><select name="external_program_status[]"><option value="planned" {% if (ext.status if ext and ext.status is defined else 'planned')=='planned' %}selected{% endif %}>Planned</option><option value="confirmed" {% if ext and ext.status is defined and ext.status=='confirmed' %}selected{% endif %}>Confirmed</option><option value="completed" {% if ext and ext.status is defined and ext.status=='completed' %}selected{% endif %}>Completed</option><option value="cancelled" {% if ext and ext.status is defined and ext.status=='cancelled' %}selected{% endif %}>Cancelled</option></select><select name="external_program_recurrence[]"><option value="none" {% if (ext.recurrence if ext and ext.recurrence is defined else 'none')=='none' %}selected{% endif %}>No Repeat</option><option value="weekly" {% if ext and ext.recurrence is defined and ext.recurrence=='weekly' %}selected{% endif %}>Weekly</option><option value="monthly" {% if ext and ext.recurrence is defined and ext.recurrence=='monthly' %}selected{% endif %}>Monthly</option></select><input type="date" name="external_program_recurrence_until[]" value="{{ ext.recurrence_until if ext and ext.recurrence_until is defined else '' }}" /><select name="external_program_visibility[]"><option value="all" {% if vis_key=='all' %}selected{% endif %}>All</option><option value="teachers" {% if vis_key=='teachers' %}selected{% endif %}>Teachers</option><option value="parents" {% if vis_key=='parents' %}selected{% endif %}>Parents</option><option value="students" {% if vis_key=='students' %}selected{% endif %}>Students</option><option value="staff" {% if vis_key=='staff' %}selected{% endif %}>Teachers+Students</option><option value="parents_students" {% if vis_key=='parents_students' %}selected{% endif %}>Parents+Students</option></select><input type="text" name="external_program_attachment[]" value="{{ ext.attachment if ext and ext.attachment is defined else '' }}" placeholder="Attachment" /><input type="text" name="external_program_note[]" value="{{ ext.note if ext and ext.note is defined else '' }}" placeholder="Note" /><button type="button" class="btn btn-danger external-remove-btn">Remove</button></div>
+              {% endfor %}
+            </div>
+            <button type="button" id="addExternalProgramBtn" class="btn btn-secondary mt-10">Add External Program</button>
+          </div>
+
+          <div class="mt-12">
+            <button type="submit" class="btn btn-primary">Save School Programs</button>
+            <button type="submit" class="btn btn-secondary" name="copy_previous" value="1">Copy Previous Year Template</button>
+            <a class="btn btn-success" href="{{ url_for('school_admin_print_term_programs', program_term=selected_program_term, program_year=selected_program_year) }}">Print</a>
+            <a class="btn btn-success" href="{{ url_for('school_admin_export_term_programs_ics', program_term=selected_program_term, program_year=selected_program_year) }}">Export ICS</a>
+          </div>
+        </form>
+        <form action="{{ url_for('school_admin_send_term_program_reminders') }}" method="POST" class="mt-10">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <input type="hidden" name="program_term" value="{{ selected_program_term }}" />
+          <input type="hidden" name="program_year" value="{{ selected_program_year }}" />
+          <button type="submit" class="btn btn-warning">Send Reminders (Email/SMS)</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2><i class="fas fa-calendar-week"></i> Color Calendar (Month)</h2>
+        <input type="month" id="monthPicker" value="{{ selected_calendar_month }}" />
+        <div id="monthGrid" class="month-grid mt-10"></div>
+      </div>
+
+      <div class="card">
+        <h2><i class="fas fa-list"></i> Events</h2>
+        <table><thead><tr><th>Event</th><th>Date</th><th>Status</th><th>Note</th></tr></thead><tbody>
+        {% for row in term_program_events %}
+          <tr><td>{{ row.label }}</td><td>{{ row.date }}</td><td><span class="badge-status status-{{ row.status }}">{{ row.status|title }}</span></td><td>{{ row.note or '-' }}</td></tr>
+        {% else %}<tr><td colspan="4">No events.</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+<script>
+(function(){
+  function addRow(listId, html){ var list=document.getElementById(listId); if(!list) return; var d=document.createElement('div'); d.innerHTML=html; list.appendChild(d.firstElementChild);} 
+  var addHolidayBtn = document.getElementById('addHolidayBtn');
+  if (addHolidayBtn) addHolidayBtn.addEventListener('click', function(){ addRow('holidayList','<div class="grid mt-10 holiday-row"><input type="text" name="holiday_name[]" placeholder="Name" /><input type="date" name="holiday_start[]" /><input type="date" name="holiday_end[]" /><input type="text" name="holiday_type[]" value="holiday" placeholder="Type" /><button type="button" class="btn btn-danger holiday-remove-btn">Remove</button></div>'); bindRemovers(); });
+  var addExternalProgramBtn = document.getElementById('addExternalProgramBtn');
+  if (addExternalProgramBtn) addExternalProgramBtn.addEventListener('click', function(){ addRow('externalProgramsList','<div class="grid mt-10 external-row"><input type="text" name="external_program_name[]" placeholder="Program" /><input type="date" name="external_program_date[]" /><select name="external_program_status[]"><option value="planned">Planned</option><option value="confirmed">Confirmed</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><select name="external_program_recurrence[]"><option value="none">No Repeat</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select><input type="date" name="external_program_recurrence_until[]" /><select name="external_program_visibility[]"><option value="all">All</option><option value="teachers">Teachers</option><option value="parents">Parents</option><option value="students">Students</option><option value="staff">Teachers+Students</option><option value="parents_students">Parents+Students</option></select><input type="text" name="external_program_attachment[]" placeholder="Attachment" /><input type="text" name="external_program_note[]" placeholder="Note" /><button type="button" class="btn btn-danger external-remove-btn">Remove</button></div>'); bindRemovers(); });
+  function bindRemovers(){ document.querySelectorAll('.holiday-remove-btn,.external-remove-btn').forEach(function(b){ b.onclick=function(){ var row=b.closest('.grid'); if (row) row.remove(); }; }); }
+  bindRemovers();
+
+  var events={{ term_program_events_payload|tojson }};
+  function color(status){status=(status||'').toLowerCase(); if(status==='confirmed')return '#bbf7d0'; if(status==='completed')return '#ddd6fe'; if(status==='cancelled')return '#fecaca'; if(status==='holiday')return '#fde68a'; return '#bae6fd';}
+  function expand(e){ var out=[]; if(!e.date_raw) return out; var s=new Date(e.date_raw+'T00:00:00'); if(isNaN(s)) return out; var ed=e.date_end_raw?new Date(e.date_end_raw+'T00:00:00'):s; if(isNaN(ed)||ed<s)ed=s; for(var d=new Date(s); d<=ed && out.length<120; d.setDate(d.getDate()+1)){ out.push(d.toISOString().slice(0,10)); } return out; }
+  function draw(){ var picker=document.getElementById('monthPicker'); var grid=document.getElementById('monthGrid'); if(!picker||!grid) return; var m=picker.value || new Date().toISOString().slice(0,7); picker.value=m; grid.innerHTML=''; var y=parseInt(m.slice(0,4),10), mo=parseInt(m.slice(5,7),10); var f=new Date(y,mo-1,1), l=new Date(y,mo,0); var offset=(f.getDay()+6)%7; var map={}; events.forEach(function(e){ expand(e).forEach(function(k){ if(k.slice(0,7)===m){ (map[k]=map[k]||[]).push(e); } }); }); for(var i=0;i<offset;i++){ var emp=document.createElement('div'); emp.className='month-cell empty'; grid.appendChild(emp); }
+    for(var d=1; d<=l.getDate(); d++){ var cell=document.createElement('div'); cell.className='month-cell'; var key=y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0'); cell.innerHTML='<div style="font-size:12px;font-weight:700">'+d+'</div>'; (map[key]||[]).slice(0,3).forEach(function(ev){ var s=document.createElement('span'); s.className='event-dot'; s.style.background=color(ev.status); s.textContent=ev.label; cell.appendChild(s); }); grid.appendChild(cell); }
+  }
+  var monthPicker = document.getElementById('monthPicker');
+  if (monthPicker) monthPicker.addEventListener('change', draw);
+  draw();
+})();
+</script>
+</body>
+</html>
+
+

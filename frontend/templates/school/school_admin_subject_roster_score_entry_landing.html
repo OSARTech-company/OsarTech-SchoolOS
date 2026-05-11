@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subject Roster Score Entry</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(10, 132, 110, 0.10), transparent 30%),
+                linear-gradient(180deg, #f3fbf9 0%, #f8fbff 100%);
+        }
+        .container {
+            width: min(1260px, 100%);
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .score-entry-shell {
+            display: grid;
+            gap: 18px;
+        }
+        .page-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            padding: 28px;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 34%),
+                linear-gradient(135deg, #114e60 0%, #177081 56%, #1a936f 100%);
+            color: #fff;
+            box-shadow: 0 22px 44px rgba(17, 78, 96, 0.20);
+        }
+        .hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.45fr) minmax(240px, 0.75fr);
+            gap: 20px;
+            align-items: end;
+        }
+        .hero-topline,
+        .hero-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            color: #fff;
+            font-weight: 700;
+        }
+        .hero-topline {
+            font-size: 0.82rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .hero-title {
+            margin: 14px 0 0;
+            font-size: clamp(1.9rem, 4vw, 2.7rem);
+            line-height: 1.08;
+        }
+        .hero-text {
+            margin: 12px 0 0;
+            max-width: 720px;
+            color: rgba(255,255,255,0.90);
+            line-height: 1.6;
+        }
+        .hero-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 18px;
+        }
+        .summary-card,
+        .card {
+            border-radius: 20px;
+            border: 1px solid #dbe7f3;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+        }
+        .summary-card {
+            padding: 18px;
+            background: rgba(255,255,255,0.13);
+            border-color: rgba(255,255,255,0.16);
+            color: #fff;
+        }
+        .summary-card .label {
+            display: block;
+            font-size: 0.76rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.74);
+            margin-bottom: 8px;
+        }
+        .summary-card .value {
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1.05;
+        }
+        .summary-card .meta {
+            margin-top: 8px;
+            color: rgba(255,255,255,0.88);
+        }
+        .card {
+            padding: 22px;
+        }
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .section-head h2 {
+            margin: 0;
+            color: #163a5a;
+            font-size: 1.18rem;
+        }
+        .filter-grid,
+        .class-grid {
+            display: grid;
+            gap: 14px;
+        }
+        .filter-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            align-items: end;
+        }
+        .class-grid {
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        }
+        .select-card {
+            display: block;
+            text-decoration: none;
+            border: 1px solid #dbe7f3;
+            border-radius: 18px;
+            padding: 18px;
+            background: #fff;
+            color: #163a5a;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+        .select-card:hover {
+            transform: translateY(-3px);
+            border-color: #6cc7a8;
+            box-shadow: 0 16px 28px rgba(15, 23, 42, 0.08);
+        }
+        .select-card.active {
+            background: linear-gradient(135deg, #edfcf6 0%, #f7fcff 100%);
+            border-color: #198f78;
+        }
+        .select-card .name {
+            font-size: 1.05rem;
+            font-weight: 800;
+        }
+        .select-card .meta {
+            margin-top: 8px;
+            color: #607086;
+        }
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.45fr);
+            gap: 18px;
+            align-items: start;
+        }
+        .subject-list {
+            display: grid;
+            gap: 12px;
+        }
+        .subject-link {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border: 1px solid #dbe7f3;
+            border-radius: 16px;
+            background: #fff;
+            color: #163a5a;
+            text-decoration: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        .subject-link:hover {
+            transform: translateY(-2px);
+            border-color: #70bfa2;
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+        }
+        .subject-link.active {
+            border-color: #198f78;
+            background: linear-gradient(135deg, #edfcf6 0%, #f7fcff 100%);
+        }
+        .subject-link .count {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 42px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: #e8f7f0;
+            color: #186555;
+            font-weight: 700;
+        }
+        .roster-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+        .roster-meta {
+            color: #64748b;
+        }
+        .student-table-wrap {
+            overflow-x: auto;
+            border: 1px solid #dbe7f3;
+            border-radius: 16px;
+        }
+        table {
+            width: 100%;
+            min-width: 720px;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #e5edf6;
+            text-align: left;
+        }
+        thead th {
+            background: #effaf6;
+            color: #19555e;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .student-name {
+            font-weight: 700;
+            color: #163a5a;
+        }
+        .muted {
+            color: #64748b;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 34px 18px;
+            border: 1px dashed #c6d7ea;
+            border-radius: 18px;
+            background: #fbfdff;
+            color: #5f6f83;
+        }
+        @media (max-width: 960px) {
+            .hero-grid,
+            .filter-grid,
+            .workspace-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (max-width: 640px) {
+            .container {
+                padding: 16px;
+            }
+            .page-hero {
+                padding: 22px 18px;
+                border-radius: 18px;
+            }
+            .hero-chip {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'score_entry' %}
+        {% include 'school/_school_admin_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="score-entry-shell">
+                    <section class="page-hero">
+                        <div class="hero-grid">
+                            <div>
+                                <span class="hero-topline"><i class="fas fa-list-check"></i> {{ score_entry_mode_label }}</span>
+                                <h1 class="hero-title">Keep the subject list open and see every student offering the selected subject beside it.</h1>
+                                <p class="hero-text">This mode is built for quick subject-based review. Pick a class, click a subject, and the roster updates in place so you can move straight into the score sheet.</p>
+                                <div class="hero-chip-row">
+                                    <span class="hero-chip"><i class="fas fa-calendar-alt"></i> {{ selected_term or current_term }}</span>
+                                    <span class="hero-chip"><i class="fas fa-school"></i> {{ selected_class or 'Choose a class' }}</span>
+                                    <span class="hero-chip"><i class="fas fa-book-open"></i> {{ selected_subject or 'Choose a subject' }}</span>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <span class="label">Live Roster</span>
+                                <div class="value">{{ total_students }}</div>
+                                <div class="meta">Student{{ '' if total_students == 1 else 's' }} offering the selected subject right now.</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <div class="section-head">
+                            <h2><i class="fas fa-filter"></i> Roster Filters</h2>
+                        </div>
+                        <form method="get" class="filter-grid">
+                            <div class="form-group">
+                                <label for="score_entry_class">Class</label>
+                                <select id="score_entry_class" name="class">
+                                    <option value="">All Classes</option>
+                                    {% for classname in available_classes %}
+                                    <option value="{{ classname }}" {% if selected_class == classname %}selected{% endif %}>{{ classname }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="score_entry_term">Term</label>
+                                <select id="score_entry_term" name="term">
+                                    {% for term_name in available_terms %}
+                                    <option value="{{ term_name }}" {% if selected_term == term_name %}selected{% endif %}>{{ term_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-sliders-h"></i> Apply Filters</button>
+                                <a href="{{ url_for('school_admin_score_entry') }}" class="btn btn-secondary" style="margin-left:10px;">Reset</a>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section class="card">
+                        <div class="section-head">
+                            <h2><i class="fas fa-school"></i> Pick A Class</h2>
+                        </div>
+                        <div class="class-grid">
+                            {% for item in class_cards %}
+                            <a href="{{ url_for('school_admin_score_entry', class=item.classname, term=selected_term or current_term) }}" class="select-card {% if item.is_selected %}active{% endif %}">
+                                <div class="name">{{ item.classname }}</div>
+                                <div class="meta">{{ item.count }} student{{ '' if item.count == 1 else 's' }}</div>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <div class="workspace-grid">
+                            <div>
+                                <div class="section-head">
+                                    <h2><i class="fas fa-book-open"></i> Subject List</h2>
+                                    <div class="muted">{{ subject_cards|length }} subject{{ '' if subject_cards|length == 1 else 's' }}</div>
+                                </div>
+                                {% if selected_class and subject_cards %}
+                                <div class="subject-list">
+                                    {% for item in subject_cards %}
+                                    <a
+                                        href="{{ url_for('school_admin_score_entry', class=selected_class, term=selected_term or current_term, subject=item.subject) }}"
+                                        class="subject-link {% if selected_subject == item.subject %}active{% endif %}"
+                                    >
+                                        <span>{{ item.subject }}</span>
+                                        <span class="count">{{ item.count }}</span>
+                                    </a>
+                                    {% endfor %}
+                                </div>
+                                {% elif selected_class %}
+                                <div class="empty-state">
+                                    <p>No subject roster was found for {{ selected_class }}.</p>
+                                    <p>Check class-subject setup or student subject selections.</p>
+                                </div>
+                                {% else %}
+                                <div class="empty-state">
+                                    <p>Select a class first to load the subject list.</p>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div>
+                                <div class="roster-head">
+                                    <div>
+                                        <h2 style="margin:0; color:#163a5a;"><i class="fas fa-user-graduate"></i> Subject Roster</h2>
+                                        <div class="roster-meta">
+                                            {% if selected_subject %}
+                                            {{ total_students }} student{{ '' if total_students == 1 else 's' }} offer {{ selected_subject }} in {{ selected_class }}.
+                                            {% else %}
+                                            Click a subject to preview the matching students here.
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% if selected_subject %}
+                                    <a href="{{ url_for('school_admin_subject_score_sheet', class=selected_class, subject=selected_subject, term=selected_term or current_term) }}" class="btn btn-primary">
+                                        <i class="fas fa-table"></i> Open Subject Sheet
+                                    </a>
+                                    {% endif %}
+                                </div>
+
+                                {% if subject_student_rows %}
+                                <div class="student-table-wrap">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Student</th>
+                                                <th>Student ID</th>
+                                                <th>Class</th>
+                                                <th>Term</th>
+                                                <th>Subject</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in subject_student_rows %}
+                                            <tr>
+                                                <td>
+                                                    <div class="student-name">{{ row.fullname }}</div>
+                                                    <div class="muted">{{ row.stream or 'No stream' }}</div>
+                                                </td>
+                                                <td>{{ row.student_id }}</td>
+                                                <td>{{ row.classname }}</td>
+                                                <td>{{ row.term or '-' }}</td>
+                                                <td>{{ row.subject }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% elif selected_subject %}
+                                <div class="empty-state">
+                                    <p>No students in {{ selected_class }} currently offer {{ selected_subject }}.</p>
+                                </div>
+                                {% else %}
+                                <div class="empty-state">
+                                    <p>Choose a subject from the left to show all students offering it.</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+</body>
+</html>

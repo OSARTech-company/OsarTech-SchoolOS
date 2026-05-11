@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subject Comments - Parent Portal</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(1080px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.85rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: end; }
+        @media (max-width: 860px) { .filters { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'subject_comments' %}
+    {% include 'parent/_parent_sidebar.html' %}
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1><i class="fas fa-comments"></i> Subject Comments</h1>
+                <a href="{{ url_for('parent_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <form method="get" action="{{ url_for('parent_subject_comments') }}" class="filters">
+                    <div>
+                        <label>Student</label>
+                        <select name="student_key" required>
+                            {% for child in children %}
+                            <option value="{{ child.key }}" {% if child.key == selected_key %}selected{% endif %}>
+                                {{ child.firstname }} ({{ child.student_id }}) - {{ child.school_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Term</label>
+                        <input type="text" name="term" value="{{ comment_term }}">
+                    </div>
+                    <div>
+                        <label>Academic Year</label>
+                        <input type="text" name="academic_year" value="{{ comment_year }}">
+                    </div>
+                    <div>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Load</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3 class="no-margin">
+                    {{ selected_student.firstname }} ({{ selected_student.student_id }})
+                    - {{ selected_student.classname }}{% if selected_student.stream %} ({{ selected_student.stream }}){% endif %}
+                </h3>
+                <p class="muted mt-10">School: {{ selected_school.school_name if selected_school and selected_school.school_name else selected_school.school_id }}</p>
+                <div class="mt-10">
+                    <strong>Class Teacher Comment:</strong>
+                    <div class="muted mt-10">
+                        {% if class_teacher_comment %}
+                            {{ class_teacher_comment }}
+                        {% else %}
+                            No class teacher comment for selected term/year.
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mt-12">
+                    <strong>Subject Teacher Comments:</strong>
+                    {% if subject_teacher_comments %}
+                    <table class="mt-10">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th>Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in subject_teacher_comments %}
+                            <tr>
+                                <td>{{ row.subject }}</td>
+                                <td>{{ row.comment }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="muted mt-10">No subject teacher comments found for selected term/year.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
+</body>
+</html>
+

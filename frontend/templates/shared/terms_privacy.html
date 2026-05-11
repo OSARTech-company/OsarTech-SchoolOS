@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms and Privacy</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .policy-sidebar .side-brand span {
+            font-size: 1rem;
+        }
+        .policy-sidebar .side-links {
+            padding-bottom: 14px;
+        }
+        .wrap {
+            max-width: 900px;
+            margin: 28px auto 40px;
+            padding: 0 16px 24px;
+        }
+        .card {
+            padding: 22px;
+        }
+        h1, h2 {
+            margin-top: 0;
+            color: #111827;
+        }
+        h2 {
+            margin-top: 18px;
+            font-size: 1.1rem;
+        }
+        ul {
+            padding-left: 18px;
+        }
+        .muted {
+            color: #6b7280;
+            font-size: 0.95rem;
+        }
+        .actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 16px;
+            border-radius: 8px;
+            background: #2563eb;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .btn:hover {
+            background: #1d4ed8;
+        }
+        .top-line {
+            margin-bottom: 12px;
+            color: #5b6475;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+    <aside class="side-taskbar policy-sidebar">
+        <div class="side-brand">
+            <i class="fas fa-shield-alt"></i>
+            <span>Policy Center</span>
+        </div>
+        <div class="side-links">
+            <a href="{{ url_for('terms_privacy') }}" class="side-link active">
+                <i class="fas fa-file-contract"></i>
+                <span>Terms & Privacy</span>
+            </a>
+            <a href="{{ url_for('help') }}" class="side-link">
+                <i class="fas fa-question-circle"></i>
+                <span>Help</span>
+            </a>
+            <a href="{{ url_for('report_issue') }}" class="side-link">
+                <i class="fas fa-bug"></i>
+                <span>Report Issue</span>
+            </a>
+            <a href="{{ url_for('login') }}" class="side-link side-link-logout">
+                <i class="fas fa-sign-in-alt"></i>
+                <span>Back to Login</span>
+            </a>
+        </div>
+    </aside>
+    <div class="main-content">
+    <div class="container">
+    <div class="header">
+        <h1><i class="fas fa-user-shield"></i> Terms and Privacy</h1>
+        <div class="meta-line">Review policy terms before continuing to login.</div>
+    </div>
+    <div class="wrap">
+        <div class="card">
+            <div class="top-line"><i class="fas fa-shield-alt"></i> Student Score Policy</div>
+            <h1>Terms of Use and Privacy Notice</h1>
+            <p class="muted">Last updated: March 8, 2026</p>
+
+            <h2>1. Platform Scope</h2>
+            <ul>
+                <li>This platform is operated by <strong>Osartech LTD</strong> for school management workflows.</li>
+                <li>Registration is <strong>school-only</strong>: only approved schools can be onboarded by Osartech LTD or an authorized super admin.</li>
+                <li>Individual self-registration is not allowed for personal use outside a registered school.</li>
+                <li>It is for authorized users only: super admin, school admin, teacher, student, and parent roles.</li>
+                <li>Access and actions are limited by role permissions configured in the app.</li>
+            </ul>
+
+            <h2>2. Acceptable Use</h2>
+            <ul>
+                <li>Keep your username, password, and access device secure.</li>
+                <li>Do not share account credentials or bypass access restrictions.</li>
+                <li>Do not upload harmful files, offensive content, or unauthorized data exports.</li>
+                <li>You are responsible for actions performed using your account.</li>
+            </ul>
+
+            <h2>3. Data We Process</h2>
+            <ul>
+                <li>Identity data: names, role, username, and class/school associations.</li>
+                <li>Academic data: scores, attendance, disputes, and report records.</li>
+                <li>Operational data: timetable, messages, audits, and issue reports.</li>
+                <li>Security data: login attempts, role-based actions, and error logs.</li>
+            </ul>
+
+            <h2>4. Privacy and Access Control</h2>
+            <ul>
+                <li>Data access is role-based and restricted to legitimate school operations.</li>
+                <li>User accounts are provisioned under a registered school tenant; standalone individual accounts are not created.</li>
+                <li>Parents only see linked-child data; teachers only see assigned class/subject scope.</li>
+                <li>System logs are used for security, compliance, and troubleshooting.</li>
+                <li>We do not permit unauthorized disclosure of student/staff records.</li>
+            </ul>
+
+            <h2>5. Data Retention and Security</h2>
+            <ul>
+                <li>Records are retained according to school policy and legal requirements.</li>
+                <li>Backups, audits, and integrity checks may be used to preserve system reliability.</li>
+                <li>Users should report suspected breaches immediately via <strong>Report Issue</strong>.</li>
+            </ul>
+
+            <h2>6. Consent</h2>
+            <p>
+                By checking the Terms and Privacy box at login, you confirm that you have read and agreed to these terms.
+                This acceptance is recorded per user account and may be required again after major policy updates.
+            </p>
+
+            <h2>7. Contact</h2>
+            <p>
+                For policy or support questions, contact your school administrator first. If needed, escalate through the in-app
+                <strong>Report Issue</strong> page to Osartech LTD support.
+            </p>
+            <p>
+                For data privacy actions (export, deletion, correction), use the in-app
+                <a href="{{ url_for('privacy_request') }}"><strong>Privacy Request</strong></a> form.
+            </p>
+
+            <div class="actions">
+                <a class="btn" href="{{ url_for('login', terms_read=1) }}">I Have Read This, Continue To Login</a>
+                <a class="btn" style="background:#475569;" href="{{ url_for('login') }}">Back to Login</a>
+            </div>
+        </div>
+    </div>
+    </div>
+    </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
+

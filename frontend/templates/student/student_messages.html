@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Messages - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(1120px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.85rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .messages-shell { display: grid; gap: 18px; }
+        .page-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 22px;
+            padding: 26px;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 32%),
+                linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 58%, var(--accent) 100%);
+            color: #fff;
+            box-shadow: 0 20px 40px rgba(15, 76, 129, 0.22);
+        }
+        .page-hero::after {
+            content: "";
+            position: absolute;
+            inset: auto -60px -80px auto;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+        }
+        .hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(220px, 0.8fr);
+            gap: 18px;
+            align-items: end;
+        }
+        .hero-topline {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            font-size: 0.82rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .hero-title { margin: 14px 0 0; font-size: clamp(1.8rem, 3.8vw, 2.6rem); line-height: 1.08; }
+        .hero-text { margin: 12px 0 0; color: rgba(255,255,255,0.88); line-height: 1.6; max-width: 680px; }
+        .hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+        .hero-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            color: #fff;
+            font-weight: 600;
+        }
+        .summary-card {
+            border-radius: 18px;
+            padding: 16px;
+            background: rgba(255,255,255,0.13);
+            border: 1px solid rgba(255,255,255,0.16);
+            backdrop-filter: blur(6px);
+        }
+        .summary-card .label {
+            display: block;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.72);
+            margin-bottom: 6px;
+        }
+        .summary-card .value { font-size: 1.8rem; font-weight: 800; line-height: 1.1; }
+        .summary-card .meta { margin-top: 6px; color: rgba(255,255,255,0.84); }
+        .message-list-card {
+            border: 1px solid #dbe7f3;
+            border-radius: 20px;
+            padding: 22px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+        }
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .section-head h2 { margin: 0; color: #12314d; }
+        .section-head p { margin: 6px 0 0; color: #5b6475; }
+        .student-message-card {
+            border: 1px solid #dbe4ef;
+            border-radius: 16px;
+            padding: 16px;
+            background: #f8fbff;
+            margin-bottom: 12px;
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04);
+        }
+        .student-message-card.is-unread { border-left: 4px solid #0F4C81; background: #eef6ff; }
+        .student-message-card h4 { margin: 0 0 6px; font-size: 1rem; color: #1e3a5f; }
+        .student-message-meta { color: #5b6475; font-size: 0.86rem; margin-bottom: 8px; line-height: 1.5; }
+        .student-message-actions { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        @media (max-width: 900px) {
+            .hero-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 640px) {
+            .container { padding: 16px; }
+            .page-hero { padding: 22px 18px; border-radius: 18px; }
+            .hero-chip { width: 100%; justify-content: center; }
+        }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+        <div class="side-taskbar">
+            <div class="side-brand">
+                <img src="{{ url_for('static', filename='img/osartech-logo.png', v='20260411b') }}" alt="Osartech Logo" class="brand-logo">
+                <span>Student</span>
+            </div>
+            {% if school_access_state %}
+            {% set access_status = (school_access_state.effective_status or school_access_state.status or '') %}
+            {% set access_class = 'is-active' if access_status in ['trial_free', 'active_paid'] else ('is-warning' if access_status == 'pending_payment' else 'is-blocked') %}
+            <div class="side-access-status">
+                <span class="label">Access</span>
+                <span class="status {{ access_class }}">{{ access_status|replace('_', ' ')|title }}</span>
+            </div>
+            {% endif %}
+            <div class="side-links">
+                <a href="{{ url_for('student_dashboard') }}" class="side-link">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('student_messages') }}" class="side-link active">
+                    <i class="fas fa-bell"></i>
+                    <span>Messages</span>
+                    {% if unread_student_messages %}
+                    <span class="notif-badge">{{ unread_student_messages }}</span>
+                    {% endif %}
+                </a>
+                <a href="{{ url_for('student_view_result') }}" class="side-link">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>View Results</span>
+                </a>
+                {% if school_cbt_enabled %}
+                <a href="{{ url_for('student_cbt') }}" class="side-link">
+                    <i class="fas fa-laptop-code"></i>
+                    <span>CBT</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('student_profile') }}" class="side-link">
+                    <i class="fas fa-user"></i>
+                    <span>Profile</span>
+                </a>
+                <a href="{{ url_for('student_subject_requests') }}" class="side-link">
+                    <i class="fas fa-book"></i>
+                    <span>Subject Requests</span>
+                </a>
+                <a href="{{ url_for('student_change_password') }}" class="side-link">
+                    <i class="fas fa-key"></i>
+                    <span>Change Password</span>
+                </a>
+                <a href="{{ url_for('help', role='student') }}" class="side-link">
+                    <i class="fas fa-question-circle"></i>
+                    <span>Help</span>
+                </a>
+                <form method="post" action="{{ url_for('logout') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="side-link side-link-logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-bell"></i> Messages</h1>
+                    <a href="{{ url_for('student_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="messages-shell">
+                <section class="page-hero">
+                    <div class="hero-grid">
+                        <div>
+                            <span class="hero-topline"><i class="fas fa-bell"></i> Student Messages</span>
+                            <h2 class="hero-title">Stay on top of deadlines, notices, and school updates.</h2>
+                            <p class="hero-text">This page keeps your school communication in one place, so you can quickly see what is new, what needs attention, and what has already been read.</p>
+                            <div class="hero-meta">
+                                <span class="hero-chip"><i class="fas fa-id-card"></i> {{ student.student_id }}</span>
+                                <span class="hero-chip"><i class="fas fa-users"></i> {{ student.classname or '-' }}</span>
+                                <span class="hero-chip"><i class="fas fa-calendar-alt"></i> {{ student.term or '-' }}</span>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <span class="label">Unread Messages</span>
+                            <div class="value">{{ unread_student_messages or 0 }}</div>
+                            <div class="meta">New notices waiting for your attention</div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="message-list-card">
+                    <div class="section-head">
+                        <div>
+                            <h2><i class="fas fa-bullhorn"></i> School Messages & Deadlines</h2>
+                            <p>Review official notices, deadlines, and attached documents from your school.</p>
+                        </div>
+                    {% if unread_student_messages %}
+                    <div class="student-message-actions">
+                        <span class="chip chip-warning">Unread: {{ unread_student_messages }}</span>
+                        <form method="post" action="{{ url_for('student_mark_all_messages_read') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-check-double"></i> Mark All Read
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                    </div>
+                    {% if student_messages %}
+                        {% for msg in student_messages %}
+                        <div class="student-message-card {% if not msg.is_read %}is-unread{% endif %}">
+                            <h4>{{ msg.title }}</h4>
+                            <div class="student-message-meta">
+                                Deadline: {{ msg.deadline_date if msg.deadline_date else 'None' }}
+                                {% if msg.is_expired %}
+                                    | <span class="chip chip-danger">Expired</span>
+                                {% elif msg.is_due_soon %}
+                                    | <span class="chip chip-warning">Due Soon</span>
+                                {% endif %}
+                                {% if msg.is_read %}
+                                    | <span class="chip chip-success">Read</span>
+                                {% else %}
+                                    | <span class="chip chip-warning">Unread</span>
+                                {% endif %}
+                                | Sent: {{ msg.created_at }}
+                            </div>
+                            <div>{{ msg.message }}</div>
+                            {% if msg.attachment_url %}
+                            <div class="mt-10">
+                                {% if msg.attachment_mime and msg.attachment_mime.startswith('image/') %}
+                                <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener" class="btn btn-secondary">
+                                    <i class="fas fa-image"></i> Open Attached Image
+                                </a>
+                                <div class="mt-10">
+                                    <img src="{{ msg.attachment_url }}" alt="Attachment" style="max-width:100%; max-height:360px; border-radius:10px; border:1px solid #dbe4ef;">
+                                </div>
+                                {% else %}
+                                <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener" class="btn btn-secondary">
+                                    <i class="fas fa-file"></i> Download Attachment
+                                </a>
+                                {% if msg.attachment_name %}
+                                <p class="note mt-10">File: {{ msg.attachment_name }}</p>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            {% if not msg.is_read %}
+                            <div class="student-message-actions">
+                                <form method="post" action="{{ url_for('student_mark_message_read') }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="message_id" value="{{ msg.id }}">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-check"></i> Mark as Read
+                                    </button>
+                                </form>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <p class="note">No messages from school admin yet.</p>
+                    {% endif %}
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% if session.get('role') in ['student', 'school_admin', 'teacher', 'parent', 'super_admin'] %}
+    {% include 'shared/_ai_assistant_widget.html' %}
+    {% endif %}
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
+
+
+
