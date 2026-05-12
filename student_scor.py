@@ -15428,7 +15428,14 @@ def get_effective_grade_scale(cfg_or_school=None):
     raw_json = source.get('grade_scale_json', '')
     if (raw_json or '').strip():
         return grade_scale_rows_from_json(raw_json, default_rows=build_default_grade_scale_rows(source))
-    return build_default_grade_scale_rows(source)
+    # No custom scale set, use hardcoded default
+    return [
+        {'label': 'A', 'min_score': 70},
+        {'label': 'B', 'min_score': 60},
+        {'label': 'C', 'min_score': 50},
+        {'label': 'D', 'min_score': 40},
+        {'label': 'F', 'min_score': 0},
+    ]
 
 
 def get_grade_label_map(cfg_or_school=None):
