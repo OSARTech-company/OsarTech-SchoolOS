@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: school-result-app
+    runtime: python
+    plan: starter
+    region: oregon
+    autoDeployTrigger: commit
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: python migrate.py
+    startCommand: gunicorn --workers=${WEB_CONCURRENCY:-1} --threads=${GUNICORN_THREADS:-2} --timeout=${GUNICORN_TIMEOUT:-120} --graceful-timeout=${GUNICORN_GRACEFUL_TIMEOUT:-30} --max-requests=${GUNICORN_MAX_REQUESTS:-500} --max-requests-jitter=${GUNICORN_MAX_REQUESTS_JITTER:-50} student_scor:app
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: BACKUP_SIGNING_KEY
+        sync: false
+      - key: DEFAULT_STUDENT_PASSWORD
+        sync: false
+      - key: DEFAULT_TEACHER_PASSWORD
+        sync: false
+      - key: ALLOW_INSECURE_DEFAULTS
+        value: "0"
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: RUN_STARTUP_DDL
+        value: "0"
+      - key: RUN_STARTUP_BOOTSTRAP
+        value: "0"
+      - key: DB_GUARDS_STRICT
+        value: "0"
+      - key: ALLOW_RUNTIME_SCHEMA_HEAL
+        value: "0"
