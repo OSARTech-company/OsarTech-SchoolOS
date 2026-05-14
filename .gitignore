@@ -9,6 +9,7 @@ env/
 users.json
 students.json
 reports.json
+.venv
 
 # VS Code
 .vscode/
