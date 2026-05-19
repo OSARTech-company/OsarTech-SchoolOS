@@ -117,6 +117,19 @@
                                 <input type="text" id="motto" name="motto" placeholder="e.g., Excellence and Discipline">
                             </div>
                             <div class="form-group">
+                                <label for="academic_year">Academic Year:</label>
+                                <input type="text" id="academic_year" name="academic_year" placeholder="e.g., 2026-2027">
+                            </div>
+                            <div class="form-group">
+                                <label for="current_term">Current Term:</label>
+                                <select id="current_term" name="current_term">
+                                    <option value="">Select term</option>
+                                    <option value="First Term">First Term</option>
+                                    <option value="Second Term">Second Term</option>
+                                    <option value="Third Term">Third Term</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
                                 <label for="class_arm_ranking_mode">Class Arm Ranking:</label>
                                 <select id="class_arm_ranking_mode" name="class_arm_ranking_mode">
                                     <option value="separate" selected>Arms Separate</option>
@@ -212,7 +225,6 @@
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 </body>
 </html>
-
 
 
 

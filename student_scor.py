@@ -15135,6 +15135,7 @@ def update_school_access_policy_with_cursor(
     plan_features_json='{}',
     cbt_enabled=None,
     updated_by='',
+    validate_profile_complete=True,
 ):
     """Update super-admin controlled access lifecycle for one school using an existing cursor."""
     sid = _normalize_school_id_text(school_id)
@@ -15221,7 +15222,7 @@ def update_school_access_policy_with_cursor(
     if status_value in {'active_paid', 'pending_payment'} and not due_date and sub_end:
         due_date = sub_end
 
-    if status_value == 'active_paid':
+    if status_value == 'active_paid' and validate_profile_complete:
         profile = build_school_profile_completeness(sid)
         if not profile.get('is_complete'):
             missing = ', '.join((profile.get('missing') or [])[:4])
@@ -15343,6 +15344,7 @@ def update_school_access_policy(
     plan_features_json='{}',
     cbt_enabled=None,
     updated_by='',
+    validate_profile_complete=True,
 ):
     """Update super-admin controlled access lifecycle for one school."""
     sid = _normalize_school_id_text(school_id)
@@ -15371,6 +15373,7 @@ def update_school_access_policy(
             plan_features_json=plan_features_json,
             cbt_enabled=cbt_enabled,
             updated_by=updated_by,
+            validate_profile_complete=validate_profile_complete,
         )
     invalidate_school_cache(sid)
 
@@ -28784,7 +28787,11 @@ def super_admin_add_school_page():
         return redirect(url_for('login'))
     _schools, overview = _build_super_admin_school_overview()
     last_login_at = format_timestamp(get_last_login_at(session.get('user_id')))
-    return render_template('super/super_admin_add_school.html', overview=overview, last_login_at=last_login_at)
+    return render_template(
+        'super/super_admin_add_school.html',
+        overview=overview,
+        last_login_at=last_login_at,
+    )
 
 @app.route('/super-admin/schools')
 def super_admin_view_schools():
@@ -28933,6 +28940,7 @@ def super_admin_onboarding_approve():
                 plan_features_json=request.form.get('plan_features_json', '{}'),
                 cbt_enabled=cbt_enabled,
                 updated_by=session.get('user_id', ''),
+                validate_profile_complete=False,
             )
             temp_password = secrets.token_urlsafe(24)
             upsert_user_with_cursor(
@@ -29397,6 +29405,8 @@ def super_admin_add_school():
     school_email = _first_form_value('school_email', 'email', 'school_contact_email').lower()
     principal_name = _first_form_value('principal_name', 'principal')
     motto = _first_form_value('motto', 'school_motto')
+    academic_year = _first_form_value('academic_year')
+    current_term = _first_form_value('current_term')
     class_arm_ranking_mode = (_first_form_value('class_arm_ranking_mode') or 'separate').lower()
     access_status = (_first_form_value('access_status') or 'trial_free').lower()
     cbt_enabled = normalize_school_cbt_enabled(request.form.get('cbt_enabled', '1'), default=1)
@@ -29434,6 +29444,31 @@ def super_admin_add_school():
         if school_email and not is_valid_email(school_email):
             flash('School contact email must be a valid email address.', 'error')
             return redirect(url_for('super_admin_add_school_page'))
+        if academic_year:
+            if not re.fullmatch(r'^\d{4}-\d{4}$', academic_year):
+                flash('Academic year must be in YYYY-YYYY format, e.g. 2026-2027.', 'error')
+                return redirect(url_for('super_admin_add_school_page'))
+            start_year = int(academic_year[:4])
+            end_year = int(academic_year[5:])
+            if end_year != start_year + 1:
+                flash('Academic year must be consecutive, e.g. 2026-2027.', 'error')
+                return redirect(url_for('super_admin_add_school_page'))
+        if current_term and current_term not in {'First Term', 'Second Term', 'Third Term'}:
+            flash('Current term must be First Term, Second Term, or Third Term.', 'error')
+            return redirect(url_for('super_admin_add_school_page'))
+        if access_status == 'active_paid':
+            missing_activation_fields = []
+            if not academic_year:
+                missing_activation_fields.append('Academic Year')
+            if not current_term:
+                missing_activation_fields.append('Current Term')
+            if missing_activation_fields:
+                flash(
+                    'Active Paid schools require these fields before activation: '
+                    + ', '.join(missing_activation_fields),
+                    'error',
+                )
+                return redirect(url_for('super_admin_add_school_page'))
         ok_pwd, pwd_msg = validate_admin_password_strength(admin_password)
         if not ok_pwd:
             flash(f'School admin password policy: {pwd_msg}', 'error')
@@ -29463,6 +29498,13 @@ def super_admin_add_school():
                 'UPDATE schools SET class_arm_ranking_mode = ? WHERE school_id = ?',
                 (class_arm_ranking_mode, school_id),
             )
+            if academic_year or current_term:
+                update_school_term_year_with_cursor(
+                    c,
+                    school_id=school_id,
+                    term=current_term or 'First Term',
+                    academic_year=academic_year,
+                )
             update_school_access_policy_with_cursor(
                 c=c,
                 school_id=school_id,
@@ -29482,6 +29524,7 @@ def super_admin_add_school():
                 plan_features_json=plan_features_json,
                 cbt_enabled=cbt_enabled,
                 updated_by=session.get('user_id', ''),
+                validate_profile_complete=False,
             )
             # Create school admin user with the provided username and password.
             password_hash = hash_password(admin_password)
