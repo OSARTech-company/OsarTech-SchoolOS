@@ -5897,6 +5897,32 @@ def init_db():
         Drop any FK constraints on public tables that include a school_id column.
         Legacy deployments may have varying FK names/types.
         """
+        if getattr(conn, 'autocommit', False):
+            try:
+                db_execute(
+                    c,
+                    """SELECT ns.nspname, cls.relname, con.conname
+                       FROM pg_constraint con
+                       JOIN pg_class cls ON cls.oid = con.conrelid
+                       JOIN pg_namespace ns ON ns.oid = cls.relnamespace
+                       WHERE con.contype = 'f'
+                         AND ns.nspname = 'public'
+                         AND EXISTS (
+                           SELECT 1
+                           FROM unnest(con.conkey) AS ck(attnum)
+                           JOIN pg_attribute a
+                             ON a.attrelid = con.conrelid AND a.attnum = ck.attnum
+                           WHERE a.attname = 'school_id'
+                         )"""
+                )
+                for schema_name, table_name, con_name in c.fetchall() or []:
+                    safe_exec_ignore(
+                        f'ALTER TABLE {_quote_ident(schema_name)}.{_quote_ident(table_name)} '
+                        f'DROP CONSTRAINT IF EXISTS {_quote_ident(con_name)}'
+                    )
+            except Exception as exc:
+                logging.info("Ignored FK cleanup error during startup DDL: %s", exc)
+            return
         db_execute(c, 'SAVEPOINT ddl_ignore')
         try:
             db_execute(
@@ -29356,16 +29382,23 @@ def super_admin_db_view():
 def super_admin_add_school():
     if session.get('role') != 'super_admin':
         return redirect(url_for('login'))
-    
-    raw_school_name = request.form.get('school_name', '').strip()
+
+    def _first_form_value(*keys):
+        for key in keys:
+            value = (request.form.get(key, '') or '').strip()
+            if value:
+                return value
+        return ''
+
+    raw_school_name = _first_form_value('school_name', 'school', 'name')
     school_name = raw_school_name
-    location = request.form.get('location', '').strip()
-    phone = request.form.get('phone', '').strip()
-    school_email = request.form.get('school_email', '').strip().lower()
-    principal_name = request.form.get('principal_name', '').strip()
-    motto = request.form.get('motto', '').strip()
-    class_arm_ranking_mode = request.form.get('class_arm_ranking_mode', 'separate').strip().lower()
-    access_status = request.form.get('access_status', 'trial_free').strip().lower()
+    location = _first_form_value('location', 'school_location')
+    phone = _first_form_value('phone', 'school_phone')
+    school_email = _first_form_value('school_email', 'email', 'school_contact_email').lower()
+    principal_name = _first_form_value('principal_name', 'principal')
+    motto = _first_form_value('motto', 'school_motto')
+    class_arm_ranking_mode = (_first_form_value('class_arm_ranking_mode') or 'separate').lower()
+    access_status = (_first_form_value('access_status') or 'trial_free').lower()
     cbt_enabled = normalize_school_cbt_enabled(request.form.get('cbt_enabled', '1'), default=1)
     trial_start_date = (request.form.get('trial_start_date', '') or '').strip()
     trial_end_date = (request.form.get('trial_end_date', '') or '').strip()
@@ -29380,75 +29413,83 @@ def super_admin_add_school():
     plan_max_teachers = (request.form.get('plan_max_teachers', '') or '0').strip()
     plan_storage_quota_mb = (request.form.get('plan_storage_quota_mb', '') or '0').strip()
     plan_features_json = (request.form.get('plan_features_json', '') or '{}').strip()
-    admin_username = request.form.get('admin_username', '').strip().lower()
-    admin_password = request.form.get('admin_password', '').strip()
-    
-    if school_name and admin_username and admin_password:
-        try:
-            if not is_valid_email(admin_username):
-                flash('School admin username must be a valid email address.', 'error')
-                return redirect(url_for('super_admin_add_school_page'))
-            if school_email and not is_valid_email(school_email):
-                flash('School contact email must be a valid email address.', 'error')
-                return redirect(url_for('super_admin_add_school_page'))
-            ok_pwd, pwd_msg = validate_admin_password_strength(admin_password)
-            if not ok_pwd:
-                flash(f'School admin password policy: {pwd_msg}', 'error')
-                return redirect(url_for('super_admin_add_school_page'))
+    admin_username = _first_form_value('admin_username', 'username', 'admin_email').lower()
+    admin_password = _first_form_value('admin_password', 'password')
 
-            existing_admin = get_user(admin_username)
-            if existing_admin:
-                flash(f'Admin username "{admin_username}" already exists. Please choose another username.', 'error')
-                return redirect(url_for('super_admin_add_school_page'))
+    missing_fields = []
+    if not school_name:
+        missing_fields.append('School Name')
+    if not admin_username:
+        missing_fields.append('School Admin Email')
+    if not admin_password:
+        missing_fields.append('School Admin Password')
+    if missing_fields:
+        flash('Please fill these required fields: ' + ', '.join(missing_fields), 'error')
+        return redirect(url_for('super_admin_add_school_page'))
 
-            if class_arm_ranking_mode not in {'separate', 'together'}:
-                class_arm_ranking_mode = 'separate'
-            with db_connection(commit=True) as conn:
-                c = conn.cursor()
-                db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS class_arm_ranking_mode TEXT DEFAULT 'separate'")
-                school_id = create_school_with_index_id_with_cursor(
-                    c,
-                    school_name,
-                    location,
-                    phone=phone,
-                    email=school_email,
-                    principal_name=principal_name,
-                    motto=motto,
-                )
-                db_execute(
-                    c,
-                    'UPDATE schools SET class_arm_ranking_mode = ? WHERE school_id = ?',
-                    (class_arm_ranking_mode, school_id),
-                )
-                update_school_access_policy_with_cursor(
-                    c=c,
-                    school_id=school_id,
-                    access_status=access_status,
-                    trial_start_date=trial_start_date,
-                    trial_end_date=trial_end_date,
-                    subscription_plan=subscription_plan,
-                    subscription_start_date=subscription_start_date,
-                    subscription_end_date=subscription_end_date,
-                    payment_due_date=payment_due_date,
-                    payment_grace_days=payment_grace_days,
-                    payment_reference=payment_reference,
-                    access_note=access_note,
-                    plan_max_students=plan_max_students,
-                    plan_max_teachers=plan_max_teachers,
-                    plan_storage_quota_mb=plan_storage_quota_mb,
-                    plan_features_json=plan_features_json,
-                    cbt_enabled=cbt_enabled,
-                    updated_by=session.get('user_id', ''),
-                )
-                # Create school admin user with the provided username and password.
-                password_hash = hash_password(admin_password)
-                upsert_user_with_cursor(c, admin_username, password_hash, 'school_admin', school_id)
-            
-            flash(f'School created successfully! School ID: {school_id} | Admin username: {admin_username}', 'success')
-        except Exception as e:
-            flash(f'Error creating school: {str(e)}', 'error')
-    else:
-        flash('Please fill in all fields.', 'error')
+    try:
+        if not is_valid_email(admin_username):
+            flash('School admin username must be a valid email address.', 'error')
+            return redirect(url_for('super_admin_add_school_page'))
+        if school_email and not is_valid_email(school_email):
+            flash('School contact email must be a valid email address.', 'error')
+            return redirect(url_for('super_admin_add_school_page'))
+        ok_pwd, pwd_msg = validate_admin_password_strength(admin_password)
+        if not ok_pwd:
+            flash(f'School admin password policy: {pwd_msg}', 'error')
+            return redirect(url_for('super_admin_add_school_page'))
+
+        existing_admin = get_user(admin_username)
+        if existing_admin:
+            flash(f'Admin username "{admin_username}" already exists. Please choose another username.', 'error')
+            return redirect(url_for('super_admin_add_school_page'))
+
+        if class_arm_ranking_mode not in {'separate', 'together'}:
+            class_arm_ranking_mode = 'separate'
+        with db_connection(commit=True) as conn:
+            c = conn.cursor()
+            db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS class_arm_ranking_mode TEXT DEFAULT 'separate'")
+            school_id = create_school_with_index_id_with_cursor(
+                c,
+                school_name,
+                location,
+                phone=phone,
+                email=school_email,
+                principal_name=principal_name,
+                motto=motto,
+            )
+            db_execute(
+                c,
+                'UPDATE schools SET class_arm_ranking_mode = ? WHERE school_id = ?',
+                (class_arm_ranking_mode, school_id),
+            )
+            update_school_access_policy_with_cursor(
+                c=c,
+                school_id=school_id,
+                access_status=access_status,
+                trial_start_date=trial_start_date,
+                trial_end_date=trial_end_date,
+                subscription_plan=subscription_plan,
+                subscription_start_date=subscription_start_date,
+                subscription_end_date=subscription_end_date,
+                payment_due_date=payment_due_date,
+                payment_grace_days=payment_grace_days,
+                payment_reference=payment_reference,
+                access_note=access_note,
+                plan_max_students=plan_max_students,
+                plan_max_teachers=plan_max_teachers,
+                plan_storage_quota_mb=plan_storage_quota_mb,
+                plan_features_json=plan_features_json,
+                cbt_enabled=cbt_enabled,
+                updated_by=session.get('user_id', ''),
+            )
+            # Create school admin user with the provided username and password.
+            password_hash = hash_password(admin_password)
+            upsert_user_with_cursor(c, admin_username, password_hash, 'school_admin', school_id)
+
+        flash(f'School created successfully! School ID: {school_id} | Admin username: {admin_username}', 'success')
+    except Exception as e:
+        flash(f'Error creating school: {str(e)}', 'error')
 
     return redirect(url_for('super_admin_add_school_page'))
 
