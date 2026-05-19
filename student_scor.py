@@ -5783,8 +5783,13 @@ def _store_csv_error_export(content, filename, owner_role='', owner_id='', schoo
 def init_db():
     """Initialize the database with new schema for multi-school support."""
     conn = get_db()
-    # we rely on db_execute committing each statement; this keeps the
-    # connection in a usable state even if one DDL command fails.
+    # Startup DDL needs statement-by-statement durability on Postgres.
+    # Otherwise one later rollback can wipe earlier CREATE TABLE work in the
+    # same transaction, which breaks first-time Render bootstraps.
+    try:
+        conn.autocommit = True
+    except Exception:
+        pass
     c = conn.cursor()
 
     # Fast path: if startup schema version is already applied, skip heavy DDL.
@@ -5803,6 +5808,12 @@ def init_db():
         logging.warning("Schema fast-path check failed; continuing with startup DDL: %s", exc)
 
     def safe_exec_ignore(sql):
+        if getattr(conn, 'autocommit', False):
+            try:
+                c.execute(_adapt_query(sql))
+            except Exception as e:
+                logging.info("Ignored DB migration statement error: %s", e)
+            return
         c.execute('SAVEPOINT ddl_ignore_stmt')
         try:
             c.execute(_adapt_query(sql))
@@ -5811,6 +5822,72 @@ def init_db():
             logging.info("Ignored DB migration statement error: %s", e)
         finally:
             c.execute('RELEASE SAVEPOINT ddl_ignore_stmt')
+
+    def _ensure_schools_table():
+        db_execute(c, """CREATE TABLE IF NOT EXISTS schools (
+                        id SERIAL PRIMARY KEY,
+                        school_id TEXT UNIQUE NOT NULL,
+                        school_name TEXT NOT NULL,
+                        location TEXT,
+                        school_logo TEXT,
+                        academic_year TEXT,
+                        current_term TEXT DEFAULT 'First Term',
+                        operations_enabled INTEGER DEFAULT 1,
+                        teacher_operations_enabled INTEGER DEFAULT 1,
+                        cbt_enabled INTEGER DEFAULT 1,
+                        test_enabled INTEGER DEFAULT 1,
+                        exam_enabled INTEGER DEFAULT 1,
+                        max_tests INTEGER DEFAULT 3,
+                        test_score_max INTEGER DEFAULT 30,
+                        exam_objective_max INTEGER DEFAULT 30,
+                        exam_theory_max INTEGER DEFAULT 40,
+                        grade_a_min INTEGER DEFAULT 70,
+                        grade_b_min INTEGER DEFAULT 60,
+                        grade_c_min INTEGER DEFAULT 50,
+                        grade_d_min INTEGER DEFAULT 40,
+                        grade_label_a TEXT DEFAULT 'A',
+                        grade_label_b TEXT DEFAULT 'B',
+                        grade_label_c TEXT DEFAULT 'C',
+                        grade_label_d TEXT DEFAULT 'D',
+                        grade_label_f TEXT DEFAULT 'F',
+                        grade_scale_json TEXT DEFAULT '',
+                        performance_remark_a TEXT DEFAULT '',
+                        performance_remark_b TEXT DEFAULT '',
+                        performance_remark_c TEXT DEFAULT '',
+                        performance_remark_d TEXT DEFAULT '',
+                        performance_remark_f TEXT DEFAULT '',
+                        pass_mark INTEGER DEFAULT 50,
+                        behaviour_grade_mode TEXT DEFAULT 'alpha_ad',
+                        show_positions INTEGER DEFAULT 1,
+                        ss_ranking_mode TEXT DEFAULT 'together',
+                        class_arm_ranking_mode TEXT DEFAULT 'separate',
+                        combine_third_term_results INTEGER DEFAULT 0,
+                        ss1_stream_mode TEXT DEFAULT 'separate',
+                        ss_arm_mode TEXT DEFAULT 'preserve',
+                        parent_timetable_show_teacher INTEGER DEFAULT 1,
+                        theme_primary_color TEXT DEFAULT '#1E3C72',
+                        theme_secondary_color TEXT DEFAULT '#2A5298',
+                        theme_accent_color TEXT DEFAULT '#1F7A8C',
+                        score_entry_mode TEXT DEFAULT 'teacher_subject',
+                        access_status TEXT DEFAULT 'trial_free',
+                        trial_start_date TEXT,
+                        trial_end_date TEXT,
+                        subscription_plan TEXT DEFAULT '',
+                        subscription_start_date TEXT,
+                        subscription_end_date TEXT,
+                        payment_due_date TEXT,
+                        payment_grace_days INTEGER DEFAULT 14,
+                        payment_reference TEXT DEFAULT '',
+                        access_note TEXT DEFAULT '',
+                        plan_max_students INTEGER DEFAULT 0,
+                        plan_max_teachers INTEGER DEFAULT 0,
+                        plan_storage_quota_mb INTEGER DEFAULT 0,
+                        plan_features_json TEXT DEFAULT '{}',
+                        access_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        access_updated_by TEXT DEFAULT '',
+                        leadership_title TEXT DEFAULT 'principal',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )""")
 
     def _quote_ident(name):
         return '"' + str(name).replace('"', '""') + '"'
@@ -5896,70 +5973,7 @@ def init_db():
     safe_exec_ignore('ALTER TABLE users ADD COLUMN last_login_at TIMESTAMP')
     
     # Schools table
-    db_execute(c, """CREATE TABLE IF NOT EXISTS schools (
-                        id SERIAL PRIMARY KEY,
-                        school_id TEXT UNIQUE NOT NULL,
-                        school_name TEXT NOT NULL,
-                        location TEXT,
-                        school_logo TEXT,
-                        academic_year TEXT,
-                        current_term TEXT DEFAULT 'First Term',
-                        operations_enabled INTEGER DEFAULT 1,
-                        teacher_operations_enabled INTEGER DEFAULT 1,
-                        cbt_enabled INTEGER DEFAULT 1,
-                        test_enabled INTEGER DEFAULT 1,
-                        exam_enabled INTEGER DEFAULT 1,
-                        max_tests INTEGER DEFAULT 3,
-                        test_score_max INTEGER DEFAULT 30,
-                        exam_objective_max INTEGER DEFAULT 30,
-                        exam_theory_max INTEGER DEFAULT 40,
-                        grade_a_min INTEGER DEFAULT 70,
-                        grade_b_min INTEGER DEFAULT 60,
-                        grade_c_min INTEGER DEFAULT 50,
-                        grade_d_min INTEGER DEFAULT 40,
-                        grade_label_a TEXT DEFAULT 'A',
-                        grade_label_b TEXT DEFAULT 'B',
-                        grade_label_c TEXT DEFAULT 'C',
-                        grade_label_d TEXT DEFAULT 'D',
-                        grade_label_f TEXT DEFAULT 'F',
-                        grade_scale_json TEXT DEFAULT '',
-                        performance_remark_a TEXT DEFAULT '',
-                        performance_remark_b TEXT DEFAULT '',
-                        performance_remark_c TEXT DEFAULT '',
-                        performance_remark_d TEXT DEFAULT '',
-                        performance_remark_f TEXT DEFAULT '',
-                        pass_mark INTEGER DEFAULT 50,
-                        behaviour_grade_mode TEXT DEFAULT 'alpha_ad',
-                        show_positions INTEGER DEFAULT 1,
-                        ss_ranking_mode TEXT DEFAULT 'together',
-                        class_arm_ranking_mode TEXT DEFAULT 'separate',
-                        combine_third_term_results INTEGER DEFAULT 0,
-                        ss1_stream_mode TEXT DEFAULT 'separate',
-                        ss_arm_mode TEXT DEFAULT 'preserve',
-                        parent_timetable_show_teacher INTEGER DEFAULT 1,
-                        theme_primary_color TEXT DEFAULT '#1E3C72',
-                        theme_secondary_color TEXT DEFAULT '#2A5298',
-                        theme_accent_color TEXT DEFAULT '#1F7A8C',
-                        score_entry_mode TEXT DEFAULT 'teacher_subject',
-                        access_status TEXT DEFAULT 'trial_free',
-                        trial_start_date TEXT,
-                        trial_end_date TEXT,
-                        subscription_plan TEXT DEFAULT '',
-                        subscription_start_date TEXT,
-                        subscription_end_date TEXT,
-                        payment_due_date TEXT,
-                        payment_grace_days INTEGER DEFAULT 14,
-                        payment_reference TEXT DEFAULT '',
-                        access_note TEXT DEFAULT '',
-                        plan_max_students INTEGER DEFAULT 0,
-                        plan_max_teachers INTEGER DEFAULT 0,
-                        plan_storage_quota_mb INTEGER DEFAULT 0,
-                        plan_features_json TEXT DEFAULT '{}',
-                        access_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        access_updated_by TEXT DEFAULT '',
-                        leadership_title TEXT DEFAULT 'principal',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )""")
+    _ensure_schools_table()
     safe_exec_ignore('ALTER TABLE schools ADD COLUMN operations_enabled INTEGER DEFAULT 1')
     safe_exec_ignore('ALTER TABLE schools ADD COLUMN teacher_operations_enabled INTEGER DEFAULT 1')
     safe_exec_ignore('ALTER TABLE schools ADD COLUMN cbt_enabled INTEGER DEFAULT 1')
@@ -6910,6 +6924,12 @@ def init_db():
     safe_exec_ignore("ALTER TABLE cbt_attempts ADD COLUMN integrity_flag_reason TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE cbt_attempt_answers ADD COLUMN points_awarded REAL NOT NULL DEFAULT 0")
 
+    # Persist the core schema before any later data-heal statements run.
+    # This protects first-time bootstraps on hosts where connection
+    # autocommit is not effective during import-time startup.
+    if not getattr(conn, 'autocommit', False):
+        conn.commit()
+
     # Create indexes
     db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)')
     db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_users_username_lower ON users(LOWER(username))')
@@ -7105,6 +7125,7 @@ def init_db():
     db_execute(c, 'CREATE UNIQUE INDEX IF NOT EXISTS uq_result_publications ON result_publications(school_id, classname, term, academic_year)')
     # Auto-heal legacy/orphan school references before adding FK guards.
     # This preserves rows by creating placeholder school records when needed.
+    _ensure_schools_table()
     db_execute(
         c,
         """INSERT INTO schools (school_id, school_name)
@@ -7175,7 +7196,8 @@ def init_db():
         ('schema_version', STARTUP_SCHEMA_VERSION),
     )
 
-    conn.commit()
+    if not getattr(conn, 'autocommit', False):
+        conn.commit()
     conn.close()
 
 def get_alembic_db_version():
@@ -20714,7 +20736,7 @@ def load_published_student_result(school_id, student_id, term, academic_year='',
         if academic_year and classname:
             db_execute(
                 c,
-                """SELECT firstname, classname, academic_year, term, stream, number_of_subject, subjects, scores, behaviour_json, teacher_comment, principal_comment, average_marks, grade, status
+                """SELECT firstname, classname, academic_year, term, stream, number_of_subject, subjects, scores, behaviour_json, teacher_comment, principal_comment, average_marks, grade, status, published_at
                    FROM published_student_results
                    WHERE school_id = ? AND student_id = ? AND term = ? AND COALESCE(academic_year, '') = ? AND LOWER(classname) = LOWER(?)
                    ORDER BY published_at DESC
@@ -20724,7 +20746,7 @@ def load_published_student_result(school_id, student_id, term, academic_year='',
         elif academic_year:
             db_execute(
                 c,
-                """SELECT firstname, classname, academic_year, term, stream, number_of_subject, subjects, scores, behaviour_json, teacher_comment, principal_comment, average_marks, grade, status
+                """SELECT firstname, classname, academic_year, term, stream, number_of_subject, subjects, scores, behaviour_json, teacher_comment, principal_comment, average_marks, grade, status, published_at
                    FROM published_student_results
                    WHERE school_id = ? AND student_id = ? AND term = ? AND COALESCE(academic_year, '') = ?
                    ORDER BY published_at DESC
@@ -20734,7 +20756,7 @@ def load_published_student_result(school_id, student_id, term, academic_year='',
         elif classname:
             db_execute(
                 c,
-                """SELECT firstname, classname, academic_year, term, stream, number_of_subject, subjects, scores, behaviour_json, teacher_comment, principal_comment, average_marks, grade, status
+                """SELECT firstname, classname, academic_year, term, stream, number_of_subject, subjects, scores, behaviour_json, teacher_comment, principal_comment, average_marks, grade, status, published_at
                    FROM published_student_results
                    WHERE school_id = ? AND student_id = ? AND term = ? AND LOWER(classname) = LOWER(?)
                    ORDER BY published_at DESC
@@ -20744,7 +20766,7 @@ def load_published_student_result(school_id, student_id, term, academic_year='',
         else:
             db_execute(
                 c,
-                """SELECT firstname, classname, academic_year, term, stream, number_of_subject, subjects, scores, behaviour_json, teacher_comment, principal_comment, average_marks, grade, status
+                """SELECT firstname, classname, academic_year, term, stream, number_of_subject, subjects, scores, behaviour_json, teacher_comment, principal_comment, average_marks, grade, status, published_at
                    FROM published_student_results
                    WHERE school_id = ? AND student_id = ? AND term = ?
                    ORDER BY published_at DESC
@@ -20761,8 +20783,17 @@ def load_published_student_result(school_id, student_id, term, academic_year='',
     average_marks_raw = 0
     grade_value = 'F'
     status_value = 'Fail'
+    published_at = ''
     # Backward-compatible row parsing for legacy/mocked tuples.
-    if len(row) >= 14:
+    if len(row) >= 15:
+        behaviour_raw = row[8] if row[8] else '{}'
+        teacher_comment = row[9] or ''
+        principal_comment = row[10] or ''
+        average_marks_raw = row[11]
+        grade_value = row[12]
+        status_value = row[13]
+        published_at = row[14] or ''
+    elif len(row) >= 14:
         behaviour_raw = row[8] if row[8] else '{}'
         teacher_comment = row[9] or ''
         principal_comment = row[10] or ''
@@ -20801,6 +20832,7 @@ def load_published_student_result(school_id, student_id, term, academic_year='',
         'average_marks': average_marks_val,
         'Grade': grade_value,
         'Status': status_value,
+        'published_at': published_at,
     }
 
     # if third-term and the school wants combined results, merge earlier terms
@@ -45352,7 +45384,7 @@ def verify_result_qr():
         'average_marks': snapshot.get('average_marks', 0),
         'grade': snapshot.get('Grade', ''),
         'status': snapshot.get('Status', ''),
-        'published_at': snapshot.get('published_at', ''),
+        'published_at': format_timestamp(snapshot.get('published_at', '')) if snapshot.get('published_at') else '',
     }
     return render_template('shared/result_verification.html', verified=True, reason='', details=details)
 
