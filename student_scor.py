@@ -13533,7 +13533,7 @@ def normalize_school_access_status(value, default='trial_free'):
 
 
 def normalize_school_cbt_enabled(value, default=1):
-    raw = str(value or '').strip().lower()
+    raw = '' if value is None else str(value).strip().lower()
     if raw in {'1', 'true', 'yes', 'on', 'enabled'}:
         return 1
     if raw in {'0', 'false', 'no', 'off', 'disabled'}:

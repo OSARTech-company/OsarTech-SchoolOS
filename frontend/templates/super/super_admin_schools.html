@@ -116,7 +116,7 @@
                         <div class="school-card">
                             <div class="school-card-main">
                                 <div class="school-name">{{ school.school_name }}</div>
-                                <div class="school-id">ID: {{ school.id }}</div>
+                                <div class="school-id">ID: {{ school.school_id }}</div>
                                 <div class="school-meta">
                                     Location: {{ school.location or 'Not set' }} |
                                     Phone: {{ school.phone or 'Not set' }} |
@@ -394,7 +394,6 @@
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 </body>
 </html>
-
 
 
 
