@@ -595,6 +595,8 @@ def inject_grade_label_helpers():
         'display_grade_label': display_grade_label,
         'normalize_grade_band': normalize_grade_band,
         'grade_css_class_from_grade': grade_css_class_from_grade,
+        'format_ca_slot_label': format_ca_slot_label,
+        'ca_slot_max_score': ca_slot_max_score,
     }
 
 
@@ -19728,6 +19730,54 @@ def detect_max_tests_from_scores(scores, default_max_tests=3):
     fallback = max(1, safe_int(default_max_tests, 3))
     return max_seen if max_seen > 0 else fallback
 
+def _format_score_label_value(value):
+    try:
+        numeric = round(float(value or 0), 2)
+    except (TypeError, ValueError):
+        numeric = 0.0
+    if abs(numeric - round(numeric)) <= 1e-9:
+        return str(int(round(numeric)))
+    return f"{numeric:.2f}".rstrip('0').rstrip('.')
+
+def ca_slot_max_score(max_tests_or_school, test_score_max=None):
+    """Return per-CA slot maximum based on school test total / number of tests."""
+    if isinstance(max_tests_or_school, dict):
+        school = max_tests_or_school or {}
+        max_tests = max(1, min(safe_int(school.get('max_tests', 3), 3), 10))
+        total_test_max = max(0.0, safe_float(school.get('test_score_max', 30), 30))
+    else:
+        max_tests = max(1, min(safe_int(max_tests_or_school, 3), 10))
+        total_test_max = max(0.0, safe_float(test_score_max, 30))
+    return (total_test_max / max_tests) if max_tests > 0 else total_test_max
+
+def format_ca_slot_label(slot_index, max_tests_or_school, test_score_max=None):
+    """Human-friendly CA slot label like CA1 (10)."""
+    slot_no = max(1, safe_int(slot_index, 1))
+    return f"CA{slot_no} ({_format_score_label_value(ca_slot_max_score(max_tests_or_school, test_score_max))})"
+
+def build_ca_csv_headers(max_tests_or_school, test_score_max=None):
+    if isinstance(max_tests_or_school, dict):
+        max_tests = max(1, min(safe_int((max_tests_or_school or {}).get('max_tests', 3), 3), 10))
+    else:
+        max_tests = max(1, min(safe_int(max_tests_or_school, 3), 3 if safe_int(max_tests_or_school, 3) <= 0 else 10))
+    return [f'CA{i}' for i in range(1, max_tests + 1)]
+
+def resolve_test_csv_header(headers, slot_index):
+    """Accept both legacy Test 1 and newer CA1 CSV column names."""
+    slot_no = max(1, safe_int(slot_index, 1))
+    if not isinstance(headers, dict):
+        return None
+    aliases = [
+        f'ca{slot_no}',
+        f'ca {slot_no}',
+        f'test {slot_no}',
+        f'test{slot_no}',
+        f'continuous assessment {slot_no}',
+    ]
+    for alias in aliases:
+        if alias in headers:
+            return headers[alias]
+    return None
 
 def _is_finite_number_like(value):
     if isinstance(value, (int, float)):
@@ -36380,6 +36430,7 @@ def school_admin_import_target(target):
             class_config_cache = {}
             next_index_by_class = {}
             batch_student_ids = set()
+            batch_student_identity_rows = set()
             for idx, row in enumerate(rows, start=2):
                 classname = canonicalize_classname(row.get('classname', ''))
                 term = (row.get('term', '') or '').strip()
@@ -36432,6 +36483,18 @@ def school_admin_import_target(target):
                     add_error(idx, row, f'student_id "{sid}" is duplicated in this import batch.')
                     continue
                 batch_student_ids.add(sid.lower())
+                identity_key = (
+                    full_name.strip().lower(),
+                    (row.get('date_of_birth', '') or '').strip(),
+                    normalize_student_gender(row.get('gender', '')),
+                    email,
+                    classname,
+                    term,
+                )
+                if identity_key in batch_student_identity_rows:
+                    add_error(idx, row, f'student "{full_name}" appears more than once in this import batch.')
+                    continue
+                batch_student_identity_rows.add(identity_key)
                 existing_user = get_user(sid)
                 if existing_user:
                     existing_role = (existing_user.get('role') or '').strip().lower()
@@ -37647,6 +37710,8 @@ def school_admin_add_students_by_class():
         
         # Keep only rows with name; reg no is optional.
         rows = []
+        seen_manual_reg_nos = set()
+        seen_manual_identity_rows = set()
         for idx, name in enumerate(student_names):
             if not name:
                 continue
@@ -37663,6 +37728,22 @@ def school_admin_add_students_by_class():
             if email and not is_valid_email(email):
                 flash(f'Invalid email for {name}.', 'error')
                 continue
+            reg_key = reg_no.lower()
+            if reg_key:
+                if reg_key in seen_manual_reg_nos:
+                    flash(f'Duplicate Reg No. "{reg_no}" in the submitted table. Skipped repeated row for {name}.', 'error')
+                    continue
+                seen_manual_reg_nos.add(reg_key)
+            identity_key = (
+                name.strip().lower(),
+                date_of_birth,
+                gender.strip().lower(),
+                email,
+            )
+            if identity_key in seen_manual_identity_rows:
+                flash(f'Duplicate student row detected for {name}. Skipped the repeated entry.', 'error')
+                continue
+            seen_manual_identity_rows.add(identity_key)
             rows.append({
                 'firstname': name,
                 'reg_no': reg_no,

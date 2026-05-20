@@ -304,16 +304,23 @@
         }
 
         document.getElementById('addStudentsForm').addEventListener('submit', function (e) {
+            if (this.dataset.submitting === '1') {
+                e.preventDefault();
+                return;
+            }
             const rows = Array.from(document.querySelectorAll('#studentsBody tr'));
+            const seenRows = new Set();
             for (let i = 0; i < rows.length; i++) {
                 const nameInput = rows[i].querySelector('input[name="student_name[]"]');
                 const emailInput = rows[i].querySelector('input[name="student_email[]"]');
                 const dobInput = rows[i].querySelector('input[name="date_of_birth[]"]');
                 const genderSelect = rows[i].querySelector('select[name="gender[]"]');
+                const regInput = rows[i].querySelector('input[name="reg_no[]"]');
                 const name = (nameInput && nameInput.value ? nameInput.value : '').trim();
                 const email = (emailInput && emailInput.value ? emailInput.value : '').trim();
                 const dob = (dobInput && dobInput.value ? dobInput.value : '').trim();
                 const gender = (genderSelect && genderSelect.value ? genderSelect.value : '').trim();
+                const regNo = (regInput && regInput.value ? regInput.value : '').trim();
                 if (!name && !dob && !gender) continue;
                 if (!name) {
                     e.preventDefault();
@@ -339,7 +346,23 @@
                     alert(`Row ${i + 1}: Gender is required for ${name}.`);
                     return;
                 }
+                const rowKey = [name.toLowerCase(), dob, gender.toLowerCase(), email.toLowerCase(), regNo.toLowerCase()].join('||');
+                if (seenRows.has(rowKey)) {
+                    e.preventDefault();
+                    if (typeof hideLoadingOverlay === 'function') hideLoadingOverlay();
+                    alert(`Row ${i + 1}: ${name} is duplicated in this submission table.`);
+                    return;
+                }
+                seenRows.add(rowKey);
             }
+            this.dataset.submitting = '1';
+            Array.from(this.querySelectorAll('button[type="submit"]')).forEach(function (btn) {
+                btn.disabled = true;
+                if (!btn.dataset.originalText) {
+                    btn.dataset.originalText = btn.innerHTML;
+                }
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            });
         });
     </script>
 </body>
