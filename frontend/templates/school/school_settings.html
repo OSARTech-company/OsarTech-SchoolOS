@@ -264,9 +264,9 @@
                     <input type="number" id="max_tests" name="max_tests" value="{{ settings_form.max_tests if settings_form else 3 }}" min="1" max="10">
                 </div>
                 <div class="form-group">
-                    <label for="test_score_max">Max Total Test Score (All Tests Combined):</label>
+                    <label for="test_score_max">Max Total CA Score (All CA Slots Combined):</label>
                     <input type="number" id="test_score_max" name="test_score_max" value="{{ settings_form.test_score_max if settings_form else 30 }}" min="0" max="100">
-                    <small id="test_score_rule_hint" style="color:#5a6c7d; display:block; margin-top:6px;">Each test score is calculated from the total test score.</small>
+                    <small id="test_score_rule_hint" style="color:#5a6c7d; display:block; margin-top:6px;">Each CA slot score is calculated from the total CA score.</small>
                 </div>
                 <div class="settings-actions">
                     <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Score Configuration</button>
@@ -788,7 +788,7 @@
                     examScoreEl.value = formatScoreValue(derivedExamScore);
                 }
                 if (examTotalHintEl) {
-                    examTotalHintEl.textContent = `${level.toUpperCase()} exam total is automatically ${formatScoreValue(derivedExamScore)} because total test score is ${formatScoreValue(testTotal)}.`;
+                    examTotalHintEl.textContent = `${level.toUpperCase()} exam total is automatically ${formatScoreValue(derivedExamScore)} because total CA score is ${formatScoreValue(testTotal)}.`;
                 }
                 if (examSplitHintEl) {
                     if (mode === 'combined') {

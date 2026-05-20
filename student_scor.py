@@ -19759,7 +19759,7 @@ def build_ca_csv_headers(max_tests_or_school, test_score_max=None):
     if isinstance(max_tests_or_school, dict):
         max_tests = max(1, min(safe_int((max_tests_or_school or {}).get('max_tests', 3), 3), 10))
     else:
-        max_tests = max(1, min(safe_int(max_tests_or_school, 3), 3 if safe_int(max_tests_or_school, 3) <= 0 else 10))
+        max_tests = max(1, min(safe_int(max_tests_or_school, 3), 10))
     return [f'CA{i}' for i in range(1, max_tests + 1)]
 
 def resolve_test_csv_header(headers, slot_index):
@@ -33392,7 +33392,7 @@ def school_admin_settings():
         if not (1 <= max_tests <= 10):
             return _settings_error('Maximum Number of Tests must be between 1 and 10.')
         if not (0 <= test_score_max <= 100):
-            return _settings_error('Max Total Test Score must be between 0 and 100.')
+            return _settings_error('Max Total CA Score must be between 0 and 100.')
         new_term = (request.form.get('current_term', '') or '').strip()
         if not new_term:
             new_term = (current_school.get('current_term', '') or '').strip()
@@ -33644,7 +33644,7 @@ def school_admin_settings():
                     if exam_score_max != derived_exam_score_max:
                         return _settings_error(
                             f'{level.upper()} objective + theory must add up to {derived_exam_score_max} '
-                            f'because total test score is {test_score_max}.',
+                            f'because total CA score is {test_score_max}.',
                             calendar_term_override=calendar_target_term,
                             calendar_year_override=calendar_target_year,
                         )
@@ -35671,7 +35671,7 @@ def _historical_results_template_headers_for_school(school):
     max_tests = max(1, min(safe_int((school or {}).get('max_tests', 3), 3), 10))
     headers = ['Student ID', 'Student Name', 'Subject']
     if (school or {}).get('test_enabled', 1):
-        headers.extend([f'Test {i}' for i in range(1, max_tests + 1)])
+        headers.extend(build_ca_csv_headers(max_tests))
     if (school or {}).get('exam_enabled', 1):
         # Keep both exam layouts in one template so admins can reuse it
         # across historical classes with different exam modes.
@@ -36744,15 +36744,15 @@ def school_admin_import_target(target):
                     if test_enabled:
                         total_test = 0.0
                         for i in range(1, max_tests + 1):
-                            test_header = headers.get(f'test {i}')
+                            test_header = resolve_test_csv_header(headers, i)
                             raw_test = (row.get(test_header, '') if test_header else '')
-                            test_val = 0.0 if str(raw_test).strip() == '' else parse_csv_float(raw_test, idx, f'Test {i}')
+                            test_val = 0.0 if str(raw_test).strip() == '' else parse_csv_float(raw_test, idx, f'CA{i}')
                             if test_val < 0 or test_val > test_total_max:
-                                raise ValueError(f'Row {idx}: Test {i} must be between 0 and {test_total_max:g}.')
+                                raise ValueError(f'Row {idx}: CA{i} must be between 0 and {test_total_max:g}.')
                             subject_scores[f'test_{i}'] = test_val
                             total_test += test_val
                         if total_test > test_total_max:
-                            raise ValueError(f'Row {idx}: total test score must not exceed {test_total_max:g}.')
+                            raise ValueError(f'Row {idx}: total CA score must not exceed {test_total_max:g}.')
                         subject_scores['total_test'] = total_test
                     else:
                         subject_scores['total_test'] = 0.0
@@ -41770,17 +41770,17 @@ def teacher_enter_scores():
                 for i in range(1, max_tests + 1):
                     raw_val = request.form.get(f'test_{i}_{subj_key}', 0)
                     try:
-                        test_val = parse_score_entry_number(raw_val, f'Test {i} score for {subject}')
+                        test_val = parse_score_entry_number(raw_val, f'CA{i} score for {subject}')
                     except ValueError:
-                        flash(f'Invalid Test {i} score for {subject}.', 'error')
+                        flash(f'Invalid CA{i} score for {subject}.', 'error')
                         return redirect(url_for('teacher_enter_scores', **redirect_kwargs))
                     if test_val < 0 or test_val > test_total_max:
-                        flash(f'Test {i} score for {subject} must be between 0 and {test_total_max:g}.', 'error')
+                        flash(f'CA{i} score for {subject} must be between 0 and {test_total_max:g}.', 'error')
                         return redirect(url_for('teacher_enter_scores', **redirect_kwargs))
                     subject_scores[f'test_{i}'] = test_val
                 subject_scores['total_test'] = sum(subject_scores.get(f'test_{i}', 0) for i in range(1, max_tests + 1))
                 if subject_scores['total_test'] > test_total_max:
-                    flash(f'Total test score for {subject} must not exceed {test_total_max:g}.', 'error')
+                    flash(f'Total CA score for {subject} must not exceed {test_total_max:g}.', 'error')
                     return redirect(url_for('teacher_enter_scores', **redirect_kwargs))
             else:
                 subject_scores['total_test'] = 0
@@ -42076,6 +42076,9 @@ def teacher_upload_csv():
             'updated_students': 0,
             'updated_classes': 0,
             'error_token': '',
+            'error_stage': '',
+            'upload_filename': '',
+            'detected_headers': [],
         }
         rows = []
         headers = {}
@@ -42083,6 +42086,24 @@ def teacher_upload_csv():
         current_row_num = 0
         current_row_data = None
         processed_rows = 0
+        upload_filename = ''
+
+        def fail_csv_upload(message, stage='validation'):
+            csv_result.update({
+                'success': False,
+                'message': message,
+                'processed_rows': processed_rows,
+                'error_stage': stage,
+                'upload_filename': upload_filename,
+                'detected_headers': fieldnames,
+            })
+            return render_template(
+                'teacher/teacher_upload_csv.html',
+                school=school,
+                max_tests=max(1, min(safe_int(school.get('max_tests', 3), 3), 10)),
+                exam_mode_view=exam_mode_view,
+                csv_result=csv_result,
+            )
 
         def parse_csv_float(raw_value, row_num, field_label):
             try:
@@ -42094,15 +42115,52 @@ def teacher_upload_csv():
             return value
         try:
             file = request.files.get('file')
-            if not file or not (file.filename or '').lower().endswith('.csv'):
-                raise ValueError('Please upload a valid CSV file (.csv).')
+            if not file:
+                return fail_csv_upload(
+                    'No file was received. Click "Choose File" and select your CSV before uploading.',
+                    stage='file',
+                )
+            upload_filename = (file.filename or '').strip()
+            csv_result['upload_filename'] = upload_filename
+            if not upload_filename:
+                return fail_csv_upload(
+                    'No file was selected. Choose a CSV file from your device and try again.',
+                    stage='file',
+                )
+            lower_name = upload_filename.lower()
+            if not lower_name.endswith('.csv'):
+                if lower_name.endswith(('.xlsx', '.xls')):
+                    return fail_csv_upload(
+                        f'"{upload_filename}" is an Excel file, not a CSV. Export or Save As CSV (.csv) first, then upload that CSV file.',
+                        stage='file_type',
+                    )
+                return fail_csv_upload(
+                    f'"{upload_filename}" is not a CSV file. Upload a file that ends with .csv.',
+                    stage='file_type',
+                )
 
-            csv_content = file.read().decode('utf-8-sig')
+            raw_bytes = file.read()
+            if not raw_bytes:
+                return fail_csv_upload(
+                    f'"{upload_filename}" is empty. Open it and make sure it contains a header row and score rows before uploading again.',
+                    stage='file_empty',
+                )
+            try:
+                csv_content = raw_bytes.decode('utf-8-sig')
+            except UnicodeDecodeError:
+                return fail_csv_upload(
+                    f'"{upload_filename}" could not be read as UTF-8 CSV text. Re-save it as CSV UTF-8 and upload again.',
+                    stage='encoding',
+                )
             reader = csv.DictReader(StringIO(csv_content))
             if not reader.fieldnames:
-                raise ValueError('CSV is empty or has no header row.')
+                return fail_csv_upload(
+                    f'"{upload_filename}" has no header row. The first row must include columns like Student ID, Subject, CA1, CA2, and exam columns.',
+                    stage='headers',
+                )
             rows = list(reader)
             fieldnames = [h for h in (reader.fieldnames or []) if h]
+            csv_result['detected_headers'] = fieldnames
             csv_result['total_rows'] = len(rows)
             headers = {h.strip().lower(): h for h in reader.fieldnames if h}
             has_exam_col = 'exam score' in headers
@@ -42112,7 +42170,11 @@ def teacher_upload_csv():
             score_mode = ('student id' in headers) and ('subject' in headers)
             grade_cfg = get_grade_config(school_id)
             if not score_mode:
-                raise ValueError('CSV must include "Student ID" and "Subject" columns.')
+                found = ', '.join(fieldnames[:12]) if fieldnames else 'none'
+                return fail_csv_upload(
+                    f'"{upload_filename}" is missing required headers. The CSV must include "Student ID" and "Subject". Found: {found}',
+                    stage='headers',
+                )
 
             updated_students = set()
             staged_students = {}
@@ -42193,17 +42255,17 @@ def teacher_upload_csv():
 
                 if school.get('test_enabled', 1):
                     for i in range(1, max_tests + 1):
-                        test_col = headers.get(f'test {i}')
+                        test_col = resolve_test_csv_header(headers, i)
                         raw_test = (row.get(test_col, '') if test_col else '')
                         if str(raw_test).strip() != '':
                             entry_touched = True
-                        test_val = float(subject_scores.get(f'test_{i}', 0) or 0) if str(raw_test).strip() == '' else parse_csv_float(raw_test, idx, f'Test {i} for {student_id} {subject_key}')
+                        test_val = float(subject_scores.get(f'test_{i}', 0) or 0) if str(raw_test).strip() == '' else parse_csv_float(raw_test, idx, f'CA{i} for {student_id} {subject_key}')
                         if test_val < 0 or test_val > test_total_max:
-                            raise ValueError(f'Row {idx}: Test {i} for {student_id} {subject_key} must be 0..{test_total_max:g}.')
+                            raise ValueError(f'Row {idx}: CA{i} for {student_id} {subject_key} must be 0..{test_total_max:g}.')
                         subject_scores[f'test_{i}'] = test_val
                     subject_scores['total_test'] = sum(subject_scores.get(f'test_{i}', 0) for i in range(1, max_tests + 1))
                     if subject_scores['total_test'] > test_total_max:
-                        raise ValueError(f'Row {idx}: Total test score for {student_id} {subject_key} must be <= {test_total_max:g}.')
+                        raise ValueError(f'Row {idx}: Total CA score for {student_id} {subject_key} must be <= {test_total_max:g}.')
                 else:
                     subject_scores['total_test'] = 0
 
@@ -42387,15 +42449,20 @@ def teacher_upload_csv():
                     owner_id=(session.get('user_id') or ''),
                     school_id=(school_id or ''),
                 )
+                error_message = f'{error_message} Download the error CSV to see the failing row.'
             csv_result.update({
                 'success': False,
                 'message': error_message,
                 'processed_rows': processed_rows,
                 'error_token': error_token,
+                'error_stage': 'row_validation' if current_row_num else 'processing',
+                'upload_filename': upload_filename,
+                'detected_headers': fieldnames,
             })
 
         return render_template(
             'teacher/teacher_upload_csv.html',
+            school=school,
             max_tests=max(1, min(safe_int(school.get('max_tests', 3), 3), 10)),
             exam_mode_view=exam_mode_view,
             csv_result=csv_result,
@@ -42403,6 +42470,7 @@ def teacher_upload_csv():
 
     return render_template(
         'teacher/teacher_upload_csv.html',
+        school=school,
         max_tests=max(1, min(safe_int(school.get('max_tests', 3), 3), 10)),
         exam_mode_view=exam_mode_view,
     )
@@ -42475,7 +42543,7 @@ def teacher_upload_csv_template():
             exam_mode_view = 'separate'
 
     headers = ['Student ID', 'Subject']
-    headers.extend([f'Test {i}' for i in range(1, max_tests + 1)])
+    headers.extend(build_ca_csv_headers(max_tests))
     if exam_mode_view == 'combined':
         headers.append('Exam Score')
     elif exam_mode_view == 'separate':
@@ -42498,7 +42566,7 @@ def teacher_upload_csv_template():
     sample.append('')
     writer.writerow(sample)
 
-    filename = f'score_upload_template_{exam_mode_view}_{max_tests}_tests.csv'
+    filename = f'score_upload_template_{exam_mode_view}_{max_tests}_ca_slots.csv'
     return Response(
         output.getvalue(),
         mimetype='text/csv',
@@ -42546,7 +42614,7 @@ def teacher_result_sheet_template():
 
     headers = ['Class', 'Subject']
     if include_tests:
-        headers.extend([f'Test {i}' for i in range(1, max_tests + 1)])
+        headers.extend(build_ca_csv_headers(max_tests))
     if include_exam:
         # Keep all exam score columns so one template works across combined/separate classes.
         headers.extend(['Objective', 'Theory', 'Exam Score'])
@@ -46776,15 +46844,15 @@ def _render_subject_score_sheet(role):
                 for i in range(1, max_tests + 1):
                     raw_val = request.form.get(f'test_{i}_{row_key}', 0)
                     try:
-                        test_val = parse_score_entry_number(raw_val, f'Test {i} score for {row.get("fullname") or student_id}')
+                        test_val = parse_score_entry_number(raw_val, f'CA{i} score for {row.get("fullname") or student_id}')
                     except ValueError:
-                        flash(f'Invalid Test {i} score for {row.get("fullname") or student_id}.', 'error')
+                        flash(f'Invalid CA{i} score for {row.get("fullname") or student_id}.', 'error')
                         return redirect(url_for(
                             'school_admin_subject_score_sheet' if role == 'school_admin' else 'teacher_subject_score_sheet',
                             **{'class': selected_class, 'subject': selected_subject, 'term': selected_term}
                         ))
                     if test_val < 0 or test_val > test_total_max:
-                        flash(f'Test {i} score for {row.get("fullname") or student_id} must be between 0 and {test_total_max:g}.', 'error')
+                        flash(f'CA{i} score for {row.get("fullname") or student_id} must be between 0 and {test_total_max:g}.', 'error')
                         return redirect(url_for(
                             'school_admin_subject_score_sheet' if role == 'school_admin' else 'teacher_subject_score_sheet',
                             **{'class': selected_class, 'subject': selected_subject, 'term': selected_term}
@@ -46792,7 +46860,7 @@ def _render_subject_score_sheet(role):
                     subject_scores[f'test_{i}'] = test_val
                 subject_scores['total_test'] = sum(subject_scores.get(f'test_{i}', 0) for i in range(1, max_tests + 1))
                 if subject_scores['total_test'] > test_total_max:
-                    flash(f'Total test score for {row.get("fullname") or student_id} must not exceed {test_total_max:g}.', 'error')
+                    flash(f'Total CA score for {row.get("fullname") or student_id} must not exceed {test_total_max:g}.', 'error')
                     return redirect(url_for(
                         'school_admin_subject_score_sheet' if role == 'school_admin' else 'teacher_subject_score_sheet',
                         **{'class': selected_class, 'subject': selected_subject, 'term': selected_term}

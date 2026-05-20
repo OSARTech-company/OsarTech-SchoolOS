@@ -188,9 +188,9 @@
                                 <th>Subject</th>
                                 {% if school.test_enabled %}
                                     {% for i in range(1, school.max_tests + 1) %}
-                                        <th>Test {{ i }}</th>
+                                        <th>{{ format_ca_slot_label(i, school) }}</th>
                                     {% endfor %}
-                                    <th>Total Test Score (Auto, Max {{ school.test_score_max }})</th>
+                                    <th>Total CA Score (Auto, Max {{ school.test_score_max }})</th>
                                 {% endif %}
                                 {% if school.exam_enabled %}
                                     {% if exam_config.exam_mode == 'combined' %}

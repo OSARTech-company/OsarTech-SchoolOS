@@ -60,7 +60,7 @@
                     <div class="meta-item"><div class="meta-label">Subject</div><div class="meta-value">{{ test.subject }}</div></div>
                     <div class="meta-item"><div class="meta-label">Type</div><div class="meta-value">{{ (test.assessment_type or 'test')|title }}</div></div>
                     <div class="meta-item"><div class="meta-label">Score Over</div><div class="meta-value">{{ '%.2f'|format(test.score_over or 0) }}</div></div>
-                    <div class="meta-item"><div class="meta-label">Sync Slot</div><div class="meta-value">{% if (test.assessment_type or 'test') == 'test' %}Test {{ test.test_slot or 1 }}{% else %}Exam{% endif %}</div></div>
+                    <div class="meta-item"><div class="meta-label">Sync Slot</div><div class="meta-value">{% if (test.assessment_type or 'test') == 'test' %}{{ format_ca_slot_label(test.test_slot or 1, school) }}{% else %}Exam{% endif %}</div></div>
                     <div class="meta-item"><div class="meta-label">Submitted</div><div class="meta-value">{{ submitted_count }}</div></div>
                     <div class="meta-item"><div class="meta-label">Average</div><div class="meta-value">{{ '%.2f'|format(average_score or 0) }} / {{ '%.2f'|format(max_total_marks or 0) }}</div></div>
                     <div class="meta-item"><div class="meta-label">Status</div><div class="meta-value"><span class="status-pill {{ test.status|lower }}">{{ test.status }}</span></div></div>
@@ -160,4 +160,3 @@
 {% include "shared/_loading_overlay.html" %}
 </body>
 </html>
-

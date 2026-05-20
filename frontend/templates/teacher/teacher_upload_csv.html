@@ -79,7 +79,16 @@
                 <li><strong>Processed Rows:</strong> {{ csv_result.processed_rows }}</li>
                 <li><strong>Updated Students:</strong> {{ csv_result.updated_students }}</li>
                 <li><strong>Affected Classes:</strong> {{ csv_result.updated_classes }}</li>
+                {% if csv_result.upload_filename %}
+                <li><strong>Uploaded File:</strong> {{ csv_result.upload_filename }}</li>
+                {% endif %}
+                {% if csv_result.error_stage %}
+                <li><strong>Failure Stage:</strong> {{ csv_result.error_stage|replace('_', ' ')|title }}</li>
+                {% endif %}
             </ul>
+            {% if not csv_result.success and csv_result.detected_headers %}
+            <p><strong>Detected Headers:</strong> {{ csv_result.detected_headers|join(', ') }}</p>
+            {% endif %}
             <p style="margin-top:10px;">
                 {% if csv_result.success %}
                 <a href="{{ url_for('teacher_dashboard') }}" class="btn btn-primary" style="text-decoration:none;">
@@ -104,7 +113,7 @@
                 <ul>
                     <li><code>Student ID</code> - Existing student ID</li>
                     <li><code>Subject</code> - One subject per row</li>
-                    <li><code>Test 1</code> ... <code>Test {{ max_tests }}</code> (combined test total must stay within school test maximum)</li>
+                    <li><code>CA1</code> ... <code>CA{{ max_tests }}</code> (each CA slot is {{ ca_slot_max_score(max_tests, school.test_score_max if school else 30) }} max; combined CA total must stay within school CA maximum)</li>
                     {% if exam_mode_view == 'combined' %}
                     <li><code>Exam Score</code> (your class/classes use combined exam mode)</li>
                     {% elif exam_mode_view == 'separate' %}
@@ -125,15 +134,15 @@
                 </p>
                 <p><strong>Example:</strong></p>
                 {% if exam_mode_view == 'combined' %}
-                <pre>Student ID,Subject,Test 1,Test 2,Exam Score,Teacher Comment
+                <pre>Student ID,Subject,CA1,CA2,Exam Score,Teacher Comment
 26/testinge/1/26,Mathematics,10,9,58,Good work
 26/testinge/1/26,English,8,10,52,Keep improving</pre>
                 {% elif exam_mode_view == 'separate' %}
-                <pre>Student ID,Subject,Test 1,Test 2,Objective,Theory,Teacher Comment
+                <pre>Student ID,Subject,CA1,CA2,Objective,Theory,Teacher Comment
 26/testinge/1/26,Mathematics,10,9,25,30,Good work
 26/testinge/1/26,English,8,10,20,28,Keep improving</pre>
                 {% else %}
-                <pre>Student ID,Subject,Test 1,Test 2,Objective,Theory,Exam Score,Teacher Comment
+                <pre>Student ID,Subject,CA1,CA2,Objective,Theory,Exam Score,Teacher Comment
 26/testinge/1/26,Mathematics,10,9,25,30,,Separate-mode class
 26/testinge/1/26,English,8,10,,,52,Combined-mode class</pre>
                 {% endif %}

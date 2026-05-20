@@ -117,7 +117,7 @@
         <hr>
         <h3>Historical Results Backfill</h3>
         <p class="note">Use this to import older published results without changing the school's active term. Each upload is for one class + one term + one academic year, and the CSV can contain all students in that class. To backfill the last two terms, repeat this import for each term.</p>
-        <p class="note">CSV columns: Student ID, Student Name (optional), Subject, Test 1...Test {{ school.max_tests if school and school.max_tests else 3 }}, Objective, Theory, Exam Score, Teacher Comment, Principal Comment, Stream. The app will use Objective/Theory or Exam Score based on the selected class exam mode.</p>
+        <p class="note">CSV columns: Student ID, Student Name (optional), Subject, CA1...CA{{ school.max_tests if school and school.max_tests else 3 }}, Objective, Theory, Exam Score, Teacher Comment, Principal Comment, Stream. The app will use Objective/Theory or Exam Score based on the selected class exam mode.</p>
         <p>
             <a class="btn btn-secondary" href="{{ url_for('school_admin_historical_results_template') }}">Download Historical Results Template</a>
         </p>

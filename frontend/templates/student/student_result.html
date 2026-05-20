@@ -1509,7 +1509,7 @@
             <div class="table-title">Subject Performance Details</div>
             {% set combined_exam = exam_config and exam_config.exam_mode == 'combined' %}
             <div class="table-support">
-                <span class="table-pill"><i class="fas fa-layer-group"></i> {{ result_max_tests }} Test{{ '' if result_max_tests == 1 else 's' }}</span>
+                <span class="table-pill"><i class="fas fa-layer-group"></i> {{ result_max_tests }} CA Slot{{ '' if result_max_tests == 1 else 's' }}</span>
                 {% if combined_exam %}
                 <span class="table-pill"><i class="fas fa-file-pen"></i> Combined Exam Score</span>
                 {% else %}
@@ -1532,7 +1532,7 @@
                     </tr>
                     <tr>
                         {% for i in range(1, result_max_tests + 1) %}
-                        <th>Test {{ i }}</th>
+                        <th>{{ format_ca_slot_label(i, result_max_tests, school.test_score_max if school else 30) }}</th>
                         {% endfor %}
                         {% if combined_exam %}
                             <th>Exam Score</th>
@@ -1547,7 +1547,7 @@
                     <tr>
                         <td data-label="Subject">{{ subject }}</td>
                         {% for i in range(1, result_max_tests + 1) %}
-                        <td class="score-cell" data-label="Test {{ i }}">{{ s.get('test_' ~ i, '-') }}</td>
+                        <td class="score-cell" data-label="{{ format_ca_slot_label(i, result_max_tests, school.test_score_max if school else 30) }}">{{ s.get('test_' ~ i, '-') }}</td>
                         {% endfor %}
                         {% if combined_exam %}
                             <td class="score-cell" data-label="Exam Score">{{ s.get('exam_score', s.get('total_exam', '-')) }}</td>

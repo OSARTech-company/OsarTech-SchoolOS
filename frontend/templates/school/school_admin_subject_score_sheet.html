@@ -331,9 +331,9 @@
                                         <th>Student ID</th>
                                         {% if school.test_enabled %}
                                             {% for i in range(1, max_tests + 1) %}
-                                            <th>Test {{ i }}</th>
+                                            <th>{{ format_ca_slot_label(i, max_tests, school.test_score_max if school else 30) }}</th>
                                             {% endfor %}
-                                            <th>Total Test</th>
+                                            <th>Total CA</th>
                                         {% endif %}
                                         {% if school.exam_enabled %}
                                             {% if exam_config.exam_mode == 'combined' %}
