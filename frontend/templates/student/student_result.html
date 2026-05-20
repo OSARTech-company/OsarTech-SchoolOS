@@ -806,6 +806,22 @@
             font-size: var(--font-sm);
         }
 
+        .result-switch-form,
+        .result-switch-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .result-switch-form {
+            margin: 0;
+        }
+
+        .result-switch-label {
+            font-weight: 600;
+        }
+
         .notice-band {
             padding: 12px 22px;
             border-bottom: 1px solid var(--school-border-soft);
@@ -892,7 +908,12 @@
             font-size: var(--font-sm);
             color: var(--school-muted);
             line-height: 1.5;
-            word-break: break-all;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+
+        .verification-text a {
+            overflow-wrap: anywhere;
         }
 
         .chart-wrapper {
@@ -1143,6 +1164,26 @@
         }
 
         @media (max-width: 720px) {
+            .header-band {
+                padding: 14px 16px;
+                align-items: stretch;
+            }
+            .header-band > * {
+                width: 100%;
+            }
+            .result-switch-form {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            .result-switch-form .btn,
+            .result-switch-form select,
+            .result-switch-actions .btn {
+                width: 100%;
+            }
+            .result-switch-actions {
+                width: 100%;
+            }
             .subject-performance-table thead,
             .subject-performance-table tfoot {
                 display: none;
@@ -1204,6 +1245,52 @@
             .table-wrap table {
                 min-width: 0;
                 margin-bottom: 0;
+            }
+            .behaviour-table thead {
+                display: none;
+            }
+            .behaviour-table,
+            .behaviour-table tbody,
+            .behaviour-table tr,
+            .behaviour-table td {
+                display: block;
+                width: 100%;
+            }
+            .behaviour-table tbody tr {
+                margin: 0 0 14px;
+                border: 1px solid var(--school-border-soft);
+                border-radius: 14px;
+                overflow: hidden;
+                background: #fff;
+                box-shadow: 0 10px 20px rgba(17, 24, 39, 0.05);
+            }
+            .behaviour-table tbody td {
+                display: grid;
+                grid-template-columns: minmax(96px, 126px) 1fr;
+                gap: 10px;
+                padding: 10px 12px;
+                text-align: left;
+                border-bottom: 1px solid var(--school-border-soft);
+            }
+            .behaviour-table tbody td::before {
+                content: attr(data-label);
+                font-size: 10.5px;
+                font-weight: 800;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: var(--school-muted);
+            }
+            .behaviour-table tbody td:first-child {
+                grid-template-columns: 1fr;
+                font-size: 15px;
+                font-weight: 700;
+                background: linear-gradient(135deg, rgba(42, 82, 152, 0.10), rgba(31, 122, 140, 0.04));
+            }
+            .behaviour-table tbody td:first-child::before {
+                display: none;
+            }
+            .behaviour-table tbody td:last-child {
+                border-bottom: 0;
             }
         }
     </style>
@@ -1383,8 +1470,8 @@
                 - {{ student.class_name }}
             </div>
             {% if available_result_classes %}
-            <form method="get" action="{{ url_for(term_endpoint, student_id=student.student_id, student_key=student_key if is_parent_view else None) }}" style="display:flex; gap:8px; align-items:center; margin:0;">
-                <label for="class_name" style="font-weight:600;">Class:</label>
+            <form method="get" action="{{ url_for(term_endpoint, student_id=student.student_id, student_key=student_key if is_parent_view else None) }}" class="result-switch-form">
+                <label for="class_name" class="result-switch-label">Class:</label>
                 <select id="class_name" name="class_name" class="btn btn-back" style="padding:8px 12px;">
                     <option value="">All Published Classes</option>
                     {% for c in available_result_classes %}
@@ -1394,7 +1481,7 @@
                 <button type="submit" class="btn btn-back" style="padding:8px 12px;">Search</button>
             </form>
             {% endif %}
-            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <div class="result-switch-actions">
                 {% if prev_term and (session.get('role') == 'student' or session.get('role') == 'school_admin' or session.get('role') == 'parent') %}
                 <a href="{{ url_for(term_endpoint, term=prev_term.token, student_id=student.student_id, class_name=selected_result_class, student_key=student_key if is_parent_view else None) }}" class="btn btn-back" style="padding:8px 12px;">
                     <i class="fas fa-arrow-left"></i> {{ prev_term.label }}
@@ -1502,7 +1589,7 @@
         <div class="subjects-table">
             <div class="table-title">Behaviour Assessment (Affective Domain)</div>
             <div class="table-wrap">
-            <table>
+            <table class="behaviour-table">
                 <thead>
                     <tr>
                         <th>Trait</th>
@@ -1513,9 +1600,9 @@
                 <tbody>
                     {% for trait, grade in (student.behaviour_assessment or {}).items() %}
                     <tr>
-                        <td style="text-align:left; font-weight:bold;">{{ trait }}</td>
-                        <td>{{ grade or '-' }}</td>
-                        <td>{{ (behaviour_grade_scale or {}).get(grade, '-') }}</td>
+                        <td data-label="Trait" style="text-align:left; font-weight:bold;">{{ trait }}</td>
+                        <td data-label="Grade">{{ grade or '-' }}</td>
+                        <td data-label="Meaning">{{ (behaviour_grade_scale or {}).get(grade, '-') }}</td>
                     </tr>
                     {% endfor %}
                     {% if not (student.behaviour_assessment or {}) %}

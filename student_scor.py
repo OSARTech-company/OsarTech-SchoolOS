@@ -35617,6 +35617,124 @@ def school_admin_dispute_thread(dispute_id):
         total_comments=total_comments,
     )
 
+def _historical_results_template_headers_for_school(school):
+    max_tests = max(1, min(safe_int((school or {}).get('max_tests', 3), 3), 10))
+    headers = ['Student ID', 'Student Name', 'Subject']
+    if (school or {}).get('test_enabled', 1):
+        headers.extend([f'Test {i}' for i in range(1, max_tests + 1)])
+    if (school or {}).get('exam_enabled', 1):
+        # Keep both exam layouts in one template so admins can reuse it
+        # across historical classes with different exam modes.
+        headers.extend(['Objective', 'Theory', 'Exam Score'])
+    headers.extend(['Teacher Comment', 'Principal Comment', 'Stream'])
+    return headers
+
+@app.route('/school-admin/historical-results-template')
+def school_admin_historical_results_template():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    school = get_school(school_id) or {}
+    max_tests = max(1, min(safe_int(school.get('max_tests', 3), 3), 10))
+    headers = _historical_results_template_headers_for_school(school)
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(headers)
+
+    sample_row = ['26/school/001/26', 'Jane Doe', 'Mathematics']
+    if school.get('test_enabled', 1):
+        sample_row.extend(['' for _ in range(max_tests)])
+    if school.get('exam_enabled', 1):
+        sample_row.extend(['', '', ''])
+    sample_row.extend(['Consistent effort.', 'Keep it up.', 'Science'])
+    writer.writerow(sample_row)
+
+    second_row = ['26/school/001/26', 'Jane Doe', 'English Language']
+    if school.get('test_enabled', 1):
+        second_row.extend(['' for _ in range(max_tests)])
+    if school.get('exam_enabled', 1):
+        second_row.extend(['', '', ''])
+    second_row.extend(['Consistent effort.', 'Keep it up.', 'Science'])
+    writer.writerow(second_row)
+
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=historical_results_import_template.csv'},
+    )
+
+@app.route('/school-admin/historical-results-template-prefill')
+def school_admin_historical_results_template_prefill():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+
+    classname = canonicalize_classname(request.args.get('classname', ''))
+    if not classname:
+        flash('Select a class to generate the prefilled historical template.', 'error')
+        return redirect(url_for('school_admin_bulk_tools'))
+    if not is_secondary_classname(classname):
+        flash('Historical template class must be a secondary class (JSS/SS).', 'error')
+        return redirect(url_for('school_admin_bulk_tools'))
+
+    school = get_school(school_id) or {}
+    students_map = load_students(school_id, class_filter=classname)
+    students = sorted(
+        [
+            (sid, item)
+            for sid, item in (students_map or {}).items()
+            if canonicalize_classname(item.get('classname', '')) == classname
+        ],
+        key=lambda pair: str(pair[1].get('firstname', '')).lower(),
+    )
+    if not students:
+        flash(f'No active students were found in {classname} for the prefilled historical template.', 'error')
+        return redirect(url_for('school_admin_bulk_tools'))
+
+    headers = _historical_results_template_headers_for_school(school)
+    max_tests = max(1, min(safe_int(school.get('max_tests', 3), 3), 10))
+    test_enabled = bool(school.get('test_enabled', 1))
+    exam_enabled = bool(school.get('exam_enabled', 1))
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(headers)
+
+    for student_id, student in students:
+        subjects = _dedupe_keep_order(
+            normalize_subjects_list(get_student_offered_subjects_for_class(student, school_id, school=school))
+        )
+        if not subjects:
+            continue
+        stream_value = (student.get('stream') or '').strip()
+        if not class_uses_stream_for_school(school, classname):
+            stream_value = 'N/A'
+        for subject in subjects:
+            row = [
+                student_id,
+                student.get('firstname', '') or '',
+                subject,
+            ]
+            if test_enabled:
+                row.extend(['' for _ in range(max_tests)])
+            if exam_enabled:
+                row.extend(['', '', ''])
+            row.extend(['', '', stream_value])
+            writer.writerow(row)
+
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename=historical_results_{classname}_prefill.csv'},
+    )
+
 @app.route('/school-admin/bulk-tools', methods=['GET'])
 def school_admin_bulk_tools():
     if session.get('role') != 'school_admin':
@@ -35626,6 +35744,8 @@ def school_admin_bulk_tools():
     if not school_id:
         flash('School session is missing. Please log in again.', 'error')
         return redirect(url_for('login'))
+    school = get_school(school_id) or {}
+    historical_class_options = get_secondary_school_classnames(school_id) or []
     schedule = get_backup_schedule_settings(school_id)
     storage_usage = compute_school_storage_usage(school_id)
     backup_health = get_backup_health_summary(school_id, days=30)
@@ -35670,6 +35790,8 @@ def school_admin_bulk_tools():
         error_preview_headers=error_preview_headers,
         error_preview_rows=error_preview_rows,
         error_preview_truncated=error_preview_truncated,
+        school=school,
+        historical_class_options=historical_class_options,
         backup_schedule=schedule,
         storage_usage=storage_usage,
         backup_health=backup_health,
@@ -36231,6 +36353,7 @@ def school_admin_import_target(target):
         'students': ['firstname', 'classname', 'term'],
         'teachers': ['user_id', 'firstname', 'lastname'],
         'class_assignments': ['teacher_id', 'classname', 'term', 'academic_year'],
+        'historical_results': ['student id', 'subject'],
     }
     if target_key not in required_by_target:
         flash('Invalid import target.', 'error')
@@ -36243,6 +36366,8 @@ def school_admin_import_target(target):
     error_rows = []
     processed = 0
     imported = 0
+    import_details = ''
+    audit_payload = {'dry_run': dry_run}
     def add_error(row_num, row_obj, message):
         out = {k: (row_obj.get(k, '') if isinstance(row_obj, dict) else '') for k in (reader.fieldnames or [])}
         out['Error'] = message
@@ -36475,6 +36600,321 @@ def school_admin_import_target(target):
                     imported += 1
                 except Exception as exc:
                     add_error(idx, row, str(exc))
+        elif target_key == 'historical_results':
+            school = get_school(school_id) or {}
+            classname = canonicalize_classname(request.form.get('classname', ''))
+            term = (request.form.get('term', '') or '').strip()
+            academic_year = (request.form.get('academic_year', '') or '').strip()
+            teacher_name_override = ' '.join((request.form.get('teacher_name', '') or '').strip().split())
+            principal_name_override = ' '.join((request.form.get('principal_name', '') or '').strip().split())
+            replace_existing = (request.form.get('replace_existing', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+            if not classname:
+                flash('Enter the historical class for this import.', 'error')
+                return redirect(url_for('school_admin_bulk_tools'))
+            if not is_secondary_classname(classname):
+                flash('Historical class must be a secondary class (JSS/SS).', 'error')
+                return redirect(url_for('school_admin_bulk_tools'))
+            if term not in {'First Term', 'Second Term', 'Third Term'}:
+                flash('Select a valid historical term.', 'error')
+                return redirect(url_for('school_admin_bulk_tools'))
+            if not re.fullmatch(r'^\d{4}-\d{4}$', academic_year):
+                flash('Historical academic year must be in YYYY-YYYY format.', 'error')
+                return redirect(url_for('school_admin_bulk_tools'))
+
+            max_tests = max(1, min(safe_int(school.get('max_tests', 3), 3), 10))
+            test_enabled = bool(school.get('test_enabled', 1))
+            exam_enabled = bool(school.get('exam_enabled', 1))
+            exam_config = get_assessment_config_for_class(school_id, classname)
+            test_total_max = max(0.0, safe_float(school.get('test_score_max', 30), 30))
+            stream_required = class_uses_stream_for_school(school, classname)
+            grade_cfg = get_grade_config(school_id)
+            historical_teacher_name = teacher_name_override or 'Historical Import'
+            historical_principal_name = principal_name_override or (school.get('principal_name', '') or '').strip()
+            actor_user_id = (session.get('user_id') or '').strip()
+            has_obj_col = 'objective' in headers
+            has_theory_col = 'theory' in headers
+            has_exam_col = 'exam score' in headers
+            student_cache = {}
+            staged_results = {}
+            seen_subject_rows = set()
+
+            def parse_csv_float(raw_value, row_num, field_label):
+                try:
+                    value = float(raw_value)
+                except (TypeError, ValueError):
+                    raise ValueError(f'Row {row_num}: {field_label} must be a number.')
+                if not math.isfinite(value):
+                    raise ValueError(f'Row {row_num}: {field_label} is invalid.')
+                return value
+
+            for idx, row in enumerate(rows, start=2):
+                raw_student_id = (row.get(headers['student id'], '') or '').strip()
+                raw_subject = (row.get(headers['subject'], '') or '').strip()
+                if not raw_student_id and not raw_subject:
+                    continue
+                processed += 1
+                student_id = raw_student_id
+                subject = normalize_subject_name(raw_subject)
+                if not student_id:
+                    add_error(idx, row, 'Student ID is required.')
+                    continue
+                if not subject:
+                    add_error(idx, row, 'Subject is required.')
+                    continue
+
+                student = student_cache.get(student_id)
+                if student is None:
+                    student = load_student(school_id, student_id)
+                    student_cache[student_id] = student
+                if not student:
+                    add_error(idx, row, f'student "{student_id}" was not found in this school.')
+                    continue
+
+                row_key = (student_id.lower(), subject.lower())
+                if row_key in seen_subject_rows:
+                    add_error(idx, row, f'Duplicate subject row for student "{student_id}" and subject "{subject}".')
+                    continue
+                seen_subject_rows.add(row_key)
+
+                try:
+                    subject_scores = {}
+                    if test_enabled:
+                        total_test = 0.0
+                        for i in range(1, max_tests + 1):
+                            test_header = headers.get(f'test {i}')
+                            raw_test = (row.get(test_header, '') if test_header else '')
+                            test_val = 0.0 if str(raw_test).strip() == '' else parse_csv_float(raw_test, idx, f'Test {i}')
+                            if test_val < 0 or test_val > test_total_max:
+                                raise ValueError(f'Row {idx}: Test {i} must be between 0 and {test_total_max:g}.')
+                            subject_scores[f'test_{i}'] = test_val
+                            total_test += test_val
+                        if total_test > test_total_max:
+                            raise ValueError(f'Row {idx}: total test score must not exceed {test_total_max:g}.')
+                        subject_scores['total_test'] = total_test
+                    else:
+                        subject_scores['total_test'] = 0.0
+
+                    if exam_enabled:
+                        exam_mode = (exam_config.get('exam_mode') or 'separate').strip().lower()
+                        if exam_mode == 'combined':
+                            if not has_exam_col:
+                                raise ValueError('CSV must include "Exam Score" for combined exam mode classes.')
+                            if (
+                                (has_obj_col and str(row.get(headers['objective'], '') or '').strip())
+                                or (has_theory_col and str(row.get(headers['theory'], '') or '').strip())
+                            ):
+                                raise ValueError(f'Row {idx}: combined exam mode accepts Exam Score only.')
+                            raw_exam = row.get(headers.get('exam score'), '') if headers.get('exam score') else ''
+                            exam_score = 0.0 if str(raw_exam).strip() == '' else parse_csv_float(raw_exam, idx, 'Exam Score')
+                            exam_max = max(0.0, safe_float(exam_config.get('exam_score_max', 70), 70))
+                            if exam_score < 0 or exam_score > exam_max:
+                                raise ValueError(f'Row {idx}: Exam Score must be between 0 and {exam_max:g}.')
+                            subject_scores['objective'] = 0.0
+                            subject_scores['theory'] = 0.0
+                            subject_scores['exam_score'] = exam_score
+                            subject_scores['total_exam'] = exam_score
+                            subject_scores['exam_mode'] = 'combined'
+                        else:
+                            if not has_obj_col or not has_theory_col:
+                                raise ValueError('CSV must include both "Objective" and "Theory" for separate exam mode classes.')
+                            if has_exam_col and str(row.get(headers['exam score'], '') or '').strip():
+                                raise ValueError(f'Row {idx}: separate exam mode does not accept Exam Score values.')
+                            raw_obj = row.get(headers.get('objective'), '') if headers.get('objective') else ''
+                            raw_theory = row.get(headers.get('theory'), '') if headers.get('theory') else ''
+                            objective = 0.0 if str(raw_obj).strip() == '' else parse_csv_float(raw_obj, idx, 'Objective')
+                            theory = 0.0 if str(raw_theory).strip() == '' else parse_csv_float(raw_theory, idx, 'Theory')
+                            objective_max = max(0.0, safe_float(exam_config.get('objective_max', 30), 30))
+                            theory_max = max(0.0, safe_float(exam_config.get('theory_max', 40), 40))
+                            exam_total_max = max(
+                                0.0,
+                                safe_float(exam_config.get('exam_score_max', objective_max + theory_max), objective_max + theory_max),
+                            )
+                            if objective < 0 or objective > objective_max:
+                                raise ValueError(f'Row {idx}: Objective must be between 0 and {objective_max:g}.')
+                            if theory < 0 or theory > theory_max:
+                                raise ValueError(f'Row {idx}: Theory must be between 0 and {theory_max:g}.')
+                            if objective + theory > exam_total_max:
+                                raise ValueError(f'Row {idx}: Objective + Theory must not exceed {exam_total_max:g}.')
+                            subject_scores['objective'] = objective
+                            subject_scores['theory'] = theory
+                            subject_scores['total_exam'] = objective + theory
+                            subject_scores['exam_mode'] = 'separate'
+                    else:
+                        subject_scores['total_exam'] = 0.0
+
+                    overall_mark = float(subject_scores.get('total_test', 0) or 0) + float(subject_scores.get('total_exam', 0) or 0)
+                    if overall_mark > 100:
+                        raise ValueError(f'Row {idx}: total score for "{subject}" exceeds 100.')
+                    subject_scores['overall_mark'] = overall_mark
+                    subject_scores['total_score'] = overall_mark
+                    subject_scores['grade'] = grade_from_score(overall_mark, grade_cfg)
+                    subject_scores['entry_confirmed'] = 1
+                    subject_scores['entry_confirmed_v2'] = 1
+                except ValueError as exc:
+                    add_error(idx, row, str(exc))
+                    continue
+
+                student_name_header = headers.get('student name')
+                teacher_comment_header = headers.get('teacher comment')
+                principal_comment_header = headers.get('principal comment')
+                stream_header = headers.get('stream')
+
+                csv_student_name = normalize_person_name(row.get(student_name_header, '')) if student_name_header else ''
+                csv_teacher_comment = (row.get(teacher_comment_header, '') or '').strip() if teacher_comment_header else ''
+                csv_principal_comment = (row.get(principal_comment_header, '') or '').strip() if principal_comment_header else ''
+                csv_stream = (row.get(stream_header, '') or '').strip() if stream_header else ''
+
+                entry = staged_results.setdefault(
+                    student_id,
+                    {
+                        'student_id': student_id,
+                        'firstname': csv_student_name or (student.get('firstname', '') or '').strip() or student_id,
+                        'scores': {},
+                        'subjects': [],
+                        'teacher_comment': '',
+                        'principal_comment': '',
+                        'stream': '',
+                    },
+                )
+
+                if csv_student_name and entry['firstname'] != csv_student_name:
+                    add_error(idx, row, f'Conflicting Student Name values found for "{student_id}".')
+                    continue
+                if csv_teacher_comment:
+                    if entry['teacher_comment'] and entry['teacher_comment'] != csv_teacher_comment:
+                        add_error(idx, row, f'Conflicting Teacher Comment values found for "{student_id}".')
+                        continue
+                    entry['teacher_comment'] = csv_teacher_comment
+                if csv_principal_comment:
+                    if entry['principal_comment'] and entry['principal_comment'] != csv_principal_comment:
+                        add_error(idx, row, f'Conflicting Principal Comment values found for "{student_id}".')
+                        continue
+                    entry['principal_comment'] = csv_principal_comment
+
+                desired_stream = csv_stream or entry.get('stream') or (student.get('stream', '') or '').strip()
+                if stream_required:
+                    normalized_stream, stream_error = normalize_stream_for_class(classname, desired_stream, school=school)
+                    if stream_error:
+                        add_error(idx, row, f'Row {idx}: provide a valid Stream for {classname} ({student_id}).')
+                        continue
+                    entry['stream'] = normalized_stream
+                else:
+                    entry['stream'] = 'N/A'
+
+                entry['scores'][subject] = subject_scores
+                if subject not in entry['subjects']:
+                    entry['subjects'].append(subject)
+
+            imported = len(staged_results)
+            audit_payload.update(
+                {
+                    'classname': classname,
+                    'term': term,
+                    'academic_year': academic_year,
+                    'replace_existing': replace_existing,
+                }
+            )
+
+            if staged_results and not dry_run and not (replace_existing and error_rows):
+                behaviour_payload = normalize_behaviour_assessment({}, school)
+                publish_at = datetime.now().isoformat()
+                with db_connection(commit=True) as conn:
+                    c = conn.cursor()
+                    if replace_existing:
+                        db_execute(
+                            c,
+                            """DELETE FROM published_student_results
+                               WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
+                                 AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+                            (school_id, classname, term, academic_year),
+                        )
+                    for staged in staged_results.values():
+                        subjects = _dedupe_keep_order(normalize_subjects_list(staged.get('subjects', [])))
+                        scores = staged.get('scores', {}) if isinstance(staged.get('scores', {}), dict) else {}
+                        average_marks = compute_average_marks_from_scores(scores, subjects=subjects)
+                        db_execute(
+                            c,
+                            """INSERT INTO published_student_results
+                               (school_id, student_id, firstname, classname, academic_year, term, stream, number_of_subject, subjects, scores, behaviour_json, teacher_comment, principal_comment, average_marks, grade, status, published_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               ON CONFLICT(school_id, student_id, academic_year, term) DO UPDATE SET
+                                 firstname = excluded.firstname,
+                                 classname = excluded.classname,
+                                 academic_year = excluded.academic_year,
+                                 stream = excluded.stream,
+                                 number_of_subject = excluded.number_of_subject,
+                                 subjects = excluded.subjects,
+                                 scores = excluded.scores,
+                                 behaviour_json = excluded.behaviour_json,
+                                 teacher_comment = excluded.teacher_comment,
+                                 principal_comment = excluded.principal_comment,
+                                 average_marks = excluded.average_marks,
+                                 grade = excluded.grade,
+                                 status = excluded.status,
+                                 published_at = excluded.published_at""",
+                            (
+                                school_id,
+                                staged.get('student_id', ''),
+                                staged.get('firstname', ''),
+                                classname,
+                                academic_year,
+                                term,
+                                staged.get('stream', 'N/A') or 'N/A',
+                                len(subjects),
+                                json.dumps(subjects),
+                                json.dumps(scores),
+                                json.dumps(behaviour_payload),
+                                staged.get('teacher_comment', ''),
+                                staged.get('principal_comment', ''),
+                                float(average_marks),
+                                grade_from_score(average_marks, grade_cfg),
+                                status_from_score(average_marks, grade_cfg),
+                                publish_at,
+                            ),
+                        )
+                    _set_result_published_with_cursor(
+                        c=c,
+                        school_id=school_id,
+                        classname=classname,
+                        term=term,
+                        academic_year=academic_year,
+                        teacher_id=actor_user_id or 'historical_import',
+                        is_published=True,
+                        teacher_name=historical_teacher_name,
+                        principal_name=historical_principal_name,
+                    )
+                    try:
+                        db_execute(
+                            c,
+                            """INSERT INTO term_edit_locks
+                               (school_id, classname, term, academic_year, is_locked, unlocked_until, unlock_reason, unlocked_by, updated_at)
+                               VALUES (?, ?, ?, ?, 1, NULL, '', ?, CURRENT_TIMESTAMP)
+                               ON CONFLICT(school_id, classname, term, academic_year) DO UPDATE SET
+                                 is_locked = 1,
+                                 unlocked_until = NULL,
+                                 updated_at = CURRENT_TIMESTAMP""",
+                            (school_id, classname, term, academic_year, actor_user_id or 'historical_import'),
+                        )
+                    except Exception as lock_exc:
+                        logging.warning("Failed to enforce term edit lock after historical import: %s", lock_exc)
+
+            if processed <= 0:
+                raise ValueError('No historical result rows found. Fill at least Student ID and Subject in one row.')
+
+            if replace_existing and error_rows and not dry_run:
+                import_details = (
+                    f'Historical results import blocked: replace existing was selected, but {len(error_rows)} row(s) failed validation. '
+                    'No published historical results were changed.'
+                )
+            elif dry_run:
+                import_details = (
+                    f'Historical results dry-run checked {processed} subject row(s) and built {imported} student result snapshot(s).'
+                )
+            else:
+                import_details = (
+                    f'Historical results import processed {processed} subject row(s) and '
+                    f'{"prepared" if error_rows else "saved"} {imported} student result snapshot(s).'
+                )
         else:
             raise ValueError('Invalid import target.')
         error_token = ''
@@ -36496,22 +36936,20 @@ def school_admin_import_target(target):
             session['last_import_target'] = target_key
             session['last_import_failed_rows'] = len(error_rows)
             session['last_import_at'] = datetime.now().isoformat()
-            flash(
-                f'{target_key.replace("_", " ").title()} {"dry-run" if dry_run else "import"} finished: {imported} valid row(s), {len(error_rows)} failed rows.',
-                'error',
-            )
+            flash(import_details or f'{target_key.replace("_", " ").title()} {"dry-run" if dry_run else "import"} finished: {imported} valid row(s), {len(error_rows)} failed rows.', 'error')
         else:
             session.pop('last_import_error_token', None)
             session.pop('last_import_target', None)
             session.pop('last_import_failed_rows', None)
             session.pop('last_import_at', None)
-            msg = f'{target_key.replace("_", " ").title()} {"dry-run" if dry_run else "import"} completed. {"Validated" if dry_run else "Imported"} {imported} row(s).'
+            msg = import_details or f'{target_key.replace("_", " ").title()} {"dry-run" if dry_run else "import"} completed. {"Validated" if dry_run else "Imported"} {imported} row(s).'
             flash(msg, 'success')
+        audit_payload.update({'processed': processed, 'valid_rows': imported, 'failed_rows': len(error_rows)})
         record_admin_action_audit(
             school_id,
             'bulk_import',
             target_scope=target_key,
-            payload={'dry_run': dry_run, 'processed': processed, 'valid_rows': imported, 'failed_rows': len(error_rows)},
+            payload=audit_payload,
         )
         return redirect(url_for('school_admin_bulk_tools', error_token=error_token))
     except Exception as exc:

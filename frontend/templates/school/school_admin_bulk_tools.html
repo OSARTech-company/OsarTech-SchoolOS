@@ -114,6 +114,46 @@
             <label style="margin-left:10px;"><input type="checkbox" name="dry_run" value="1"> Dry run only</label>
             <button class="btn btn-primary" type="submit">Import Class Assignments CSV</button>
         </form>
+        <hr>
+        <h3>Historical Results Backfill</h3>
+        <p class="note">Use this to import older published results without changing the school's active term. Each upload is for one class + one term + one academic year, and the CSV can contain all students in that class. To backfill the last two terms, repeat this import for each term.</p>
+        <p class="note">CSV columns: Student ID, Student Name (optional), Subject, Test 1...Test {{ school.max_tests if school and school.max_tests else 3 }}, Objective, Theory, Exam Score, Teacher Comment, Principal Comment, Stream. The app will use Objective/Theory or Exam Score based on the selected class exam mode.</p>
+        <p>
+            <a class="btn btn-secondary" href="{{ url_for('school_admin_historical_results_template') }}">Download Historical Results Template</a>
+        </p>
+        <form method="get" action="{{ url_for('school_admin_historical_results_template_prefill') }}" class="mt-12">
+            <select name="classname" required>
+                <option value="">Prefill Template For Class</option>
+                {% for classname in historical_class_options %}
+                <option value="{{ classname }}">{{ classname }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-secondary" type="submit">Download Prefilled Class Template</button>
+        </form>
+        <form method="post" action="{{ url_for('school_admin_import_target', target='historical_results') }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="classname" required>
+                <option value="">Select Historical Class</option>
+                {% for classname in historical_class_options %}
+                <option value="{{ classname }}">{{ classname }}</option>
+                {% endfor %}
+            </select>
+            <select name="term" required>
+                <option value="">Select Term</option>
+                <option value="First Term" {% if school and school.current_term == 'First Term' %}selected{% endif %}>First Term</option>
+                <option value="Second Term" {% if school and school.current_term == 'Second Term' %}selected{% endif %}>Second Term</option>
+                <option value="Third Term" {% if school and school.current_term == 'Third Term' %}selected{% endif %}>Third Term</option>
+            </select>
+            <input type="text" name="academic_year" placeholder="Academic Year e.g. 2025-2026" value="{{ school.academic_year if school else '' }}" required>
+            <input type="text" name="teacher_name" placeholder="Publication teacher name (optional)">
+            <input type="text" name="principal_name" placeholder="Principal name override (optional)">
+            <div class="mt-12">
+                <input type="file" name="file" accept=".csv" required>
+                <label style="margin-left:10px;"><input type="checkbox" name="replace_existing" value="1"> Replace existing published snapshots for this class/term/year</label>
+                <label style="margin-left:10px;"><input type="checkbox" name="dry_run" value="1"> Dry run only</label>
+            </div>
+            <button class="btn btn-primary mt-12" type="submit">Import Historical Results CSV</button>
+        </form>
     </div>
 
     <div class="card">
@@ -185,5 +225,3 @@
     </script>
 </body>
 </html>
-
-
