@@ -36966,7 +36966,7 @@ def school_admin_import_target(target):
 
     headers = {str(h or '').strip().lower(): h for h in fieldnames if str(h or '').strip()}
     required_by_target = {
-        'students': ['firstname', 'classname', 'term'],
+        'students': [],
         'teachers': ['user_id', 'firstname', 'lastname'],
         'class_assignments': ['teacher_id', 'classname', 'term', 'academic_year'],
         'historical_results': ['student id', 'subject'],
@@ -36975,6 +36975,14 @@ def school_admin_import_target(target):
         flash('Invalid import target.', 'error')
         return redirect(url_for('school_admin_bulk_tools'))
     missing_headers = [h for h in required_by_target[target_key] if h not in headers]
+    if target_key == 'students':
+        student_required_headers = {
+            'name': resolve_spreadsheet_header(headers, 'firstname', 'student name', 'student_name', 'name', 'full name', 'full_name'),
+            'class': resolve_spreadsheet_header(headers, 'classname', 'class', 'class name', 'class_name'),
+            'date of birth': resolve_spreadsheet_header(headers, 'date_of_birth', 'date of birth', 'dob', 'birth date'),
+            'gender': resolve_spreadsheet_header(headers, 'gender', 'sex'),
+        }
+        missing_headers.extend([label for label, header_name in student_required_headers.items() if not header_name])
     if missing_headers:
         flash(f'Missing required spreadsheet columns: {", ".join(missing_headers)}', 'error')
         return redirect(url_for('school_admin_bulk_tools'))
@@ -36993,19 +37001,46 @@ def school_admin_import_target(target):
     try:
         if target_key == 'students':
             school = get_school(school_id) or {}
+            default_student_term = get_current_term(school)
+            student_id_header = resolve_spreadsheet_header(headers, 'student_id', 'student id', 'admission no', 'admission number')
+            firstname_header = resolve_spreadsheet_header(headers, 'firstname', 'student name', 'student_name', 'name', 'full name', 'full_name')
+            lastname_header = resolve_spreadsheet_header(headers, 'lastname', 'surname', 'last name')
+            email_header = resolve_spreadsheet_header(headers, 'email', 'student_email', 'student email')
+            dob_header = resolve_spreadsheet_header(headers, 'date_of_birth', 'date of birth', 'dob', 'birth date')
+            gender_header = resolve_spreadsheet_header(headers, 'gender', 'sex')
+            classname_header = resolve_spreadsheet_header(headers, 'classname', 'class', 'class name', 'class_name')
+            first_year_class_header = resolve_spreadsheet_header(headers, 'first_year_class', 'first year class', 'entry class')
+            term_header = resolve_spreadsheet_header(headers, 'term', 'current term')
+            stream_header = resolve_spreadsheet_header(headers, 'stream', 'arm')
+            promoted_header = resolve_spreadsheet_header(headers, 'promoted')
+            parent_phone_header = resolve_spreadsheet_header(headers, 'parent_phone', 'parent phone')
             class_config_cache = {}
             next_index_by_class = {}
             batch_student_ids = set()
             batch_student_identity_rows = set()
+
+            def student_cell(row_obj, header_name, fallback=''):
+                if not header_name:
+                    return fallback
+                return row_obj.get(header_name, fallback) if isinstance(row_obj, dict) else fallback
+
             for idx, row in enumerate(rows, start=2):
-                classname = canonicalize_classname(row.get('classname', ''))
-                term = (row.get('term', '') or '').strip()
-                firstname = normalize_person_name(row.get('firstname', '') or row.get('student_name', '') or row.get('name', ''))
-                lastname = normalize_person_name(row.get('lastname', '') or row.get('surname', ''))
+                classname = canonicalize_classname(student_cell(row, classname_header, ''))
+                term = (student_cell(row, term_header, '') or '').strip() or default_student_term
+                firstname = normalize_person_name(student_cell(row, firstname_header, ''))
+                lastname = normalize_person_name(student_cell(row, lastname_header, ''))
                 full_name = (f'{firstname} {lastname}'.strip() if lastname else firstname).strip()
-                email = (row.get('email', '') or row.get('student_email', '') or '').strip().lower()
+                email = (student_cell(row, email_header, '') or '').strip().lower()
+                date_of_birth = (student_cell(row, dob_header, '') or '').strip()
+                gender = (student_cell(row, gender_header, '') or '').strip()
                 if not firstname:
-                    add_error(idx, row, 'firstname is required.')
+                    add_error(idx, row, 'student name is required.')
+                    continue
+                if not date_of_birth:
+                    add_error(idx, row, 'date of birth is required.')
+                    continue
+                if not normalize_student_gender(gender):
+                    add_error(idx, row, 'gender is required and must be male/female/other.')
                     continue
                 if email and not is_valid_email(email):
                     add_error(idx, row, 'email must be a valid address (or blank).')
@@ -37019,11 +37054,11 @@ def school_admin_import_target(target):
                 if not is_secondary_classname(classname):
                     add_error(idx, row, 'classname must be a secondary class (JSS/SS).')
                     continue
-                first_year_class = canonicalize_classname(row.get('first_year_class', row.get('classname', '')))
+                first_year_class = canonicalize_classname(student_cell(row, first_year_class_header, '') or student_cell(row, classname_header, ''))
                 if not is_secondary_classname(first_year_class):
                     add_error(idx, row, 'first_year_class must be a secondary class (JSS/SS).')
                     continue
-                sid_raw = (row.get('student_id', '') or '').strip()
+                sid_raw = (student_cell(row, student_id_header, '') or '').strip()
                 sid = ''
                 if sid_raw:
                     sid = with_school_suffix_manual_id(sid_raw, school_id)
@@ -37051,8 +37086,8 @@ def school_admin_import_target(target):
                 batch_student_ids.add(sid.lower())
                 identity_key = (
                     full_name.strip().lower(),
-                    (row.get('date_of_birth', '') or '').strip(),
-                    normalize_student_gender(row.get('gender', '')),
+                    date_of_birth,
+                    normalize_student_gender(gender),
                     email,
                     classname,
                     term,
@@ -37068,7 +37103,7 @@ def school_admin_import_target(target):
                     if not (existing_role == 'student' and existing_school == school_id):
                         add_error(idx, row, f'student_id "{sid}" already belongs to another account/school.')
                         continue
-                promoted_raw = (row.get('promoted', '') or '').strip().lower()
+                promoted_raw = (student_cell(row, promoted_header, '') or '').strip().lower()
                 if promoted_raw not in {'', '0', '1', 'true', 'false', 'yes', 'no'}:
                     add_error(idx, row, 'promoted must be 0/1/true/false/yes/no.')
                     continue
@@ -37081,7 +37116,7 @@ def school_admin_import_target(target):
                     add_error(idx, row, f'No class subject configuration found for {classname}.')
                     continue
 
-                input_stream = (row.get('stream', '') or '').strip()
+                input_stream = (student_cell(row, stream_header, '') or '').strip()
                 if class_uses_stream_for_school(school, classname):
                     if input_stream:
                         normalized_stream, stream_error = normalize_stream_for_class(
@@ -37120,8 +37155,8 @@ def school_admin_import_target(target):
                 student_data = {
                     'firstname': full_name,
                     'email': email,
-                    'date_of_birth': row.get('date_of_birth', ''),
-                    'gender': row.get('gender', ''),
+                    'date_of_birth': date_of_birth,
+                    'gender': gender,
                     'classname': classname,
                     'first_year_class': first_year_class,
                     'term': term,
@@ -37130,7 +37165,7 @@ def school_admin_import_target(target):
                     'subjects': subjects,
                     'scores': {},
                     'promoted': normalize_promoted_db_value(promoted_raw in {'1', 'true', 'yes'}),
-                    'parent_phone': row.get('parent_phone', ''),
+                    'parent_phone': student_cell(row, parent_phone_header, ''),
                     'parent_password_hash': '',
                 }
                 try:

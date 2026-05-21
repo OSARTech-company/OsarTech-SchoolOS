@@ -91,7 +91,7 @@
             <a class="btn btn-secondary btn-sm ml-10" href="{{ url_for('school_admin_import_report') }}">Open Report</a>
         </div>
         {% endif %}
-        <p class="note">Students spreadsheet columns: student_id (optional, leave blank to auto-generate), firstname (or student_name/name), lastname/surname (optional), email (optional), date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects, promoted, parent_phone, parent_phone_2</p>
+        <p class="note">Students spreadsheet columns: Class, Student Name, Date of Birth, Gender. Student ID is optional; leave it blank to auto-generate. Term defaults to the school's current term, and Stream can be left blank until it is assigned later.</p>
         <form method="post" action="{{ url_for('school_admin_import_target', target='students') }}" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="file" name="file" accept=".csv,.xlsx" required>
