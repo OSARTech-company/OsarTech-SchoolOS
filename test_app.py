@@ -261,6 +261,32 @@ def test_historical_template_headers_include_attendance_behaviour_and_term_dates
     assert "Responsibility" in headers
 
 
+def test_parse_generic_behaviour_spreadsheet_values_accepts_trait_and_grade_lists(app_module):
+    m = app_module
+    payload = m.parse_generic_behaviour_spreadsheet_values(
+        "Punctuality, Neatness, Honesty",
+        "A, B, C",
+        {"behaviour_grade_mode": "alpha_ad"},
+    )
+    assert payload == {
+        "Punctuality": "A",
+        "Neatness": "B",
+        "Honesty": "C",
+    }
+
+
+def test_parse_generic_behaviour_spreadsheet_values_accepts_trait_grade_pairs(app_module):
+    m = app_module
+    payload = m.parse_generic_behaviour_spreadsheet_values(
+        "Punctuality:A; Neatness:B; Honesty:C",
+        "",
+        {"behaviour_grade_mode": "alpha_ad"},
+    )
+    assert payload["Punctuality"] == "A"
+    assert payload["Neatness"] == "B"
+    assert payload["Honesty"] == "C"
+
+
 def test_compute_average_marks_ignores_stale_non_subject_score_keys(app_module):
     m = app_module
     scores = {

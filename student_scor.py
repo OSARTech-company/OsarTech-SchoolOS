@@ -19997,8 +19997,69 @@ def parse_spreadsheet_non_negative_int(raw_value, field_label, row_num=None):
     if value < 0:
         if row_num is None:
             raise ValueError(f'{field_label} cannot be negative.')
-        raise ValueError(f'Row {row_num}: {field_label} cannot be negative.')
+            raise ValueError(f'Row {row_num}: {field_label} cannot be negative.')
     return value
+
+
+def _normalize_trait_alias_key(value):
+    return re.sub(r'[^a-z0-9]+', '', str(value or '').strip().lower())
+
+
+def resolve_behaviour_trait_name(raw_name):
+    alias_key = _normalize_trait_alias_key(raw_name)
+    if not alias_key:
+        return ''
+    for trait in BEHAVIOUR_TRAITS:
+        if alias_key == _normalize_trait_alias_key(trait):
+            return trait
+    return ''
+
+
+def _split_spreadsheet_list_values(raw_value):
+    text = str(raw_value or '').strip()
+    if not text:
+        return []
+    return [item.strip() for item in re.split(r'[\r\n,;|]+', text) if item.strip()]
+
+
+def parse_generic_behaviour_spreadsheet_values(traits_raw, grades_raw, school_or_mode=None):
+    """Accept either:
+    - Traits + Trait Grades columns as matching delimited lists
+    - A single Traits column with `Trait:Grade` pairs
+    Returns a normalized behaviour payload subset.
+    """
+    traits_text = str(traits_raw or '').strip()
+    grades_text = str(grades_raw or '').strip()
+    if not traits_text and not grades_text:
+        return {}
+    pairs = []
+    if grades_text:
+        trait_names = _split_spreadsheet_list_values(traits_text)
+        trait_grades = _split_spreadsheet_list_values(grades_text)
+        if not trait_names:
+            raise ValueError('Trait column is empty while Trait Grades contains values.')
+        if len(trait_names) != len(trait_grades):
+            raise ValueError('Trait and Trait Grades columns must contain the same number of entries.')
+        pairs = list(zip(trait_names, trait_grades))
+    else:
+        blocks = [item.strip() for item in re.split(r'[\r\n;|]+', traits_text) if item.strip()]
+        if len(blocks) == 1 and blocks[0].count(':') > 1 and ',' in blocks[0]:
+            blocks = [item.strip() for item in blocks[0].split(',') if item.strip()]
+        for block in blocks:
+            if ':' not in block:
+                raise ValueError('Trait entries without Trait Grades must use `Trait:Grade` format.')
+            left, right = block.split(':', 1)
+            pairs.append((left.strip(), right.strip()))
+    payload = {}
+    for raw_trait, raw_grade in pairs:
+        canonical_trait = resolve_behaviour_trait_name(raw_trait)
+        if not canonical_trait:
+            raise ValueError(f'Unknown behaviour trait "{raw_trait}".')
+        normalized_grade = normalize_behaviour_grade_value(raw_grade, school_or_mode)
+        if not normalized_grade:
+            raise ValueError(f'Invalid grade "{raw_grade}" for behaviour trait "{canonical_trait}".')
+        payload[canonical_trait] = normalized_grade
+    return payload
 
 _XLSX_MAIN_NS = {'x': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 _XLSX_REL_NS = {'r': 'http://schemas.openxmlformats.org/package/2006/relationships'}
@@ -37187,9 +37248,28 @@ def school_admin_import_target(target):
                     trait,
                     trait.replace(' ', '_'),
                     trait.replace(' ', '-'),
+                    f'{trait} grade',
+                    f'{trait}_grade',
+                    f'{trait}-grade',
                 )
                 for trait in BEHAVIOUR_TRAITS
             }
+            generic_trait_header = resolve_spreadsheet_header(
+                headers,
+                'trait',
+                'traits',
+                'behaviour trait',
+                'behaviour traits',
+            )
+            generic_trait_grade_header = resolve_spreadsheet_header(
+                headers,
+                'trait grade',
+                'trait grades',
+                'behaviour grade',
+                'behaviour grades',
+                'behaviour trait grade',
+                'behaviour trait grades',
+            )
             days_open_header = resolve_spreadsheet_header(headers, 'days open', 'attendance days open')
             days_present_header = resolve_spreadsheet_header(headers, 'days present', 'attendance days present')
             days_absent_header = resolve_spreadsheet_header(headers, 'days absent', 'attendance days absent')
@@ -37442,6 +37522,20 @@ def school_admin_import_target(target):
                             raise ValueError(
                                 f'Row {idx}: {trait} for "{student_id}" must use one of: {allowed_values}.'
                             )
+                        existing_trait = (behaviour_payload.get(trait, '') or '').strip()
+                        if existing_trait and existing_trait != normalized_trait:
+                            raise ValueError(
+                                f'Row {idx}: conflicting {trait} values found for "{student_id}".'
+                            )
+                        behaviour_payload[trait] = normalized_trait
+                    generic_behaviour_payload = parse_generic_behaviour_spreadsheet_values(
+                        row.get(generic_trait_header, '') if generic_trait_header else '',
+                        row.get(generic_trait_grade_header, '') if generic_trait_grade_header else '',
+                        school_or_mode=school,
+                    )
+                    for trait, normalized_trait in generic_behaviour_payload.items():
+                        if behaviour_payload is None:
+                            behaviour_payload = dict(staged_behaviour.get(student_id, _default_behaviour_assessment()))
                         existing_trait = (behaviour_payload.get(trait, '') or '').strip()
                         if existing_trait and existing_trait != normalized_trait:
                             raise ValueError(

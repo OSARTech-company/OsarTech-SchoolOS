@@ -1839,7 +1839,9 @@
                         <td colspan="{{ result_max_tests + (1 if combined_exam else 2) + 2 }}" style="text-align: center; font-weight: bold;">Average Score</td>
                         <td style="font-weight: bold;">{{ "%.1f"|format(student.average_marks) }}</td>
                         <td style="font-weight: bold;">{{ display_grade_label(student.Grade, school) }}</td>
-                        <td>-</td>
+                        <td class="{{ status_css_class_from_status(student.Status, school) }}" style="font-weight: bold;">
+                            {{ student.Status if student.Status else 'Status Pending' }}
+                        </td>
                     </tr>
                 </tfoot>
             </table>

@@ -118,7 +118,7 @@
         <h3>Historical Results Backfill</h3>
         <p class="note">Use this to import older published results without changing the school's active term. Each upload is for one class + one term + one academic year, and the spreadsheet can contain all students in that class. To backfill the last two terms, repeat this import for each term.</p>
         <p class="note">Spreadsheet columns: Student ID, Student Name (optional), Subject, CA1...CA{{ school.max_tests if school and school.max_tests else 3 }}, Objective, Theory, Exam Score, Teacher Comment, Principal Comment, Stream, Days Open, Days Present, Days Absent, Term Begin, Term End, Next Term Begin, Next Term End, plus the behaviour trait columns from the template.</p>
-        <p class="note">Attendance and behaviour values are optional, but if you provide them they should stay consistent across the repeated subject rows for the same student. Term date columns are shared for the whole class/term import.</p>
+        <p class="note">Behaviour can be supplied either as one column per trait, as `Trait` + `Trait Grades` list columns, or as `Trait:Grade` pairs in the `Trait` column. Attendance and behaviour values are optional, but if you provide them they should stay consistent across the repeated subject rows for the same student. Term date columns are shared for the whole class/term import.</p>
         <p class="note">Accepted file types: CSV (.csv) and Excel Workbook (.xlsx). Older Excel .xls files are not supported yet.</p>
         <p>
             <a class="btn btn-secondary" href="{{ url_for('school_admin_historical_results_template') }}">Download Historical Results Template</a>
