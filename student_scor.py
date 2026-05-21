@@ -37295,6 +37295,8 @@ def school_admin_import_target(target):
             seen_subject_rows = set()
             imported_behaviour_students = set()
             imported_attendance_students = set()
+            behaviour_source_rows = {}
+            behaviour_source_row_data = {}
             imported_term_dates = {
                 'term_begin': '',
                 'term_end': '',
@@ -37542,17 +37544,10 @@ def school_admin_import_target(target):
                             )
                         behaviour_payload[trait] = normalized_trait
                     if behaviour_payload is not None:
-                        normalized_behaviour = normalize_behaviour_assessment(behaviour_payload, school)
-                        missing_traits = [
-                            trait for trait in BEHAVIOUR_TRAITS
-                            if (normalized_behaviour.get(trait, '') or '').strip() not in behaviour_grade_scale
-                        ]
-                        if missing_traits:
-                            raise ValueError(
-                                f'Row {idx}: complete all behaviour traits for "{student_id}" before importing historical results.'
-                            )
-                        staged_behaviour[student_id] = normalized_behaviour
+                        staged_behaviour[student_id] = dict(behaviour_payload)
                         imported_behaviour_students.add(student_id)
+                        behaviour_source_rows.setdefault(student_id, idx)
+                        behaviour_source_row_data.setdefault(student_id, dict(row) if isinstance(row, dict) else {})
 
                     attendance_values = [
                         parse_spreadsheet_non_negative_int(
@@ -37625,6 +37620,32 @@ def school_admin_import_target(target):
                 entry['scores'][subject] = subject_scores
                 if subject not in entry['subjects']:
                     entry['subjects'].append(subject)
+
+            invalid_behaviour_students = set()
+            for behaviour_student_id in sorted(imported_behaviour_students):
+                normalized_behaviour = normalize_behaviour_assessment(
+                    staged_behaviour.get(behaviour_student_id, {}),
+                    school,
+                )
+                missing_traits = [
+                    trait for trait in BEHAVIOUR_TRAITS
+                    if (normalized_behaviour.get(trait, '') or '').strip() not in behaviour_grade_scale
+                ]
+                if missing_traits:
+                    invalid_behaviour_students.add(behaviour_student_id)
+                    add_error(
+                        behaviour_source_rows.get(behaviour_student_id, 0) or 0,
+                        behaviour_source_row_data.get(behaviour_student_id, {}),
+                        f'Complete all behaviour traits for "{behaviour_student_id}" before importing historical results.',
+                    )
+                    continue
+                staged_behaviour[behaviour_student_id] = normalized_behaviour
+            for invalid_student_id in invalid_behaviour_students:
+                staged_results.pop(invalid_student_id, None)
+                staged_attendance.pop(invalid_student_id, None)
+                staged_behaviour.pop(invalid_student_id, None)
+                imported_attendance_students.discard(invalid_student_id)
+                imported_behaviour_students.discard(invalid_student_id)
 
             imported = len(staged_results)
             audit_payload.update(
