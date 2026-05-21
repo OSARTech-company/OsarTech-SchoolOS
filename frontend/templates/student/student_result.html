@@ -443,7 +443,7 @@
 
         .kpi-strip {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(5, minmax(0, 1fr));
             gap: 14px;
             padding: 18px 22px;
             border-bottom: 1px solid var(--school-border-soft);
@@ -1170,7 +1170,7 @@
                 opacity: 1;
             }
             .kpi-strip {
-                grid-template-columns: repeat(4, minmax(0, 1fr));
+                grid-template-columns: repeat(5, minmax(0, 1fr));
                 gap: 6px;
                 padding: 8px 12px;
                 page-break-inside: avoid;
@@ -1600,6 +1600,7 @@
             <div class="hero-chip hero-chip--accent"><i class="fas fa-calendar-alt"></i><strong>{{ student.term }}</strong>{% if student.academic_year %}<span>{{ student.academic_year }}</span>{% endif %}</div>
             <div class="hero-chip"><i class="fas fa-chalkboard"></i><strong>{{ student.class_name if student.class_name else 'Class Not Set' }}</strong></div>
             <div class="hero-chip"><i class="fas fa-chart-line"></i><strong>Average {{ "%.1f"|format(student.average_marks or 0) }}</strong></div>
+            <div class="hero-chip"><i class="fas fa-users"></i><strong>{% if student.class_average_is_stream is defined and student.class_average_is_stream %}Stream Avg{% else %}Class Avg{% endif %} {% if student.class_average is defined and student.class_average is not none %}{{ "%.1f"|format(student.class_average) }}{% else %}-{% endif %}</strong></div>
             <div class="hero-chip"><i class="fas fa-book-open"></i><strong>{{ student.number_of_subject if student.number_of_subject is not none else 0 }} Subjects</strong></div>
             <div class="hero-chip"><i class="fas fa-circle-check"></i><strong>{{ student.Status if student.Status else 'Status Pending' }}</strong></div>
         </div>
@@ -1648,6 +1649,16 @@
                     <div class="info-value">{{ "%.1f"|format(student.total_score or 0) }}</div>
                 </div>
                 <div class="info-row">
+                    <div class="info-label">{% if student.class_average_is_stream is defined and student.class_average_is_stream %}Stream Average{% else %}Class Average{% endif %}</div>
+                    <div class="info-value">
+                        {% if student.class_average is defined and student.class_average is not none %}
+                            {{ "%.1f"|format(student.class_average) }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="info-row">
                     <div class="info-label">Overall Grade</div>
                     <div class="info-value {{ grade_css_class_from_grade(student.Grade, school) }}" style="font-size: var(--font-lg); font-weight: 700;">
                         {{ display_grade_label(student.Grade, school) }}
@@ -1685,6 +1696,10 @@
             <div class="kpi-card">
                 <div class="kpi-label">Average</div>
                 <div class="kpi-value">{{ "%.1f"|format(student.average_marks or 0) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">{% if student.class_average_is_stream is defined and student.class_average_is_stream %}Stream Avg{% else %}Class Avg{% endif %}</div>
+                <div class="kpi-value">{% if student.class_average is defined and student.class_average is not none %}{{ "%.1f"|format(student.class_average) }}{% else %}-{% endif %}</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Grade</div>

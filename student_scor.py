@@ -19666,6 +19666,7 @@ def _build_rich_result_pdf_reportlab(report):
     term = (report.get('term') or '').strip()
     year = (report.get('year') or '').strip()
     average = report.get('average')
+    class_average = report.get('class_average')
     grade = (report.get('grade') or '').strip()
     status = (report.get('status') or '').strip()
     teacher_name = (report.get('teacher_name') or '').strip()
@@ -19716,7 +19717,8 @@ def _build_rich_result_pdf_reportlab(report):
         ["Student", student_name, "Student ID", student_id],
         ["Class", class_name, "Term", term],
         ["Academic Year", year or "-", "Generated", generated_on or "-"],
-        ["Average", _format_mark(average), "Grade / Status", f"{grade} / {status}"],
+        ["Average", _format_mark(average), "Class Average", _format_mark(class_average)],
+        ["Grade / Status", f"{grade} / {status}", "", ""],
     ]
     meta_table = Table(meta_data, colWidths=[28 * mm, 58 * mm, 30 * mm, 58 * mm])
     meta_table.setStyle(
@@ -19996,7 +19998,7 @@ def parse_spreadsheet_non_negative_int(raw_value, field_label, row_num=None):
     if value < 0:
         if row_num is None:
             raise ValueError(f'{field_label} cannot be negative.')
-            raise ValueError(f'Row {row_num}: {field_label} cannot be negative.')
+        raise ValueError(f'Row {row_num}: {field_label} cannot be negative.')
     return value
 
 
@@ -21789,6 +21791,27 @@ def build_subject_positions_for_student(school_id, student, school):
                 'lowest': lowest,
             }
     return subject_positions
+
+def build_class_average_from_published_results(school, classname, class_results, student_stream=''):
+    """Compute the peer-group average used on a published result sheet."""
+    school = school or {}
+    separate_stream_ranking = bool(
+        school.get('ss_ranking_mode') == 'separate' and class_uses_stream_for_school(school, classname)
+    )
+    peer_rows = list(class_results or [])
+    if separate_stream_ranking:
+        stream_key = (student_stream or '').strip()
+        peer_rows = [row for row in peer_rows if (row.get('stream') or '').strip() == stream_key]
+    marks = []
+    for row in peer_rows:
+        value = safe_float(row.get('average_marks', 0), 0)
+        if math.isfinite(value):
+            marks.append(float(value))
+    return {
+        'average': (sum(marks) / len(marks)) if marks else None,
+        'size': len(marks),
+        'is_stream_separate': separate_stream_ranking,
+    }
 
 def build_positions_from_published_results(school, classname, term, class_results, student_id, student_stream, subjects):
     """Compute overall and per-subject positions from published class result rows."""
@@ -37328,7 +37351,23 @@ def school_admin_import_target(target):
                         pass
                 parsed = _parse_iso_date(text)
                 if not parsed:
-                    raise ValueError(f'Row {row_num}: {field_label} must be in YYYY-MM-DD format.')
+                    for fmt in (
+                        '%d/%m/%Y',
+                        '%d-%m-%Y',
+                        '%d.%m.%Y',
+                        '%m/%d/%Y',
+                        '%m-%d-%Y',
+                        '%Y/%m/%d',
+                    ):
+                        try:
+                            parsed = datetime.strptime(text, fmt).date()
+                            break
+                        except Exception:
+                            continue
+                if not parsed:
+                    raise ValueError(
+                        f'Row {row_num}: {field_label} must be a valid date, for example YYYY-MM-DD or DD/MM/YYYY.'
+                    )
                 return parsed.isoformat()
 
             def merge_shared_date(key, value, row_num, field_label):
@@ -37673,10 +37712,13 @@ def school_admin_import_target(target):
                 ]
                 if missing_traits:
                     invalid_behaviour_students.add(behaviour_student_id)
+                    missing_preview = ', '.join(missing_traits[:6])
+                    if len(missing_traits) > 6:
+                        missing_preview += f', and {len(missing_traits) - 6} more'
                     add_error(
                         behaviour_source_rows.get(behaviour_student_id, 0) or 0,
                         behaviour_source_row_data.get(behaviour_student_id, {}),
-                        f'Complete all behaviour traits for "{behaviour_student_id}" before importing historical results.',
+                        f'Complete all behaviour traits for "{behaviour_student_id}" before importing historical results. Missing: {missing_preview}.',
                     )
                     continue
                 staged_behaviour[behaviour_student_id] = normalized_behaviour
@@ -37740,27 +37782,28 @@ def school_admin_import_target(target):
                 with db_connection(commit=True) as conn:
                     c = conn.cursor()
                     if replace_existing:
-                        db_execute(
-                            c,
-                            """DELETE FROM published_student_results
-                               WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
-                                 AND COALESCE(academic_year, '') = COALESCE(?, '')""",
-                            (school_id, classname, term, academic_year),
-                        )
-                        db_execute(
-                            c,
-                            """DELETE FROM behaviour_assessments
-                               WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
-                                 AND COALESCE(academic_year, '') = COALESCE(?, '')""",
-                            (school_id, classname, term, academic_year),
-                        )
-                        db_execute(
-                            c,
-                            """DELETE FROM result_attendance_manual
-                               WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
-                                 AND COALESCE(academic_year, '') = COALESCE(?, '')""",
-                            (school_id, classname, term, academic_year),
-                        )
+                        for replace_student_id in staged_results.keys():
+                            db_execute(
+                                c,
+                                """DELETE FROM published_student_results
+                                   WHERE school_id = ? AND student_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
+                                     AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+                                (school_id, replace_student_id, classname, term, academic_year),
+                            )
+                            db_execute(
+                                c,
+                                """DELETE FROM behaviour_assessments
+                                   WHERE school_id = ? AND student_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
+                                     AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+                                (school_id, replace_student_id, classname, term, academic_year),
+                            )
+                            db_execute(
+                                c,
+                                """DELETE FROM result_attendance_manual
+                                   WHERE school_id = ? AND student_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
+                                     AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+                                (school_id, replace_student_id, classname, term, academic_year),
+                            )
                     if term_begin_value or term_end_value or next_term_begin_value or next_term_end_value:
                         save_school_term_calendar_with_cursor(
                             c,
@@ -37791,13 +37834,67 @@ def school_admin_import_target(target):
                             'program_meta_json': merged_program_meta,
                         }
                         save_school_term_program_with_cursor(c, school_id, academic_year, term, program_payload)
-                    for staged in staged_results.values():
-                        subjects = _dedupe_keep_order(normalize_subjects_list(staged.get('subjects', [])))
-                        scores = staged.get('scores', {}) if isinstance(staged.get('scores', {}), dict) else {}
-                        behaviour_payload = staged_behaviour.get(
-                            staged.get('student_id', ''),
-                            normalize_behaviour_assessment({}, school),
+                    def load_existing_historical_snapshot(student_id_value):
+                        db_execute(
+                            c,
+                            """SELECT firstname, stream, subjects, scores, behaviour_json, teacher_comment, principal_comment
+                               FROM published_student_results
+                               WHERE school_id = ? AND student_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
+                                 AND COALESCE(academic_year, '') = COALESCE(?, '')
+                               ORDER BY published_at DESC
+                               LIMIT 1""",
+                            (school_id, student_id_value, classname, term, academic_year),
                         )
+                        existing_row = c.fetchone()
+                        if not existing_row:
+                            return {}
+                        return {
+                            'firstname': existing_row[0] or '',
+                            'stream': existing_row[1] or '',
+                            'subjects': normalize_subjects_list(_safe_json_rows(existing_row[2])),
+                            'scores': _safe_json_object(existing_row[3]),
+                            'behaviour': normalize_behaviour_assessment(_safe_json_object(existing_row[4]), school),
+                            'teacher_comment': existing_row[5] or '',
+                            'principal_comment': existing_row[6] or '',
+                        }
+
+                    def merge_historical_score_payload(existing_scores, uploaded_scores, merged_subjects):
+                        combined_scores = {}
+                        if isinstance(existing_scores, dict):
+                            combined_scores.update(existing_scores)
+                        if isinstance(uploaded_scores, dict):
+                            for subject_name, score_block in uploaded_scores.items():
+                                canonical_subject = normalize_subject_name(subject_name)
+                                for existing_key in list(combined_scores.keys()):
+                                    if normalize_subject_name(existing_key).lower() == canonical_subject.lower():
+                                        combined_scores.pop(existing_key, None)
+                                combined_scores[canonical_subject] = score_block
+                        aligned_scores = {}
+                        for subject_name in merged_subjects:
+                            score_block = get_subject_score_block(combined_scores, subject_name)
+                            if isinstance(score_block, dict) and score_block:
+                                aligned_scores[subject_name] = score_block
+                        return aligned_scores
+
+                    for staged in staged_results.values():
+                        staged_student_id = staged.get('student_id', '')
+                        existing_snapshot = {} if replace_existing else load_existing_historical_snapshot(staged_student_id)
+                        uploaded_subjects = _dedupe_keep_order(normalize_subjects_list(staged.get('subjects', [])))
+                        existing_subjects = normalize_subjects_list(existing_snapshot.get('subjects', []))
+                        subjects = _dedupe_keep_order(existing_subjects + uploaded_subjects)
+                        uploaded_scores = staged.get('scores', {}) if isinstance(staged.get('scores', {}), dict) else {}
+                        scores = merge_historical_score_payload(
+                            existing_snapshot.get('scores', {}),
+                            uploaded_scores,
+                            subjects,
+                        )
+                        if staged_student_id in staged_behaviour:
+                            behaviour_payload = staged_behaviour.get(staged_student_id, {})
+                        elif existing_snapshot:
+                            behaviour_payload = existing_snapshot.get('behaviour', {})
+                        else:
+                            behaviour_payload = normalize_behaviour_assessment({}, school)
+                        behaviour_payload = normalize_behaviour_assessment(behaviour_payload, school)
                         attendance_payload = staged_attendance.get(staged.get('student_id', ''))
                         average_marks = compute_average_marks_from_scores(scores, subjects=subjects)
                         if attendance_payload:
@@ -37857,18 +37954,18 @@ def school_admin_import_target(target):
                                  published_at = excluded.published_at""",
                             (
                                 school_id,
-                                staged.get('student_id', ''),
-                                staged.get('firstname', ''),
+                                staged_student_id,
+                                staged.get('firstname', '') or existing_snapshot.get('firstname', ''),
                                 classname,
                                 academic_year,
                                 term,
-                                staged.get('stream', 'N/A') or 'N/A',
+                                staged.get('stream', '') or existing_snapshot.get('stream', '') or 'N/A',
                                 len(subjects),
                                 json.dumps(subjects),
                                 json.dumps(scores),
                                 json.dumps(behaviour_payload),
-                                staged.get('teacher_comment', ''),
-                                staged.get('principal_comment', ''),
+                                staged.get('teacher_comment', '') or existing_snapshot.get('teacher_comment', ''),
+                                staged.get('principal_comment', '') or existing_snapshot.get('principal_comment', ''),
                                 float(average_marks),
                                 grade_from_score(average_marks, grade_cfg),
                                 status_from_score(average_marks, grade_cfg),
@@ -44421,6 +44518,12 @@ def student_view_result():
 
     exam_config = get_assessment_config_for_class(school_id, snapshot.get('classname', ''))
     class_results = load_published_class_results(school_id, snapshot.get('classname', ''), target_term, target_year, school=school)
+    class_average_summary = build_class_average_from_published_results(
+        school,
+        snapshot.get('classname', ''),
+        class_results,
+        student_stream=snapshot.get('stream', ''),
+    )
     position, subject_positions = build_positions_from_published_results(
         school=school,
         classname=snapshot.get('classname', ''),
@@ -44439,6 +44542,9 @@ def student_view_result():
         'gender': (live_student.get('gender', '') or '').strip(),
         'class_name': snapshot.get('classname', ''),
         'class_size': len(class_results or []),
+        'class_average': class_average_summary.get('average'),
+        'class_average_size': class_average_summary.get('size', 0),
+        'class_average_is_stream': class_average_summary.get('is_stream_separate', False),
         'term': target_term,
         'academic_year': target_year,
         'number_of_subject': snapshot.get('number_of_subject', 0),
@@ -45793,6 +45899,12 @@ def parent_view_result():
 
     exam_config = get_assessment_config_for_class(school_id, snapshot.get('classname', ''))
     class_results = load_published_class_results(school_id, snapshot.get('classname', ''), target_term, target_year, school=school)
+    class_average_summary = build_class_average_from_published_results(
+        school,
+        snapshot.get('classname', ''),
+        class_results,
+        student_stream=snapshot.get('stream', ''),
+    )
     position, subject_positions = build_positions_from_published_results(
         school=school,
         classname=snapshot.get('classname', ''),
@@ -45810,6 +45922,9 @@ def parent_view_result():
         'gender': (student.get('gender', '') or '').strip(),
         'class_name': snapshot.get('classname', student.get('classname', '')),
         'class_size': len(class_results or []),
+        'class_average': class_average_summary.get('average'),
+        'class_average_size': class_average_summary.get('size', 0),
+        'class_average_is_stream': class_average_summary.get('is_stream_separate', False),
         'term': target_term,
         'academic_year': target_year,
         'number_of_subject': snapshot.get('number_of_subject', student.get('number_of_subject', 0)),
@@ -45991,6 +46106,12 @@ def download_result_pdf():
         target_year,
         school=school,
     )
+    class_average_summary = build_class_average_from_published_results(
+        school,
+        snapshot.get('classname', ''),
+        class_results,
+        student_stream=snapshot.get('stream', ''),
+    )
     _position, subject_positions = build_positions_from_published_results(
         school=school,
         classname=snapshot.get('classname', ''),
@@ -46017,7 +46138,7 @@ def download_result_pdf():
         f"Student: {snapshot.get('firstname', '')} ({sid})",
         f"Class: {snapshot.get('classname', '')}",
         f"Term: {target_term}" + (f"  Year: {target_year}" if target_year else ''),
-        f"Average: {_format_mark(snapshot.get('average_marks', 0))}  Grade: {snapshot.get('Grade', 'F')}  Status: {snapshot.get('Status', 'Fail')}",
+        f"Average: {_format_mark(snapshot.get('average_marks', 0))}  Class Average: {_format_mark(class_average_summary.get('average'))}  Grade: {snapshot.get('Grade', 'F')}  Status: {snapshot.get('Status', 'Fail')}",
         "",
         "Subject | Total Exam | Highest | Lowest | Total | Grade" + (" | Position" if show_positions else ""),
     ]
@@ -46062,6 +46183,7 @@ def download_result_pdf():
         'term': target_term,
         'year': target_year,
         'average': snapshot.get('average_marks', 0),
+        'class_average': class_average_summary.get('average'),
         'grade': snapshot.get('Grade', 'F'),
         'status': snapshot.get('Status', 'Fail'),
         'teacher_name': signoff.get('teacher_name', ''),
@@ -46157,6 +46279,12 @@ def teacher_student_result():
         target_year,
         school=school,
     )
+    class_average_summary = build_class_average_from_published_results(
+        school,
+        snapshot_class,
+        class_results,
+        student_stream=snapshot.get('stream', ''),
+    )
     position, subject_positions = build_positions_from_published_results(
         school=school,
         classname=snapshot_class,
@@ -46175,6 +46303,9 @@ def teacher_student_result():
         'gender': (student.get('gender', '') or '').strip(),
         'class_name': snapshot_class,
         'class_size': len(class_results or []),
+        'class_average': class_average_summary.get('average'),
+        'class_average_size': class_average_summary.get('size', 0),
+        'class_average_is_stream': class_average_summary.get('is_stream_separate', False),
         'term': target_term,
         'academic_year': target_year,
         'number_of_subject': snapshot.get('number_of_subject', student.get('number_of_subject', 0)),
@@ -46488,6 +46619,12 @@ def school_admin_student_result():
                 'stream': student.get('stream', ''),
                 'average_marks': average_marks,
             })
+        class_average_summary = build_class_average_from_published_results(
+            school,
+            classname,
+            ranking_students,
+            student_stream=student.get('stream', ''),
+        )
         position = calculate_positions(ranking_students, school.get('ss_ranking_mode', 'together'), school=school).get(sid)
         preview_student_for_positions = dict(student)
         preview_student_for_positions['student_id'] = sid
@@ -46502,6 +46639,9 @@ def school_admin_student_result():
             'gender': (student.get('gender', '') or '').strip(),
             'class_name': classname,
             'class_size': len(ranking_students or []),
+            'class_average': class_average_summary.get('average'),
+            'class_average_size': class_average_summary.get('size', 0),
+            'class_average_is_stream': class_average_summary.get('is_stream_separate', False),
             'term': target_term,
             'academic_year': target_year,
             'number_of_subject': student.get('number_of_subject', len(preview_subjects)),
@@ -46561,6 +46701,12 @@ def school_admin_student_result():
 
         exam_config = get_assessment_config_for_class(school_id, snapshot.get('classname', ''))
         class_results = load_published_class_results(school_id, snapshot.get('classname', ''), target_term, target_year, school=school)
+        class_average_summary = build_class_average_from_published_results(
+            school,
+            snapshot.get('classname', ''),
+            class_results,
+            student_stream=snapshot.get('stream', ''),
+        )
         position, subject_positions = build_positions_from_published_results(
             school=school,
             classname=snapshot.get('classname', ''),
@@ -46579,6 +46725,9 @@ def school_admin_student_result():
             'gender': (student.get('gender', '') or '').strip(),
             'class_name': snapshot.get('classname', student.get('classname', '')),
             'class_size': len(class_results or []),
+            'class_average': class_average_summary.get('average'),
+            'class_average_size': class_average_summary.get('size', 0),
+            'class_average_is_stream': class_average_summary.get('is_stream_separate', False),
             'term': target_term,
             'academic_year': target_year,
             'number_of_subject': snapshot.get('number_of_subject', student.get('number_of_subject', 0)),
@@ -47124,6 +47273,12 @@ def check_result():
 
     exam_config = get_assessment_config_for_class(school_id, snapshot.get('classname', ''))
     class_results = load_published_class_results(school_id, snapshot.get('classname', ''), target_term, target_year, school=school)
+    class_average_summary = build_class_average_from_published_results(
+        school,
+        snapshot.get('classname', ''),
+        class_results,
+        student_stream=snapshot.get('stream', ''),
+    )
     position, subject_positions = build_positions_from_published_results(
         school=school,
         classname=snapshot.get('classname', ''),
@@ -47140,6 +47295,9 @@ def check_result():
         'profile_image_url': get_student_profile_image_url(live_student, snapshot),
         'class_name': snapshot.get('classname', classname),
         'class_size': len(class_results or []),
+        'class_average': class_average_summary.get('average'),
+        'class_average_size': class_average_summary.get('size', 0),
+        'class_average_is_stream': class_average_summary.get('is_stream_separate', False),
         'term': target_term,
         'academic_year': target_year,
         'stream': snapshot.get('stream', stream),
