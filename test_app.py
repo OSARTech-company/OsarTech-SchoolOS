@@ -245,6 +245,22 @@ def test_subject_overall_mark_prefers_numeric_components_over_stale_explicit(app
     assert m.subject_overall_mark(score_block) == pytest.approx(80.0)
 
 
+def test_historical_template_headers_include_attendance_behaviour_and_term_dates(app_module):
+    m = app_module
+    headers = m._historical_results_template_headers_for_school(
+        {"max_tests": 2, "test_enabled": 1, "exam_enabled": 1}
+    )
+    assert "Days Open" in headers
+    assert "Days Present" in headers
+    assert "Days Absent" in headers
+    assert "Term Begin" in headers
+    assert "Term End" in headers
+    assert "Next Term Begin" in headers
+    assert "Next Term End" in headers
+    assert "Punctuality" in headers
+    assert "Responsibility" in headers
+
+
 def test_compute_average_marks_ignores_stale_non_subject_score_keys(app_module):
     m = app_module
     scores = {
@@ -1182,6 +1198,44 @@ def test_teacher_upload_csv_form_includes_csrf_token(client, app_module, monkeyp
     resp = client.get("/teacher/upload-csv")
     assert resp.status_code == 200
     assert 'name="csrf_token"' in resp.get_data(as_text=True)
+
+
+def test_build_result_term_attendance_data_exposes_next_term_end(app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(
+        m,
+        "get_school_term_calendar",
+        lambda school_id, academic_year, term: {
+            "open_date": "2025-09-16",
+            "close_date": "2025-12-12",
+            "days_open": 72,
+        },
+    )
+    monkeypatch.setattr(
+        m,
+        "get_school_term_program",
+        lambda school_id, academic_year, term: {
+            "next_term_begin_date": "2026-01-06",
+            "next_term_end_date": "2026-04-10",
+            "program_meta_json": {"next_term_end_date": "2026-04-10"},
+        },
+    )
+    monkeypatch.setattr(m, "class_has_attendance_marks", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        m,
+        "get_student_manual_result_attendance",
+        lambda *args, **kwargs: {"days_open": 72, "days_present": 68},
+    )
+    monkeypatch.setattr(m, "resolve_next_term_begin_date", lambda *args, **kwargs: "2026-01-06")
+
+    payload = m.build_result_term_attendance_data("SCH1", "ST1", "JSS1", "First Term", "2025-2026")
+    assert payload["term_begin"] == "2025-09-16"
+    assert payload["term_end"] == "2025-12-12"
+    assert payload["next_term_begin"] == "2026-01-06"
+    assert payload["next_term_end"] == "2026-04-10"
+    assert payload["days_open"] == 72
+    assert payload["days_present"] == 68
+    assert payload["days_absent"] == 4
 
 
 def test_school_admin_bulk_tools_forms_accept_excel(client, app_module, monkeypatch):

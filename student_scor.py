@@ -19010,6 +19010,7 @@ def get_student_absent_days(school_id, student_id, classname, term='', academic_
 def build_result_term_attendance_data(school_id, student_id, classname, term, academic_year):
     calendar_row = get_school_term_calendar(school_id, academic_year, term) or {}
     program_row = get_school_term_program(school_id, academic_year, term) or {}
+    program_meta = program_row.get('program_meta_json') if isinstance(program_row.get('program_meta_json'), dict) else {}
     try:
         days_open = int(calendar_row.get('days_open', 0) or 0)
     except Exception:
@@ -19060,6 +19061,7 @@ def build_result_term_attendance_data(school_id, student_id, classname, term, ac
         'term_begin': (calendar_row.get('open_date') or '').strip(),
         'term_end': (calendar_row.get('close_date') or '').strip(),
         'next_term_begin': next_term_begin,
+        'next_term_end': (program_row.get('next_term_end_date') or program_meta.get('next_term_end_date') or '').strip(),
         'days_open': days_open,
         'days_absent': max(days_absent, 0),
         'days_present': days_present,
@@ -19780,6 +19782,34 @@ def resolve_test_csv_header(headers, slot_index):
         if alias in headers:
             return headers[alias]
     return None
+
+
+def resolve_spreadsheet_header(headers, *aliases):
+    """Return the original header name for the first matching lowercase alias."""
+    if not isinstance(headers, dict):
+        return None
+    for alias in aliases:
+        key = str(alias or '').strip().lower()
+        if key and key in headers:
+            return headers[key]
+    return None
+
+
+def parse_spreadsheet_non_negative_int(raw_value, field_label, row_num=None):
+    text = str(raw_value or '').strip()
+    if not text:
+        return None
+    try:
+        value = int(text)
+    except (TypeError, ValueError):
+        if row_num is None:
+            raise ValueError(f'{field_label} must be a whole number.')
+        raise ValueError(f'Row {row_num}: {field_label} must be a whole number.')
+    if value < 0:
+        if row_num is None:
+            raise ValueError(f'{field_label} cannot be negative.')
+        raise ValueError(f'Row {row_num}: {field_label} cannot be negative.')
+    return value
 
 _XLSX_MAIN_NS = {'x': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 _XLSX_REL_NS = {'r': 'http://schemas.openxmlformats.org/package/2006/relationships'}
@@ -23345,6 +23375,7 @@ def get_school_term_program(school_id, academic_year, term):
             'continuous_assessment_deadline': '',
             'school_events_date': '',
             'next_term_begin_date': '',
+            'next_term_end_date': '',
             'school_events': '',
         }
     school_key = _normalize_school_id_text(school_id)
@@ -23379,6 +23410,7 @@ def get_school_term_program(school_id, academic_year, term):
                 'school_events_date': '',
                 'school_events': '',
                 'next_term_begin_date': '',
+                'next_term_end_date': '',
                 'program_meta_json': {},
             }
         meta = _safe_json_object(row[13]) if len(row) > 13 else {}
@@ -23396,6 +23428,7 @@ def get_school_term_program(school_id, academic_year, term):
             'school_events_date': row[10] or '',
             'school_events': row[11] or '',
             'next_term_begin_date': row[12] or '',
+            'next_term_end_date': (meta.get('next_term_end_date') or '') if isinstance(meta, dict) else '',
             'program_meta_json': meta if isinstance(meta, dict) else {},
         }
 
@@ -23434,6 +23467,7 @@ def list_school_term_programs(school_id):
                 'school_events_date': row[10] or '',
                 'school_events': row[11] or '',
                 'next_term_begin_date': row[12] or '',
+                'next_term_end_date': (meta.get('next_term_end_date') or '') if isinstance(meta, dict) else '',
                 'program_meta_json': meta if isinstance(meta, dict) else {},
             })
         return rows
@@ -35792,7 +35826,19 @@ def _historical_results_template_headers_for_school(school):
         # Keep both exam layouts in one template so admins can reuse it
         # across historical classes with different exam modes.
         headers.extend(['Objective', 'Theory', 'Exam Score'])
-    headers.extend(['Teacher Comment', 'Principal Comment', 'Stream'])
+    headers.extend([
+        'Teacher Comment',
+        'Principal Comment',
+        'Stream',
+        'Days Open',
+        'Days Present',
+        'Days Absent',
+        'Term Begin',
+        'Term End',
+        'Next Term Begin',
+        'Next Term End',
+    ])
+    headers.extend(BEHAVIOUR_TRAITS)
     return headers
 
 @app.route('/school-admin/historical-results-template')
@@ -35816,7 +35862,19 @@ def school_admin_historical_results_template():
         sample_row.extend(['' for _ in range(max_tests)])
     if school.get('exam_enabled', 1):
         sample_row.extend(['', '', ''])
-    sample_row.extend(['Consistent effort.', 'Keep it up.', 'Science'])
+    sample_row.extend([
+        'Consistent effort.',
+        'Keep it up.',
+        'Science',
+        '72',
+        '68',
+        '4',
+        '2025-09-16',
+        '2025-12-12',
+        '2026-01-06',
+        '2026-04-10',
+    ])
+    sample_row.extend(['A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A'])
     writer.writerow(sample_row)
 
     second_row = ['26/school/001/26', 'Jane Doe', 'English Language']
@@ -35824,7 +35882,19 @@ def school_admin_historical_results_template():
         second_row.extend(['' for _ in range(max_tests)])
     if school.get('exam_enabled', 1):
         second_row.extend(['', '', ''])
-    second_row.extend(['Consistent effort.', 'Keep it up.', 'Science'])
+    second_row.extend([
+        'Consistent effort.',
+        'Keep it up.',
+        'Science',
+        '72',
+        '68',
+        '4',
+        '2025-09-16',
+        '2025-12-12',
+        '2026-01-06',
+        '2026-04-10',
+    ])
+    second_row.extend(['A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A'])
     writer.writerow(second_row)
 
     return Response(
@@ -35892,7 +35962,8 @@ def school_admin_historical_results_template_prefill():
                 row.extend(['' for _ in range(max_tests)])
             if exam_enabled:
                 row.extend(['', '', ''])
-            row.extend(['', '', stream_value])
+            row.extend(['', '', stream_value, '', '', '', '', '', '', ''])
+            row.extend(['' for _ in BEHAVIOUR_TRAITS])
             writer.writerow(row)
 
     return Response(
@@ -36837,9 +36908,48 @@ def school_admin_import_target(target):
             has_obj_col = 'objective' in headers
             has_theory_col = 'theory' in headers
             has_exam_col = 'exam score' in headers
+            behaviour_grade_scale = get_behaviour_grade_scale(school)
+            behaviour_headers = {
+                trait: resolve_spreadsheet_header(
+                    headers,
+                    trait,
+                    trait.replace(' ', '_'),
+                    trait.replace(' ', '-'),
+                )
+                for trait in BEHAVIOUR_TRAITS
+            }
+            days_open_header = resolve_spreadsheet_header(headers, 'days open', 'attendance days open')
+            days_present_header = resolve_spreadsheet_header(headers, 'days present', 'attendance days present')
+            days_absent_header = resolve_spreadsheet_header(headers, 'days absent', 'attendance days absent')
+            term_begin_header = resolve_spreadsheet_header(headers, 'term begin', 'term begins', 'term start', 'term open date')
+            term_end_header = resolve_spreadsheet_header(headers, 'term end', 'term ends', 'term close date')
+            next_term_begin_header = resolve_spreadsheet_header(
+                headers,
+                'next term begin',
+                'next term begins',
+                'next term start',
+                'next term begin date',
+            )
+            next_term_end_header = resolve_spreadsheet_header(
+                headers,
+                'next term end',
+                'next term ends',
+                'next term close',
+                'next term end date',
+            )
             student_cache = {}
             staged_results = {}
+            staged_behaviour = {}
+            staged_attendance = {}
             seen_subject_rows = set()
+            imported_behaviour_students = set()
+            imported_attendance_students = set()
+            imported_term_dates = {
+                'term_begin': '',
+                'term_end': '',
+                'next_term_begin': '',
+                'next_term_end': '',
+            }
 
             def parse_csv_float(raw_value, row_num, field_label):
                 try:
@@ -36849,6 +36959,32 @@ def school_admin_import_target(target):
                 if not math.isfinite(value):
                     raise ValueError(f'Row {row_num}: {field_label} is invalid.')
                 return value
+
+            def parse_sheet_date(raw_value, row_num, field_label):
+                text = str(raw_value or '').strip()
+                if not text:
+                    return ''
+                if re.fullmatch(r'\d+(?:\.\d+)?', text):
+                    try:
+                        serial_value = float(text)
+                        if 1 <= serial_value <= 60000:
+                            return (date(1899, 12, 30) + timedelta(days=int(serial_value))).isoformat()
+                    except Exception:
+                        pass
+                parsed = _parse_iso_date(text)
+                if not parsed:
+                    raise ValueError(f'Row {row_num}: {field_label} must be in YYYY-MM-DD format.')
+                return parsed.isoformat()
+
+            def merge_shared_date(key, value, row_num, field_label):
+                if not value:
+                    return
+                existing = imported_term_dates.get(key, '')
+                if existing and existing != value:
+                    raise ValueError(
+                        f'Row {row_num}: conflicting {field_label} values found ({existing} vs {value}).'
+                    )
+                imported_term_dates[key] = value
 
             for idx, row in enumerate(rows, start=2):
                 raw_student_id = (row.get(headers['student id'], '') or '').strip()
@@ -36901,7 +37037,7 @@ def school_admin_import_target(target):
                         exam_mode = (exam_config.get('exam_mode') or 'separate').strip().lower()
                         if exam_mode == 'combined':
                             if not has_exam_col:
-                                raise ValueError('CSV must include "Exam Score" for combined exam mode classes.')
+                                raise ValueError('Spreadsheet must include "Exam Score" for combined exam mode classes.')
                             if (
                                 (has_obj_col and str(row.get(headers['objective'], '') or '').strip())
                                 or (has_theory_col and str(row.get(headers['theory'], '') or '').strip())
@@ -36919,7 +37055,7 @@ def school_admin_import_target(target):
                             subject_scores['exam_mode'] = 'combined'
                         else:
                             if not has_obj_col or not has_theory_col:
-                                raise ValueError('CSV must include both "Objective" and "Theory" for separate exam mode classes.')
+                                raise ValueError('Spreadsheet must include both "Objective" and "Theory" for separate exam mode classes.')
                             if has_exam_col and str(row.get(headers['exam score'], '') or '').strip():
                                 raise ValueError(f'Row {idx}: separate exam mode does not accept Exam Score values.')
                             raw_obj = row.get(headers.get('objective'), '') if headers.get('objective') else ''
@@ -37004,6 +37140,123 @@ def school_admin_import_target(target):
                 else:
                     entry['stream'] = 'N/A'
 
+                try:
+                    merge_shared_date('term_begin', parse_sheet_date(row.get(term_begin_header, '') if term_begin_header else '', idx, 'Term Begin'), idx, 'Term Begin')
+                    merge_shared_date('term_end', parse_sheet_date(row.get(term_end_header, '') if term_end_header else '', idx, 'Term End'), idx, 'Term End')
+                    merge_shared_date(
+                        'next_term_begin',
+                        parse_sheet_date(row.get(next_term_begin_header, '') if next_term_begin_header else '', idx, 'Next Term Begin'),
+                        idx,
+                        'Next Term Begin',
+                    )
+                    merge_shared_date(
+                        'next_term_end',
+                        parse_sheet_date(row.get(next_term_end_header, '') if next_term_end_header else '', idx, 'Next Term End'),
+                        idx,
+                        'Next Term End',
+                    )
+
+                    behaviour_payload = None
+                    for trait in BEHAVIOUR_TRAITS:
+                        trait_header = behaviour_headers.get(trait)
+                        raw_trait = (row.get(trait_header, '') or '').strip() if trait_header else ''
+                        if not raw_trait:
+                            continue
+                        if behaviour_payload is None:
+                            behaviour_payload = dict(staged_behaviour.get(student_id, _default_behaviour_assessment()))
+                        normalized_trait = normalize_behaviour_grade_value(raw_trait, school)
+                        if not normalized_trait:
+                            allowed_values = ', '.join(behaviour_grade_scale.keys())
+                            raise ValueError(
+                                f'Row {idx}: {trait} for "{student_id}" must use one of: {allowed_values}.'
+                            )
+                        existing_trait = (behaviour_payload.get(trait, '') or '').strip()
+                        if existing_trait and existing_trait != normalized_trait:
+                            raise ValueError(
+                                f'Row {idx}: conflicting {trait} values found for "{student_id}".'
+                            )
+                        behaviour_payload[trait] = normalized_trait
+                    if behaviour_payload is not None:
+                        normalized_behaviour = normalize_behaviour_assessment(behaviour_payload, school)
+                        missing_traits = [
+                            trait for trait in BEHAVIOUR_TRAITS
+                            if (normalized_behaviour.get(trait, '') or '').strip() not in behaviour_grade_scale
+                        ]
+                        if missing_traits:
+                            raise ValueError(
+                                f'Row {idx}: complete all behaviour traits for "{student_id}" before importing historical results.'
+                            )
+                        staged_behaviour[student_id] = normalized_behaviour
+                        imported_behaviour_students.add(student_id)
+
+                    attendance_values = [
+                        parse_spreadsheet_non_negative_int(
+                            row.get(days_open_header, '') if days_open_header else '',
+                            'Days Open',
+                            idx,
+                        ),
+                        parse_spreadsheet_non_negative_int(
+                            row.get(days_present_header, '') if days_present_header else '',
+                            'Days Present',
+                            idx,
+                        ),
+                        parse_spreadsheet_non_negative_int(
+                            row.get(days_absent_header, '') if days_absent_header else '',
+                            'Days Absent',
+                            idx,
+                        ),
+                    ]
+                    row_days_open, row_days_present, row_days_absent = attendance_values
+                    if any(value is not None for value in attendance_values):
+                        if row_days_open is None:
+                            if row_days_present is not None and row_days_absent is not None:
+                                row_days_open = row_days_present + row_days_absent
+                            else:
+                                raise ValueError(
+                                    f'Row {idx}: provide Days Open plus Days Present or Days Absent for "{student_id}".'
+                                )
+                        if row_days_present is None and row_days_absent is None:
+                            raise ValueError(
+                                f'Row {idx}: provide Days Present or Days Absent for "{student_id}".'
+                            )
+                        if row_days_present is None:
+                            row_days_present = row_days_open - row_days_absent
+                        if row_days_absent is None:
+                            row_days_absent = row_days_open - row_days_present
+                        if row_days_open <= 0:
+                            raise ValueError(f'Row {idx}: Days Open must be greater than 0 for "{student_id}".')
+                        if row_days_present < 0:
+                            raise ValueError(f'Row {idx}: Days Present cannot be negative for "{student_id}".')
+                        if row_days_absent < 0:
+                            raise ValueError(f'Row {idx}: Days Absent cannot be negative for "{student_id}".')
+                        if row_days_present > row_days_open:
+                            raise ValueError(
+                                f'Row {idx}: Days Present cannot be greater than Days Open for "{student_id}".'
+                            )
+                        if row_days_absent > row_days_open:
+                            raise ValueError(
+                                f'Row {idx}: Days Absent cannot be greater than Days Open for "{student_id}".'
+                            )
+                        if row_days_present + row_days_absent != row_days_open:
+                            raise ValueError(
+                                f'Row {idx}: Days Present plus Days Absent must equal Days Open for "{student_id}".'
+                            )
+                        attendance_payload = {
+                            'days_open': row_days_open,
+                            'days_present': row_days_present,
+                            'days_absent': row_days_absent,
+                        }
+                        existing_attendance = staged_attendance.get(student_id)
+                        if existing_attendance and existing_attendance != attendance_payload:
+                            raise ValueError(
+                                f'Row {idx}: conflicting attendance summary found for "{student_id}".'
+                            )
+                        staged_attendance[student_id] = attendance_payload
+                        imported_attendance_students.add(student_id)
+                except ValueError as exc:
+                    add_error(idx, row, str(exc))
+                    continue
+
                 entry['scores'][subject] = subject_scores
                 if subject not in entry['subjects']:
                     entry['subjects'].append(subject)
@@ -37015,12 +37268,49 @@ def school_admin_import_target(target):
                     'term': term,
                     'academic_year': academic_year,
                     'replace_existing': replace_existing,
+                    'behaviour_students': len(imported_behaviour_students),
+                    'attendance_students': len(imported_attendance_students),
+                    'term_dates_supplied': [key for key, value in imported_term_dates.items() if value],
                 }
             )
 
             if staged_results and not dry_run and not (replace_existing and error_rows):
-                behaviour_payload = normalize_behaviour_assessment({}, school)
                 publish_at = datetime.now().isoformat()
+                if (replace_existing or imported_behaviour_students) and not ensure_behaviour_assessment_schema():
+                    raise ValueError('Behaviour assessment table is unavailable. Run the database schema update, then retry.')
+                if (replace_existing or imported_attendance_students) and not ensure_result_attendance_manual_schema():
+                    raise ValueError('Historical attendance summary table is unavailable. Run the database schema update, then retry.')
+                existing_calendar = get_school_term_calendar(school_id, academic_year, term) or {}
+                existing_program = get_school_term_program(school_id, academic_year, term) or {}
+                existing_program_meta = (
+                    dict(existing_program.get('program_meta_json', {}))
+                    if isinstance(existing_program.get('program_meta_json'), dict)
+                    else {}
+                )
+                term_begin_value = imported_term_dates.get('term_begin') or (existing_calendar.get('open_date') or '').strip()
+                term_end_value = imported_term_dates.get('term_end') or (existing_calendar.get('close_date') or '').strip()
+                next_term_begin_value = (
+                    imported_term_dates.get('next_term_begin')
+                    or (existing_program.get('next_term_begin_date') or '').strip()
+                    or (existing_calendar.get('next_term_begin_date') or '').strip()
+                )
+                next_term_end_value = (
+                    imported_term_dates.get('next_term_end')
+                    or (existing_program.get('next_term_end_date') or '').strip()
+                    or (existing_program_meta.get('next_term_end_date') or '').strip()
+                )
+                if bool(term_begin_value) != bool(term_end_value):
+                    raise ValueError('Historical term dates require both Term Begin and Term End when one is provided.')
+                if term_begin_value and term_end_value:
+                    term_begin_dt = _parse_iso_date(term_begin_value)
+                    term_end_dt = _parse_iso_date(term_end_value)
+                    if term_begin_dt and term_end_dt and term_begin_dt > term_end_dt:
+                        raise ValueError('Historical Term Begin cannot be after Term End.')
+                if next_term_begin_value and next_term_end_value:
+                    next_term_begin_dt = _parse_iso_date(next_term_begin_value)
+                    next_term_end_dt = _parse_iso_date(next_term_end_value)
+                    if next_term_begin_dt and next_term_end_dt and next_term_begin_dt > next_term_end_dt:
+                        raise ValueError('Historical Next Term Begin cannot be after Next Term End.')
                 with db_connection(commit=True) as conn:
                     c = conn.cursor()
                     if replace_existing:
@@ -37031,10 +37321,94 @@ def school_admin_import_target(target):
                                  AND COALESCE(academic_year, '') = COALESCE(?, '')""",
                             (school_id, classname, term, academic_year),
                         )
+                        db_execute(
+                            c,
+                            """DELETE FROM behaviour_assessments
+                               WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
+                                 AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+                            (school_id, classname, term, academic_year),
+                        )
+                        db_execute(
+                            c,
+                            """DELETE FROM result_attendance_manual
+                               WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
+                                 AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+                            (school_id, classname, term, academic_year),
+                        )
+                    if term_begin_value or term_end_value or next_term_begin_value or next_term_end_value:
+                        save_school_term_calendar_with_cursor(
+                            c,
+                            school_id=school_id,
+                            academic_year=academic_year,
+                            term=term,
+                            open_date=term_begin_value,
+                            close_date=term_end_value,
+                            break_start=(existing_calendar.get('midterm_break_start') or '').strip(),
+                            break_end=(existing_calendar.get('midterm_break_end') or '').strip(),
+                            next_term_begin_date=next_term_begin_value,
+                        )
+                        merged_program_meta = dict(existing_program_meta)
+                        if next_term_end_value:
+                            merged_program_meta['next_term_end_date'] = next_term_end_value
+                        program_payload = {
+                            'midterm_break_start': (existing_program.get('midterm_break_start') or '').strip(),
+                            'midterm_break_end': (existing_program.get('midterm_break_end') or '').strip(),
+                            'exams_period_start': (existing_program.get('exams_period_start') or '').strip(),
+                            'exams_period_end': (existing_program.get('exams_period_end') or '').strip(),
+                            'pta_meeting_date': (existing_program.get('pta_meeting_date') or '').strip(),
+                            'interhouse_sports_date': (existing_program.get('interhouse_sports_date') or '').strip(),
+                            'graduation_ceremony_date': (existing_program.get('graduation_ceremony_date') or '').strip(),
+                            'continuous_assessment_deadline': (existing_program.get('continuous_assessment_deadline') or '').strip(),
+                            'school_events_date': (existing_program.get('school_events_date') or '').strip(),
+                            'school_events': (existing_program.get('school_events') or '').strip(),
+                            'next_term_begin_date': next_term_begin_value,
+                            'program_meta_json': merged_program_meta,
+                        }
+                        save_school_term_program_with_cursor(c, school_id, academic_year, term, program_payload)
                     for staged in staged_results.values():
                         subjects = _dedupe_keep_order(normalize_subjects_list(staged.get('subjects', [])))
                         scores = staged.get('scores', {}) if isinstance(staged.get('scores', {}), dict) else {}
+                        behaviour_payload = staged_behaviour.get(
+                            staged.get('student_id', ''),
+                            normalize_behaviour_assessment({}, school),
+                        )
+                        attendance_payload = staged_attendance.get(staged.get('student_id', ''))
                         average_marks = compute_average_marks_from_scores(scores, subjects=subjects)
+                        if attendance_payload:
+                            db_execute(
+                                c,
+                                """INSERT INTO result_attendance_manual
+                                   (school_id, student_id, classname, term, academic_year, days_open, days_present, updated_by, updated_at)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                                   ON CONFLICT(school_id, student_id, term, academic_year) DO UPDATE SET
+                                       classname = excluded.classname,
+                                       days_open = excluded.days_open,
+                                       days_present = excluded.days_present,
+                                       updated_by = excluded.updated_by,
+                                       updated_at = CURRENT_TIMESTAMP""",
+                                (
+                                    school_id,
+                                    staged.get('student_id', ''),
+                                    classname,
+                                    term,
+                                    academic_year or '',
+                                    int(attendance_payload.get('days_open', 0) or 0),
+                                    int(attendance_payload.get('days_present', 0) or 0),
+                                    actor_user_id or 'historical_import',
+                                ),
+                            )
+                        if staged.get('student_id', '') in staged_behaviour:
+                            save_behaviour_assessment_with_cursor(
+                                c,
+                                school_id=school_id,
+                                student_id=staged.get('student_id', ''),
+                                classname=classname,
+                                term=term,
+                                academic_year=academic_year,
+                                behaviour_payload=behaviour_payload,
+                                updated_by=actor_user_id or 'historical_import',
+                                school_or_mode=school,
+                            )
                         db_execute(
                             c,
                             """INSERT INTO published_student_results
@@ -37111,12 +37485,14 @@ def school_admin_import_target(target):
                 )
             elif dry_run:
                 import_details = (
-                    f'Historical results dry-run checked {processed} subject row(s) and built {imported} student result snapshot(s).'
+                    f'Historical results dry-run checked {processed} subject row(s), built {imported} student result snapshot(s), '
+                    f'captured behaviour for {len(imported_behaviour_students)} student(s), and attendance for {len(imported_attendance_students)} student(s).'
                 )
             else:
                 import_details = (
                     f'Historical results import processed {processed} subject row(s) and '
-                    f'{"prepared" if error_rows else "saved"} {imported} student result snapshot(s).'
+                    f'{"prepared" if error_rows else "saved"} {imported} student result snapshot(s). '
+                    f'Behaviour: {len(imported_behaviour_students)} student(s). Attendance: {len(imported_attendance_students)} student(s).'
                 )
         else:
             raise ValueError('Invalid import target.')
