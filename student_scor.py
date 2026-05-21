@@ -5082,18 +5082,20 @@ def _b64url_decode_bytes(raw):
     return base64.urlsafe_b64decode((raw + pad).encode('ascii'))
 
 def build_result_verification_token(school_id, student_id, term, academic_year='', classname=''):
-    issued_at = int(time.time())
-    expires_at = issued_at + (RESULT_VERIFY_TOKEN_TTL_MINUTES * 60)
+    expires_at = int(time.time()) + (RESULT_VERIFY_TOKEN_TTL_MINUTES * 60)
     payload = {
-        'v': 2,
-        'school_id': (school_id or '').strip(),
-        'student_id': (student_id or '').strip(),
-        'term': (term or '').strip(),
-        'academic_year': (academic_year or '').strip(),
-        'classname': (classname or '').strip(),
-        'iat': issued_at,
-        'exp': expires_at,
+        'v': 3,
+        's': (school_id or '').strip(),
+        'u': (student_id or '').strip(),
+        't': (term or '').strip(),
+        'e': expires_at,
     }
+    academic_year = (academic_year or '').strip()
+    classname = (classname or '').strip()
+    if academic_year:
+        payload['y'] = academic_year
+    if classname:
+        payload['c'] = classname
     payload_json = json.dumps(payload, separators=(',', ':'), sort_keys=True).encode('utf-8')
     payload_b64 = _b64url_encode_bytes(payload_json)
     sig = hmac.new(_result_verify_signing_key(), payload_b64.encode('ascii'), hashlib.sha256).digest()
@@ -5114,8 +5116,19 @@ def parse_result_verification_token(token):
         payload = json.loads(payload_raw.decode('utf-8'))
         if not isinstance(payload, dict):
             return None
-        if int(payload.get('v', 0) or 0) != 2:
+        version = int(payload.get('v', 0) or 0)
+        if version not in {2, 3}:
             return None
+        if version >= 3:
+            payload = {
+                'v': version,
+                'school_id': (payload.get('s') or '').strip(),
+                'student_id': (payload.get('u') or '').strip(),
+                'term': (payload.get('t') or '').strip(),
+                'academic_year': (payload.get('y') or '').strip(),
+                'classname': (payload.get('c') or '').strip(),
+                'exp': int(payload.get('e', 0) or 0),
+            }
         expires_at = int(payload.get('exp', 0) or 0)
         now_ts = int(time.time())
         if not expires_at or now_ts > expires_at:
@@ -5132,48 +5145,48 @@ def build_verification_qr_data_uri(value):
         qr = qrcode.QRCode(
             version=None,
             error_correction=qrcode.constants.ERROR_CORRECT_M,
-            box_size=6,
-            border=2,
+            box_size=10,
+            border=4,
         )
         qr.add_data(payload)
         qr.make(fit=True)
-        image = qr.make_image(fill_color="black", back_color="white")
-        buffer = BytesIO()
-        image.save(buffer, format='PNG')
-        encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
-        return f'data:image/png;base64,{encoded}'
+        matrix = qr.get_matrix()
+        size = len(matrix or [])
+        if not size:
+            return ''
+        rects = []
+        for y, row in enumerate(matrix):
+            run_start = None
+            for x, is_dark in enumerate(list(row) + [False]):
+                if is_dark and run_start is None:
+                    run_start = x
+                elif not is_dark and run_start is not None:
+                    rects.append(f'<rect x="{run_start}" y="{y}" width="{x - run_start}" height="1"/>')
+                    run_start = None
+        svg_markup = (
+            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" '
+            'shape-rendering="crispEdges">'
+            '<rect width="100%" height="100%" fill="#ffffff"/>'
+            f'<g fill="#000000">{"".join(rects)}</g>'
+            '</svg>'
+        )
+        encoded = base64.b64encode(svg_markup.encode('utf-8')).decode('ascii')
+        return f'data:image/svg+xml;base64,{encoded}'
     except Exception:
         try:
             qr = qrcode.QRCode(
                 version=None,
                 error_correction=qrcode.constants.ERROR_CORRECT_M,
-                box_size=6,
-                border=2,
+                box_size=10,
+                border=4,
             )
             qr.add_data(payload)
             qr.make(fit=True)
-            matrix = qr.get_matrix()
-            size = len(matrix or [])
-            if not size:
-                return ''
-            rects = []
-            for y, row in enumerate(matrix):
-                run_start = None
-                for x, is_dark in enumerate(list(row) + [False]):
-                    if is_dark and run_start is None:
-                        run_start = x
-                    elif not is_dark and run_start is not None:
-                        rects.append(f'<rect x="{run_start}" y="{y}" width="{x - run_start}" height="1"/>')
-                        run_start = None
-            svg_markup = (
-                f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" '
-                'shape-rendering="crispEdges">'
-                '<rect width="100%" height="100%" fill="#ffffff"/>'
-                f'<g fill="#000000">{"".join(rects)}</g>'
-                '</svg>'
-            )
-            encoded = base64.b64encode(svg_markup.encode('utf-8')).decode('ascii')
-            return f'data:image/svg+xml;base64,{encoded}'
+            image = qr.make_image(fill_color="black", back_color="white")
+            buffer = BytesIO()
+            image.save(buffer, format='PNG')
+            encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
+            return f'data:image/png;base64,{encoded}'
         except Exception:
             logging.exception("Could not generate verification QR code.")
             return ''
@@ -5186,7 +5199,7 @@ def build_result_verification_context(school_id, student_id, term, academic_year
         academic_year=academic_year,
         classname=classname,
     )
-    verification_url = url_for('verify_result_qr', token=token, _external=True)
+    verification_url = url_for('verify_result_qr', t=token, _external=True)
     qr_image_url = build_verification_qr_data_uri(verification_url)
     return {
         'verification_token': token,
@@ -46651,7 +46664,7 @@ def school_admin_unpublish_results():
 
 @app.route('/verify-result')
 def verify_result_qr():
-    token = (request.args.get('token', '') or '').strip()
+    token = (request.args.get('t', '') or request.args.get('token', '') or '').strip()
     payload = parse_result_verification_token(token)
     if not payload:
         return render_template('shared/result_verification.html', verified=False, reason='Invalid verification token.', details={})

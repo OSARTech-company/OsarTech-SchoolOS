@@ -104,7 +104,7 @@
             padding: 26px 28px 24px;
             position: relative;
             display: grid;
-            grid-template-columns: minmax(0, 170px) 1fr minmax(180px, 230px);
+            grid-template-columns: minmax(0, 170px) 1fr minmax(220px, 280px);
             align-items: center;
             gap: 22px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.32);
@@ -147,7 +147,7 @@
             display: inline-flex;
             align-items: center;
             justify-content: flex-end;
-            gap: 12px;
+            gap: 14px;
         }
 
         .header-logo-shell {
@@ -200,23 +200,25 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 112px;
-            height: 112px;
-            padding: 8px;
-            border-radius: 18px;
-            background: rgba(255, 255, 255, 0.18);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            width: 144px;
+            height: 144px;
+            padding: 10px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid rgba(255, 255, 255, 0.78);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 24px rgba(15, 23, 42, 0.12);
         }
 
         .header-qr-image {
-            width: 96px;
-            height: 96px;
-            object-fit: contain;
+            width: 124px;
+            height: 124px;
+            object-fit: fill;
             background: #fff;
-            border-radius: 8px;
-            padding: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 0;
+            padding: 0;
+            border: 0;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
         }
 
         .header-student-profile {
@@ -289,6 +291,39 @@
             font-size: var(--font-sm);
             opacity: 0.96;
             margin-bottom: 12px;
+        }
+
+        .school-contact-row {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 8px 10px;
+            margin-bottom: 12px;
+        }
+
+        .school-contact-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            max-width: 100%;
+            padding: 7px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: rgba(255, 255, 255, 0.96);
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        .school-contact-chip i {
+            flex: 0 0 auto;
+            opacity: 0.9;
+        }
+
+        .school-contact-chip span {
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .school-meta {
@@ -961,6 +996,74 @@
             overflow-wrap: anywhere;
         }
 
+        .behaviour-panel {
+            margin: 22px;
+            padding: 16px;
+            background: #fff;
+            border: 1px solid var(--school-border-soft);
+            border-radius: 16px;
+            box-shadow: 0 14px 28px rgba(17, 24, 39, 0.06);
+        }
+
+        .behaviour-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }
+
+        .behaviour-card {
+            border: 1px solid var(--school-border-soft);
+            border-radius: 14px;
+            padding: 12px 14px;
+            background: linear-gradient(180deg, #fbfdff 0%, #f5f9ff 100%);
+            box-shadow: 0 8px 18px rgba(17, 24, 39, 0.04);
+        }
+
+        .behaviour-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .behaviour-trait {
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--school-ink);
+            line-height: 1.35;
+        }
+
+        .behaviour-grade-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 38px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: rgba(42, 82, 152, 0.1);
+            color: var(--school-primary);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+
+        .behaviour-meaning {
+            font-size: 12px;
+            color: var(--school-muted);
+            line-height: 1.45;
+        }
+
+        .behaviour-empty {
+            text-align: center;
+            padding: 18px;
+            border: 1px dashed var(--school-border);
+            border-radius: 12px;
+            color: var(--school-muted);
+            background: linear-gradient(180deg, #fbfdff 0%, #f7fbff 100%);
+        }
+
         .verification-qr-preview {
             flex: 0 0 auto;
             display: inline-flex;
@@ -989,7 +1092,7 @@
 
         @media (max-width: 900px) {
             .header {
-                grid-template-columns: 110px 1fr 190px;
+                grid-template-columns: 110px 1fr 220px;
                 gap: 16px;
                 padding: 22px 18px 20px;
             }
@@ -998,6 +1101,9 @@
             }
             .report-title {
                 font-size: 17px;
+            }
+            .school-contact-chip {
+                font-size: 11px;
             }
             .student-info {
                 grid-template-columns: 1fr;
@@ -1103,12 +1209,30 @@
                 height: 64px;
                 box-shadow: none;
             }
+            .header-qr-shell {
+                width: 120px;
+                height: 120px;
+                padding: 8px;
+            }
+            .header-qr-image {
+                width: 104px;
+                height: 104px;
+            }
             .subjects-table,
+            .behaviour-panel,
             .teacher-comment,
             .signatures,
             .verification-box {
                 margin: 10px 12px;
                 page-break-inside: avoid;
+            }
+            .behaviour-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+            }
+            .behaviour-card {
+                padding: 8px 10px;
+                box-shadow: none;
             }
             .verification-qr-preview {
                 width: 74px;
@@ -1179,6 +1303,13 @@
             .report-subtitle {
                 padding: 5px 12px;
             }
+            .school-contact-row {
+                gap: 8px;
+            }
+            .school-contact-chip {
+                width: 100%;
+                justify-content: center;
+            }
             .student-info {
                 grid-template-columns: 1fr;
                 gap: 15px;
@@ -1205,12 +1336,13 @@
                 font-size: 20px;
             }
             .header-qr-shell {
-                width: 86px;
-                height: 86px;
+                width: 104px;
+                height: 104px;
+                padding: 7px;
             }
             .header-qr-image {
-                width: 70px;
-                height: 70px;
+                width: 90px;
+                height: 90px;
             }
 
             .signatures {
@@ -1222,6 +1354,14 @@
                 flex-direction: column;
                 text-align: center;
                 margin: 16px 16px 0;
+            }
+            .behaviour-panel {
+                margin: 16px;
+                padding: 14px;
+            }
+            .behaviour-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
             }
             .verification-qr-preview {
                 width: 86px;
@@ -1419,6 +1559,16 @@
                 <div class="school-name">{{ school.school_name if school and school.school_name else 'Student Score Management System' }}</div>
                 <div class="report-title">Academic Report Card</div>
                 <div class="report-subtitle">Term/Semester Report</div>
+                <div class="school-contact-row">
+                    <div class="school-contact-chip">
+                        <i class="fas fa-location-dot" aria-hidden="true"></i>
+                        <span>{{ school.location if school and school.location else 'Location not set' }}</span>
+                    </div>
+                    <div class="school-contact-chip">
+                        <i class="fas fa-envelope" aria-hidden="true"></i>
+                        <span>{{ school.email if school and school.email else 'Email not set' }}</span>
+                    </div>
+                </div>
                 <div class="school-meta">
                     <span>{{ student.class_name if student.class_name else 'Class Not Set' }}</span>
                     <span>{{ student.number_of_subject if student.number_of_subject is not none else 0 }} Subjects</span>
@@ -1695,33 +1845,23 @@
         </div>
 
         {% set teacher_comment_text = ((student.teacher_comment or '')|trim) %}
-        <div class="subjects-table">
+        <div class="behaviour-panel">
             <div class="table-title">Behaviour Assessment (Affective Domain)</div>
-            <div class="table-wrap">
-            <table class="behaviour-table">
-                <thead>
-                    <tr>
-                        <th>Trait</th>
-                        <th>Grade</th>
-                        <th>Meaning</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for trait, grade in (student.behaviour_assessment or {}).items() %}
-                    <tr>
-                        <td data-label="Trait" style="text-align:left; font-weight:bold;">{{ trait }}</td>
-                        <td data-label="Grade">{{ grade or '-' }}</td>
-                        <td data-label="Meaning">{{ (behaviour_grade_scale or {}).get(grade, '-') }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% if not (student.behaviour_assessment or {}) %}
-                    <tr>
-                        <td colspan="3" style="text-align:center;">No behaviour assessment provided.</td>
-                    </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+            {% if student.behaviour_assessment %}
+            <div class="behaviour-grid">
+                {% for trait, grade in (student.behaviour_assessment or {}).items() %}
+                <div class="behaviour-card">
+                    <div class="behaviour-card-header">
+                        <div class="behaviour-trait">{{ trait }}</div>
+                        <div class="behaviour-grade-pill">{{ grade or '-' }}</div>
+                    </div>
+                    <div class="behaviour-meaning">{{ (behaviour_grade_scale or {}).get(grade, '-') }}</div>
+                </div>
+                {% endfor %}
             </div>
+            {% else %}
+            <div class="behaviour-empty">No behaviour assessment provided.</div>
+            {% endif %}
         </div>
 
         <div class="comment-grid">
