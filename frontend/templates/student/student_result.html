@@ -1281,9 +1281,11 @@
                 padding-right: 16px;
             }
             .header-side {
+                order: 1;
                 justify-content: center;
             }
             .header-qr-side {
+                order: 3;
                 justify-content: center;
             }
             .header-right-cluster {
@@ -1577,6 +1579,11 @@
             </div>
             <div class="header-qr-side">
                 <div class="header-right-cluster">
+                    {% if verification_qr_url %}
+                    <div class="header-qr-shell">
+                        <img src="{{ verification_qr_url }}" alt="Result Verification QR Code" class="header-qr-image">
+                    </div>
+                    {% endif %}
                     <div class="header-student-profile">
                         {% if student.profile_image_url %}
                         <img src="{{ student.profile_image_url }}" alt="{{ student_display_name }} Profile Picture" class="header-student-photo">
@@ -1585,11 +1592,6 @@
                         {% endif %}
                         <div class="header-student-label">Student</div>
                     </div>
-                    {% if verification_qr_url %}
-                    <div class="header-qr-shell">
-                        <img src="{{ verification_qr_url }}" alt="Result Verification QR Code" class="header-qr-image">
-                    </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -1653,7 +1655,7 @@
                 </div>
                 <div class="info-row">
                     <div class="info-label">Status</div>
-                    <div class="info-value {% if student.Status == 'Pass' %}status-pass{% else %}status-fail{% endif %}" style="font-weight: bold;">
+                    <div class="info-value {{ status_css_class_from_status(student.Status, school) }}" style="font-weight: bold;">
                         {{ student.Status }}
                     </div>
                 </div>
@@ -1690,7 +1692,7 @@
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Status</div>
-                <div class="kpi-value {% if student.Status == 'Pass' %}status-pass{% else %}status-fail{% endif %}">{{ student.Status }}</div>
+                <div class="kpi-value {{ status_css_class_from_status(student.Status, school) }}">{{ student.Status }}</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-label">Subjects</div>
@@ -1919,23 +1921,6 @@
                 <div class="signature-meta">Acknowledgement</div>
             </div>
         </div>
-
-        {% if verification_url %}
-        <div class="verification-box">
-            {% if verification_qr_url %}
-            <div class="verification-qr-preview">
-                <img src="{{ verification_qr_url }}" alt="Result Verification QR Code" class="verification-qr-image">
-            </div>
-            {% endif %}
-            <div class="verification-copy">
-                <div class="verification-title"><i class="fas fa-shield-halved"></i> Result Verification</div>
-                <div class="verification-text">
-                    Scan the QR code or open this link to verify this result:<br>
-                    <a href="{{ verification_url }}" target="_blank" rel="noopener">{{ verification_url }}</a>
-                </div>
-            </div>
-        </div>
-        {% endif %}
 
         <div class="footer-note">
             <div><strong>{{ school.school_name if school and school.school_name else 'Student Score Management System' }}</strong></div>

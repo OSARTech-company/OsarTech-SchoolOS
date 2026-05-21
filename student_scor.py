@@ -597,6 +597,8 @@ def inject_grade_label_helpers():
         'display_grade_label': display_grade_label,
         'normalize_grade_band': normalize_grade_band,
         'grade_css_class_from_grade': grade_css_class_from_grade,
+        'status_css_class_from_status': status_css_class_from_status,
+        'status_is_passing': status_is_passing,
         'format_ca_slot_label': format_ca_slot_label,
         'ca_slot_max_score': ca_slot_max_score,
     }
@@ -5960,6 +5962,7 @@ def init_db():
                         grade_label_d TEXT DEFAULT 'D',
                         grade_label_f TEXT DEFAULT 'F',
                         grade_scale_json TEXT DEFAULT '',
+                        status_scale_json TEXT DEFAULT '',
                         performance_remark_a TEXT DEFAULT '',
                         performance_remark_b TEXT DEFAULT '',
                         performance_remark_c TEXT DEFAULT '',
@@ -6123,6 +6126,7 @@ def init_db():
     safe_exec_ignore("ALTER TABLE schools ADD COLUMN grade_label_d TEXT DEFAULT 'D'")
     safe_exec_ignore("ALTER TABLE schools ADD COLUMN grade_label_f TEXT DEFAULT 'F'")
     safe_exec_ignore("ALTER TABLE schools ADD COLUMN grade_scale_json TEXT DEFAULT ''")
+    safe_exec_ignore("ALTER TABLE schools ADD COLUMN status_scale_json TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE schools ADD COLUMN performance_remark_a TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE schools ADD COLUMN performance_remark_b TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE schools ADD COLUMN performance_remark_c TEXT DEFAULT ''")
@@ -14448,6 +14452,7 @@ def _school_row_to_dict(row):
         'grade_label_d': (row['grade_label_d'] if 'grade_label_d' in row.keys() else 'D') or 'D',
         'grade_label_f': (row['grade_label_f'] if 'grade_label_f' in row.keys() else 'F') or 'F',
         'grade_scale_json': (row['grade_scale_json'] if 'grade_scale_json' in row.keys() else '') or '',
+        'status_scale_json': (row['status_scale_json'] if 'status_scale_json' in row.keys() else '') or '',
         'performance_remark_a': (row['performance_remark_a'] if 'performance_remark_a' in row.keys() else '') or '',
         'performance_remark_b': (row['performance_remark_b'] if 'performance_remark_b' in row.keys() else '') or '',
         'performance_remark_c': (row['performance_remark_c'] if 'performance_remark_c' in row.keys() else '') or '',
@@ -14686,6 +14691,7 @@ def update_school_settings_with_cursor(c, school_id, settings):
     db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS grade_label_d TEXT DEFAULT 'D'")
     db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS grade_label_f TEXT DEFAULT 'F'")
     db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS grade_scale_json TEXT DEFAULT ''")
+    db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS status_scale_json TEXT DEFAULT ''")
     db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS performance_remark_a TEXT DEFAULT ''")
     db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS performance_remark_b TEXT DEFAULT ''")
     db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS performance_remark_c TEXT DEFAULT ''")
@@ -14713,7 +14719,7 @@ def update_school_settings_with_cursor(c, school_id, settings):
                 "current_term = ?, test_enabled = ?, exam_enabled = ?, "
                 "max_tests = ?, test_score_max = ?, exam_objective_max = ?, exam_theory_max = ?, "
                 "grade_a_min = ?, grade_b_min = ?, grade_c_min = ?, grade_d_min = ?, "
-                "grade_label_a = ?, grade_label_b = ?, grade_label_c = ?, grade_label_d = ?, grade_label_f = ?, grade_scale_json = ?, "
+                "grade_label_a = ?, grade_label_b = ?, grade_label_c = ?, grade_label_d = ?, grade_label_f = ?, grade_scale_json = ?, status_scale_json = ?, "
                 "performance_remark_a = ?, performance_remark_b = ?, performance_remark_c = ?, performance_remark_d = ?, performance_remark_f = ?, "
                 "pass_mark = ?, behaviour_grade_mode = ?, "
                 "show_positions = ?, ss_ranking_mode = ?, class_arm_ranking_mode = ?, "
@@ -14734,6 +14740,7 @@ def update_school_settings_with_cursor(c, school_id, settings):
                 (settings.get('grade_label_d', 'D') or 'D').strip(),
                 (settings.get('grade_label_f', 'F') or 'F').strip(),
                 (settings.get('grade_scale_json', '') or '').strip(),
+                (settings.get('status_scale_json', '') or '').strip(),
                 (settings.get('performance_remark_a', '') or '').strip(),
                 (settings.get('performance_remark_b', '') or '').strip(),
                 (settings.get('performance_remark_c', '') or '').strip(),
@@ -15514,6 +15521,8 @@ def get_grade_config(school_id):
         'grade_label_f': (school.get('grade_label_f', 'F') or 'F').strip() or 'F',
         'grade_scale_json': (school.get('grade_scale_json', '') or '').strip(),
         'grade_scale': get_effective_grade_scale(school),
+        'status_scale_json': (school.get('status_scale_json', '') or '').strip(),
+        'status_scale': get_effective_status_scale(school),
     }
 
 
@@ -15598,6 +15607,58 @@ def get_effective_grade_scale(cfg_or_school=None):
         {'label': 'D', 'min_score': 40},
         {'label': 'F', 'min_score': 0},
     ]
+
+
+def build_default_status_scale_rows(cfg_or_school=None):
+    source = cfg_or_school or {}
+    pass_mark = max(0, min(100, safe_int(source.get('pass_mark', 50), 50)))
+    return [
+        {'label': 'Pass', 'min_score': pass_mark},
+        {'label': 'Fail', 'min_score': 0},
+    ]
+
+
+def normalize_status_scale_rows(rows, default_rows=None):
+    default_rows = default_rows or build_default_status_scale_rows()
+    normalized = []
+    seen_labels = set()
+    seen_scores = set()
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        label = (row.get('label', '') or '').strip()[:24]
+        if not label:
+            continue
+        min_score = max(0, min(100, safe_int(row.get('min_score', 0), 0)))
+        label_key = label.casefold()
+        if label_key in seen_labels or min_score in seen_scores:
+            continue
+        seen_labels.add(label_key)
+        seen_scores.add(min_score)
+        normalized.append({'label': label, 'min_score': min_score})
+    normalized.sort(key=lambda item: (-int(item.get('min_score', 0)), str(item.get('label', '')).casefold()))
+    if len(normalized) < 2 or int(normalized[-1].get('min_score', 0)) != 0:
+        normalized = [dict(item) for item in default_rows]
+    return normalized
+
+
+def status_scale_rows_from_json(raw_value, default_rows=None):
+    default_rows = default_rows or build_default_status_scale_rows()
+    try:
+        parsed = json.loads(raw_value or '[]')
+    except Exception:
+        parsed = []
+    return normalize_status_scale_rows(parsed, default_rows=default_rows)
+
+
+def get_effective_status_scale(cfg_or_school=None):
+    source = cfg_or_school or {}
+    if isinstance(source.get('status_scale'), list):
+        return normalize_status_scale_rows(source.get('status_scale'))
+    raw_json = source.get('status_scale_json', '')
+    if (raw_json or '').strip():
+        return status_scale_rows_from_json(raw_json, default_rows=build_default_status_scale_rows(source))
+    return build_default_status_scale_rows(source)
 
 
 def get_grade_label_map(cfg_or_school=None):
@@ -15698,10 +15759,31 @@ def grade_from_score(score, cfg):
     return (get_effective_grade_scale(cfg)[-1].get('label', 'F') or 'F').strip() or 'F'
 
 def status_from_score(score, cfg):
-    """Get pass/fail status from score."""
+    """Get configured status label from score."""
     cfg = cfg or {}
+    numeric_score = safe_float(score, 0)
+    for row in get_effective_status_scale(cfg):
+        min_score = safe_float(row.get('min_score', 0), 0)
+        if numeric_score >= min_score:
+            return (row.get('label', '') or '').strip() or 'Pass'
+    return (get_effective_status_scale(cfg)[-1].get('label', 'Fail') or 'Fail').strip() or 'Fail'
+
+
+def status_is_passing(status_value, cfg_or_school=None):
+    raw = (status_value or '').strip()
+    if not raw:
+        return False
+    cfg = cfg_or_school or {}
     pass_mark = safe_float(cfg.get('pass_mark', cfg.get('passmark', 50)), 50)
-    return 'Pass' if float(score or 0) >= pass_mark else 'Fail'
+    for row in get_effective_status_scale(cfg):
+        label = (row.get('label', '') or '').strip()
+        if label and raw.casefold() == label.casefold():
+            return safe_float(row.get('min_score', 0), 0) >= pass_mark
+    return raw.casefold() == 'pass'
+
+
+def status_css_class_from_status(status_value, cfg_or_school=None):
+    return 'status-pass' if status_is_passing(status_value, cfg_or_school) else 'status-fail'
 
 BEHAVIOUR_GRADE_MODE_OPTIONS = {
     'alpha_ad': {
@@ -24562,7 +24644,7 @@ def restore_school_backup_payload(school_id, payload, mode='merge'):
                    SET school_name = ?, location = ?, school_logo = ?, academic_year = ?, current_term = ?,
                        test_enabled = ?, exam_enabled = ?, max_tests = ?, test_score_max = ?, exam_objective_max = ?,
                        exam_theory_max = ?, grade_a_min = ?, grade_b_min = ?, grade_c_min = ?, grade_d_min = ?,
-                       grade_label_a = ?, grade_label_b = ?, grade_label_c = ?, grade_label_d = ?, grade_label_f = ?, grade_scale_json = ?,
+                       grade_label_a = ?, grade_label_b = ?, grade_label_c = ?, grade_label_d = ?, grade_label_f = ?, grade_scale_json = ?, status_scale_json = ?,
                        performance_remark_a = ?, performance_remark_b = ?, performance_remark_c = ?, performance_remark_d = ?, performance_remark_f = ?,
                        pass_mark = ?, show_positions = ?, ss_ranking_mode = ?, class_arm_ranking_mode = ?,
                        combine_third_term_results = ?, ss1_stream_mode = ?, ss_arm_mode = ?, theme_primary_color = ?, theme_secondary_color = ?,
@@ -24590,6 +24672,7 @@ def restore_school_backup_payload(school_id, payload, mode='merge'):
                     school_data.get('grade_label_d', 'D') or 'D',
                     school_data.get('grade_label_f', 'F') or 'F',
                     school_data.get('grade_scale_json', '') or '',
+                    school_data.get('status_scale_json', '') or '',
                     school_data.get('performance_remark_a', '') or '',
                     school_data.get('performance_remark_b', '') or '',
                     school_data.get('performance_remark_c', '') or '',
@@ -33236,6 +33319,8 @@ def _build_school_settings_form_state(school):
         'grade_label_f': (school.get('grade_label_f', 'F') or 'F').strip() or 'F',
         'grade_scale_json': (school.get('grade_scale_json', '') or '').strip(),
         'grade_scale_rows': get_effective_grade_scale(school),
+        'status_scale_json': (school.get('status_scale_json', '') or '').strip(),
+        'status_scale_rows': get_effective_status_scale(school),
         'performance_remark_a': (school.get('performance_remark_a', '') or '').strip(),
         'performance_remark_b': (school.get('performance_remark_b', '') or '').strip(),
         'performance_remark_c': (school.get('performance_remark_c', '') or '').strip(),
@@ -33294,6 +33379,7 @@ def _build_school_settings_form_state_from_request(school, form_data):
         'grade_label_d': (form_data.get('grade_label_d', state.get('grade_label_d', 'D')) or 'D').strip()[:24] or 'D',
         'grade_label_f': (form_data.get('grade_label_f', state.get('grade_label_f', 'F')) or 'F').strip()[:24] or 'F',
         'grade_scale_json': (form_data.get('grade_scale_json', state.get('grade_scale_json', '')) or '').strip(),
+        'status_scale_json': (form_data.get('status_scale_json', state.get('status_scale_json', '')) or '').strip(),
         'performance_remark_a': (form_data.get('performance_remark_a', state.get('performance_remark_a', '')) or '').strip()[:1500],
         'performance_remark_b': (form_data.get('performance_remark_b', state.get('performance_remark_b', '')) or '').strip()[:1500],
         'performance_remark_c': (form_data.get('performance_remark_c', state.get('performance_remark_c', '')) or '').strip()[:1500],
@@ -33329,6 +33415,19 @@ def _build_school_settings_form_state_from_request(school, form_data):
         state['grade_scale_json'] = ''
     else:
         state['grade_scale_rows'] = get_effective_grade_scale(state)
+    posted_status_rows = _collect_status_scale_form_rows(form_data)
+    if any(((row.get('label') or '').strip() or str(row.get('min_score', '') or '').strip()) for row in posted_status_rows):
+        visible_status_rows = []
+        for row in posted_status_rows:
+            label = (row.get('label') or '').strip()
+            min_raw = str(row.get('min_score', '') or '').strip()
+            if not label and not min_raw:
+                continue
+            visible_status_rows.append({'label': label, 'min_score': min_raw})
+        state['status_scale_rows'] = visible_status_rows or [{'label': '', 'min_score': ''}]
+        state['status_scale_json'] = ''
+    else:
+        state['status_scale_rows'] = get_effective_status_scale(state)
     return state
 
 
@@ -33411,6 +33510,26 @@ def _collect_grade_scale_form_rows(form_data):
     return rows
 
 
+def _collect_status_scale_form_rows(form_data):
+    labels = _settings_form_getlist(form_data, 'status_scale_label')
+    mins = _settings_form_getlist(form_data, 'status_scale_min')
+    rows = []
+    if labels or mins:
+        total_rows = max(len(labels), len(mins))
+        for idx in range(total_rows):
+            rows.append({
+                'label': (labels[idx] if idx < len(labels) else '') or '',
+                'min_score': (mins[idx] if idx < len(mins) else '') or '',
+            })
+        return rows
+    for idx in range(1, DEFAULT_GRADE_SCALE_ROW_COUNT + 1):
+        rows.append({
+            'label': (form_data.get(f'status_scale_label_{idx}', '') or '').strip(),
+            'min_score': form_data.get(f'status_scale_min_{idx}', ''),
+        })
+    return rows
+
+
 def _extract_grade_scale_rows_from_form(form_data, default_rows=None):
     rows = _collect_grade_scale_form_rows(form_data)
     return normalize_grade_scale_rows(rows, default_rows=default_rows or build_default_grade_scale_rows())
@@ -33447,6 +33566,39 @@ def _validate_grade_scale_rows(form_data, default_rows=None):
     if int(validated[-1].get('min_score', 0)) != 0:
         return [], 'Your lowest custom grade band must start at 0.'
     return normalize_grade_scale_rows(validated, default_rows=default_rows or build_default_grade_scale_rows()), ''
+
+
+def _validate_status_scale_rows(form_data, default_rows=None):
+    validated = []
+    seen_labels = set()
+    seen_scores = set()
+    candidate_rows = _collect_status_scale_form_rows(form_data)
+    for idx, row in enumerate(candidate_rows, start=1):
+        label = (row.get('label', '') or '').strip()[:24]
+        min_score_raw = str(row.get('min_score', '') or '').strip()
+        if not label and not min_score_raw:
+            continue
+        if not label or not min_score_raw:
+            return [], f'Custom status row {idx} must include both a label and a minimum score.'
+        if not re.fullmatch(r'^\d+$', min_score_raw):
+            return [], f'Custom status minimum scores must be whole numbers. Check row {idx}.'
+        min_score = int(min_score_raw)
+        if not (0 <= min_score <= 100):
+            return [], f'Custom status minimum scores must be between 0 and 100. Check row {idx}.'
+        label_key = label.casefold()
+        if label_key in seen_labels:
+            return [], f'Custom status labels must be unique. "{label}" is repeated.'
+        if min_score in seen_scores:
+            return [], f'Custom status minimum scores must be unique. "{min_score}" is repeated.'
+        seen_labels.add(label_key)
+        seen_scores.add(min_score)
+        validated.append({'label': label, 'min_score': min_score})
+    validated.sort(key=lambda item: (-int(item.get('min_score', 0)), str(item.get('label', '')).casefold()))
+    if len(validated) < 2:
+        return [], 'Add at least two custom status bands, including the lowest band.'
+    if int(validated[-1].get('min_score', 0)) != 0:
+        return [], 'Your lowest custom status band must start at 0.'
+    return normalize_status_scale_rows(validated, default_rows=default_rows or build_default_status_scale_rows()), ''
 
 
 def _legacy_grade_fields_from_scale_rows(scale_rows, current_school=None):
@@ -33589,6 +33741,7 @@ def school_admin_settings():
         grade_label_d = (request.form.get('grade_label_d', current_school.get('grade_label_d', 'D')) or 'D').strip()[:24] or 'D'
         grade_label_f = (request.form.get('grade_label_f', current_school.get('grade_label_f', 'F')) or 'F').strip()[:24] or 'F'
         grade_scale_json = (current_school.get('grade_scale_json', '') or '').strip()
+        status_scale_json = (current_school.get('status_scale_json', '') or '').strip()
         custom_grade_scale_rows = []
         if saving_grade_scale_card:
             custom_grade_scale_rows, grade_scale_error = _validate_grade_scale_rows(
@@ -33597,6 +33750,12 @@ def school_admin_settings():
             )
             if grade_scale_error:
                 return _settings_error(grade_scale_error)
+            custom_status_scale_rows, status_scale_error = _validate_status_scale_rows(
+                request.form,
+                default_rows=get_effective_status_scale(current_school),
+            )
+            if status_scale_error:
+                return _settings_error(status_scale_error)
             legacy_grade_fields = _legacy_grade_fields_from_scale_rows(custom_grade_scale_rows, current_school)
             grade_a_min = legacy_grade_fields['grade_a_min']
             grade_b_min = legacy_grade_fields['grade_b_min']
@@ -33608,6 +33767,7 @@ def school_admin_settings():
             grade_label_d = legacy_grade_fields['grade_label_d']
             grade_label_f = legacy_grade_fields['grade_label_f']
             grade_scale_json = json.dumps(custom_grade_scale_rows)
+            status_scale_json = json.dumps(custom_status_scale_rows)
         performance_remark_a = (request.form.get('performance_remark_a', current_school.get('performance_remark_a', '')) or '').strip()[:1500]
         performance_remark_b = (request.form.get('performance_remark_b', current_school.get('performance_remark_b', '')) or '').strip()[:1500]
         performance_remark_c = (request.form.get('performance_remark_c', current_school.get('performance_remark_c', '')) or '').strip()[:1500]
@@ -33856,6 +34016,7 @@ def school_admin_settings():
             'grade_label_d': grade_label_d,
             'grade_label_f': grade_label_f,
             'grade_scale_json': grade_scale_json,
+            'status_scale_json': status_scale_json,
             'performance_remark_a': performance_remark_a,
             'performance_remark_b': performance_remark_b,
             'performance_remark_c': performance_remark_c,
@@ -47070,7 +47231,7 @@ def view_students():
     positions = calculate_positions(students, school.get('ss_ranking_mode', 'together'), school=school)
     total_students = len(students)
     grade_a_count = sum(1 for s in students if s.get('Grade') == 'A')
-    pass_count = sum(1 for s in students if s.get('Status') == 'Pass')
+    pass_count = sum(1 for s in students if status_is_passing(s.get('Status'), grade_cfg))
     overall_average = (sum(s.get('average_marks', 0) for s in students) / total_students) if total_students else 0
     total_pages = max(1, (total_students + per_page - 1) // per_page)
     if page > total_pages:
