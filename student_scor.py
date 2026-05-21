@@ -15534,6 +15534,8 @@ DEFAULT_GRADE_LABELS = {
     'F': 'F',
 }
 
+DEFAULT_STATUS_PASS_MIN = 50
+
 DEFAULT_GRADE_SCALE_ROW_COUNT = 8
 
 
@@ -15610,10 +15612,8 @@ def get_effective_grade_scale(cfg_or_school=None):
 
 
 def build_default_status_scale_rows(cfg_or_school=None):
-    source = cfg_or_school or {}
-    pass_mark = max(0, min(100, safe_int(source.get('pass_mark', 50), 50)))
     return [
-        {'label': 'Pass', 'min_score': pass_mark},
+        {'label': 'Pass', 'min_score': DEFAULT_STATUS_PASS_MIN},
         {'label': 'Fail', 'min_score': 0},
     ]
 
@@ -15773,12 +15773,11 @@ def status_is_passing(status_value, cfg_or_school=None):
     raw = (status_value or '').strip()
     if not raw:
         return False
-    cfg = cfg_or_school or {}
-    pass_mark = safe_float(cfg.get('pass_mark', cfg.get('passmark', 50)), 50)
-    for row in get_effective_status_scale(cfg):
+    scale = get_effective_status_scale(cfg_or_school)
+    for idx, row in enumerate(scale):
         label = (row.get('label', '') or '').strip()
         if label and raw.casefold() == label.casefold():
-            return safe_float(row.get('min_score', 0), 0) >= pass_mark
+            return idx < len(scale) - 1
     return raw.casefold() == 'pass'
 
 

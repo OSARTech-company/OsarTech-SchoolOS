@@ -287,6 +287,23 @@ def test_parse_generic_behaviour_spreadsheet_values_accepts_trait_grade_pairs(ap
     assert payload["Honesty"] == "C"
 
 
+def test_status_is_passing_uses_status_band_order_not_pass_mark(app_module):
+    m = app_module
+    school = {
+        "pass_mark": 80,
+        "status_scale_json": json.dumps([
+            {"label": "Excellent", "min_score": 85},
+            {"label": "Pass", "min_score": 50},
+            {"label": "Probation", "min_score": 40},
+            {"label": "Fail", "min_score": 0},
+        ]),
+    }
+    assert m.status_is_passing("Excellent", school) is True
+    assert m.status_is_passing("Pass", school) is True
+    assert m.status_is_passing("Probation", school) is True
+    assert m.status_is_passing("Fail", school) is False
+
+
 def test_compute_average_marks_ignores_stale_non_subject_score_keys(app_module):
     m = app_module
     scores = {
