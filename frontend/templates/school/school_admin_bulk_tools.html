@@ -81,7 +81,7 @@
     </div>
 
     <div class="card">
-        <h2>Import CSV</h2>
+        <h2>Import Spreadsheet</h2>
         {% if last_import_error_token %}
         <div class="flash warning">
             <strong>Last Import Report:</strong>
@@ -91,33 +91,34 @@
             <a class="btn btn-secondary btn-sm ml-10" href="{{ url_for('school_admin_import_report') }}">Open Report</a>
         </div>
         {% endif %}
-        <p class="note">Students columns: student_id (optional, leave blank to auto-generate), firstname (or student_name/name), lastname/surname (optional), email (optional), date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects, promoted, parent_phone, parent_phone_2</p>
+        <p class="note">Students spreadsheet columns: student_id (optional, leave blank to auto-generate), firstname (or student_name/name), lastname/surname (optional), email (optional), date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects, promoted, parent_phone, parent_phone_2</p>
         <form method="post" action="{{ url_for('school_admin_import_target', target='students') }}" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="file" name="file" accept=".csv" required>
+            <input type="file" name="file" accept=".csv,.xlsx" required>
             <label style="margin-left:10px;"><input type="checkbox" name="dry_run" value="1"> Dry run only</label>
-            <button class="btn btn-primary" type="submit">Import Students CSV</button>
+            <button class="btn btn-primary" type="submit">Import Students Spreadsheet</button>
         </form>
         <hr>
-        <p class="note">Teachers columns: user_id, firstname, lastname, phone, gender, assigned_classes, subjects_taught</p>
+        <p class="note">Teachers spreadsheet columns: user_id, firstname, lastname, phone, gender, assigned_classes, subjects_taught</p>
         <form method="post" action="{{ url_for('school_admin_import_target', target='teachers') }}" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="file" name="file" accept=".csv" required>
+            <input type="file" name="file" accept=".csv,.xlsx" required>
             <label style="margin-left:10px;"><input type="checkbox" name="dry_run" value="1"> Dry run only</label>
-            <button class="btn btn-primary" type="submit">Import Teachers CSV</button>
+            <button class="btn btn-primary" type="submit">Import Teachers Spreadsheet</button>
         </form>
         <hr>
-        <p class="note">Class assignments columns: teacher_id, classname, term, academic_year</p>
+        <p class="note">Class assignments spreadsheet columns: teacher_id, classname, term, academic_year</p>
         <form method="post" action="{{ url_for('school_admin_import_target', target='class_assignments') }}" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="file" name="file" accept=".csv" required>
+            <input type="file" name="file" accept=".csv,.xlsx" required>
             <label style="margin-left:10px;"><input type="checkbox" name="dry_run" value="1"> Dry run only</label>
-            <button class="btn btn-primary" type="submit">Import Class Assignments CSV</button>
+            <button class="btn btn-primary" type="submit">Import Class Assignments Spreadsheet</button>
         </form>
         <hr>
         <h3>Historical Results Backfill</h3>
-        <p class="note">Use this to import older published results without changing the school's active term. Each upload is for one class + one term + one academic year, and the CSV can contain all students in that class. To backfill the last two terms, repeat this import for each term.</p>
-        <p class="note">CSV columns: Student ID, Student Name (optional), Subject, CA1...CA{{ school.max_tests if school and school.max_tests else 3 }}, Objective, Theory, Exam Score, Teacher Comment, Principal Comment, Stream. The app will use Objective/Theory or Exam Score based on the selected class exam mode.</p>
+        <p class="note">Use this to import older published results without changing the school's active term. Each upload is for one class + one term + one academic year, and the spreadsheet can contain all students in that class. To backfill the last two terms, repeat this import for each term.</p>
+        <p class="note">Spreadsheet columns: Student ID, Student Name (optional), Subject, CA1...CA{{ school.max_tests if school and school.max_tests else 3 }}, Objective, Theory, Exam Score, Teacher Comment, Principal Comment, Stream. The app will use Objective/Theory or Exam Score based on the selected class exam mode.</p>
+        <p class="note">Accepted file types: CSV (.csv) and Excel Workbook (.xlsx). Older Excel .xls files are not supported yet.</p>
         <p>
             <a class="btn btn-secondary" href="{{ url_for('school_admin_historical_results_template') }}">Download Historical Results Template</a>
         </p>
@@ -148,11 +149,11 @@
             <input type="text" name="teacher_name" placeholder="Publication teacher name (optional)">
             <input type="text" name="principal_name" placeholder="Principal name override (optional)">
             <div class="mt-12">
-                <input type="file" name="file" accept=".csv" required>
+                <input type="file" name="file" accept=".csv,.xlsx" required>
                 <label style="margin-left:10px;"><input type="checkbox" name="replace_existing" value="1"> Replace existing published snapshots for this class/term/year</label>
                 <label style="margin-left:10px;"><input type="checkbox" name="dry_run" value="1"> Dry run only</label>
             </div>
-            <button class="btn btn-primary mt-12" type="submit">Import Historical Results CSV</button>
+            <button class="btn btn-primary mt-12" type="submit">Import Historical Results Spreadsheet</button>
         </form>
     </div>
 

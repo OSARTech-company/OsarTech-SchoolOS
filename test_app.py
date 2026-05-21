@@ -1,9 +1,63 @@
 import contextlib
 import importlib
+import io
 import json
+import zipfile
 from datetime import datetime, timedelta
 
 import pytest
+
+
+def _xlsx_column_name(index):
+    letters = []
+    current = int(index)
+    while current > 0:
+        current, remainder = divmod(current - 1, 26)
+        letters.append(chr(65 + remainder))
+    return ''.join(reversed(letters))
+
+
+def _build_inline_xlsx(rows):
+    sheet_rows = []
+    for row_idx, row in enumerate(rows, start=1):
+        cells = []
+        for col_idx, value in enumerate(row, start=1):
+            ref = f"{_xlsx_column_name(col_idx)}{row_idx}"
+            text = (
+                str(value)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+            )
+            cells.append(f'<c r="{ref}" t="inlineStr"><is><t>{text}</t></is></c>')
+        sheet_rows.append(f'<row r="{row_idx}">{"".join(cells)}</row>')
+    sheet_xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        f'<sheetData>{"".join(sheet_rows)}</sheetData>'
+        '</worksheet>'
+    )
+    workbook_xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        '<sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>'
+        '</workbook>'
+    )
+    rels_xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+        'Target="worksheets/sheet1.xml"/>'
+        '</Relationships>'
+    )
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("xl/workbook.xml", workbook_xml)
+        archive.writestr("xl/_rels/workbook.xml.rels", rels_xml)
+        archive.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+    return buffer.getvalue()
 
 
 def test_db_execute_transaction_resets(monkeypatch):
@@ -1128,6 +1182,88 @@ def test_teacher_upload_csv_form_includes_csrf_token(client, app_module, monkeyp
     resp = client.get("/teacher/upload-csv")
     assert resp.status_code == 200
     assert 'name="csrf_token"' in resp.get_data(as_text=True)
+
+
+def test_school_admin_bulk_tools_forms_accept_excel(client, app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"max_tests": 3, "academic_year": "2025-2026"})
+    monkeypatch.setattr(m, "get_secondary_school_classnames", lambda school_id: ["JSS1"])
+    monkeypatch.setattr(m, "get_backup_schedule_settings", lambda school_id: None)
+    monkeypatch.setattr(m, "compute_school_storage_usage", lambda school_id: {"used_mb": 0, "quota_mb": 100, "pct": 0})
+    monkeypatch.setattr(m, "get_backup_health_summary", lambda school_id, days=30: None)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "admin1"
+
+    resp = client.get("/school-admin/bulk-tools")
+    assert resp.status_code == 200
+    page = resp.get_data(as_text=True)
+    assert 'accept=".csv,.xlsx"' in page
+
+
+def test_school_admin_import_teachers_accepts_xlsx(client, app_module, monkeypatch):
+    m = app_module
+    saved_teachers = []
+    provisioned_users = []
+
+    def fake_save_teacher(school_id, teacher_id, firstname, lastname, assigned_classes, subjects_taught=None, phone='', gender=''):
+        saved_teachers.append(
+            {
+                "school_id": school_id,
+                "teacher_id": teacher_id,
+                "firstname": firstname,
+                "lastname": lastname,
+                "assigned_classes": assigned_classes,
+                "subjects_taught": subjects_taught,
+                "phone": phone,
+                "gender": gender,
+            }
+        )
+
+    def fake_upsert_user(user_id, password_hash, role, school_id):
+        provisioned_users.append(
+            {
+                "user_id": user_id,
+                "password_hash": password_hash,
+                "role": role,
+                "school_id": school_id,
+            }
+        )
+
+    monkeypatch.setattr(m, "get_user", lambda user_id: None)
+    monkeypatch.setattr(m, "save_teacher", fake_save_teacher)
+    monkeypatch.setattr(m, "upsert_user", fake_upsert_user)
+    monkeypatch.setattr(m, "record_admin_action_audit", lambda *args, **kwargs: None)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "admin1"
+
+    workbook = _build_inline_xlsx(
+        [
+            ["user_id", "firstname", "lastname", "phone", "gender"],
+            ["teacher1@example.com", "Tega", "Okafor", "08012345678", "female"],
+        ]
+    )
+    resp = client.post(
+        "/school-admin/import/teachers",
+        data={"file": (io.BytesIO(workbook), "teachers.xlsx")},
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/school-admin/bulk-tools?error_token=")
+    assert len(saved_teachers) == 1
+    assert saved_teachers[0]["teacher_id"] == "teacher1@example.com"
+    assert len(provisioned_users) == 1
+    assert provisioned_users[0]["role"] == "teacher"
+    with client.session_transaction() as sess:
+        flashes = sess.get("_flashes", [])
+    assert any("Teachers import completed. Imported 1 row(s)." in message for _category, message in flashes)
 
 
 def test_school_admin_settings_academic_save_preserves_result_configuration(client, app_module, monkeypatch):

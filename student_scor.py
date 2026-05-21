@@ -23,6 +23,7 @@ import base64
 import hmac
 import hashlib
 import urllib.parse
+import zipfile
 from io import StringIO, BytesIO
 from datetime import date, datetime, timedelta
 import smtplib
@@ -37,6 +38,7 @@ import base64
 import threading
 import socket
 import sys
+import xml.etree.ElementTree as ET
 from collections import deque, Counter
 import traceback
 
@@ -19779,6 +19781,120 @@ def resolve_test_csv_header(headers, slot_index):
             return headers[alias]
     return None
 
+_XLSX_MAIN_NS = {'x': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+_XLSX_REL_NS = {'r': 'http://schemas.openxmlformats.org/package/2006/relationships'}
+
+def _xlsx_column_index(cell_ref):
+    letters = ''.join(ch for ch in str(cell_ref or '') if ch.isalpha()).upper()
+    if not letters:
+        return 0
+    value = 0
+    for ch in letters:
+        value = (value * 26) + (ord(ch) - 64)
+    return value
+
+def _xlsx_cell_value(cell_el, shared_strings):
+    cell_type = (cell_el.get('t') or '').strip()
+    if cell_type == 'inlineStr':
+        return ''.join(text for text in cell_el.itertext()).strip()
+    value_el = cell_el.find('x:v', _XLSX_MAIN_NS)
+    if value_el is None:
+        text_el = cell_el.find('x:is/x:t', _XLSX_MAIN_NS)
+        return (text_el.text or '').strip() if text_el is not None and text_el.text is not None else ''
+    raw = value_el.text or ''
+    if cell_type == 's':
+        try:
+            idx = int(raw)
+            return shared_strings[idx] if 0 <= idx < len(shared_strings) else ''
+        except (TypeError, ValueError):
+            return ''
+    if cell_type == 'b':
+        return 'TRUE' if str(raw).strip() == '1' else 'FALSE'
+    return str(raw).strip()
+
+def parse_xlsx_rows(raw_bytes):
+    """Read first worksheet rows from an .xlsx file into fieldnames + row dicts."""
+    try:
+        archive = zipfile.ZipFile(BytesIO(raw_bytes))
+    except Exception as exc:
+        raise ValueError(f'Excel file could not be opened: {exc}')
+    with archive:
+        try:
+            workbook_root = ET.fromstring(archive.read('xl/workbook.xml'))
+        except KeyError:
+            raise ValueError('Excel workbook is missing xl/workbook.xml.')
+        except ET.ParseError as exc:
+            raise ValueError(f'Excel workbook.xml is invalid: {exc}')
+
+        try:
+            rels_root = ET.fromstring(archive.read('xl/_rels/workbook.xml.rels'))
+        except KeyError:
+            raise ValueError('Excel workbook is missing workbook relationships.')
+        except ET.ParseError as exc:
+            raise ValueError(f'Excel workbook relationships are invalid: {exc}')
+
+        rel_targets = {}
+        for rel in rels_root.findall('r:Relationship', _XLSX_REL_NS):
+            rel_id = rel.get('Id')
+            target = rel.get('Target')
+            if rel_id and target:
+                rel_targets[rel_id] = target
+
+        first_sheet = workbook_root.find('x:sheets/x:sheet', _XLSX_MAIN_NS)
+        if first_sheet is None:
+            raise ValueError('Excel workbook has no worksheet.')
+        rel_id = first_sheet.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id')
+        target = rel_targets.get(rel_id or '')
+        if not target:
+            raise ValueError('Could not resolve the first worksheet inside the Excel workbook.')
+        sheet_path = target if target.startswith('xl/') else f"xl/{target.lstrip('/')}"
+
+        shared_strings = []
+        try:
+            shared_root = ET.fromstring(archive.read('xl/sharedStrings.xml'))
+            for item in shared_root.findall('x:si', _XLSX_MAIN_NS):
+                shared_strings.append(''.join(text for text in item.itertext()).strip())
+        except KeyError:
+            shared_strings = []
+        except ET.ParseError as exc:
+            raise ValueError(f'Excel shared strings are invalid: {exc}')
+
+        try:
+            sheet_root = ET.fromstring(archive.read(sheet_path))
+        except KeyError:
+            raise ValueError(f'Excel worksheet file "{sheet_path}" is missing.')
+        except ET.ParseError as exc:
+            raise ValueError(f'Excel worksheet XML is invalid: {exc}')
+
+        matrix_rows = []
+        max_col = 0
+        for row_el in sheet_root.findall('.//x:sheetData/x:row', _XLSX_MAIN_NS):
+            row_map = {}
+            for cell_el in row_el.findall('x:c', _XLSX_MAIN_NS):
+                col_idx = _xlsx_column_index(cell_el.get('r', ''))
+                if col_idx <= 0:
+                    continue
+                row_map[col_idx] = _xlsx_cell_value(cell_el, shared_strings)
+                max_col = max(max_col, col_idx)
+            if row_map:
+                matrix_rows.append(row_map)
+
+        if not matrix_rows or max_col <= 0:
+            return [], []
+
+        header_map = matrix_rows[0]
+        fieldnames = [str(header_map.get(col, '') or '').strip() for col in range(1, max_col + 1)]
+        rows = []
+        for row_map in matrix_rows[1:]:
+            row_obj = {}
+            for col in range(1, max_col + 1):
+                header = fieldnames[col - 1]
+                if not header:
+                    continue
+                row_obj[header] = str(row_map.get(col, '') or '').strip()
+            rows.append(row_obj)
+        return fieldnames, rows
+
 def _is_finite_number_like(value):
     if isinstance(value, (int, float)):
         return math.isfinite(float(value))
@@ -36385,20 +36501,44 @@ def school_admin_import_target(target):
     target_key = (target or '').strip().lower()
     dry_run = (request.form.get('dry_run', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
     file = request.files.get('file')
-    if not file or not (file.filename or '').lower().endswith('.csv'):
-        flash('Upload a valid CSV file.', 'error')
+    upload_filename = (file.filename or '').strip() if file else ''
+    lower_name = upload_filename.lower()
+    is_csv_upload = lower_name.endswith('.csv')
+    is_xlsx_upload = lower_name.endswith('.xlsx')
+    if not file or not upload_filename:
+        flash('Choose a CSV (.csv) or Excel Workbook (.xlsx) file to import.', 'error')
         return redirect(url_for('school_admin_bulk_tools'))
+    if not (is_csv_upload or is_xlsx_upload):
+        if lower_name.endswith('.xls'):
+            flash(
+                f'"{upload_filename}" is an older Excel .xls file. Re-save it as Excel Workbook (.xlsx) or CSV (.csv), then upload again.',
+                'error',
+            )
+        else:
+            flash('Upload a valid CSV (.csv) or Excel Workbook (.xlsx) file.', 'error')
+        return redirect(url_for('school_admin_bulk_tools'))
+    fieldnames = []
+    rows = []
     try:
-        text = file.read().decode('utf-8-sig')
-        reader = csv.DictReader(StringIO(text))
-        if not reader.fieldnames:
-            raise ValueError('CSV is empty or missing headers.')
-        rows = list(reader)
+        raw_bytes = file.read() or b''
+        if not raw_bytes:
+            raise ValueError(f'"{upload_filename}" is empty.')
+        if is_xlsx_upload:
+            fieldnames, rows = parse_xlsx_rows(raw_bytes)
+            if not fieldnames:
+                raise ValueError('Excel workbook is empty or missing headers in the first worksheet.')
+        else:
+            text = raw_bytes.decode('utf-8-sig')
+            reader = csv.DictReader(StringIO(text))
+            if not reader.fieldnames:
+                raise ValueError('CSV is empty or missing headers.')
+            fieldnames = [str(h or '').strip() for h in (reader.fieldnames or []) if str(h or '').strip()]
+            rows = list(reader)
     except Exception as exc:
-        flash(f'Failed to parse CSV: {exc}', 'error')
+        flash(f'Failed to parse {"Excel workbook" if is_xlsx_upload else "CSV"}: {exc}', 'error')
         return redirect(url_for('school_admin_bulk_tools'))
 
-    headers = {str(h or '').strip().lower(): h for h in (reader.fieldnames or []) if str(h or '').strip()}
+    headers = {str(h or '').strip().lower(): h for h in fieldnames if str(h or '').strip()}
     required_by_target = {
         'students': ['firstname', 'classname', 'term'],
         'teachers': ['user_id', 'firstname', 'lastname'],
@@ -36410,7 +36550,7 @@ def school_admin_import_target(target):
         return redirect(url_for('school_admin_bulk_tools'))
     missing_headers = [h for h in required_by_target[target_key] if h not in headers]
     if missing_headers:
-        flash(f'Missing required CSV columns: {", ".join(missing_headers)}', 'error')
+        flash(f'Missing required spreadsheet columns: {", ".join(missing_headers)}', 'error')
         return redirect(url_for('school_admin_bulk_tools'))
 
     error_rows = []
@@ -36419,7 +36559,7 @@ def school_admin_import_target(target):
     import_details = ''
     audit_payload = {'dry_run': dry_run}
     def add_error(row_num, row_obj, message):
-        out = {k: (row_obj.get(k, '') if isinstance(row_obj, dict) else '') for k in (reader.fieldnames or [])}
+        out = {k: (row_obj.get(k, '') if isinstance(row_obj, dict) else '') for k in fieldnames}
         out['Error'] = message
         out['RowNumber'] = row_num
         error_rows.append(out)
@@ -36983,8 +37123,8 @@ def school_admin_import_target(target):
         error_token = ''
         if error_rows:
             output = StringIO()
-            fieldnames = list(reader.fieldnames or []) + ['Error', 'RowNumber']
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            export_fieldnames = list(fieldnames) + ['Error', 'RowNumber']
+            writer = csv.DictWriter(output, fieldnames=export_fieldnames)
             writer.writeheader()
             for item in error_rows:
                 writer.writerow(item)
@@ -42128,14 +42268,16 @@ def teacher_upload_csv():
                     stage='file',
                 )
             lower_name = upload_filename.lower()
-            if not lower_name.endswith('.csv'):
-                if lower_name.endswith(('.xlsx', '.xls')):
+            is_csv_upload = lower_name.endswith('.csv')
+            is_xlsx_upload = lower_name.endswith('.xlsx')
+            if not (is_csv_upload or is_xlsx_upload):
+                if lower_name.endswith('.xls'):
                     return fail_csv_upload(
-                        f'"{upload_filename}" is an Excel file, not a CSV. Export or Save As CSV (.csv) first, then upload that CSV file.',
+                        f'"{upload_filename}" is an older Excel .xls file. Please re-save it as modern Excel Workbook (.xlsx) or CSV (.csv), then upload again.',
                         stage='file_type',
                     )
                 return fail_csv_upload(
-                    f'"{upload_filename}" is not a CSV file. Upload a file that ends with .csv.',
+                    f'"{upload_filename}" is not a supported score upload file. Upload either CSV (.csv) or Excel Workbook (.xlsx).',
                     stage='file_type',
                 )
 
@@ -42145,24 +42287,38 @@ def teacher_upload_csv():
                     f'"{upload_filename}" is empty. Open it and make sure it contains a header row and score rows before uploading again.',
                     stage='file_empty',
                 )
-            try:
-                csv_content = raw_bytes.decode('utf-8-sig')
-            except UnicodeDecodeError:
-                return fail_csv_upload(
-                    f'"{upload_filename}" could not be read as UTF-8 CSV text. Re-save it as CSV UTF-8 and upload again.',
-                    stage='encoding',
-                )
-            reader = csv.DictReader(StringIO(csv_content))
-            if not reader.fieldnames:
-                return fail_csv_upload(
-                    f'"{upload_filename}" has no header row. The first row must include columns like Student ID, Subject, CA1, CA2, and exam columns.',
-                    stage='headers',
-                )
-            rows = list(reader)
-            fieldnames = [h for h in (reader.fieldnames or []) if h]
+            if is_xlsx_upload:
+                try:
+                    fieldnames, rows = parse_xlsx_rows(raw_bytes)
+                except ValueError as exc:
+                    return fail_csv_upload(
+                        f'Could not read "{upload_filename}" as Excel: {exc}',
+                        stage='excel_read',
+                    )
+                if not fieldnames:
+                    return fail_csv_upload(
+                        f'"{upload_filename}" has no usable header row in the first worksheet. The first row must include columns like Student ID, Subject, CA1, CA2, and exam columns.',
+                        stage='headers',
+                    )
+            else:
+                try:
+                    csv_content = raw_bytes.decode('utf-8-sig')
+                except UnicodeDecodeError:
+                    return fail_csv_upload(
+                        f'"{upload_filename}" could not be read as UTF-8 CSV text. Re-save it as CSV UTF-8 and upload again.',
+                        stage='encoding',
+                    )
+                reader = csv.DictReader(StringIO(csv_content))
+                if not reader.fieldnames:
+                    return fail_csv_upload(
+                        f'"{upload_filename}" has no header row. The first row must include columns like Student ID, Subject, CA1, CA2, and exam columns.',
+                        stage='headers',
+                    )
+                rows = list(reader)
+                fieldnames = [h for h in (reader.fieldnames or []) if h]
             csv_result['detected_headers'] = fieldnames
             csv_result['total_rows'] = len(rows)
-            headers = {h.strip().lower(): h for h in reader.fieldnames if h}
+            headers = {h.strip().lower(): h for h in fieldnames if h}
             has_exam_col = 'exam score' in headers
             has_obj_col = 'objective' in headers
             has_theory_col = 'theory' in headers

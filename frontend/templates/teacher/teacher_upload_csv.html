@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload CSV Scores - Teacher Dashboard</title>
+    <title>Upload CSV/Excel Scores - Teacher Dashboard</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
@@ -56,7 +56,7 @@
     <div class="main-content">
     <div class="container">
         <div class="header">
-            <h1><i class="fas fa-file-csv"></i> Upload Student Scores via CSV</h1>
+            <h1><i class="fas fa-file-csv"></i> Upload Student Scores via CSV/Excel</h1>
             <a href="{{ url_for('teacher_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back</a>
         </div>
         
@@ -107,9 +107,9 @@
         {% endif %}
         
         <div class="card">
-            <h2><i class="fas fa-info-circle"></i> CSV Format (Scores Upload)</h2>
+            <h2><i class="fas fa-info-circle"></i> Spreadsheet Format (Scores Upload)</h2>
             <div class="info-box">
-                <p>Use this format to upload scores for existing students in your assigned class:</p>
+                <p>Use CSV (.csv) or Excel Workbook (.xlsx) to upload scores for existing students in your assigned class:</p>
                 <ul>
                     <li><code>Student ID</code> - Existing student ID</li>
                     <li><code>Subject</code> - One subject per row</li>
@@ -146,14 +146,14 @@
 26/testinge/1/26,Mathematics,10,9,25,30,,Separate-mode class
 26/testinge/1/26,English,8,10,,,52,Combined-mode class</pre>
                 {% endif %}
-                <p style="margin-top:10px;">This uploader accepts score CSV only.</p>
+                <p style="margin-top:10px;">This uploader accepts score CSV (.csv) and Excel Workbook (.xlsx). Older Excel .xls files are not supported yet.</p>
             </div>
             
             <form method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group">
-                    <label for="file">Select CSV File:</label>
-                    <input type="file" id="file" name="file" accept=".csv" required>
+                    <label for="file">Select CSV or Excel File:</label>
+                    <input type="file" id="file" name="file" accept=".csv,.xlsx" required>
                 </div>
                 
                 <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> Upload and Import</button>
