@@ -37303,6 +37303,8 @@ def school_admin_import_target(target):
                 'next_term_begin': '',
                 'next_term_end': '',
             }
+            current_student_id = ''
+            test_headers_for_detection = [resolve_test_csv_header(headers, i) for i in range(1, max_tests + 1)]
 
             def parse_csv_float(raw_value, row_num, field_label):
                 try:
@@ -37341,16 +37343,57 @@ def school_admin_import_target(target):
 
             for idx, row in enumerate(rows, start=2):
                 raw_student_id = (row.get(headers['student id'], '') or '').strip()
+                if raw_student_id:
+                    current_student_id = raw_student_id
+                student_id = raw_student_id or current_student_id
                 raw_subject = (row.get(headers['subject'], '') or '').strip()
-                if not raw_student_id and not raw_subject:
+                score_inputs_present = any(
+                    str(row.get(header_name, '') or '').strip()
+                    for header_name in test_headers_for_detection
+                    if header_name
+                )
+                score_inputs_present = score_inputs_present or any(
+                    str(row.get(header_name, '') or '').strip()
+                    for header_name in (
+                        headers.get('objective'),
+                        headers.get('theory'),
+                        headers.get('exam score'),
+                    )
+                    if header_name
+                )
+                behaviour_inputs_present = any(
+                    str(row.get(header_name, '') or '').strip()
+                    for header_name in behaviour_headers.values()
+                    if header_name
+                ) or bool(
+                    str(row.get(generic_trait_header, '') or '').strip()
+                    or str(row.get(generic_trait_grade_header, '') or '').strip()
+                )
+                support_inputs_present = any(
+                    str(row.get(header_name, '') or '').strip()
+                    for header_name in (
+                        teacher_comment_header if 'teacher_comment_header' in locals() else None,
+                        principal_comment_header if 'principal_comment_header' in locals() else None,
+                        stream_header if 'stream_header' in locals() else None,
+                        days_open_header,
+                        days_present_header,
+                        days_absent_header,
+                        term_begin_header,
+                        term_end_header,
+                        next_term_begin_header,
+                        next_term_end_header,
+                    )
+                    if header_name
+                )
+                if not student_id and not raw_subject and not score_inputs_present and not behaviour_inputs_present and not support_inputs_present:
                     continue
-                processed += 1
-                student_id = raw_student_id
-                subject = normalize_subject_name(raw_subject)
                 if not student_id:
                     add_error(idx, row, 'Student ID is required.')
                     continue
-                if not subject:
+                processed += 1
+                subject = normalize_subject_name(raw_subject)
+                row_is_support_only = not subject and (behaviour_inputs_present or support_inputs_present) and not score_inputs_present
+                if not subject and not row_is_support_only:
                     add_error(idx, row, 'Subject is required.')
                     continue
 
@@ -37360,90 +37403,6 @@ def school_admin_import_target(target):
                     student_cache[student_id] = student
                 if not student:
                     add_error(idx, row, f'student "{student_id}" was not found in this school.')
-                    continue
-
-                row_key = (student_id.lower(), subject.lower())
-                if row_key in seen_subject_rows:
-                    add_error(idx, row, f'Duplicate subject row for student "{student_id}" and subject "{subject}".')
-                    continue
-                seen_subject_rows.add(row_key)
-
-                try:
-                    subject_scores = {}
-                    if test_enabled:
-                        total_test = 0.0
-                        for i in range(1, max_tests + 1):
-                            test_header = resolve_test_csv_header(headers, i)
-                            raw_test = (row.get(test_header, '') if test_header else '')
-                            test_val = 0.0 if str(raw_test).strip() == '' else parse_csv_float(raw_test, idx, f'CA{i}')
-                            if test_val < 0 or test_val > test_total_max:
-                                raise ValueError(f'Row {idx}: CA{i} must be between 0 and {test_total_max:g}.')
-                            subject_scores[f'test_{i}'] = test_val
-                            total_test += test_val
-                        if total_test > test_total_max:
-                            raise ValueError(f'Row {idx}: total CA score must not exceed {test_total_max:g}.')
-                        subject_scores['total_test'] = total_test
-                    else:
-                        subject_scores['total_test'] = 0.0
-
-                    if exam_enabled:
-                        exam_mode = (exam_config.get('exam_mode') or 'separate').strip().lower()
-                        if exam_mode == 'combined':
-                            if not has_exam_col:
-                                raise ValueError('Spreadsheet must include "Exam Score" for combined exam mode classes.')
-                            if (
-                                (has_obj_col and str(row.get(headers['objective'], '') or '').strip())
-                                or (has_theory_col and str(row.get(headers['theory'], '') or '').strip())
-                            ):
-                                raise ValueError(f'Row {idx}: combined exam mode accepts Exam Score only.')
-                            raw_exam = row.get(headers.get('exam score'), '') if headers.get('exam score') else ''
-                            exam_score = 0.0 if str(raw_exam).strip() == '' else parse_csv_float(raw_exam, idx, 'Exam Score')
-                            exam_max = max(0.0, safe_float(exam_config.get('exam_score_max', 70), 70))
-                            if exam_score < 0 or exam_score > exam_max:
-                                raise ValueError(f'Row {idx}: Exam Score must be between 0 and {exam_max:g}.')
-                            subject_scores['objective'] = 0.0
-                            subject_scores['theory'] = 0.0
-                            subject_scores['exam_score'] = exam_score
-                            subject_scores['total_exam'] = exam_score
-                            subject_scores['exam_mode'] = 'combined'
-                        else:
-                            if not has_obj_col or not has_theory_col:
-                                raise ValueError('Spreadsheet must include both "Objective" and "Theory" for separate exam mode classes.')
-                            if has_exam_col and str(row.get(headers['exam score'], '') or '').strip():
-                                raise ValueError(f'Row {idx}: separate exam mode does not accept Exam Score values.')
-                            raw_obj = row.get(headers.get('objective'), '') if headers.get('objective') else ''
-                            raw_theory = row.get(headers.get('theory'), '') if headers.get('theory') else ''
-                            objective = 0.0 if str(raw_obj).strip() == '' else parse_csv_float(raw_obj, idx, 'Objective')
-                            theory = 0.0 if str(raw_theory).strip() == '' else parse_csv_float(raw_theory, idx, 'Theory')
-                            objective_max = max(0.0, safe_float(exam_config.get('objective_max', 30), 30))
-                            theory_max = max(0.0, safe_float(exam_config.get('theory_max', 40), 40))
-                            exam_total_max = max(
-                                0.0,
-                                safe_float(exam_config.get('exam_score_max', objective_max + theory_max), objective_max + theory_max),
-                            )
-                            if objective < 0 or objective > objective_max:
-                                raise ValueError(f'Row {idx}: Objective must be between 0 and {objective_max:g}.')
-                            if theory < 0 or theory > theory_max:
-                                raise ValueError(f'Row {idx}: Theory must be between 0 and {theory_max:g}.')
-                            if objective + theory > exam_total_max:
-                                raise ValueError(f'Row {idx}: Objective + Theory must not exceed {exam_total_max:g}.')
-                            subject_scores['objective'] = objective
-                            subject_scores['theory'] = theory
-                            subject_scores['total_exam'] = objective + theory
-                            subject_scores['exam_mode'] = 'separate'
-                    else:
-                        subject_scores['total_exam'] = 0.0
-
-                    overall_mark = float(subject_scores.get('total_test', 0) or 0) + float(subject_scores.get('total_exam', 0) or 0)
-                    if overall_mark > 100:
-                        raise ValueError(f'Row {idx}: total score for "{subject}" exceeds 100.')
-                    subject_scores['overall_mark'] = overall_mark
-                    subject_scores['total_score'] = overall_mark
-                    subject_scores['grade'] = grade_from_score(overall_mark, grade_cfg)
-                    subject_scores['entry_confirmed'] = 1
-                    subject_scores['entry_confirmed_v2'] = 1
-                except ValueError as exc:
-                    add_error(idx, row, str(exc))
                     continue
 
                 student_name_header = headers.get('student name')
@@ -37494,6 +37453,86 @@ def school_admin_import_target(target):
                     entry['stream'] = 'N/A'
 
                 try:
+                    if subject:
+                        row_key = (student_id.lower(), subject.lower())
+                        if row_key in seen_subject_rows:
+                            raise ValueError(f'Duplicate subject row for student "{student_id}" and subject "{subject}".')
+                        seen_subject_rows.add(row_key)
+
+                        subject_scores = {}
+                        if test_enabled:
+                            total_test = 0.0
+                            for i in range(1, max_tests + 1):
+                                test_header = resolve_test_csv_header(headers, i)
+                                raw_test = (row.get(test_header, '') if test_header else '')
+                                test_val = 0.0 if str(raw_test).strip() == '' else parse_csv_float(raw_test, idx, f'CA{i}')
+                                if test_val < 0 or test_val > test_total_max:
+                                    raise ValueError(f'Row {idx}: CA{i} must be between 0 and {test_total_max:g}.')
+                                subject_scores[f'test_{i}'] = test_val
+                                total_test += test_val
+                            if total_test > test_total_max:
+                                raise ValueError(f'Row {idx}: total CA score must not exceed {test_total_max:g}.')
+                            subject_scores['total_test'] = total_test
+                        else:
+                            subject_scores['total_test'] = 0.0
+
+                        if exam_enabled:
+                            exam_mode = (exam_config.get('exam_mode') or 'separate').strip().lower()
+                            if exam_mode == 'combined':
+                                if not has_exam_col:
+                                    raise ValueError('Spreadsheet must include "Exam Score" for combined exam mode classes.')
+                                if (
+                                    (has_obj_col and str(row.get(headers['objective'], '') or '').strip())
+                                    or (has_theory_col and str(row.get(headers['theory'], '') or '').strip())
+                                ):
+                                    raise ValueError(f'Row {idx}: combined exam mode accepts Exam Score only.')
+                                raw_exam = row.get(headers.get('exam score'), '') if headers.get('exam score') else ''
+                                exam_score = 0.0 if str(raw_exam).strip() == '' else parse_csv_float(raw_exam, idx, 'Exam Score')
+                                exam_max = max(0.0, safe_float(exam_config.get('exam_score_max', 70), 70))
+                                if exam_score < 0 or exam_score > exam_max:
+                                    raise ValueError(f'Row {idx}: Exam Score must be between 0 and {exam_max:g}.')
+                                subject_scores['objective'] = 0.0
+                                subject_scores['theory'] = 0.0
+                                subject_scores['exam_score'] = exam_score
+                                subject_scores['total_exam'] = exam_score
+                                subject_scores['exam_mode'] = 'combined'
+                            else:
+                                if not has_obj_col or not has_theory_col:
+                                    raise ValueError('Spreadsheet must include both "Objective" and "Theory" for separate exam mode classes.')
+                                if has_exam_col and str(row.get(headers['exam score'], '') or '').strip():
+                                    raise ValueError(f'Row {idx}: separate exam mode does not accept Exam Score values.')
+                                raw_obj = row.get(headers.get('objective'), '') if headers.get('objective') else ''
+                                raw_theory = row.get(headers.get('theory'), '') if headers.get('theory') else ''
+                                objective = 0.0 if str(raw_obj).strip() == '' else parse_csv_float(raw_obj, idx, 'Objective')
+                                theory = 0.0 if str(raw_theory).strip() == '' else parse_csv_float(raw_theory, idx, 'Theory')
+                                objective_max = max(0.0, safe_float(exam_config.get('objective_max', 30), 30))
+                                theory_max = max(0.0, safe_float(exam_config.get('theory_max', 40), 40))
+                                exam_total_max = max(
+                                    0.0,
+                                    safe_float(exam_config.get('exam_score_max', objective_max + theory_max), objective_max + theory_max),
+                                )
+                                if objective < 0 or objective > objective_max:
+                                    raise ValueError(f'Row {idx}: Objective must be between 0 and {objective_max:g}.')
+                                if theory < 0 or theory > theory_max:
+                                    raise ValueError(f'Row {idx}: Theory must be between 0 and {theory_max:g}.')
+                                if objective + theory > exam_total_max:
+                                    raise ValueError(f'Row {idx}: Objective + Theory must not exceed {exam_total_max:g}.')
+                                subject_scores['objective'] = objective
+                                subject_scores['theory'] = theory
+                                subject_scores['total_exam'] = objective + theory
+                                subject_scores['exam_mode'] = 'separate'
+                        else:
+                            subject_scores['total_exam'] = 0.0
+
+                        overall_mark = float(subject_scores.get('total_test', 0) or 0) + float(subject_scores.get('total_exam', 0) or 0)
+                        if overall_mark > 100:
+                            raise ValueError(f'Row {idx}: total score for "{subject}" exceeds 100.')
+                        subject_scores['overall_mark'] = overall_mark
+                        subject_scores['total_score'] = overall_mark
+                        subject_scores['grade'] = grade_from_score(overall_mark, grade_cfg)
+                        subject_scores['entry_confirmed'] = 1
+                        subject_scores['entry_confirmed_v2'] = 1
+
                     merge_shared_date('term_begin', parse_sheet_date(row.get(term_begin_header, '') if term_begin_header else '', idx, 'Term Begin'), idx, 'Term Begin')
                     merge_shared_date('term_end', parse_sheet_date(row.get(term_end_header, '') if term_end_header else '', idx, 'Term End'), idx, 'Term End')
                     merge_shared_date(
@@ -37617,9 +37656,10 @@ def school_admin_import_target(target):
                     add_error(idx, row, str(exc))
                     continue
 
-                entry['scores'][subject] = subject_scores
-                if subject not in entry['subjects']:
-                    entry['subjects'].append(subject)
+                if subject:
+                    entry['scores'][subject] = subject_scores
+                    if subject not in entry['subjects']:
+                        entry['subjects'].append(subject)
 
             invalid_behaviour_students = set()
             for behaviour_student_id in sorted(imported_behaviour_students):
