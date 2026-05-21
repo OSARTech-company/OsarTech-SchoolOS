@@ -104,7 +104,7 @@
             padding: 26px 28px 24px;
             position: relative;
             display: grid;
-            grid-template-columns: minmax(0, 170px) 1fr minmax(84px, 110px);
+            grid-template-columns: minmax(0, 170px) 1fr minmax(180px, 230px);
             align-items: center;
             gap: 22px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.32);
@@ -141,6 +141,13 @@
             display: flex;
             justify-content: flex-end;
             align-items: center;
+        }
+
+        .header-right-cluster {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
         }
 
         .header-logo-shell {
@@ -193,23 +200,61 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 96px;
-            height: 96px;
-            padding: 6px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.14);
+            width: 112px;
+            height: 112px;
+            padding: 8px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.18);
             border: 1px solid rgba(255, 255, 255, 0.2);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 24px rgba(15, 23, 42, 0.12);
         }
 
         .header-qr-image {
-            width: 84px;
-            height: 84px;
+            width: 96px;
+            height: 96px;
             object-fit: contain;
             background: #fff;
-            border-radius: 50%;
-            padding: 3px;
+            border-radius: 8px;
+            padding: 6px;
             border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+
+        .header-student-profile {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-student-photo,
+        .header-student-fallback {
+            width: 78px;
+            height: 78px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.72);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .header-student-photo {
+            object-fit: cover;
+        }
+
+        .header-student-fallback {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1e3c72;
+            font-size: 24px;
+            font-weight: 800;
+        }
+
+        .header-student-label {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.9px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.88);
         }
 
         .is-hidden {
@@ -359,59 +404,6 @@
             font-weight: 700;
             color: var(--school-ink);
             word-break: break-word;
-        }
-
-        .student-photo-card {
-            align-items: center;
-            text-align: center;
-        }
-
-        .student-photo-stage {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100%;
-            padding-top: 6px;
-        }
-
-        .student-photo,
-        .student-photo-fallback {
-            width: min(100%, 210px);
-            aspect-ratio: 3 / 4;
-            border-radius: 20px;
-            border: 1px solid var(--school-border);
-            box-shadow: 0 16px 32px rgba(17, 24, 39, 0.1);
-        }
-
-        .student-photo {
-            object-fit: cover;
-            background: linear-gradient(180deg, #f7fbff 0%, #ebf3ff 100%);
-        }
-
-        .student-photo-fallback {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            background: linear-gradient(180deg, #f7fbff 0%, #ebf3ff 100%);
-            color: var(--school-primary);
-            font-weight: 800;
-        }
-
-        .student-photo-fallback i {
-            font-size: 30px;
-            opacity: 0.75;
-        }
-
-        .student-photo-fallback span {
-            font-size: 34px;
-            line-height: 1;
-        }
-
-        .student-photo-note {
-            font-size: var(--font-sm);
-            color: var(--school-muted);
         }
 
         .kpi-strip {
@@ -997,7 +989,7 @@
 
         @media (max-width: 900px) {
             .header {
-                grid-template-columns: 110px 1fr 110px;
+                grid-template-columns: 110px 1fr 190px;
                 gap: 16px;
                 padding: 22px 18px 20px;
             }
@@ -1102,10 +1094,13 @@
             .info-row {
                 border-color: #d5d5d5;
             }
-            .student-photo,
-            .student-photo-fallback {
-                width: min(100%, 120px);
-                border-color: #d5d5d5;
+            .header-right-cluster {
+                gap: 10px;
+            }
+            .header-student-photo,
+            .header-student-fallback {
+                width: 64px;
+                height: 64px;
                 box-shadow: none;
             }
             .subjects-table,
@@ -1167,6 +1162,10 @@
             .header-qr-side {
                 justify-content: center;
             }
+            .header-right-cluster {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
             .header-copy {
                 order: 2;
                 max-width: 100%;
@@ -1193,9 +1192,10 @@
                 grid-template-columns: repeat(2, minmax(0, 1fr));
                 padding: 16px;
             }
-            .student-photo,
-            .student-photo-fallback {
-                width: min(100%, 180px);
+            .header-student-photo,
+            .header-student-fallback {
+                width: 68px;
+                height: 68px;
             }
 
             .school-logo,
@@ -1205,12 +1205,12 @@
                 font-size: 20px;
             }
             .header-qr-shell {
-                width: 68px;
-                height: 68px;
+                width: 86px;
+                height: 86px;
             }
             .header-qr-image {
-                width: 60px;
-                height: 60px;
+                width: 70px;
+                height: 70px;
             }
 
             .signatures {
@@ -1426,11 +1426,21 @@
                 </div>
             </div>
             <div class="header-qr-side">
-                {% if verification_qr_url %}
-                <div class="header-qr-shell">
-                    <img src="{{ verification_qr_url }}" alt="Result Verification QR Code" class="header-qr-image">
+                <div class="header-right-cluster">
+                    <div class="header-student-profile">
+                        {% if student.profile_image_url %}
+                        <img src="{{ student.profile_image_url }}" alt="{{ student_display_name }} Profile Picture" class="header-student-photo">
+                        {% else %}
+                        <div class="header-student-fallback">{{ student_initial }}</div>
+                        {% endif %}
+                        <div class="header-student-label">Student</div>
+                    </div>
+                    {% if verification_qr_url %}
+                    <div class="header-qr-shell">
+                        <img src="{{ verification_qr_url }}" alt="Result Verification QR Code" class="header-qr-image">
+                    </div>
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
         </div>
 
@@ -1516,23 +1526,6 @@
                 <div class="info-row">
                     <div class="info-label">Next Term Ends</div>
                     <div class="info-value">{{ student.next_term_end if student.next_term_end else 'N/A' }}</div>
-                </div>
-            </div>
-
-            <div class="info-group student-photo-card">
-                <div class="info-group-title">Student Photo</div>
-                <div class="student-photo-stage">
-                    {% if student.profile_image_url %}
-                    <img src="{{ student.profile_image_url }}" alt="{{ student_display_name }} Profile Picture" class="student-photo">
-                    {% else %}
-                    <div class="student-photo-fallback">
-                        <i class="fas fa-user-graduate" aria-hidden="true"></i>
-                        <span>{{ student_initial }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-                <div class="student-photo-note">
-                    {% if student.profile_image_url %}Official profile photo{% else %}No profile photo uploaded{% endif %}
                 </div>
             </div>
         </div>
