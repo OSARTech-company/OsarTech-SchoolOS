@@ -4949,6 +4949,42 @@ def normalize_school_logo_url(raw_url):
         return url
     return url
 
+def normalize_optional_image_src(raw_value):
+    """Allow only supported image source formats for template rendering."""
+    raw = (raw_value or '').strip()
+    if not raw:
+        return ''
+    if raw.lower().startswith('data:image/'):
+        return raw
+    if raw.startswith('//'):
+        return f'https:{raw}'
+    if raw.startswith('/static/') or raw.startswith('/uploads/'):
+        return raw
+    if raw.startswith('static/') or raw.startswith('uploads/'):
+        return f'/{raw}'
+    if re.match(r'^https?://', raw, flags=re.IGNORECASE):
+        return raw[:2000]
+    return ''
+
+def get_student_profile_image_url(*sources):
+    """Resolve the first usable student profile image from known field names."""
+    candidate_keys = (
+        'profile_image',
+        'student_profile_image',
+        'passport_image',
+        'photo',
+        'photo_url',
+        'image_url',
+    )
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        for key in candidate_keys:
+            normalized = normalize_optional_image_src(source.get(key, ''))
+            if normalized:
+                return normalized
+    return ''
+
 def _school_logo_candidate_urls(logo_url):
     """Yield candidate URLs for logo fetch, including wrappers like Bing image search."""
     raw = (logo_url or '').strip()
@@ -5107,8 +5143,40 @@ def build_verification_qr_data_uri(value):
         encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
         return f'data:image/png;base64,{encoded}'
     except Exception:
-        logging.exception("Could not generate verification QR code.")
-        return ''
+        try:
+            qr = qrcode.QRCode(
+                version=None,
+                error_correction=qrcode.constants.ERROR_CORRECT_M,
+                box_size=6,
+                border=2,
+            )
+            qr.add_data(payload)
+            qr.make(fit=True)
+            matrix = qr.get_matrix()
+            size = len(matrix or [])
+            if not size:
+                return ''
+            rects = []
+            for y, row in enumerate(matrix):
+                run_start = None
+                for x, is_dark in enumerate(list(row) + [False]):
+                    if is_dark and run_start is None:
+                        run_start = x
+                    elif not is_dark and run_start is not None:
+                        rects.append(f'<rect x="{run_start}" y="{y}" width="{x - run_start}" height="1"/>')
+                        run_start = None
+            svg_markup = (
+                f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" '
+                'shape-rendering="crispEdges">'
+                '<rect width="100%" height="100%" fill="#ffffff"/>'
+                f'<g fill="#000000">{"".join(rects)}</g>'
+                '</svg>'
+            )
+            encoded = base64.b64encode(svg_markup.encode('utf-8')).decode('ascii')
+            return f'data:image/svg+xml;base64,{encoded}'
+        except Exception:
+            logging.exception("Could not generate verification QR code.")
+            return ''
 
 def build_result_verification_context(school_id, student_id, term, academic_year='', classname=''):
     token = build_result_verification_token(
@@ -5266,6 +5334,7 @@ _STUDENTS_HAS_PARENT_MULTI_COLS = None
 _STUDENTS_HAS_EMAIL_COL = None
 _STUDENTS_HAS_ARCHIVE_COLS = None
 _STUDENTS_HAS_PHONE_COL = None
+_STUDENTS_HAS_PROFILE_IMAGE_COL = None
 _TEACHERS_HAS_ARCHIVE_COLS = None
 _USERS_HAS_PASSWORD_CHANGED_AT = None
 _USERS_HAS_TUTORIAL_SEEN_AT = None
@@ -5393,6 +5462,29 @@ def students_has_phone_column():
     except Exception:
         _STUDENTS_HAS_PHONE_COL = False
     return _STUDENTS_HAS_PHONE_COL
+
+def students_has_profile_image_column():
+    """Detect whether students.profile_image exists."""
+    global _STUDENTS_HAS_PROFILE_IMAGE_COL
+    if _STUDENTS_HAS_PROFILE_IMAGE_COL is not None:
+        return _STUDENTS_HAS_PROFILE_IMAGE_COL
+    try:
+        with db_connection() as conn:
+            c = conn.cursor()
+            db_execute(
+                c,
+                """SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'students'
+                     AND column_name = 'profile_image'
+                   LIMIT 1""",
+                None,
+            )
+            _STUDENTS_HAS_PROFILE_IMAGE_COL = bool(c.fetchone())
+    except Exception:
+        _STUDENTS_HAS_PROFILE_IMAGE_COL = False
+    return _STUDENTS_HAS_PROFILE_IMAGE_COL
 
 def students_has_archive_columns():
     """Detect whether students.is_archived + students.archived_at exist."""
@@ -6247,6 +6339,7 @@ def init_db():
                         firstname TEXT NOT NULL,
                         email TEXT DEFAULT '',
                         student_phone TEXT DEFAULT '',
+                        profile_image TEXT DEFAULT '',
                         date_of_birth TEXT,
                         gender TEXT,
                         classname TEXT NOT NULL,
@@ -6270,6 +6363,7 @@ def init_db():
                     )""")
     safe_exec_ignore("ALTER TABLE students ADD COLUMN email TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE students ADD COLUMN student_phone TEXT DEFAULT ''")
+    safe_exec_ignore("ALTER TABLE students ADD COLUMN profile_image TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE students ADD COLUMN date_of_birth TEXT")
     safe_exec_ignore("ALTER TABLE students ADD COLUMN gender TEXT")
     safe_exec_ignore("ALTER TABLE students ADD COLUMN parent_phone TEXT")
@@ -21912,7 +22006,9 @@ def load_student(school_id, student_id, include_archived=False):
     has_email_col = students_has_email_column()
     has_archive_cols = students_has_archive_columns()
     has_phone_col = students_has_phone_column()
+    has_profile_image_col = students_has_profile_image_column()
     email_col = 'email' if has_email_col else "'' AS email"
+    profile_col = ', profile_image' if has_profile_image_col else ''
     with db_connection() as conn:
         c = conn.cursor()
         if has_parent_cols:
@@ -21922,12 +22018,12 @@ def load_student(school_id, student_id, include_archived=False):
             if has_parent_multi_cols:
                 db_execute(c, f"""SELECT student_id, firstname, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream,
                                number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash, parent_name, parent_gender,
-                               parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2{archive_col}{phone_col} FROM students
+                               parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2{archive_col}{phone_col}{profile_col} FROM students
                                WHERE school_id = ? AND student_id = ?{archived_sql}""",
                            (school_id, student_id))
             else:
                 db_execute(c, f"""SELECT student_id, firstname, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream,
-                               number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash{archive_col}{phone_col} FROM students
+                               number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash{archive_col}{phone_col}{profile_col} FROM students
                                WHERE school_id = ? AND student_id = ?{archived_sql}""",
                            (school_id, student_id))
         else:
@@ -21935,7 +22031,7 @@ def load_student(school_id, student_id, include_archived=False):
             archive_col = ', COALESCE(is_archived, 0)' if has_archive_cols else ''
             phone_col = ', student_phone' if has_phone_col else ''
             db_execute(c, f"""SELECT student_id, firstname, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, 
-                           number_of_subject, subjects, scores, promoted{archive_col}{phone_col} FROM students 
+                           number_of_subject, subjects, scores, promoted{archive_col}{phone_col}{profile_col} FROM students 
                            WHERE school_id = ? AND student_id = ?{archived_sql}""",
                        (school_id, student_id))
         row = c.fetchone()
@@ -21974,11 +22070,13 @@ def load_student(school_id, student_id, include_archived=False):
             archived_idx = 13 if has_archive_cols else None
             phone_idx = (14 if has_archive_cols else 13) if has_phone_col else None
         student_phone = (row[phone_idx] or '').strip() if phone_idx is not None else ''
+        profile_image = normalize_optional_image_src(row[-1] if has_profile_image_col else '')
         return {
             'student_id': row[0],
             'firstname': row[1],
             'email': (row[2] or '').strip(),
             'student_phone': student_phone,
+            'profile_image': profile_image,
             'date_of_birth': (row[3] or '').strip(),
             'gender': (row[4] or '').strip(),
             'classname': row[5],
@@ -44008,6 +44106,7 @@ def student_view_result():
     student_view = {
         'first_name': snapshot.get('firstname', ''),
         'student_id': student_id,
+        'profile_image_url': get_student_profile_image_url(live_student, snapshot),
         'date_of_birth': (live_student.get('date_of_birth', '') or '').strip(),
         'gender': (live_student.get('gender', '') or '').strip(),
         'class_name': snapshot.get('classname', ''),
@@ -45378,6 +45477,7 @@ def parent_view_result():
     result_student = {
         'first_name': snapshot.get('firstname', student.get('firstname', '')),
         'student_id': student_id,
+        'profile_image_url': get_student_profile_image_url(student, snapshot),
         'date_of_birth': (student.get('date_of_birth', '') or '').strip(),
         'gender': (student.get('gender', '') or '').strip(),
         'class_name': snapshot.get('classname', student.get('classname', '')),
@@ -45742,6 +45842,7 @@ def teacher_student_result():
     result_student = {
         'first_name': snapshot.get('firstname', student.get('firstname', '')),
         'student_id': sid,
+        'profile_image_url': get_student_profile_image_url(student, snapshot),
         'date_of_birth': (student.get('date_of_birth', '') or '').strip(),
         'gender': (student.get('gender', '') or '').strip(),
         'class_name': snapshot_class,
@@ -46068,6 +46169,7 @@ def school_admin_student_result():
         result_student = {
             'first_name': student.get('firstname', ''),
             'student_id': sid,
+            'profile_image_url': get_student_profile_image_url(student),
             'date_of_birth': (student.get('date_of_birth', '') or '').strip(),
             'gender': (student.get('gender', '') or '').strip(),
             'class_name': classname,
@@ -46144,6 +46246,7 @@ def school_admin_student_result():
         result_student = {
             'first_name': snapshot.get('firstname', student.get('firstname', '')),
             'student_id': sid,
+            'profile_image_url': get_student_profile_image_url(student, snapshot),
             'date_of_birth': (student.get('date_of_birth', '') or '').strip(),
             'gender': (student.get('gender', '') or '').strip(),
             'class_name': snapshot.get('classname', student.get('classname', '')),
@@ -46659,6 +46762,7 @@ def check_result():
     clear_failed_login('check_result', student_id, client_ip)
     record_login_audit(student_id, 'student', school_id, 'check_result', True, '')
     school = get_school(school_id) or {}
+    live_student = load_student(school_id, sid) or {}
     published_terms = filter_visible_terms_for_student(school, get_published_terms_for_student(school_id, sid))
     if not published_terms:
         if safe_int((school or {}).get('operations_enabled', 1), 1):
@@ -46705,6 +46809,7 @@ def check_result():
     student = {
         'first_name': snapshot.get('firstname', firstname),
         'student_id': sid,
+        'profile_image_url': get_student_profile_image_url(live_student, snapshot),
         'class_name': snapshot.get('classname', classname),
         'class_size': len(class_results or []),
         'term': target_term,

@@ -361,6 +361,59 @@
             word-break: break-word;
         }
 
+        .student-photo-card {
+            align-items: center;
+            text-align: center;
+        }
+
+        .student-photo-stage {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100%;
+            padding-top: 6px;
+        }
+
+        .student-photo,
+        .student-photo-fallback {
+            width: min(100%, 210px);
+            aspect-ratio: 3 / 4;
+            border-radius: 20px;
+            border: 1px solid var(--school-border);
+            box-shadow: 0 16px 32px rgba(17, 24, 39, 0.1);
+        }
+
+        .student-photo {
+            object-fit: cover;
+            background: linear-gradient(180deg, #f7fbff 0%, #ebf3ff 100%);
+        }
+
+        .student-photo-fallback {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: linear-gradient(180deg, #f7fbff 0%, #ebf3ff 100%);
+            color: var(--school-primary);
+            font-weight: 800;
+        }
+
+        .student-photo-fallback i {
+            font-size: 30px;
+            opacity: 0.75;
+        }
+
+        .student-photo-fallback span {
+            font-size: 34px;
+            line-height: 1;
+        }
+
+        .student-photo-note {
+            font-size: var(--font-sm);
+            color: var(--school-muted);
+        }
+
         .kpi-strip {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -916,6 +969,26 @@
             overflow-wrap: anywhere;
         }
 
+        .verification-qr-preview {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 92px;
+            height: 92px;
+            padding: 6px;
+            border-radius: 18px;
+            background: #fff;
+            border: 1px solid var(--school-border-soft);
+            box-shadow: 0 10px 22px rgba(17, 24, 39, 0.06);
+        }
+
+        .verification-qr-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
         .chart-wrapper {
             position: relative;
             height: 350px;
@@ -1029,12 +1102,24 @@
             .info-row {
                 border-color: #d5d5d5;
             }
+            .student-photo,
+            .student-photo-fallback {
+                width: min(100%, 120px);
+                border-color: #d5d5d5;
+                box-shadow: none;
+            }
             .subjects-table,
             .teacher-comment,
             .signatures,
             .verification-box {
                 margin: 10px 12px;
                 page-break-inside: avoid;
+            }
+            .verification-qr-preview {
+                width: 74px;
+                height: 74px;
+                box-shadow: none;
+                border-color: #d5d5d5;
             }
             .table-wrap {
                 border-color: #d5d5d5;
@@ -1108,6 +1193,10 @@
                 grid-template-columns: repeat(2, minmax(0, 1fr));
                 padding: 16px;
             }
+            .student-photo,
+            .student-photo-fallback {
+                width: min(100%, 180px);
+            }
 
             .school-logo,
             .school-logo-fallback {
@@ -1133,6 +1222,10 @@
                 flex-direction: column;
                 text-align: center;
                 margin: 16px 16px 0;
+            }
+            .verification-qr-preview {
+                width: 86px;
+                height: 86px;
             }
             .hero-ribbon {
                 padding: 12px 16px;
@@ -1302,6 +1395,8 @@
     </div>
 
         <div class="report-card">
+        {% set student_display_name = student.first_name if student.first_name else (student.firstname if student.firstname else 'Student') %}
+        {% set student_initial = ((student_display_name[:1] if student_display_name else 'S') or 'S')|upper %}
         <div class="header">
             {% set school_initial = ((school.school_name if school and school.school_name else 'S')[:1] or 'S')|upper %}
             <div class="header-side">
@@ -1421,6 +1516,23 @@
                 <div class="info-row">
                     <div class="info-label">Next Term Ends</div>
                     <div class="info-value">{{ student.next_term_end if student.next_term_end else 'N/A' }}</div>
+                </div>
+            </div>
+
+            <div class="info-group student-photo-card">
+                <div class="info-group-title">Student Photo</div>
+                <div class="student-photo-stage">
+                    {% if student.profile_image_url %}
+                    <img src="{{ student.profile_image_url }}" alt="{{ student_display_name }} Profile Picture" class="student-photo">
+                    {% else %}
+                    <div class="student-photo-fallback">
+                        <i class="fas fa-user-graduate" aria-hidden="true"></i>
+                        <span>{{ student_initial }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="student-photo-note">
+                    {% if student.profile_image_url %}Official profile photo{% else %}No profile photo uploaded{% endif %}
                 </div>
             </div>
         </div>
@@ -1677,10 +1789,15 @@
 
         {% if verification_url %}
         <div class="verification-box">
+            {% if verification_qr_url %}
+            <div class="verification-qr-preview">
+                <img src="{{ verification_qr_url }}" alt="Result Verification QR Code" class="verification-qr-image">
+            </div>
+            {% endif %}
             <div class="verification-copy">
                 <div class="verification-title"><i class="fas fa-shield-halved"></i> Result Verification</div>
                 <div class="verification-text">
-                    Open this link to verify this result:<br>
+                    Scan the QR code or open this link to verify this result:<br>
                     <a href="{{ verification_url }}" target="_blank" rel="noopener">{{ verification_url }}</a>
                 </div>
             </div>
