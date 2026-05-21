@@ -19667,6 +19667,7 @@ def _build_rich_result_pdf_reportlab(report):
     year = (report.get('year') or '').strip()
     average = report.get('average')
     class_average = report.get('class_average')
+    class_average_label = (report.get('class_average_label') or 'Class Average').strip()
     grade = (report.get('grade') or '').strip()
     status = (report.get('status') or '').strip()
     teacher_name = (report.get('teacher_name') or '').strip()
@@ -19678,6 +19679,10 @@ def _build_rich_result_pdf_reportlab(report):
     generated_on = (report.get('generated_on') or '').strip()
     subject_rows = report.get('subject_rows') or []
     show_positions = bool(report.get('show_positions', True))
+    attendance = report.get('attendance') if isinstance(report.get('attendance'), dict) else {}
+    behaviour = report.get('behaviour') if isinstance(report.get('behaviour'), dict) else {}
+    teacher_comment = (report.get('teacher_comment') or '').strip()
+    principal_comment = (report.get('principal_comment') or '').strip()
 
     def _decode_signature_ref(ref):
         raw = (ref or '').strip()
@@ -19717,9 +19722,30 @@ def _build_rich_result_pdf_reportlab(report):
         ["Student", student_name, "Student ID", student_id],
         ["Class", class_name, "Term", term],
         ["Academic Year", year or "-", "Generated", generated_on or "-"],
-        ["Average", _format_mark(average), "Class Average", _format_mark(class_average)],
+        ["Average", _format_mark(average), class_average_label, _format_mark(class_average)],
         ["Grade / Status", f"{grade} / {status}", "", ""],
     ]
+    if attendance:
+        meta_data.extend([
+            [
+                "Days Open",
+                str(attendance.get('days_open') if attendance.get('days_open') is not None else '-'),
+                "Days Present",
+                str(attendance.get('days_present') if attendance.get('days_present') is not None else '-'),
+            ],
+            [
+                "Term Begins",
+                attendance.get('term_begin') or "-",
+                "Term Ends",
+                attendance.get('term_end') or "-",
+            ],
+            [
+                "Next Term Begins",
+                attendance.get('next_term_begin') or "-",
+                "Next Term Ends",
+                attendance.get('next_term_end') or "-",
+            ],
+        ])
     meta_table = Table(meta_data, colWidths=[28 * mm, 58 * mm, 30 * mm, 58 * mm])
     meta_table.setStyle(
         TableStyle([
@@ -19748,7 +19774,7 @@ def _build_rich_result_pdf_reportlab(report):
         ]]
     for row in subject_rows:
         table_row = [
-            str(row.get('subject') or ''),
+            Paragraph(_pdf_escape(str(row.get('subject') or '')), styles['Normal']),
             _format_mark(row.get('total_exam')),
             _format_mark(row.get('highest')),
             _format_mark(row.get('lowest')),
@@ -19785,6 +19811,56 @@ def _build_rich_result_pdf_reportlab(report):
     )
     story.append(subject_table)
     story.append(Spacer(1, 8))
+
+    behaviour_rows = []
+    for trait in BEHAVIOUR_TRAITS:
+        value = (behaviour.get(trait, '') or '').strip()
+        if value:
+            behaviour_rows.append([
+                Paragraph(_pdf_escape(trait), styles['Normal']),
+                Paragraph(_pdf_escape(value), styles['Normal']),
+            ])
+    if behaviour_rows:
+        story.append(Paragraph("<b>Behaviour Assessment</b>", styles['Heading3']))
+        behaviour_table = Table([["Trait", "Grade"]] + behaviour_rows, colWidths=[112 * mm, 60 * mm], repeatRows=1)
+        behaviour_table.setStyle(
+            TableStyle([
+                ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#8b8f94')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f5f7')),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8.5),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ])
+        )
+        story.append(behaviour_table)
+        story.append(Spacer(1, 8))
+
+    comment_rows = []
+    if teacher_comment:
+        comment_rows.append(["Teacher Comment", Paragraph(_pdf_escape(teacher_comment), styles['Normal'])])
+    if principal_comment:
+        comment_rows.append([f"{leadership_label} Comment", Paragraph(_pdf_escape(principal_comment), styles['Normal'])])
+    if comment_rows:
+        comment_table = Table(comment_rows, colWidths=[38 * mm, 134 * mm])
+        comment_table.setStyle(
+            TableStyle([
+                ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#8b8f94')),
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f3f5f7')),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8.5),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ])
+        )
+        story.append(comment_table)
+        story.append(Spacer(1, 8))
 
     signature_table = Table(
         [
@@ -36976,13 +37052,14 @@ def school_admin_import_target(target):
         return redirect(url_for('school_admin_bulk_tools'))
     missing_headers = [h for h in required_by_target[target_key] if h not in headers]
     if target_key == 'students':
+        selected_import_class = canonicalize_classname(request.form.get('classname', ''))
         student_required_headers = {
             'name': resolve_spreadsheet_header(headers, 'firstname', 'student name', 'student_name', 'name', 'full name', 'full_name'),
-            'class': resolve_spreadsheet_header(headers, 'classname', 'class', 'class name', 'class_name'),
-            'date of birth': resolve_spreadsheet_header(headers, 'date_of_birth', 'date of birth', 'dob', 'birth date'),
             'gender': resolve_spreadsheet_header(headers, 'gender', 'sex'),
         }
         missing_headers.extend([label for label, header_name in student_required_headers.items() if not header_name])
+        if not selected_import_class and not resolve_spreadsheet_header(headers, 'classname', 'class', 'class name', 'class_name'):
+            missing_headers.append('class')
     if missing_headers:
         flash(f'Missing required spreadsheet columns: {", ".join(missing_headers)}', 'error')
         return redirect(url_for('school_admin_bulk_tools'))
@@ -37012,6 +37089,7 @@ def school_admin_import_target(target):
             first_year_class_header = resolve_spreadsheet_header(headers, 'first_year_class', 'first year class', 'entry class')
             term_header = resolve_spreadsheet_header(headers, 'term', 'current term')
             stream_header = resolve_spreadsheet_header(headers, 'stream', 'arm')
+            phone_header = resolve_spreadsheet_header(headers, 'phone', 'student_phone', 'student phone', 'telephone')
             promoted_header = resolve_spreadsheet_header(headers, 'promoted')
             parent_phone_header = resolve_spreadsheet_header(headers, 'parent_phone', 'parent phone')
             class_config_cache = {}
@@ -37024,20 +37102,41 @@ def school_admin_import_target(target):
                     return fallback
                 return row_obj.get(header_name, fallback) if isinstance(row_obj, dict) else fallback
 
+            fallback_classname = canonicalize_classname(request.form.get('classname', ''))
+
             for idx, row in enumerate(rows, start=2):
-                classname = canonicalize_classname(student_cell(row, classname_header, ''))
+                legacy_id_shift = False
+                if firstname_header and gender_header and phone_header:
+                    possible_id = (student_cell(row, firstname_header, '') or '').strip()
+                    possible_name = (student_cell(row, gender_header, '') or '').strip()
+                    possible_gender = (student_cell(row, phone_header, '') or '').strip()
+                    legacy_id_shift = bool(
+                        possible_id
+                        and possible_name
+                        and not normalize_student_gender(possible_name)
+                        and normalize_student_gender(possible_gender)
+                    )
+                classname = canonicalize_classname(student_cell(row, classname_header, '') or fallback_classname)
                 term = (student_cell(row, term_header, '') or '').strip() or default_student_term
-                firstname = normalize_person_name(student_cell(row, firstname_header, ''))
-                lastname = normalize_person_name(student_cell(row, lastname_header, ''))
+                firstname = normalize_person_name(
+                    student_cell(row, gender_header, '') if legacy_id_shift else student_cell(row, firstname_header, '')
+                )
+                lastname = normalize_person_name(student_cell(row, lastname_header, '')) if not legacy_id_shift else ''
                 full_name = (f'{firstname} {lastname}'.strip() if lastname else firstname).strip()
                 email = (student_cell(row, email_header, '') or '').strip().lower()
                 date_of_birth = (student_cell(row, dob_header, '') or '').strip()
-                gender = (student_cell(row, gender_header, '') or '').strip()
+                gender = (
+                    (student_cell(row, phone_header, '') or '').strip()
+                    if legacy_id_shift
+                    else (student_cell(row, gender_header, '') or '').strip()
+                )
+                student_phone = (
+                    (student_cell(row, resolve_spreadsheet_header(headers, 'options'), '') or '').strip()
+                    if legacy_id_shift
+                    else (student_cell(row, phone_header, '') or '').strip()
+                )
                 if not firstname:
                     add_error(idx, row, 'student name is required.')
-                    continue
-                if not date_of_birth:
-                    add_error(idx, row, 'date of birth is required.')
                     continue
                 if not normalize_student_gender(gender):
                     add_error(idx, row, 'gender is required and must be male/female/other.')
@@ -37055,10 +37154,16 @@ def school_admin_import_target(target):
                     add_error(idx, row, 'classname must be a secondary class (JSS/SS).')
                     continue
                 first_year_class = canonicalize_classname(student_cell(row, first_year_class_header, '') or student_cell(row, classname_header, ''))
+                if not first_year_class:
+                    first_year_class = classname
                 if not is_secondary_classname(first_year_class):
                     add_error(idx, row, 'first_year_class must be a secondary class (JSS/SS).')
                     continue
-                sid_raw = (student_cell(row, student_id_header, '') or '').strip()
+                sid_raw = (
+                    (student_cell(row, firstname_header, '') or '').strip()
+                    if legacy_id_shift
+                    else (student_cell(row, student_id_header, '') or '').strip()
+                )
                 sid = ''
                 if sid_raw:
                     sid = with_school_suffix_manual_id(sid_raw, school_id)
@@ -37157,6 +37262,7 @@ def school_admin_import_target(target):
                     'email': email,
                     'date_of_birth': date_of_birth,
                     'gender': gender,
+                    'student_phone': student_phone,
                     'classname': classname,
                     'first_year_class': first_year_class,
                     'term': term,
@@ -37322,10 +37428,24 @@ def school_admin_import_target(target):
                 headers,
                 'trait grade',
                 'trait grades',
+                'trait grad',
+                'trait grads',
                 'behaviour grade',
                 'behaviour grades',
+                'behaviour grad',
+                'behaviour grads',
+                'behavior grade',
+                'behavior grades',
+                'behavior grad',
+                'behavior grads',
                 'behaviour trait grade',
                 'behaviour trait grades',
+                'behaviour trait grad',
+                'behaviour trait grads',
+                'behavior trait grade',
+                'behavior trait grades',
+                'behavior trait grad',
+                'behavior trait grads',
             )
             days_open_header = resolve_spreadsheet_header(headers, 'days open', 'attendance days open')
             days_present_header = resolve_spreadsheet_header(headers, 'days present', 'attendance days present')

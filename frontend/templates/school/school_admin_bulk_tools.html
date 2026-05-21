@@ -91,9 +91,15 @@
             <a class="btn btn-secondary btn-sm ml-10" href="{{ url_for('school_admin_import_report') }}">Open Report</a>
         </div>
         {% endif %}
-        <p class="note">Students spreadsheet columns: Class, Student Name, Date of Birth, Gender. Student ID is optional; leave it blank to auto-generate. Term defaults to the school's current term, and Stream can be left blank until it is assigned later.</p>
+        <p class="note">Students spreadsheet columns: Class, Student Name, Date of Birth (optional), Gender, Phone (optional). Student ID is optional; leave it blank to auto-generate. Term defaults to the school's current term, and Stream can be left blank until it is assigned later. For exported lists like Student ID, Student Name, Gender, Phone, select the class below before importing.</p>
         <form method="post" action="{{ url_for('school_admin_import_target', target='students') }}" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="classname">
+                <option value="">Default Class If File Has No Class</option>
+                {% for classname in historical_class_options %}
+                <option value="{{ classname }}">{{ classname }}</option>
+                {% endfor %}
+            </select>
             <input type="file" name="file" accept=".csv,.xlsx" required>
             <label style="margin-left:10px;"><input type="checkbox" name="dry_run" value="1"> Dry run only</label>
             <button class="btn btn-primary" type="submit">Import Students Spreadsheet</button>

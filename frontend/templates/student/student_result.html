@@ -1286,11 +1286,16 @@
             }
             .header-qr-side {
                 order: 3;
-                justify-content: center;
+                justify-content: stretch;
+                width: 100%;
             }
             .header-right-cluster {
-                justify-content: center;
-                flex-wrap: wrap;
+                display: flex;
+                width: 100%;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 14px;
+                flex-wrap: nowrap;
             }
             .header-copy {
                 order: 2;
@@ -1345,6 +1350,10 @@
             .header-qr-image {
                 width: 90px;
                 height: 90px;
+            }
+            .header-student-profile {
+                align-items: flex-end;
+                text-align: right;
             }
 
             .signatures {
