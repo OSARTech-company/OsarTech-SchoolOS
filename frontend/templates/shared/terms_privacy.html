@@ -1,174 +1,528 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Terms and Privacy</title>
+    <title>Terms, Privacy and Data Rights</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        :root {
+            --policy-ink: #0f172a;
+            --policy-muted: #5b6475;
+            --policy-line: #d9e2ec;
+            --policy-panel: #ffffff;
+            --policy-soft: #f7fafc;
+            --policy-accent: #1d4ed8;
+            --policy-accent-soft: #dbeafe;
+            --policy-good: #166534;
+            --policy-good-soft: #dcfce7;
+        }
         .policy-sidebar .side-brand span {
             font-size: 1rem;
         }
         .policy-sidebar .side-links {
             padding-bottom: 14px;
         }
-        .wrap {
-            max-width: 900px;
-            margin: 28px auto 40px;
-            padding: 0 16px 24px;
+        .policy-wrap {
+            max-width: 1040px;
+            margin: 28px auto 44px;
+            padding: 0 16px 28px;
         }
-        .card {
-            padding: 22px;
+        .policy-shell {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 270px;
+            gap: 18px;
+            align-items: start;
         }
-        h1, h2 {
-            margin-top: 0;
-            color: #111827;
+        .policy-main,
+        .policy-aside {
+            min-width: 0;
         }
-        h2 {
-            margin-top: 18px;
-            font-size: 1.1rem;
+        .policy-card {
+            background: var(--policy-panel);
+            border: 1px solid var(--policy-line);
+            border-radius: 18px;
+            box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
         }
-        ul {
-            padding-left: 18px;
+        .policy-hero {
+            padding: 26px 24px;
+            background:
+                linear-gradient(135deg, rgba(29, 78, 216, 0.07), transparent 48%),
+                linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
         }
-        .muted {
-            color: #6b7280;
-            font-size: 0.95rem;
+        .policy-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            background: var(--policy-accent-soft);
+            color: #1e40af;
+            font-size: 0.84rem;
+            font-weight: 700;
         }
-        .actions {
-            margin-top: 20px;
+        .policy-hero h1 {
+            margin: 0 0 10px;
+            color: var(--policy-ink);
+            font-size: clamp(1.8rem, 3vw, 2.45rem);
+            line-height: 1.14;
+        }
+        .policy-hero p {
+            margin: 0;
+            color: var(--policy-muted);
+            font-size: 1rem;
+            line-height: 1.65;
+        }
+        .policy-meta {
+            margin-top: 16px;
             display: flex;
-            gap: 10px;
             flex-wrap: wrap;
+            gap: 10px;
         }
-        .btn {
-            display: inline-block;
-            padding: 10px 16px;
-            border-radius: 8px;
-            background: #2563eb;
-            color: #fff;
-            text-decoration: none;
+        .policy-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #fff;
+            border: 1px solid var(--policy-line);
+            color: var(--policy-muted);
+            font-size: 0.88rem;
             font-weight: 600;
         }
-        .btn:hover {
-            background: #1d4ed8;
+        .policy-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin-top: 18px;
         }
-        .top-line {
-            margin-bottom: 12px;
-            color: #5b6475;
-            font-size: 0.95rem;
+        .summary-card {
+            padding: 18px;
+            background: #fff;
+            border: 1px solid var(--policy-line);
+            border-radius: 16px;
+        }
+        .summary-card h2 {
+            margin: 0 0 10px;
+            font-size: 1rem;
+            color: var(--policy-ink);
+        }
+        .summary-card p {
+            margin: 0;
+            color: var(--policy-muted);
+            line-height: 1.6;
+        }
+        .policy-section {
+            margin-top: 18px;
+            padding: 22px 24px;
+        }
+        .policy-section + .policy-section {
+            margin-top: 14px;
+        }
+        .policy-section h2 {
+            margin: 0 0 10px;
+            color: var(--policy-ink);
+            font-size: 1.2rem;
+        }
+        .policy-section p {
+            margin: 0 0 12px;
+            color: var(--policy-muted);
+            line-height: 1.7;
+        }
+        .policy-section ul {
+            margin: 0;
+            padding-left: 18px;
+            color: var(--policy-muted);
+        }
+        .policy-section li {
+            margin-bottom: 8px;
+            line-height: 1.65;
+        }
+        .policy-highlight {
+            margin-top: 14px;
+            padding: 14px 15px;
+            border-radius: 14px;
+            border: 1px solid #c7d2fe;
+            background: #eef2ff;
+            color: #3730a3;
+            line-height: 1.65;
+        }
+        .policy-note {
+            margin-top: 12px;
+            padding: 14px 15px;
+            border-radius: 14px;
+            border: 1px solid #bbf7d0;
+            background: var(--policy-good-soft);
+            color: var(--policy-good);
+            line-height: 1.65;
+        }
+        .policy-aside-card {
+            padding: 20px;
+            position: sticky;
+            top: 22px;
+        }
+        .policy-aside-card h3 {
+            margin: 0 0 12px;
+            font-size: 1rem;
+            color: var(--policy-ink);
+        }
+        .policy-nav {
+            display: grid;
+            gap: 8px;
+        }
+        .policy-nav a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--policy-line);
+            color: var(--policy-muted);
+            text-decoration: none;
+            font-weight: 600;
+            background: #fff;
+        }
+        .policy-nav a:hover {
+            color: var(--policy-accent);
+            border-color: #bfd3f2;
+            background: #f8fbff;
+        }
+        .policy-mini {
+            margin-top: 16px;
+            display: grid;
+            gap: 10px;
+        }
+        .policy-mini-item {
+            padding: 12px 13px;
+            border-radius: 12px;
+            background: var(--policy-soft);
+            border: 1px solid var(--policy-line);
+            color: var(--policy-muted);
+            line-height: 1.55;
+        }
+        .policy-mini-item strong {
+            display: block;
+            margin-bottom: 4px;
+            color: var(--policy-ink);
+        }
+        .policy-actions {
+            margin-top: 18px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .policy-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 44px;
+            padding: 10px 16px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 700;
+        }
+        .policy-btn-primary {
+            background: var(--policy-accent);
+            color: #fff;
+        }
+        .policy-btn-primary:hover {
+            background: #1e40af;
+        }
+        .policy-btn-secondary {
+            background: #475569;
+            color: #fff;
+        }
+        .policy-btn-secondary:hover {
+            background: #334155;
+        }
+        .policy-btn-tertiary {
+            background: #fff;
+            color: var(--policy-accent);
+            border: 1px solid #bfdbfe;
+        }
+        .policy-btn-tertiary:hover {
+            background: #eff6ff;
+        }
+        .policy-footer {
+            margin-top: 16px;
+            font-size: 0.92rem;
+            color: var(--policy-muted);
+        }
+        @media (max-width: 920px) {
+            .policy-shell {
+                grid-template-columns: 1fr;
+            }
+            .policy-aside-card {
+                position: static;
+            }
+        }
+        @media (max-width: 640px) {
+            .policy-wrap {
+                margin-top: 18px;
+                padding: 0 12px 24px;
+            }
+            .policy-hero,
+            .policy-section,
+            .policy-aside-card {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+            .policy-grid {
+                grid-template-columns: 1fr;
+            }
+            .policy-actions {
+                flex-direction: column;
+            }
+            .policy-btn {
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
     {% include "shared/_loading_overlay.html" %}
     <div class="app-shell topbar-layout">
-    <aside class="side-taskbar policy-sidebar">
-        <div class="side-brand">
-            <i class="fas fa-shield-alt"></i>
-            <span>Policy Center</span>
-        </div>
-        <div class="side-links">
-            <a href="{{ url_for('terms_privacy') }}" class="side-link active">
-                <i class="fas fa-file-contract"></i>
-                <span>Terms & Privacy</span>
-            </a>
-            <a href="{{ url_for('help') }}" class="side-link">
-                <i class="fas fa-question-circle"></i>
-                <span>Help</span>
-            </a>
-            <a href="{{ url_for('report_issue') }}" class="side-link">
-                <i class="fas fa-bug"></i>
-                <span>Report Issue</span>
-            </a>
-            <a href="{{ url_for('login') }}" class="side-link side-link-logout">
-                <i class="fas fa-sign-in-alt"></i>
-                <span>Back to Login</span>
-            </a>
-        </div>
-    </aside>
-    <div class="main-content">
-    <div class="container">
-    <div class="header">
-        <h1><i class="fas fa-user-shield"></i> Terms and Privacy</h1>
-        <div class="meta-line">Review policy terms before continuing to login.</div>
-    </div>
-    <div class="wrap">
-        <div class="card">
-            <div class="top-line"><i class="fas fa-shield-alt"></i> Student Score Policy</div>
-            <h1>Terms of Use and Privacy Notice</h1>
-            <p class="muted">Last updated: March 8, 2026</p>
+        <aside class="side-taskbar policy-sidebar">
+            <div class="side-brand">
+                <i class="fas fa-shield-alt"></i>
+                <span>Policy Center</span>
+            </div>
+            <div class="side-links">
+                <a href="{{ url_for('terms_privacy') }}" class="side-link active">
+                    <i class="fas fa-file-contract"></i>
+                    <span>Terms & Privacy</span>
+                </a>
+                <a href="{{ url_for('privacy_request') }}" class="side-link">
+                    <i class="fas fa-user-shield"></i>
+                    <span>Privacy Request</span>
+                </a>
+                <a href="{{ url_for('help') }}" class="side-link">
+                    <i class="fas fa-question-circle"></i>
+                    <span>Help</span>
+                </a>
+                <a href="{{ url_for('report_issue') }}" class="side-link">
+                    <i class="fas fa-bug"></i>
+                    <span>Report Issue</span>
+                </a>
+                <a href="{{ url_for('login') }}" class="side-link side-link-logout">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Back to Login</span>
+                </a>
+            </div>
+        </aside>
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-user-shield"></i> Terms, Privacy and Data Rights</h1>
+                    <div class="meta-line">Clear rules for using the app and handling school data responsibly.</div>
+                </div>
+                <div class="policy-wrap">
+                    <div class="policy-shell">
+                        <div class="policy-main">
+                            <section class="policy-card policy-hero" id="overview">
+                                <div class="policy-kicker">
+                                    <i class="fas fa-shield-alt"></i>
+                                    Student Score Policy Center
+                                </div>
+                                <h1>Terms of Use, Privacy Notice and Data Request Guide</h1>
+                                <p>
+                                    This app supports school operations such as student records, result publishing, attendance,
+                                    parent access, teacher workflows, controlled data requests, and audit tracking. By using the
+                                    platform, you agree to use it only for legitimate school purposes and within the permissions
+                                    assigned to your role.
+                                </p>
+                                <div class="policy-meta">
+                                    <span class="policy-badge"><i class="fas fa-calendar-alt"></i> Last updated: May 22, 2026</span>
+                                    <span class="policy-badge"><i class="fas fa-school"></i> School-only onboarding</span>
+                                    <span class="policy-badge"><i class="fas fa-lock"></i> Role-based access control</span>
+                                </div>
+                                <div class="policy-grid">
+                                    <div class="summary-card">
+                                        <h2>Who this applies to</h2>
+                                        <p>Super admins, school admins, teachers, students, parents, and any person using an account linked to a registered school.</p>
+                                    </div>
+                                    <div class="summary-card">
+                                        <h2>What this page covers</h2>
+                                        <p>Acceptable use, account security, how school data is handled, privacy rights, and the in-app process for export, correction, or deletion requests.</p>
+                                    </div>
+                                </div>
+                            </section>
 
-            <h2>1. Platform Scope</h2>
-            <ul>
-                <li>This platform is operated by <strong>Osartech LTD</strong> for school management workflows.</li>
-                <li>Registration is <strong>school-only</strong>: only approved schools can be onboarded by Osartech LTD or an authorized super admin.</li>
-                <li>Individual self-registration is not allowed for personal use outside a registered school.</li>
-                <li>It is for authorized users only: super admin, school admin, teacher, student, and parent roles.</li>
-                <li>Access and actions are limited by role permissions configured in the app.</li>
-            </ul>
+                            <section class="policy-card policy-section" id="scope">
+                                <h2>1. Platform Scope and School Ownership</h2>
+                                <p>
+                                    The platform is operated for schools and their authorized users. School records inside the app
+                                    are managed within a school-specific context, and access is limited according to user role,
+                                    school assignment, class assignment, and linked-student relationships.
+                                </p>
+                                <ul>
+                                    <li>Only approved schools can be onboarded into the platform.</li>
+                                    <li>Personal self-registration for unrelated individual use is not supported.</li>
+                                    <li>Each school is responsible for the accuracy of the data it enters or approves.</li>
+                                    <li>Users may only access data that matches their role and authorized school scope.</li>
+                                </ul>
+                                <div class="policy-highlight">
+                                    Schools should use this platform in line with their own internal policies and any local legal
+                                    obligations that apply to student, staff, and parent data.
+                                </div>
+                            </section>
 
-            <h2>2. Acceptable Use</h2>
-            <ul>
-                <li>Keep your username, password, and access device secure.</li>
-                <li>Do not share account credentials or bypass access restrictions.</li>
-                <li>Do not upload harmful files, offensive content, or unauthorized data exports.</li>
-                <li>You are responsible for actions performed using your account.</li>
-            </ul>
+                            <section class="policy-card policy-section" id="acceptable-use">
+                                <h2>2. Acceptable Use and Account Responsibility</h2>
+                                <ul>
+                                    <li>Keep your username, password, and device secure.</li>
+                                    <li>Do not share credentials, impersonate another user, or try to bypass permissions.</li>
+                                    <li>Do not upload harmful files, misleading records, offensive content, or unauthorized exports.</li>
+                                    <li>Use result, attendance, and profile tools carefully because actions may affect official school records.</li>
+                                    <li>You are responsible for activity performed through your account unless you report unauthorized access promptly.</li>
+                                </ul>
+                                <div class="policy-note">
+                                    If you suspect account misuse, wrong access, or an accidental disclosure, report it immediately
+                                    through <strong>Report Issue</strong> or your school administrator.
+                                </div>
+                            </section>
 
-            <h2>3. Data We Process</h2>
-            <ul>
-                <li>Identity data: names, role, username, and class/school associations.</li>
-                <li>Academic data: scores, attendance, disputes, and report records.</li>
-                <li>Operational data: timetable, messages, audits, and issue reports.</li>
-                <li>Security data: login attempts, role-based actions, and error logs.</li>
-            </ul>
+                            <section class="policy-card policy-section" id="data-we-handle">
+                                <h2>3. Data We Handle</h2>
+                                <p>The app may store and process information required to run school workflows, including:</p>
+                                <ul>
+                                    <li>Identity data such as names, usernames, linked roles, school IDs, student IDs, and profile images where enabled.</li>
+                                    <li>Academic data such as scores, grades, report comments, published results, ranking context, and historical records.</li>
+                                    <li>Attendance and behaviour data such as days open, days present, assessment traits, and class notes.</li>
+                                    <li>Operational data such as timetables, disputes, issue reports, imports, and workflow approvals.</li>
+                                    <li>Security and audit data such as login events, password changes, activity history, and controlled admin actions.</li>
+                                </ul>
+                            </section>
 
-            <h2>4. Privacy and Access Control</h2>
-            <ul>
-                <li>Data access is role-based and restricted to legitimate school operations.</li>
-                <li>User accounts are provisioned under a registered school tenant; standalone individual accounts are not created.</li>
-                <li>Parents only see linked-child data; teachers only see assigned class/subject scope.</li>
-                <li>System logs are used for security, compliance, and troubleshooting.</li>
-                <li>We do not permit unauthorized disclosure of student/staff records.</li>
-            </ul>
+                            <section class="policy-card policy-section" id="privacy">
+                                <h2>4. Privacy, Access Control and Student Protection</h2>
+                                <ul>
+                                    <li>Access is role-based. Teachers should see only assigned subject or class scope, and parents should see only linked-child information.</li>
+                                    <li>Published results, report views, and verification flows are designed for authorized academic use, not open public disclosure.</li>
+                                    <li>Audit logs and system traces may be used to investigate abuse, errors, or unauthorized changes.</li>
+                                    <li>Users must not copy, forward, screenshot, or distribute school records except where the school has authorized that use.</li>
+                                    <li>Student information should be treated as sensitive, especially where it relates to minors.</li>
+                                </ul>
+                            </section>
 
-            <h2>5. Data Retention and Security</h2>
-            <ul>
-                <li>Records are retained according to school policy and legal requirements.</li>
-                <li>Backups, audits, and integrity checks may be used to preserve system reliability.</li>
-                <li>Users should report suspected breaches immediately via <strong>Report Issue</strong>.</li>
-            </ul>
+                            <section class="policy-card policy-section" id="security">
+                                <h2>5. Security and Retention</h2>
+                                <ul>
+                                    <li>The platform may use backups, audit logs, validation checks, and other reliability controls to protect records.</li>
+                                    <li>Data may remain in the system as long as needed for active school operations, audit needs, support, backup recovery, or legal compliance.</li>
+                                    <li>Deletion requests may be delayed or limited where records are required for legal, security, dispute, or academic-history reasons.</li>
+                                    <li>Some technical metadata may be retained to confirm what changed, when it changed, and who initiated the action.</li>
+                                </ul>
+                            </section>
 
-            <h2>6. Consent</h2>
-            <p>
-                By checking the Terms and Privacy box at login, you confirm that you have read and agreed to these terms.
-                This acceptance is recorded per user account and may be required again after major policy updates.
-            </p>
+                            <section class="policy-card policy-section" id="rights">
+                                <h2>6. Data Rights and Correction Requests</h2>
+                                <p>
+                                    The app includes a controlled <strong>Privacy Request</strong> workflow for export, correction,
+                                    deletion, and related data-rights actions. Requests are reviewed before sensitive changes are applied.
+                                </p>
+                                <ul>
+                                    <li>Use the in-app request form for export, deletion, correction, or contact-detail updates.</li>
+                                    <li>School admins review requests in their school context before final action where applicable.</li>
+                                    <li>Super admin resolution may be required for final approval, rejection, or application of controlled changes.</li>
+                                    <li>Requests may be rejected when identity cannot be verified, the request is incomplete, or the action would compromise record integrity or legal obligations.</li>
+                                </ul>
+                                <div class="policy-highlight">
+                                    Privacy requests are for formal data-rights handling. General bugs, access mistakes, or app problems
+                                    should still go through <strong>Report Issue</strong>.
+                                </div>
+                            </section>
 
-            <h2>7. Contact</h2>
-            <p>
-                For policy or support questions, contact your school administrator first. If needed, escalate through the in-app
-                <strong>Report Issue</strong> page to Osartech LTD support.
-            </p>
-            <p>
-                For data privacy actions (export, deletion, correction), use the in-app
-                <a href="{{ url_for('privacy_request') }}"><strong>Privacy Request</strong></a> form.
-            </p>
+                            <section class="policy-card policy-section" id="school-duties">
+                                <h2>7. School Responsibilities</h2>
+                                <ul>
+                                    <li>Maintain accurate student, parent, teacher, and school information.</li>
+                                    <li>Assign user roles carefully and remove access when staff or relationships change.</li>
+                                    <li>Use published results, imports, corrections, and bulk tools responsibly.</li>
+                                    <li>Review disputes, privacy requests, and unusual account activity in a timely way.</li>
+                                    <li>Provide any extra school-specific privacy notice required by local law or policy.</li>
+                                </ul>
+                            </section>
 
-            <div class="actions">
-                <a class="btn" href="{{ url_for('login', terms_read=1) }}">I Have Read This, Continue To Login</a>
-                <a class="btn" style="background:#475569;" href="{{ url_for('login') }}">Back to Login</a>
+                            <section class="policy-card policy-section" id="updates">
+                                <h2>8. Policy Updates and Acceptance</h2>
+                                <p>
+                                    By checking the Terms and Privacy box at login, you confirm that you have read and accepted this
+                                    notice. Acceptance may be recorded against your account and may be requested again after significant
+                                    policy or feature updates.
+                                </p>
+                                <p>
+                                    We may revise this page to reflect new workflows, security controls, or compliance changes. The
+                                    latest version published in the app replaces earlier general versions of this notice.
+                                </p>
+                            </section>
+
+                            <section class="policy-card policy-section" id="contact">
+                                <h2>9. Help, Support and Contact Path</h2>
+                                <ul>
+                                    <li>For login, account, or school-record questions, contact your school administrator first.</li>
+                                    <li>For product issues, suspicious behavior, or technical concerns, use the in-app <strong>Report Issue</strong> page.</li>
+                                    <li>For privacy, export, correction, or deletion requests, use the in-app <strong>Privacy Request</strong> form.</li>
+                                </ul>
+                                <div class="policy-actions">
+                                    <a class="policy-btn policy-btn-primary" href="{{ url_for('login', terms_read=1) }}">
+                                        <i class="fas fa-check-circle"></i> I Have Read This, Continue To Login
+                                    </a>
+                                    <a class="policy-btn policy-btn-tertiary" href="{{ url_for('privacy_request') }}">
+                                        <i class="fas fa-user-shield"></i> Open Privacy Request
+                                    </a>
+                                    <a class="policy-btn policy-btn-secondary" href="{{ url_for('login') }}">
+                                        <i class="fas fa-arrow-left"></i> Back to Login
+                                    </a>
+                                </div>
+                                <div class="policy-footer">
+                                    This page gives the platform-level policy summary. Where a school has its own published privacy
+                                    notice or retention rules, those school-specific rules may add to this notice for that school.
+                                </div>
+                            </section>
+                        </div>
+
+                        <aside class="policy-aside">
+                            <div class="policy-card policy-aside-card">
+                                <h3>Quick Navigation</h3>
+                                <nav class="policy-nav">
+                                    <a href="#overview"><i class="fas fa-compass"></i> Overview</a>
+                                    <a href="#scope"><i class="fas fa-school"></i> Platform Scope</a>
+                                    <a href="#acceptable-use"><i class="fas fa-user-check"></i> Acceptable Use</a>
+                                    <a href="#data-we-handle"><i class="fas fa-database"></i> Data We Handle</a>
+                                    <a href="#privacy"><i class="fas fa-user-shield"></i> Privacy</a>
+                                    <a href="#security"><i class="fas fa-lock"></i> Security</a>
+                                    <a href="#rights"><i class="fas fa-file-signature"></i> Data Rights</a>
+                                    <a href="#school-duties"><i class="fas fa-clipboard-check"></i> School Duties</a>
+                                    <a href="#updates"><i class="fas fa-sync-alt"></i> Updates</a>
+                                    <a href="#contact"><i class="fas fa-life-ring"></i> Help & Contact</a>
+                                </nav>
+                                <div class="policy-mini">
+                                    <div class="policy-mini-item">
+                                        <strong>Login acceptance</strong>
+                                        Terms acceptance is tied to the account when the user continues after reading this page.
+                                    </div>
+                                    <div class="policy-mini-item">
+                                        <strong>Formal privacy actions</strong>
+                                        Use the app's dedicated privacy workflow for export, correction, and deletion requests.
+                                    </div>
+                                    <div class="policy-mini-item">
+                                        <strong>Fast support path</strong>
+                                        General technical issues should go to the Report Issue page, not the privacy queue.
+                                    </div>
+                                </div>
+                            </div>
+                        </aside>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    </div>
-    </div>
     </div>
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 </body>
 </html>
-

@@ -14,7 +14,7 @@
     <div class="container" style="max-width: 920px;">
         <div class="header">
             <h1><i class="fas fa-user-shield"></i> Privacy / Data Request</h1>
-            <p class="meta-line">Submit a data export, deletion, or correction request.</p>
+            <p class="meta-line">Submit a controlled request for data export, correction, deletion, or profile-contact changes.</p>
         </div>
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -23,6 +23,13 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
+        <div class="card" style="margin-bottom: 16px; border-left: 4px solid #2563eb;">
+            <p class="no-margin" style="line-height: 1.65; color: #475569;">
+                Use this form for formal privacy and personal-data actions. For general bugs or login problems, use
+                <a href="{{ url_for('report_issue') }}"><strong>Report Issue</strong></a> instead. You can also review the full
+                <a href="{{ url_for('terms_privacy') }}"><strong>Terms, Privacy and Data Rights</strong></a> page before submitting.
+            </p>
+        </div>
         <div class="card">
             <form method="POST" action="{{ url_for('privacy_request') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -106,4 +113,3 @@
     </div>
 </body>
 </html>
-

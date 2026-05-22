@@ -19519,10 +19519,13 @@ def _combine_student_snapshots(snapshots, school_id):
     """
     if not snapshots:
         return None
-    # accumulate all subject names
-    all_subjects = set()
-    for s in snapshots:
-        all_subjects.update(s.get('subjects', []) or [])
+    # Preserve the natural subject order from the contributing snapshots.
+    all_subjects = _dedupe_keep_order([
+        normalize_subject_name(subj)
+        for s in snapshots
+        for subj in (s.get('subjects', []) or [])
+        if str(subj).strip()
+    ])
     combined_scores = {}
     for subj in all_subjects:
         marks = []
@@ -19558,8 +19561,8 @@ def _combine_student_snapshots(snapshots, school_id):
     combined_status = status_from_score(avg_marks, grade_cfg)
 
     base = snapshots[-1].copy()
-    base['scores'] = combined_scores
-    base['subjects'] = sorted(all_subjects)
+    base['scores'] = build_ordered_subject_score_map(combined_scores, all_subjects)
+    base['subjects'] = list(base['scores'].keys())
     base['number_of_subject'] = len(base['subjects'])
     base['average_marks'] = avg_marks
     base['Grade'] = combined_grade
@@ -20374,6 +20377,37 @@ def get_subject_score_block(scores_map, subject_name):
         if normalize_subject_name(str(key)).lower() == norm_target and isinstance(value, dict):
             return value
     return {}
+
+
+def build_ordered_subject_score_map(scores_map, subjects=None):
+    """Align score blocks to an explicit subject order, then append extras safely."""
+    if not isinstance(scores_map, dict):
+        return {}
+    ordered_scores = {}
+    seen_subjects = set()
+    ordered_subjects = _dedupe_keep_order(normalize_subjects_list(subjects or []))
+
+    for subject in ordered_subjects:
+        block = get_subject_score_block(scores_map, subject)
+        normalized_subject = normalize_subject_name(subject)
+        normalized_key = normalized_subject.lower()
+        if not normalized_subject or normalized_key in seen_subjects:
+            continue
+        if isinstance(block, dict):
+            ordered_scores[normalized_subject] = block
+            seen_subjects.add(normalized_key)
+
+    for raw_subject, block in scores_map.items():
+        if not isinstance(block, dict):
+            continue
+        normalized_subject = normalize_subject_name(raw_subject)
+        normalized_key = normalized_subject.lower()
+        if not normalized_subject or normalized_key in seen_subjects:
+            continue
+        ordered_scores[normalized_subject] = block
+        seen_subjects.add(normalized_key)
+
+    return ordered_scores
 
 
 def compute_average_marks_from_scores(scores_map, subjects=None):
@@ -21386,6 +21420,9 @@ def load_published_student_result(school_id, student_id, term, academic_year='',
         'Status': status_value,
         'published_at': published_at,
     }
+    snapshot['scores'] = build_ordered_subject_score_map(snapshot.get('scores', {}), snapshot.get('subjects', []))
+    snapshot['subjects'] = list(snapshot['scores'].keys())
+    snapshot['number_of_subject'] = len(snapshot['subjects'])
 
     # if third-term and the school wants combined results, merge earlier terms
     if (term or '').strip().lower() == 'third term' and bool(school.get('combine_third_term_results')):
