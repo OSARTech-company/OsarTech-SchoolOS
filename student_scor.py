@@ -9534,7 +9534,7 @@ def get_class_subject_config(school_id, classname):
         db_execute(
             c,
             """SELECT classname, core_subjects, science_subjects, art_subjects,
-                      commercial_subjects, optional_subjects
+                      commercial_subjects, optional_subjects, optional_subject_limit
                FROM class_subject_configs
                WHERE school_id = ?
                  AND (
@@ -9553,7 +9553,7 @@ def get_class_subject_config(school_id, classname):
             db_execute(
                 c,
                 """SELECT classname, core_subjects, science_subjects, art_subjects,
-                          commercial_subjects, optional_subjects
+                          commercial_subjects, optional_subjects, optional_subject_limit
                    FROM class_subject_configs
                    WHERE school_id = ?
                      AND (
@@ -9578,6 +9578,7 @@ def get_class_subject_config(school_id, classname):
         'art_subjects': json.loads(row[3]) if row[3] else [],
         'commercial_subjects': json.loads(row[4]) if row[4] else [],
         'optional_subjects': json.loads(row[5]) if row[5] else [],
+        'optional_subject_limit': safe_int(row[6], 0),
     }
 
 def get_all_class_subject_configs(school_id):
@@ -9587,7 +9588,7 @@ def get_all_class_subject_configs(school_id):
         db_execute(
             c,
             """SELECT classname, core_subjects, science_subjects, art_subjects,
-                      commercial_subjects, optional_subjects
+                      commercial_subjects, optional_subjects, optional_subject_limit
                FROM class_subject_configs
                WHERE school_id = ?
                ORDER BY classname""",
@@ -9604,6 +9605,7 @@ def get_all_class_subject_configs(school_id):
             'art_subjects': json.loads(row[3]) if row[3] else [],
             'commercial_subjects': json.loads(row[4]) if row[4] else [],
             'optional_subjects': json.loads(row[5]) if row[5] else [],
+            'optional_subject_limit': safe_int(row[6], 0),
         }
     return configs
 
@@ -11409,10 +11411,13 @@ def build_subjects_from_config(classname, stream, config, selected_optional_subj
     allowed_optional = config.get('optional_subjects', []) if uses_stream else []
     selected_optional = [normalize_subject_name(s) for s in (selected_optional_subjects or []) if s and s.strip()]
     selected_optional = _dedupe_keep_order(selected_optional)
+    optional_limit = max(0, safe_int(config.get('optional_subject_limit', 0), 0))
 
     invalid = [s for s in selected_optional if s not in allowed_optional]
     if invalid:
         return None, None, 'Invalid optional subject selection.'
+    if optional_limit and len(selected_optional) > optional_limit:
+        return None, None, f'Select at most {optional_limit} optional subject{"s" if optional_limit != 1 else ""}.'
 
     subjects.extend(selected_optional)
     subjects = _dedupe_keep_order(subjects)
@@ -25355,6 +25360,30 @@ def set_teacher_profile_image(school_id, teacher_id, profile_image):
                 conn.rollback()
             except Exception as exc:
                 _log_suppressed_exception('set_teacher_profile_image', exc)
+            return False
+
+
+def set_student_profile_image(school_id, student_id, profile_image):
+    """Store student profile image for dashboard/result/avatar display."""
+    school_key = _normalize_school_id_text(school_id)
+    if not school_key or not students_has_profile_image_column():
+        return False
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        try:
+            db_execute(
+                c,
+                """UPDATE students
+                   SET profile_image = ?
+                   WHERE school_id = ? AND student_id = ?""",
+                (profile_image, school_key, student_id),
+            )
+            return True
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception as exc:
+                _log_suppressed_exception('set_student_profile_image', exc)
             return False
 
 def set_principal_signature(school_id, signature_image):
@@ -41680,9 +41709,6 @@ def teacher_behaviour_assessment():
         return redirect(url_for('login'))
     teacher_id = session.get('user_id')
     school = get_school(school_id) or {}
-    if school_uses_dean_led_score_entry(school):
-        flash('Simple Mode uses the shared score-entry page for behaviour traits and class comment. Open Score Entry instead.', 'info')
-        return redirect(url_for('teacher_dashboard', tab='score'))
     current_term = get_current_term(school)
     current_year = (school or {}).get('academic_year', '')
     classname = (request.values.get('classname', '') or '').strip()
@@ -41834,6 +41860,50 @@ def teacher_upload_profile_image():
         return redirect(url_for('teacher_dashboard'))
     flash('Profile picture saved successfully.', 'success')
     return redirect(url_for('teacher_dashboard'))
+
+
+@app.route('/school-admin/upload-student-profile-image', methods=['POST'])
+@require_roles('school_admin')
+@require_rate_limit('school_admin_upload_student_profile_image', RATE_LIMIT_MUTATION_PER_MIN, 60, redirect_endpoint='school_admin_view_students', methods=('POST',))
+def school_admin_upload_student_profile_image():
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    student_id = (request.form.get('student_id', '') or '').strip()
+    selected_class = canonicalize_classname(request.form.get('return_class', ''))
+    selected_term = (request.form.get('return_term', '') or '').strip()
+    try:
+        page = int((request.form.get('return_page', '') or '1').strip())
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        per_page = int((request.form.get('return_per_page', '') or '50').strip())
+    except (TypeError, ValueError):
+        per_page = 50
+    page = max(1, page)
+    per_page = max(10, min(per_page, 200))
+    redirect_kwargs = {'page': page, 'per_page': per_page}
+    if selected_class:
+        redirect_kwargs['class'] = selected_class
+    if selected_term:
+        redirect_kwargs['term'] = selected_term
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    if not student_id:
+        flash('Student ID is required for profile image upload.', 'error')
+        return redirect(url_for('school_admin_view_students', **redirect_kwargs))
+    student = load_student(school_id, student_id, include_archived=True)
+    if not student:
+        flash('Student not found in this school.', 'error')
+        return redirect(url_for('school_admin_view_students', **redirect_kwargs))
+    image_data, err = parse_uploaded_profile_image(request.files.get('profile_image'))
+    if err:
+        flash(err, 'error')
+        return redirect(url_for('school_admin_view_students', **redirect_kwargs))
+    if not set_student_profile_image(school_id, student_id, image_data):
+        flash('Student profile picture could not be saved. Confirm the student profile image column is available, then retry.', 'error')
+        return redirect(url_for('school_admin_view_students', **redirect_kwargs))
+    flash(f'Profile picture updated for {student.get("firstname", student_id)}.', 'success')
+    return redirect(url_for('school_admin_view_students', **redirect_kwargs))
 
 @app.route('/teacher/publish-results', methods=['POST'])
 def teacher_publish_results():
@@ -42788,15 +42858,41 @@ def teacher_allocate_stream():
         flash(success_message, 'success')
         return redirect(success_redirect)
 
-    selected_optional_subjects = set(
-        s for s in (student.get('subjects') or [])
-        if s in (config.get('optional_subjects') or [])
-    )
+    current_subjects = _dedupe_keep_order([
+        normalize_subject_name(s)
+        for s in (student.get('subjects') or [])
+        if (s or '').strip()
+    ])
+    optional_subject_pool = _dedupe_keep_order([
+        normalize_subject_name(s)
+        for s in (config.get('optional_subjects') or [])
+        if (s or '').strip()
+    ])
+    selected_optional_subjects = [
+        s for s in optional_subject_pool
+        if s in current_subjects
+    ]
+    stream_subject_map = {
+        'Science': _dedupe_keep_order([normalize_subject_name(s) for s in (config.get('science_subjects') or []) if (s or '').strip()]),
+        'Art': _dedupe_keep_order([normalize_subject_name(s) for s in (config.get('art_subjects') or []) if (s or '').strip()]),
+        'Commercial': _dedupe_keep_order([normalize_subject_name(s) for s in (config.get('commercial_subjects') or []) if (s or '').strip()]),
+    }
+    preview_payload = {
+        'core_subjects': _dedupe_keep_order([normalize_subject_name(s) for s in (config.get('core_subjects') or []) if (s or '').strip()]),
+        'stream_subjects': stream_subject_map,
+        'optional_subjects': optional_subject_pool,
+        'optional_subject_limit': max(0, safe_int(config.get('optional_subject_limit', 0), 0)),
+        'current_subjects': current_subjects,
+        'current_stream': (student.get('stream') or 'N/A'),
+    }
     return render_template(
         'teacher/teacher_allocate_stream.html',
         student=student,
+        school=school,
+        role=role,
         config=config,
         selected_optional_subjects=selected_optional_subjects,
+        preview_payload=preview_payload,
     )
 
 @app.route('/teacher/enter-scores', methods=['GET', 'POST'])
@@ -42881,7 +42977,8 @@ def teacher_enter_scores():
     )
     assigned_subjects_set = {s.lower() for s in assigned_subjects}
     can_edit_teacher_comment = bool(class_access)
-    can_edit_behaviour = bool(class_access)
+    can_edit_behaviour = bool(class_access) and role == 'school_admin'
+    behaviour_entry_is_separate = bool(class_access) and role == 'teacher'
     locked_subjects_for_class = []
     if class_access and not dean_led_mode and role != 'school_admin':
         class_subject_assignments = get_teacher_subject_assignments(
@@ -43219,7 +43316,10 @@ def teacher_enter_scores():
         # Any edit requires re-publish for this class/term.
         class_name = (student.get('classname', '') or '').strip()
         set_result_published(school_id, class_name, current_term, current_year, teacher_id, False)
-        flash('Shared draft saved successfully. Scores, class comment, and behaviour are now visible to other Simple Mode editors immediately.', 'success')
+        if can_edit_behaviour:
+            flash('Shared draft saved successfully. Scores, class comment, and behaviour are now visible to other Simple Mode editors immediately.', 'success')
+        else:
+            flash('Shared draft saved successfully. Scores and class comment are now visible to other Simple Mode editors immediately.', 'success')
         if not class_access:
             assigned_subjects_for_class = get_teacher_subjects_for_class_term(
                 school_id,
@@ -43281,6 +43381,7 @@ def teacher_enter_scores():
             school_or_mode=school,
         ),
         can_edit_behaviour=can_edit_behaviour,
+        behaviour_entry_is_separate=behaviour_entry_is_separate,
         role=role,
     )
 
@@ -43966,6 +44067,7 @@ def student_dashboard():
     current_term = get_current_term(school)
     current_year = (school or {}).get('academic_year', '')
     dashboard_notice = ''
+    snapshot = None
 
     # Dashboard must show only published snapshot data (never raw working scores).
     my_data = {
@@ -43979,6 +44081,7 @@ def student_dashboard():
         'average_marks': 0,
         'Grade': '',
         'Status': '',
+        'profile_image_url': get_student_profile_image_url(student),
     }
 
     visible_terms = filter_visible_terms_for_student(
@@ -44005,6 +44108,7 @@ def student_dashboard():
                     'average_marks': snapshot.get('average_marks', 0),
                     'Grade': snapshot.get('Grade', ''),
                     'Status': snapshot.get('Status', ''),
+                    'profile_image_url': get_student_profile_image_url(student, snapshot),
                 })
             else:
                 dashboard_notice = 'No published result available yet.'
@@ -47750,6 +47854,7 @@ def view_students():
             'term': student_data.get('term', ''),
             'stream': student_data.get('stream', ''),
             'subjects': scores,
+            'profile_image_url': get_student_profile_image_url(student_data),
             'can_edit_full': bool(is_class_owner),
             'subject_actions': subject_actions,
             'average_marks': average_marks,

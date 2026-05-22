@@ -44,6 +44,66 @@
             text-transform: uppercase;
             font-weight: 700;
         }
+        .hero-corners {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 16px;
+        }
+        .hero-corner-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+        .hero-corner-avatar,
+        .hero-corner-fallback {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.72);
+            background: rgba(255,255,255,0.95);
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+            flex: 0 0 auto;
+        }
+        .hero-corner-avatar {
+            object-fit: cover;
+        }
+        .hero-corner-fallback {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #16406f;
+            font-size: 1.25rem;
+            font-weight: 800;
+        }
+        .hero-corner-copy {
+            min-width: 0;
+        }
+        .hero-corner-label {
+            display: block;
+            font-size: 0.74rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.72);
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+        .hero-corner-name {
+            display: block;
+            font-size: 0.98rem;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+        .hero-corner-right {
+            justify-content: flex-end;
+            text-align: right;
+        }
         .hero-grid {
             position: relative;
             z-index: 1;
@@ -284,6 +344,18 @@
         }
         @media (max-width: 640px) {
             .dashboard-hero { padding: 22px 18px; border-radius: 18px; }
+            .hero-corners {
+                align-items: center;
+                gap: 12px;
+            }
+            .hero-corner-avatar,
+            .hero-corner-fallback {
+                width: 58px;
+                height: 58px;
+            }
+            .hero-corner-name {
+                font-size: 0.88rem;
+            }
             .hero-meta { gap: 8px; }
             .hero-chip { width: 100%; justify-content: center; }
             .metric-card { padding: 16px; }
@@ -397,6 +469,40 @@
                 {% endif %}
                 <div class="dashboard-shell">
                 <section class="dashboard-hero">
+                    {% set school_initial = ((school.school_name if school and school.school_name else 'S')[:1] or 'S')|upper %}
+                    {% set student_initial = ((student.firstname if student and student.firstname else 'S')[:1] or 'S')|upper %}
+                    <div class="hero-corners">
+                        <div class="hero-corner-badge">
+                            {% if school and school.school_logo %}
+                            <img
+                                src="{{ url_for('school_logo_proxy', school_id=school.school_id, v=(school.updated_at|string if school and school.updated_at else '1')) }}"
+                                alt="{{ school.school_name if school and school.school_name else 'School' }} Logo"
+                                class="hero-corner-avatar"
+                            >
+                            {% else %}
+                            <span class="hero-corner-fallback">{{ school_initial }}</span>
+                            {% endif %}
+                            <div class="hero-corner-copy">
+                                <span class="hero-corner-label">School Profile</span>
+                                <span class="hero-corner-name">{{ school.school_name if school and school.school_name else 'School Portal' }}</span>
+                            </div>
+                        </div>
+                        <div class="hero-corner-badge hero-corner-right">
+                            <div class="hero-corner-copy">
+                                <span class="hero-corner-label">Student Profile</span>
+                                <span class="hero-corner-name">{{ student.firstname or 'Student' }}</span>
+                            </div>
+                            {% if student.profile_image_url %}
+                            <img
+                                src="{{ student.profile_image_url }}"
+                                alt="{{ student.firstname or 'Student' }} Profile Picture"
+                                class="hero-corner-avatar"
+                            >
+                            {% else %}
+                            <span class="hero-corner-fallback">{{ student_initial }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
                     <span class="hero-topline"><i class="fas fa-sparkles"></i> Student Dashboard</span>
                     <div class="hero-grid">
                         <div>

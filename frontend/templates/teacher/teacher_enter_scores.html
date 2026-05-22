@@ -330,7 +330,13 @@
                     Simple Mode is active, so class-assigned staff can edit all subjects offered by this student.
                     {% endif %}
                 </p>
-                <p class="hint">This page now acts as a shared draft sheet for scores, behaviour traits, and class comment, so school admin and class teacher see each other's updates immediately.</p>
+                <p class="hint">
+                    {% if behaviour_entry_is_separate %}
+                    This page handles score entry and class comment. Use the separate Behaviour Assessment page to enter behaviour grades for this student's class.
+                    {% else %}
+                    This page now acts as a shared draft sheet for scores, behaviour traits, and class comment, so school admin and class teacher see each other's updates immediately.
+                    {% endif %}
+                </p>
                 {% else %}
                 <p class="hint">Only your assigned subject(s) are editable on this page; other subjects are read-only.</p>
                 {% endif %}
@@ -377,6 +383,13 @@
                         </div>
                         {% endfor %}
                     </div>
+                </div>
+                {% endif %}
+                {% if behaviour_entry_is_separate %}
+                <div style="margin-top:18px; border:1px solid #dbe4ef; border-radius:12px; background:#f8fbff; padding:14px;">
+                    <label style="display:block; margin-bottom:8px; font-weight:700; color:#2c3e50;">Behaviour Assessment</label>
+                    <p class="hint" style="margin:0 0 10px;">Behaviour entry for class teachers is now on its own page so each student's traits can be managed separately from score entry.</p>
+                    <a href="{{ url_for('teacher_behaviour_assessment', classname=student.classname) }}" class="btn btn-secondary">Open Behaviour Assessment</a>
                 </div>
                 {% endif %}
                 

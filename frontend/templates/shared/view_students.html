@@ -275,6 +275,14 @@
             font-size: 1.2rem;
             margin-right: 15px;
             position: relative;
+            overflow: hidden;
+            flex: 0 0 auto;
+        }
+        .student-avatar-photo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
         }
         .rank-pill {
             position: absolute;
@@ -345,6 +353,20 @@
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
+        }
+        .student-photo-form {
+            display: inline-flex;
+            margin: 0;
+        }
+        .upload-photo-btn {
+            position: relative;
+            overflow: hidden;
+        }
+        .student-photo-input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
         }
         .action-btn {
             padding: 6px 10px;
@@ -693,7 +715,11 @@
                             <td>
                                 <div class="student-info">
                                     <div class="student-avatar">
+                                        {% if student.profile_image_url %}
+                                        <img src="{{ student.profile_image_url }}" alt="{{ student.first_name }} Profile Picture" class="student-avatar-photo">
+                                        {% else %}
                                         {{ student.first_name[0]|upper }}
+                                        {% endif %}
                                         {% set p = positions.get(student.student_id) %}
                                         {% if p %}
                                             <span class="rank-pill {% if p.pos == 1 %}rank-1{% elif p.pos == 2 %}rank-2{% elif p.pos == 3 %}rank-3{% endif %}">
@@ -764,6 +790,18 @@
                                     <a href="{{ url_for('school_admin_correct_result', student_id=student.student_id) }}" class="action-btn edit" title="Correct & Republish">
                                         <i class="fas fa-pen"></i> Correct
                                     </a>
+                                    <form action="{{ url_for('school_admin_upload_student_profile_image') }}" method="POST" enctype="multipart/form-data" class="student-photo-form">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="student_id" value="{{ student.student_id }}">
+                                        <input type="hidden" name="return_class" value="{{ selected_class }}">
+                                        <input type="hidden" name="return_term" value="{{ selected_term }}">
+                                        <input type="hidden" name="return_page" value="{{ page }}">
+                                        <input type="hidden" name="return_per_page" value="{{ per_page }}">
+                                        <label class="action-btn edit upload-photo-btn" title="Upload student profile picture" style="background: #0f766e;">
+                                            <i class="fas fa-camera"></i> Photo
+                                            <input type="file" name="profile_image" accept=".png,.jpg,.jpeg,.webp" class="student-photo-input" onchange="if (this.files && this.files.length) { this.form.submit(); }">
+                                        </label>
+                                    </form>
                                     {% endif %}
                                 </div>
                             </td>

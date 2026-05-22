@@ -3,101 +3,753 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Allocate Stream</title>
+    <title>Stream Allocation</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; }
-        .container { max-width: 760px; margin: 0 auto; padding: 20px; }
-        .card { background: #fff; border-radius: 10px; padding: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .form-group { margin-bottom: 16px; }
-        label { display: block; margin-bottom: 6px; font-weight: 600; }
-        select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
-        .btn { padding: 10px 14px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-block; }
-        .btn-primary { background: #3498db; color: #fff; }
-        .btn-secondary { background: #6c757d; color: #fff; margin-left: 8px; }
-        .checkbox-list label { display: block; font-weight: 500; margin-bottom: 8px; }
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(32, 129, 226, 0.14), transparent 28%),
+                linear-gradient(180deg, #edf5ff 0%, #f8fbff 100%);
+        }
+        .container {
+            width: min(1220px, 100%);
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .stream-shell {
+            display: grid;
+            gap: 18px;
+        }
+        .hero-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: 26px;
+            padding: 28px;
+            color: #fff;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.22), transparent 34%),
+                linear-gradient(135deg, #12385d 0%, #0f4c81 54%, #0f766e 100%);
+            box-shadow: 0 24px 48px rgba(15, 76, 129, 0.22);
+        }
+        .hero-card::after {
+            content: "";
+            position: absolute;
+            right: -68px;
+            bottom: -90px;
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+        }
+        .hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.95fr);
+            gap: 20px;
+            align-items: end;
+        }
+        .hero-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .hero-title {
+            margin: 14px 0 0;
+            font-size: clamp(2rem, 4vw, 2.9rem);
+            line-height: 1.06;
+        }
+        .hero-copy {
+            margin: 12px 0 0;
+            max-width: 720px;
+            color: rgba(255,255,255,0.9);
+            line-height: 1.6;
+        }
+        .hero-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 18px;
+        }
+        .hero-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.12);
+            color: #fff;
+            font-weight: 700;
+        }
+        .hero-actions {
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-start;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .hero-actions .btn {
+            min-width: 160px;
+            text-align: center;
+            border-radius: 999px;
+        }
+        .stream-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.9fr);
+            gap: 18px;
+            align-items: start;
+        }
+        .panel-card {
+            background: #fff;
+            border: 1px solid #dbe7f5;
+            border-radius: 22px;
+            box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
+        }
+        .panel-body {
+            padding: 22px;
+        }
+        .section-title {
+            margin: 0;
+            color: #12385d;
+            font-size: 1.15rem;
+        }
+        .section-text {
+            margin: 10px 0 0;
+            color: #4b647f;
+            line-height: 1.6;
+        }
+        .student-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+        .mini-stat {
+            border-radius: 16px;
+            border: 1px solid #d8e4f3;
+            background: linear-gradient(180deg, #f9fbff 0%, #f3f8ff 100%);
+            padding: 14px;
+        }
+        .mini-stat-label {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7f97;
+            font-weight: 700;
+        }
+        .mini-stat-value {
+            margin-top: 6px;
+            color: #102a43;
+            font-size: 1.05rem;
+            font-weight: 800;
+        }
+        .stream-choice-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+        .stream-choice {
+            position: relative;
+        }
+        .stream-choice input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .stream-choice-card {
+            display: block;
+            border: 1px solid #dbe4ef;
+            border-radius: 18px;
+            padding: 16px;
+            background: #fff;
+            cursor: pointer;
+            transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+        .stream-choice-card:hover {
+            transform: translateY(-1px);
+            border-color: #8fbbe8;
+            box-shadow: 0 12px 24px rgba(15, 76, 129, 0.12);
+        }
+        .stream-choice input:checked + .stream-choice-card {
+            border-color: #0f4c81;
+            background: linear-gradient(180deg, #f4f9ff 0%, #edf6ff 100%);
+            box-shadow: 0 14px 28px rgba(15, 76, 129, 0.15);
+        }
+        .stream-choice-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .stream-choice-name {
+            color: #12385d;
+            font-size: 1rem;
+            font-weight: 800;
+        }
+        .stream-choice-count {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4f86;
+            font-size: 0.82rem;
+            font-weight: 800;
+        }
+        .stream-choice-copy {
+            margin: 10px 0 0;
+            color: #5a6f86;
+            line-height: 1.5;
+            font-size: 0.94rem;
+        }
+        .muted-note {
+            margin-top: 12px;
+            color: #5a6f86;
+            font-size: 0.92rem;
+            line-height: 1.55;
+        }
+        .optional-box {
+            margin-top: 20px;
+            padding: 18px;
+            border-radius: 18px;
+            border: 1px solid #dbe4ef;
+            background: #f9fbff;
+        }
+        .optional-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .optional-limit-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #e8f3ff;
+            color: #16518a;
+            font-size: 0.85rem;
+            font-weight: 800;
+        }
+        .optional-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .optional-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 15px;
+            border-radius: 16px;
+            border: 1px solid #d7e4f4;
+            background: #fff;
+            color: #1f2d3d;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .optional-item input {
+            width: 18px;
+            height: 18px;
+            accent-color: #0f4c81;
+            flex: 0 0 auto;
+        }
+        .optional-empty {
+            margin-top: 14px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: #fff;
+            border: 1px dashed #cbd8e6;
+            color: #60758c;
+        }
+        .primary-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 22px;
+        }
+        .primary-actions .btn {
+            min-width: 150px;
+            border-radius: 999px;
+        }
+        .preview-stack {
+            display: grid;
+            gap: 16px;
+        }
+        .preview-highlight {
+            padding: 22px;
+            border-radius: 22px;
+            color: #fff;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 36%),
+                linear-gradient(145deg, #154a75 0%, #1f7a8c 100%);
+        }
+        .preview-highlight h3 {
+            margin: 0;
+            font-size: 1.08rem;
+        }
+        .preview-highlight p {
+            margin: 10px 0 0;
+            color: rgba(255,255,255,0.9);
+            line-height: 1.55;
+        }
+        .preview-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .preview-metric {
+            padding: 14px;
+            border-radius: 16px;
+            background: rgba(255,255,255,0.12);
+        }
+        .preview-metric-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: rgba(255,255,255,0.75);
+            font-weight: 700;
+        }
+        .preview-metric-value {
+            margin-top: 6px;
+            font-size: 1.3rem;
+            font-weight: 800;
+        }
+        .subject-list-card {
+            padding: 18px;
+            border-radius: 20px;
+            border: 1px solid #dbe7f5;
+            background: #fff;
+        }
+        .subject-list-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .subject-list-head h4 {
+            margin: 0;
+            color: #12385d;
+            font-size: 1rem;
+        }
+        .subject-count-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 40px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            background: #edf5ff;
+            color: #175289;
+            font-weight: 800;
+        }
+        .subject-pill-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .subject-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #f5f9ff;
+            border: 1px solid #d9e7f5;
+            color: #23405f;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .subject-pill.is-dropped {
+            background: #fff5f5;
+            border-color: #fecaca;
+            color: #b42318;
+        }
+        .subject-pill.is-added {
+            background: #ecfdf3;
+            border-color: #bbf7d0;
+            color: #166534;
+        }
+        .subject-empty {
+            padding: 14px 16px;
+            border-radius: 14px;
+            border: 1px dashed #cbd8e6;
+            color: #60758c;
+            background: #fbfdff;
+        }
+        .warning-banner {
+            margin-top: 16px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid #fed7aa;
+            background: #fff7ed;
+            color: #9a3412;
+            display: none;
+            line-height: 1.55;
+        }
+        .warning-banner.show {
+            display: block;
+        }
+        .inline-status {
+            margin-top: 16px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            display: none;
+            font-weight: 700;
+        }
+        .inline-status.show {
+            display: block;
+        }
+        .inline-status.success {
+            background: #ecfdf3;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        .inline-status.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 11px 16px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 700;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #0f4c81 0%, #1769aa 100%);
+            color: #fff;
+            box-shadow: 0 12px 24px rgba(15, 76, 129, 0.22);
+        }
+        .btn-secondary {
+            background: #e9f1fb;
+            color: #12385d;
+        }
         .modal-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(15, 23, 42, 0.5);
+            background: rgba(15, 23, 42, 0.54);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 1000;
             padding: 16px;
         }
-        .modal-overlay.show { display: flex; }
+        .modal-overlay.show {
+            display: flex;
+        }
         .modal-card {
-            width: min(520px, 100%);
+            width: min(560px, 100%);
             background: #fff;
-            border-radius: 12px;
+            border-radius: 18px;
             border: 1px solid #e2e8f0;
-            padding: 18px;
-            box-shadow: 0 16px 36px rgba(2, 6, 23, 0.22);
+            padding: 20px;
+            box-shadow: 0 18px 40px rgba(2, 6, 23, 0.25);
         }
-        .modal-title { margin: 0 0 10px; font-size: 1.1rem; color: #0f172a; }
-        .modal-text { margin: 0 0 16px; color: #334155; }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
-        .inline-status {
-            margin-top: 14px;
-            padding: 12px 14px;
-            border-radius: 8px;
-            display: none;
-            font-weight: 600;
+        .modal-title {
+            margin: 0 0 10px;
+            color: #0f172a;
+            font-size: 1.15rem;
         }
-        .inline-status.show { display: block; }
-        .inline-status.success { background: #ecfdf3; color: #166534; border: 1px solid #bbf7d0; }
-        .inline-status.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .modal-text {
+            margin: 0 0 16px;
+            color: #334155;
+            line-height: 1.6;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        @media (max-width: 1100px) {
+            .stream-grid,
+            .hero-grid {
+                grid-template-columns: 1fr;
+            }
+            .hero-actions {
+                justify-content: flex-start;
+            }
+        }
+        @media (max-width: 768px) {
+            .container {
+                padding: 16px;
+            }
+            .hero-card,
+            .panel-body,
+            .preview-highlight,
+            .subject-list-card {
+                padding: 18px;
+            }
+            .preview-metrics {
+                grid-template-columns: 1fr;
+            }
+            .student-overview,
+            .optional-grid,
+            .stream-choice-grid {
+                grid-template-columns: 1fr;
+            }
+            .hero-actions .btn,
+            .primary-actions .btn {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
     {% include "shared/_loading_overlay.html" %}
     <div class="app-shell topbar-layout">
-    {% set active_page = 'dashboard' %}
-    {% include 'teacher/_teacher_sidebar.html' %}
-    <div class="main-content">
-    <div class="container">
-        <div class="card">
-            <h2>Allocate/Change Stream</h2>
-            <p><strong>Student:</strong> {{ student.firstname }} ({{ student.student_id }})</p>
-            <p><strong>Class:</strong> {{ student.classname }}</p>
-            <p><strong>Current Stream:</strong> {{ student.stream if student.stream else 'N/A' }}</p>
-            <form method="post" id="streamForm">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="student_id" value="{{ student.student_id }}">
-                <div class="form-group">
-                    <label for="stream">Stream</label>
-                    <select id="stream" name="stream" required>
-                        <option value="">Select Stream...</option>
-                        <option value="Science" {% if (student.stream or '')|lower == 'science' %}selected{% endif %}>Science</option>
-                        <option value="Art" {% if (student.stream or '')|lower == 'art' %}selected{% endif %}>Art</option>
-                        <option value="Commercial" {% if (student.stream or '')|lower == 'commercial' %}selected{% endif %}>Commercial</option>
-                    </select>
-                </div>
-                {% if config.optional_subjects %}
-                <div class="form-group">
-                    <label>Optional Subjects</label>
-                    <div class="checkbox-list">
-                        {% for subj in config.optional_subjects %}
-                        <label><input type="checkbox" name="optional_subjects" value="{{ subj }}" {% if subj in selected_optional_subjects %}checked{% endif %}> {{ subj }}</label>
-                        {% endfor %}
+        {% if role == 'school_admin' %}
+            {% set active_page = 'view_students' %}
+            {% include 'school/_school_admin_sidebar.html' %}
+        {% else %}
+            {% set active_page = 'view_students' %}
+            {% include 'teacher/_teacher_sidebar.html' %}
+        {% endif %}
+        <div class="main-content">
+            <div class="container">
+                <div class="stream-shell">
+                    <section class="hero-card">
+                        <div class="hero-grid">
+                            <div>
+                                <div class="hero-kicker"><i class="fas fa-project-diagram"></i> Stream Workspace</div>
+                                <h1 class="hero-title">Allocate {{ student.firstname or 'Student' }} to the right stream</h1>
+                                <p class="hero-copy">
+                                    Review the student's class track, optional subjects, and final subject list before saving.
+                                    The preview updates instantly so you can spot dropped or added subjects before the change goes through.
+                                </p>
+                                <div class="hero-chip-row">
+                                    <span class="hero-chip"><i class="fas fa-user-graduate"></i> {{ student.firstname }} {{ student.lastname or '' }}</span>
+                                    <span class="hero-chip"><i class="fas fa-id-card"></i> {{ student.student_id }}</span>
+                                    <span class="hero-chip"><i class="fas fa-school"></i> {{ student.classname }}</span>
+                                    <span class="hero-chip"><i class="fas fa-layer-group"></i> Current: {{ student.stream or 'N/A' }}</span>
+                                </div>
+                            </div>
+                            <div class="hero-actions">
+                                <a href="{% if role == 'school_admin' %}{{ url_for('school_admin_view_students', **{'class': student.classname}) }}{% else %}{{ url_for('teacher_class_list') }}{% endif %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i> Back
+                                </a>
+                                <button type="button" id="heroSaveBtn" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Save Allocation
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            <div class="panel-card">
+                                <div class="panel-body">
+                                    {% for category, message in messages %}
+                                        <div class="flash {{ category }}">{{ message }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+
+                    <div class="stream-grid">
+                        <section class="panel-card">
+                            <div class="panel-body">
+                                <h2 class="section-title">Allocation Details</h2>
+                                <p class="section-text">
+                                    Choose the stream and optional subjects for this student. The final subject list will be built from the class configuration already set for {{ student.classname }}.
+                                </p>
+
+                                <div class="student-overview">
+                                    <div class="mini-stat">
+                                        <div class="mini-stat-label">Current Stream</div>
+                                        <div class="mini-stat-value">{{ student.stream or 'N/A' }}</div>
+                                    </div>
+                                    <div class="mini-stat">
+                                        <div class="mini-stat-label">Current Subjects</div>
+                                        <div class="mini-stat-value">{{ preview_payload.current_subjects|length }}</div>
+                                    </div>
+                                    <div class="mini-stat">
+                                        <div class="mini-stat-label">Optional Pool</div>
+                                        <div class="mini-stat-value">{{ preview_payload.optional_subjects|length }}</div>
+                                    </div>
+                                    <div class="mini-stat">
+                                        <div class="mini-stat-label">Configured Core</div>
+                                        <div class="mini-stat-value">{{ preview_payload.core_subjects|length }}</div>
+                                    </div>
+                                </div>
+
+                                <form method="post" id="streamForm">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="student_id" value="{{ student.student_id }}">
+
+                                    <div class="stream-choice-grid">
+                                        {% for stream_name, stream_subjects in preview_payload.stream_subjects.items() %}
+                                        <div class="stream-choice">
+                                            <input
+                                                type="radio"
+                                                id="stream_{{ stream_name|lower }}"
+                                                name="stream"
+                                                value="{{ stream_name }}"
+                                                {% if (student.stream or '')|lower == stream_name|lower %}checked{% endif %}
+                                                required
+                                            >
+                                            <label class="stream-choice-card" for="stream_{{ stream_name|lower }}">
+                                                <div class="stream-choice-top">
+                                                    <span class="stream-choice-name">{{ stream_name }}</span>
+                                                    <span class="stream-choice-count">{{ stream_subjects|length }} subjects</span>
+                                                </div>
+                                                <p class="stream-choice-copy">
+                                                    {{ stream_subjects|join(', ') if stream_subjects else 'No subjects configured for this stream yet.' }}
+                                                </p>
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+
+                                    <p class="muted-note">
+                                        Core subjects are added automatically. Stream subjects come from the class subject setup, so changing the stream may remove subjects and scores that do not belong to the new track.
+                                    </p>
+
+                                    <div class="optional-box">
+                                        <div class="optional-header">
+                                            <div>
+                                                <h3 class="section-title" style="font-size:1.02rem;">Optional Subjects</h3>
+                                                <p class="section-text" style="margin-top:8px;">
+                                                    Choose any extra subjects the student should keep alongside the selected stream.
+                                                </p>
+                                            </div>
+                                            <div class="optional-limit-badge" id="optionalLimitBadge">
+                                                <i class="fas fa-filter"></i>
+                                                {% if preview_payload.optional_subject_limit %}
+                                                Select up to {{ preview_payload.optional_subject_limit }}
+                                                {% else %}
+                                                No selection limit
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% if preview_payload.optional_subjects %}
+                                        <div class="optional-grid">
+                                            {% for subj in preview_payload.optional_subjects %}
+                                            <label class="optional-item">
+                                                <input
+                                                    type="checkbox"
+                                                    name="optional_subjects"
+                                                    value="{{ subj }}"
+                                                    {% if subj in selected_optional_subjects %}checked{% endif %}
+                                                >
+                                                <span>{{ subj }}</span>
+                                            </label>
+                                            {% endfor %}
+                                        </div>
+                                        {% else %}
+                                        <div class="optional-empty">No optional subjects are configured for this class yet.</div>
+                                        {% endif %}
+                                    </div>
+
+                                    <div id="warningBanner" class="warning-banner" role="alert"></div>
+                                    <div id="inlineStatus" class="inline-status" role="status" aria-live="polite"></div>
+
+                                    <div class="primary-actions">
+                                        <button type="button" id="saveAllocationBtn" class="btn btn-primary">
+                                            <i class="fas fa-save"></i> Save Allocation
+                                        </button>
+                                        <a href="{% if role == 'school_admin' %}{{ url_for('school_admin_view_students', **{'class': student.classname}) }}{% else %}{{ url_for('teacher_class_list') }}{% endif %}" class="btn btn-secondary">
+                                            Cancel
+                                        </a>
+                                    </div>
+                                </form>
+                            </div>
+                        </section>
+
+                        <aside class="preview-stack">
+                            <section class="preview-highlight">
+                                <h3>Live Allocation Preview</h3>
+                                <p>
+                                    Before you save, review the projected subject count, any subjects that will drop off, and the final list that will remain on the student's record.
+                                </p>
+                                <div class="preview-metrics">
+                                    <div class="preview-metric">
+                                        <div class="preview-metric-label">Current</div>
+                                        <div class="preview-metric-value" id="currentCountValue">{{ preview_payload.current_subjects|length }}</div>
+                                    </div>
+                                    <div class="preview-metric">
+                                        <div class="preview-metric-label">Projected</div>
+                                        <div class="preview-metric-value" id="projectedCountValue">{{ preview_payload.current_subjects|length }}</div>
+                                    </div>
+                                    <div class="preview-metric">
+                                        <div class="preview-metric-label">Will Drop</div>
+                                        <div class="preview-metric-value" id="droppedCountValue">0</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="subject-list-card">
+                                <div class="subject-list-head">
+                                    <h4>Core Subjects</h4>
+                                    <span class="subject-count-badge" id="coreCountBadge">{{ preview_payload.core_subjects|length }}</span>
+                                </div>
+                                <div class="subject-pill-list" id="coreSubjectList"></div>
+                            </section>
+
+                            <section class="subject-list-card">
+                                <div class="subject-list-head">
+                                    <h4>Selected Stream Subjects</h4>
+                                    <span class="subject-count-badge" id="streamCountBadge">0</span>
+                                </div>
+                                <div class="subject-pill-list" id="streamSubjectList"></div>
+                            </section>
+
+                            <section class="subject-list-card">
+                                <div class="subject-list-head">
+                                    <h4>Selected Optional Subjects</h4>
+                                    <span class="subject-count-badge" id="optionalCountBadge">{{ selected_optional_subjects|length }}</span>
+                                </div>
+                                <div class="subject-pill-list" id="optionalSubjectList"></div>
+                            </section>
+
+                            <section class="subject-list-card">
+                                <div class="subject-list-head">
+                                    <h4>Final Subject List</h4>
+                                    <span class="subject-count-badge" id="finalCountBadge">{{ preview_payload.current_subjects|length }}</span>
+                                </div>
+                                <div class="subject-pill-list" id="finalSubjectList"></div>
+                            </section>
+
+                            <section class="subject-list-card">
+                                <div class="subject-list-head">
+                                    <h4>Subjects That Will Be Removed</h4>
+                                    <span class="subject-count-badge" id="droppedBadge">0</span>
+                                </div>
+                                <div class="subject-pill-list" id="droppedSubjectList"></div>
+                            </section>
+                        </aside>
                     </div>
                 </div>
-                {% endif %}
-                <button type="button" id="saveAllocationBtn" class="btn btn-primary">Save Allocation</button>
-                <a href="{% if session.get('role') == 'school_admin' %}{{ url_for('school_admin_view_students', **{'class': student.classname}) }}{% else %}{{ url_for('teacher_class_list') }}{% endif %}" class="btn btn-secondary">Cancel</a>
-            </form>
-            <div id="inlineStatus" class="inline-status" role="status" aria-live="polite"></div>
+            </div>
         </div>
     </div>
-    </div>
-    </div>
+
     <div class="modal-overlay" id="confirmModal" aria-hidden="true">
         <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
-            <h3 class="modal-title" id="confirmTitle">Confirm Stream Change</h3>
+            <h3 class="modal-title" id="confirmTitle">Confirm Stream Allocation</h3>
             <p class="modal-text" id="confirmText">
                 Changing stream may remove scores for subjects not available in the new stream. Continue?
             </p>
@@ -107,35 +759,104 @@
             </div>
         </div>
     </div>
+
     <div class="modal-overlay" id="timeoutModal" aria-hidden="true">
         <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="timeoutTitle">
             <h3 class="modal-title" id="timeoutTitle">Saving is Taking Longer Than Usual</h3>
             <p class="modal-text" id="timeoutText">
-                The server is taking too long to save. You can wait a bit more or cancel and try again.
+                The server is taking too long to save. You can wait a bit more or close this message and try again.
             </p>
             <div class="modal-actions">
                 <button type="button" class="btn btn-secondary" id="timeoutCancel">Close</button>
             </div>
         </div>
     </div>
+
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
     <script>
         (function () {
+            var previewData = {{ preview_payload|tojson }};
             var form = document.getElementById('streamForm');
-            var streamSelect = document.getElementById('stream');
-            var overlay = document.getElementById('confirmModal');
-            var timeoutOverlay = document.getElementById('timeoutModal');
-            var timeoutCancel = document.getElementById('timeoutCancel');
-            var cancelBtn = document.getElementById('cancelConfirm');
-            var acceptBtn = document.getElementById('acceptConfirm');
             var saveBtn = document.getElementById('saveAllocationBtn');
-            var text = document.getElementById('confirmText');
-            if (!form || !streamSelect || !overlay || !cancelBtn || !acceptBtn || !text || !timeoutOverlay || !timeoutCancel || !saveBtn) return;
-
-            var currentStream = "{{ (student.stream or 'N/A')|e }}";
-            var submitTimer = null;
+            var heroSaveBtn = document.getElementById('heroSaveBtn');
+            var confirmModal = document.getElementById('confirmModal');
+            var timeoutModal = document.getElementById('timeoutModal');
+            var confirmText = document.getElementById('confirmText');
+            var cancelConfirm = document.getElementById('cancelConfirm');
+            var acceptConfirm = document.getElementById('acceptConfirm');
+            var timeoutCancel = document.getElementById('timeoutCancel');
             var inlineStatus = document.getElementById('inlineStatus');
-            var submitButton = saveBtn;
+            var warningBanner = document.getElementById('warningBanner');
+            if (!form || !saveBtn || !heroSaveBtn || !confirmModal || !timeoutModal || !confirmText || !cancelConfirm || !acceptConfirm || !timeoutCancel) {
+                return;
+            }
+
+            var streamInputs = Array.prototype.slice.call(document.querySelectorAll('input[name="stream"]'));
+            var optionalInputs = Array.prototype.slice.call(document.querySelectorAll('input[name="optional_subjects"]'));
+            var optionalLimit = Number(previewData.optional_subject_limit || 0);
+            var currentSubjects = Array.isArray(previewData.current_subjects) ? previewData.current_subjects.slice() : [];
+            var submitButton = null;
+            var submitTimer = null;
+
+            function hideOverlayIfPresent() {
+                if (typeof hideLoadingOverlay === 'function') hideLoadingOverlay();
+            }
+
+            function uniqueList(items) {
+                var seen = Object.create(null);
+                var out = [];
+                (items || []).forEach(function (item) {
+                    var text = String(item || '').trim();
+                    var key = text.toLowerCase();
+                    if (!text || seen[key]) return;
+                    seen[key] = true;
+                    out.push(text);
+                });
+                return out;
+            }
+
+            function selectedStream() {
+                var chosen = streamInputs.find(function (input) { return input.checked; });
+                return chosen ? chosen.value : '';
+            }
+
+            function selectedOptionals() {
+                return optionalInputs.filter(function (input) { return input.checked; }).map(function (input) { return input.value; });
+            }
+
+            function computeFinalSubjects() {
+                var streamName = selectedStream();
+                var core = Array.isArray(previewData.core_subjects) ? previewData.core_subjects.slice() : [];
+                var streamSubjects = (previewData.stream_subjects && previewData.stream_subjects[streamName]) ? previewData.stream_subjects[streamName].slice() : [];
+                var optionals = selectedOptionals();
+                var finalList = uniqueList(core.concat(streamSubjects).concat(optionals));
+                return {
+                    streamName: streamName,
+                    core: uniqueList(core),
+                    streamSubjects: uniqueList(streamSubjects),
+                    optionals: uniqueList(optionals),
+                    finalSubjects: finalList,
+                    dropped: currentSubjects.filter(function (subject) {
+                        return finalList.map(function (item) { return item.toLowerCase(); }).indexOf(String(subject || '').toLowerCase()) === -1;
+                    }),
+                    added: finalList.filter(function (subject) {
+                        return currentSubjects.map(function (item) { return item.toLowerCase(); }).indexOf(String(subject || '').toLowerCase()) === -1;
+                    })
+                };
+            }
+
+            function renderPills(targetId, items, emptyMessage, className) {
+                var target = document.getElementById(targetId);
+                if (!target) return;
+                if (!items || !items.length) {
+                    target.innerHTML = '<div class="subject-empty">' + emptyMessage + '</div>';
+                    return;
+                }
+                target.innerHTML = items.map(function (item) {
+                    var extraClass = className ? ' ' + className : '';
+                    return '<span class="subject-pill' + extraClass + '">' + item + '</span>';
+                }).join('');
+            }
 
             function setInlineStatus(message, kind) {
                 if (!inlineStatus) return;
@@ -143,57 +864,124 @@
                 inlineStatus.className = 'inline-status show ' + (kind || 'error');
             }
 
-            function openModal(message) {
-                text.textContent = message;
-                overlay.classList.add('show');
-                overlay.setAttribute('aria-hidden', 'false');
-            }
-
-            function closeModal() {
-                overlay.classList.remove('show');
-                overlay.setAttribute('aria-hidden', 'true');
-            }
-            function openTimeoutModal() {
-                timeoutOverlay.classList.add('show');
-                timeoutOverlay.setAttribute('aria-hidden', 'false');
-            }
-            function closeTimeoutModal() {
-                timeoutOverlay.classList.remove('show');
-                timeoutOverlay.setAttribute('aria-hidden', 'true');
-            }
-
-            function beginConfirmation() {
-                hideLoadingOverlay();
-                var targetStream = (streamSelect.value || '').trim();
-                if (!targetStream) return;
-                if (!currentStream || currentStream === 'N/A') {
-                    openModal('Allocate this student to ' + targetStream + ' stream?');
-                } else if (targetStream.toLowerCase() === String(currentStream).toLowerCase()) {
-                    openModal('Save optional-subject updates for ' + targetStream + ' stream?');
+            function setWarning(message) {
+                if (!warningBanner) return;
+                if (message) {
+                    warningBanner.textContent = message;
+                    warningBanner.classList.add('show');
                 } else {
-                    openModal('Change stream from ' + currentStream + ' to ' + targetStream + '? This may remove scores for dropped subjects.');
+                    warningBanner.textContent = '';
+                    warningBanner.classList.remove('show');
                 }
             }
 
-            saveBtn.addEventListener('click', function () {
-                beginConfirmation();
-            });
+            function enforceOptionalLimit(changedInput) {
+                if (!optionalLimit) return true;
+                var checked = optionalInputs.filter(function (input) { return input.checked; });
+                if (checked.length <= optionalLimit) return true;
+                if (changedInput) changedInput.checked = false;
+                setInlineStatus('You can select at most ' + optionalLimit + ' optional subject' + (optionalLimit === 1 ? '' : 's') + '.', 'error');
+                return false;
+            }
 
-            cancelBtn.addEventListener('click', function () {
-                closeModal();
-            });
-            acceptBtn.addEventListener('click', function () {
+            function refreshPreview() {
+                var state = computeFinalSubjects();
+                var finalCount = state.finalSubjects.length;
+                var droppedCount = state.dropped.length;
+
+                renderPills('coreSubjectList', state.core, 'No core subjects configured yet.');
+                renderPills('streamSubjectList', state.streamSubjects, state.streamName ? 'No subjects are configured for this stream yet.' : 'Choose a stream to preview its subjects.');
+                renderPills('optionalSubjectList', state.optionals, 'No optional subjects selected.');
+                renderPills('finalSubjectList', state.finalSubjects, 'Select a stream to generate the final subject list.');
+                renderPills('droppedSubjectList', state.dropped, 'No current subjects will be removed.', 'is-dropped');
+
+                var streamCountBadge = document.getElementById('streamCountBadge');
+                var optionalCountBadge = document.getElementById('optionalCountBadge');
+                var finalCountBadge = document.getElementById('finalCountBadge');
+                var droppedBadge = document.getElementById('droppedBadge');
+                var projectedCountValue = document.getElementById('projectedCountValue');
+                var droppedCountValue = document.getElementById('droppedCountValue');
+
+                if (streamCountBadge) streamCountBadge.textContent = state.streamSubjects.length;
+                if (optionalCountBadge) optionalCountBadge.textContent = state.optionals.length;
+                if (finalCountBadge) finalCountBadge.textContent = finalCount;
+                if (droppedBadge) droppedBadge.textContent = droppedCount;
+                if (projectedCountValue) projectedCountValue.textContent = finalCount;
+                if (droppedCountValue) droppedCountValue.textContent = droppedCount;
+
+                if (droppedCount) {
+                    setWarning('This change will remove ' + droppedCount + ' current subject' + (droppedCount === 1 ? '' : 's') + ' from the student record. Existing scores for removed subjects will also be dropped.');
+                } else if (state.added.length) {
+                    setWarning('This allocation will add ' + state.added.length + ' new subject' + (state.added.length === 1 ? '' : 's') + ' to the student record.');
+                } else {
+                    setWarning('');
+                }
+            }
+
+            function openModal(message) {
+                confirmText.textContent = message;
+                confirmModal.classList.add('show');
+                confirmModal.setAttribute('aria-hidden', 'false');
+            }
+
+            function closeModal() {
+                confirmModal.classList.remove('show');
+                confirmModal.setAttribute('aria-hidden', 'true');
+            }
+
+            function openTimeoutModal() {
+                timeoutModal.classList.add('show');
+                timeoutModal.setAttribute('aria-hidden', 'false');
+            }
+
+            function closeTimeoutModal() {
+                timeoutModal.classList.remove('show');
+                timeoutModal.setAttribute('aria-hidden', 'true');
+            }
+
+            function beginConfirmation(buttonRef) {
+                hideOverlayIfPresent();
+                if (!selectedStream()) {
+                    setInlineStatus('Choose a stream before saving.', 'error');
+                    return;
+                }
+                if (!enforceOptionalLimit()) {
+                    refreshPreview();
+                    return;
+                }
+                submitButton = buttonRef || saveBtn;
+                var state = computeFinalSubjects();
+                var currentStream = String(previewData.current_stream || 'N/A');
+                if (!currentStream || currentStream === 'N/A') {
+                    openModal('Allocate this student to ' + state.streamName + ' stream with ' + state.finalSubjects.length + ' total subject' + (state.finalSubjects.length === 1 ? '' : 's') + '?');
+                } else if (state.streamName.toLowerCase() === currentStream.toLowerCase()) {
+                    if (state.dropped.length) {
+                        openModal('Save optional-subject updates for ' + state.streamName + ' stream? ' + state.dropped.length + ' subject' + (state.dropped.length === 1 ? '' : 's') + ' will be removed.');
+                    } else {
+                        openModal('Save updates for ' + state.streamName + ' stream?');
+                    }
+                } else {
+                    openModal('Change stream from ' + currentStream + ' to ' + state.streamName + '? ' + state.dropped.length + ' subject' + (state.dropped.length === 1 ? '' : 's') + ' may be removed from the student record.');
+                }
+            }
+
+            function submitAllocation() {
                 closeModal();
                 if (submitTimer) clearTimeout(submitTimer);
-                hideLoadingOverlay();
+                hideOverlayIfPresent();
                 if (submitButton) submitButton.disabled = true;
+                saveBtn.disabled = true;
+                heroSaveBtn.disabled = true;
                 setInlineStatus('Saving stream allocation...', 'success');
+
                 var controller = new AbortController();
                 submitTimer = setTimeout(function () {
                     controller.abort();
                     openTimeoutModal();
                     setInlineStatus('Saving timed out. The server did not respond in time.', 'error');
                     if (submitButton) submitButton.disabled = false;
+                    saveBtn.disabled = false;
+                    heroSaveBtn.disabled = false;
                 }, 15000);
 
                 fetch(form.action || window.location.href, {
@@ -216,29 +1004,47 @@
                     }
                     setInlineStatus((payload && payload.message) || 'Could not save stream allocation.', 'error');
                     if (submitButton) submitButton.disabled = false;
+                    saveBtn.disabled = false;
+                    heroSaveBtn.disabled = false;
                 }).catch(function (error) {
                     if (submitTimer) clearTimeout(submitTimer);
-                    if (error && error.name === 'AbortError') {
-                        return;
-                    }
+                    if (error && error.name === 'AbortError') return;
                     closeTimeoutModal();
                     setInlineStatus('Could not reach the server. Please try again.', 'error');
                     if (submitButton) submitButton.disabled = false;
+                    saveBtn.disabled = false;
+                    heroSaveBtn.disabled = false;
+                });
+            }
+
+            streamInputs.forEach(function (input) {
+                input.addEventListener('change', refreshPreview);
+            });
+            optionalInputs.forEach(function (input) {
+                input.addEventListener('change', function () {
+                    if (this.checked && !enforceOptionalLimit(this)) return;
+                    refreshPreview();
                 });
             });
-            overlay.addEventListener('click', function (event) {
-                if (event.target === overlay) closeModal();
+
+            saveBtn.addEventListener('click', function () {
+                beginConfirmation(saveBtn);
             });
-            timeoutCancel.addEventListener('click', function () {
-                closeTimeoutModal();
+            heroSaveBtn.addEventListener('click', function () {
+                beginConfirmation(heroSaveBtn);
             });
-            timeoutOverlay.addEventListener('click', function (event) {
-                if (event.target === timeoutOverlay) closeTimeoutModal();
+            cancelConfirm.addEventListener('click', closeModal);
+            acceptConfirm.addEventListener('click', submitAllocation);
+            timeoutCancel.addEventListener('click', closeTimeoutModal);
+            confirmModal.addEventListener('click', function (event) {
+                if (event.target === confirmModal) closeModal();
             });
+            timeoutModal.addEventListener('click', function (event) {
+                if (event.target === timeoutModal) closeTimeoutModal();
+            });
+
+            refreshPreview();
         })();
     </script>
 </body>
 </html>
-
-
-
