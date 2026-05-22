@@ -76,6 +76,11 @@
         <strong>Class:</strong> {{ classname }} |
         <strong>Term:</strong> {{ term }} ({{ academic_year or '-' }})
       </p>
+      <p class="mt-10">
+        <a class="btn btn-secondary" href="{{ url_for('school_admin_publish_results_corrections', classname=classname, term=term, academic_year=academic_year) }}">
+          <i class="fas fa-arrow-left"></i> Back to Correction List
+        </a>
+      </p>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -198,5 +203,4 @@
   </script>
 </body>
 </html>
-
 

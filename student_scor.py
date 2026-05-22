@@ -22837,6 +22837,21 @@ def _academic_year_start(academic_year):
         return None
     return int(match.group(1))
 
+
+def compare_term_scopes(term_a, academic_year_a, term_b, academic_year_b):
+    """Compare two academic scopes by year start, then term order."""
+    year_a = _academic_year_start(academic_year_a)
+    year_b = _academic_year_start(academic_year_b)
+    if year_a is None or year_b is None:
+        return None
+    scope_a = (year_a, term_sort_value(term_a))
+    scope_b = (year_b, term_sort_value(term_b))
+    if scope_a < scope_b:
+        return -1
+    if scope_a > scope_b:
+        return 1
+    return 0
+
 def _previous_academic_year(academic_year):
     raw = (academic_year or '').strip()
     match = re.fullmatch(r'(\d{4})-(\d{4})', raw)
@@ -37412,6 +37427,8 @@ def school_admin_import_target(target):
             classname = canonicalize_classname(request.form.get('classname', ''))
             term = (request.form.get('term', '') or '').strip()
             academic_year = (request.form.get('academic_year', '') or '').strip()
+            current_term = (get_current_term(school) or '').strip()
+            current_year = (school.get('academic_year', '') or '').strip()
             teacher_name_override = ' '.join((request.form.get('teacher_name', '') or '').strip().split())
             principal_name_override = ' '.join((request.form.get('principal_name', '') or '').strip().split())
             replace_existing = (request.form.get('replace_existing', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
@@ -37426,6 +37443,22 @@ def school_admin_import_target(target):
                 return redirect(url_for('school_admin_bulk_tools'))
             if not re.fullmatch(r'^\d{4}-\d{4}$', academic_year):
                 flash('Historical academic year must be in YYYY-YYYY format.', 'error')
+                return redirect(url_for('school_admin_bulk_tools'))
+            if current_term not in {'First Term', 'Second Term', 'Third Term'}:
+                flash('Set a valid current school term before using Historical Results Backfill.', 'error')
+                return redirect(url_for('school_admin_bulk_tools'))
+            if not re.fullmatch(r'^\d{4}-\d{4}$', current_year):
+                flash('Set the school current academic year in YYYY-YYYY format before using Historical Results Backfill.', 'error')
+                return redirect(url_for('school_admin_bulk_tools'))
+            scope_cmp = compare_term_scopes(term, academic_year, current_term, current_year)
+            if scope_cmp is None:
+                flash('Could not compare the historical term against the school current term/year. Check the school academic year setting and retry.', 'error')
+                return redirect(url_for('school_admin_bulk_tools'))
+            if scope_cmp >= 0:
+                flash(
+                    f'Historical Results Backfill only accepts past terms. The selected scope {term} ({academic_year}) must be earlier than the current school term {current_term} ({current_year}).',
+                    'error',
+                )
                 return redirect(url_for('school_admin_bulk_tools'))
 
             max_tests = max(1, min(safe_int(school.get('max_tests', 3), 3), 10))
