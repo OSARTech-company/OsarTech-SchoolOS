@@ -27305,6 +27305,21 @@ def service_worker():
 def web_manifest():
     return send_file('static/manifest.webmanifest', mimetype='application/manifest+json')
 
+@app.route('/<string:filename>.html')
+def site_verification_html(filename):
+    safe_filename = f"{(filename or '').strip()}.html"
+    if not re.fullmatch(r'[A-Za-z0-9._-]+\.html', safe_filename):
+        return Response(status=404)
+    verification_root = os.path.abspath(os.path.join(app.static_folder or 'static', 'site-verification'))
+    file_path = os.path.abspath(os.path.join(verification_root, safe_filename))
+    if not file_path.startswith(verification_root + os.sep):
+        return Response(status=404)
+    if not os.path.isfile(file_path):
+        return Response(status=404)
+    response = send_file(file_path, mimetype='text/html')
+    response.headers['Cache-Control'] = 'public, max-age=300'
+    return response
+
 @app.route('/school-logo/<school_id>')
 def school_logo_proxy(school_id):
     school = get_school((school_id or '').strip())
@@ -33910,8 +33925,12 @@ def school_admin_settings():
         selected_calendar_year = (calendar_year_override or request.args.get('calendar_year', '') or '').strip() or ((school_record or {}).get('academic_year', '') or '')
         calendar = get_school_term_calendar(school_id, selected_calendar_year, selected_calendar_term)
         calendar_rows = list_school_term_calendars(school_id)
+        selected_is_current_scope = bool(
+            (selected_calendar_term or '').strip().lower() == (get_current_term(school_record) or '').strip().lower()
+            and (selected_calendar_year or '').strip() == ((school_record or {}).get('academic_year', '') or '').strip()
+        )
         selected_close_dt = _parse_iso_date((calendar.get('close_date') or '').strip()) if calendar else None
-        calendar_edit_locked = bool(selected_close_dt and date.today() > selected_close_dt)
+        calendar_edit_locked = bool(selected_close_dt and date.today() > selected_close_dt and not selected_is_current_scope)
         logo_input_value = (request.form.get('school_logo', '') or '').strip() if request.method == 'POST' else ((school_record.get('school_logo') or '').strip() if school_record else '')
         if logo_input_value.lower().startswith('data:image/'):
             logo_input_value = ''
@@ -34208,8 +34227,12 @@ def school_admin_settings():
             break_end != existing_break_end,
             next_term_begin_date != existing_next_term_begin,
         ])
+        calendar_target_is_current_scope = bool(
+            (calendar_target_term or '').strip().lower() == (new_term or '').strip().lower()
+            and (calendar_target_year or '').strip() == (new_year or '').strip()
+        )
         effective_close_dt = _parse_iso_date(existing_close_date) or close_dt
-        if effective_close_dt and date.today() > effective_close_dt and calendar_change_requested:
+        if effective_close_dt and date.today() > effective_close_dt and calendar_change_requested and not calendar_target_is_current_scope:
             return _settings_error(
                 f'{calendar_target_term} ({calendar_target_year}) has ended (closed on {effective_close_dt.isoformat()}) and calendar settings are locked.',
                 calendar_term_override=calendar_target_term,

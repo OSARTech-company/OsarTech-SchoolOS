@@ -189,6 +189,12 @@
 
                 <div class="section-title"><i class="fas fa-calendar-alt"></i> Term Calendar</div>
                 <div class="form-group">
+                    <small style="color:#5a6c7d;">
+                        You can still adjust the live current term calendar if the school postpones resumption or extends closing date.
+                        Only older historical term calendars stay locked after they have ended.
+                    </small>
+                </div>
+                <div class="form-group">
                     <label>Calendar Term Scope</label>
                     <div class="note">
                         Using current term/year: <strong id="calendar_scope_term_label">{{ settings_form.current_term if settings_form else 'First Term' }}</strong>
@@ -211,7 +217,7 @@
                 </div>
                 <div class="form-group" id="calendar_lock_notice" style="{% if calendar_edit_locked %}display:block;{% else %}display:none;{% endif %}">
                     <small style="color:#b42318; font-weight:700;">
-                        This term has ended. Calendar dates are locked for editing.
+                        This historical term has ended. Its calendar dates are locked for editing.
                     </small>
                 </div>
                 <div class="form-group">
@@ -697,6 +703,7 @@
     <script>
         const savedCalendarRows = {{ (calendar_rows or [])|tojson|safe }};
         const todayIso = '{{ today_iso }}';
+        const currentSchoolCalendarKey = '{{ ((school.academic_year if school else "") ~ "||" ~ (school.current_term if school else ""))|e }}';
         const savedCalendarByKey = {};
         (savedCalendarRows || []).forEach(row => {
             const key = `${(row.academic_year || '').trim()}||${(row.term || '').trim()}`;
@@ -773,11 +780,11 @@
                 openEl.value = row.open_date || '';
                 closeEl.value = row.close_date || '';
                 nextEl.value = row.next_term_begin_date || '';
-                const isClosed = !!(row.close_date && row.close_date < todayIso);
-                openEl.disabled = isClosed;
-                closeEl.disabled = isClosed;
-                nextEl.disabled = isClosed;
-                if (lockNoticeEl) lockNoticeEl.style.display = isClosed ? 'block' : 'none';
+                const isHistoricalClosed = !!(row.close_date && row.close_date < todayIso && key !== currentSchoolCalendarKey);
+                openEl.disabled = isHistoricalClosed;
+                closeEl.disabled = isHistoricalClosed;
+                nextEl.disabled = isHistoricalClosed;
+                if (lockNoticeEl) lockNoticeEl.style.display = isHistoricalClosed ? 'block' : 'none';
             } else {
                 openEl.value = '';
                 closeEl.value = '';
