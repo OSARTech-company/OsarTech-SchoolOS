@@ -9469,11 +9469,76 @@ def normalize_parent_gender(value):
         return 'Female'
     return ''
 
+SUBJECT_NAME_ALIASES = {
+    'english': 'English Language',
+    'eng language': 'English Language',
+    'eng lang': 'English Language',
+    'english lang': 'English Language',
+    'english language': 'English Language',
+    'general mathematics': 'Mathematics',
+    'general maths': 'Mathematics',
+    'general math': 'Mathematics',
+    'maths': 'Mathematics',
+    'math': 'Mathematics',
+    'general mathematics or mathematics': 'Mathematics',
+    'mathematics or general mathematics': 'Mathematics',
+    'further maths': 'Further Mathematics',
+    'further math': 'Further Mathematics',
+    'f maths': 'Further Mathematics',
+    'f math': 'Further Mathematics',
+    'agric': 'Agricultural Science',
+    'agric science': 'Agricultural Science',
+    'agricultural sci': 'Agricultural Science',
+    'agricultural science': 'Agricultural Science',
+    'basic sci': 'Basic Science',
+    'basic science': 'Basic Science',
+    'basic tech': 'Basic Technology',
+    'basic technology': 'Basic Technology',
+    'social study': 'Social Studies',
+    'social studies': 'Social Studies',
+    'civic': 'Civic Education',
+    'civic edu': 'Civic Education',
+    'civic studies': 'Civic Education',
+    'computer': 'Computer Studies',
+    'computer study': 'Computer Studies',
+    'computer appreciation': 'Computer Studies',
+    'ict': 'ICT',
+    'information and communication technology': 'ICT',
+    'information communication technology': 'ICT',
+    'crs': 'Christian Religious Studies',
+    'c r s': 'Christian Religious Studies',
+    'christian religious knowledge': 'Christian Religious Studies',
+    'christian religious studies': 'Christian Religious Studies',
+    'irs': 'Islamic Religious Studies',
+    'i r s': 'Islamic Religious Studies',
+    'islamic religious knowledge': 'Islamic Religious Studies',
+    'islamic religious studies': 'Islamic Religious Studies',
+    'phe': 'Physical And Health Education',
+    'p h e': 'Physical And Health Education',
+    'physical health education': 'Physical And Health Education',
+    'physical and health education': 'Physical And Health Education',
+    'business study': 'Business Studies',
+    'business studies': 'Business Studies',
+    'home econ': 'Home Economics',
+    'home economics': 'Home Economics',
+    'food and nutrition': 'Food And Nutrition',
+    'data proc': 'Data Processing',
+    'economy': 'Economics',
+    'commerce': 'Commerce',
+}
+
+def _subject_alias_lookup_key(value):
+    text = re.sub(r'[^a-z0-9]+', ' ', (value or '').strip().lower())
+    return ' '.join(text.split())
+
 def normalize_subject_name(value):
     """Normalize subject names with leading-cap style."""
     text = ' '.join((value or '').strip().split())
     if not text:
         return ''
+    alias_value = SUBJECT_NAME_ALIASES.get(_subject_alias_lookup_key(text))
+    if alias_value:
+        return alias_value
     words = []
     for word in text.split(' '):
         if word.isupper() and len(word) <= 4:
