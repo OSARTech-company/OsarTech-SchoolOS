@@ -9783,6 +9783,16 @@ def normalize_subject_name(value):
     alias_value = SUBJECT_NAME_ALIASES.get(_subject_alias_lookup_key(text))
     if alias_value:
         return alias_value
+    option_parts = [
+        part.strip()
+        for part in re.split(r'\s+\bor\b\s+|[/|]+', text, flags=re.IGNORECASE)
+        if part.strip()
+    ]
+    if len(option_parts) > 1:
+        normalized_parts = [normalize_subject_name(part) for part in option_parts]
+        unique_parts = {part.lower() for part in normalized_parts if part}
+        if len(unique_parts) == 1:
+            return normalized_parts[0]
     words = []
     for word in text.split(' '):
         if word.isupper() and len(word) <= 4:
@@ -9822,6 +9832,32 @@ def normalize_subjects_list(items):
     if isinstance(items, str):
         items = [s for s in items.split(',')]
     return _dedupe_keep_order([normalize_subject_name(str(s).strip()) for s in (items or []) if str(s).strip()])
+
+def sort_subjects_alphabetically(subjects):
+    """Normalize, dedupe, and sort subjects by display name."""
+    return sorted(
+        normalize_subjects_list(subjects or []),
+        key=lambda subject: (normalize_subject_name(subject).casefold(), str(subject).casefold()),
+    )
+
+def resolve_school_subject_display_name(school_id, classname, subject_name, config=None):
+    """Return the school's configured subject label for a normalized subject when available."""
+    normalized = normalize_subject_name(subject_name)
+    normalized_key = normalized.lower()
+    if not normalized_key:
+        return ''
+    cfg = config if isinstance(config, dict) else (get_class_subject_config(school_id, classname) or {})
+    for key in ('core_subjects', 'science_subjects', 'art_subjects', 'commercial_subjects', 'optional_subjects'):
+        for raw_subject in (cfg.get(key) or []):
+            raw_label = ' '.join(str(raw_subject or '').strip().split())
+            if not raw_label:
+                continue
+            if normalize_subject_name(raw_label).lower() != normalized_key:
+                continue
+            if re.search(r'\s+\bor\b\s+|[/|]+', raw_label, flags=re.IGNORECASE):
+                return normalized
+            return raw_label
+    return normalized
 
 def _dedupe_keep_order(items):
     seen = set()
@@ -38469,6 +38505,7 @@ def school_admin_import_target(target):
             test_enabled = bool(school.get('test_enabled', 1))
             exam_enabled = bool(school.get('exam_enabled', 1))
             exam_config = get_assessment_config_for_class(school_id, classname)
+            class_subject_config = get_class_subject_config(school_id, classname) or {}
             test_total_max = max(0.0, safe_float(school.get('test_score_max', 30), 30))
             stream_required = class_uses_stream_for_school(school, classname)
             grade_cfg = get_grade_config(school_id)
@@ -38544,7 +38581,7 @@ def school_admin_import_target(target):
             staged_results = {}
             staged_behaviour = {}
             staged_attendance = {}
-            seen_subject_rows = set()
+            seen_subject_rows = {}
             imported_behaviour_students = set()
             imported_attendance_students = set()
             behaviour_source_rows = {}
@@ -38659,7 +38696,12 @@ def school_admin_import_target(target):
                     add_error(idx, row, 'Student ID is required.')
                     continue
                 processed += 1
-                subject = normalize_subject_name(raw_subject)
+                subject = resolve_school_subject_display_name(
+                    school_id,
+                    classname,
+                    normalize_subject_name(raw_subject),
+                    config=class_subject_config,
+                )
                 row_is_support_only = not subject and (behaviour_inputs_present or support_inputs_present) and not score_inputs_present
                 if not subject and not row_is_support_only:
                     add_error(idx, row, 'Subject is required.')
@@ -38723,9 +38765,11 @@ def school_admin_import_target(target):
                 try:
                     if subject:
                         row_key = (student_id.lower(), subject.lower())
-                        if row_key in seen_subject_rows:
-                            raise ValueError(f'Duplicate subject row for student "{student_id}" and subject "{subject}".')
-                        seen_subject_rows.add(row_key)
+                        previous_raw_subject = seen_subject_rows.get(row_key)
+                        if previous_raw_subject is not None:
+                            if _subject_alias_lookup_key(previous_raw_subject) == _subject_alias_lookup_key(raw_subject):
+                                raise ValueError(f'Duplicate subject row for student "{student_id}" and subject "{subject}".')
+                        seen_subject_rows[row_key] = raw_subject
 
                         subject_scores = {}
                         if test_enabled:
@@ -39110,7 +39154,7 @@ def school_admin_import_target(target):
                         existing_snapshot = {} if replace_existing else load_existing_historical_snapshot(staged_student_id)
                         uploaded_subjects = _dedupe_keep_order(normalize_subjects_list(staged.get('subjects', [])))
                         existing_subjects = normalize_subjects_list(existing_snapshot.get('subjects', []))
-                        subjects = _dedupe_keep_order(existing_subjects + uploaded_subjects)
+                        subjects = sort_subjects_alphabetically(existing_subjects + uploaded_subjects)
                         uploaded_scores = staged.get('scores', {}) if isinstance(staged.get('scores', {}), dict) else {}
                         scores = merge_historical_score_payload(
                             existing_snapshot.get('scores', {}),
