@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSARtech SchoolOS</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css', v='20260528d') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="home-shell">
+        <nav class="home-nav" aria-label="Main navigation">
+            <a class="home-brand" href="{{ url_for('home') }}">
+                <img src="{{ url_for('static', filename='img/osartech-logo-brand.png', v='20260411b') }}" alt="" aria-hidden="true">
+                <span>OSARtech SchoolOS</span>
+            </a>
+            <div class="home-nav-actions">
+                <a class="home-link" href="{{ url_for('home') }}#features">Features</a>
+                <a class="home-link" href="{{ url_for('school_access_request') }}">School Access</a>
+                <a class="home-btn" href="{{ url_for('cbt_login') }}"><i class="fas fa-laptop-code"></i> CBT</a>
+                <a class="home-btn primary" href="{{ url_for('login') }}"><i class="fas fa-sign-in-alt"></i> Login</a>
+            </div>
+        </nav>
+
+        <header class="home-hero">
+            <div class="home-hero-inner">
+                <div class="home-hero-content">
+                    <span class="home-kicker"><i class="fas fa-school"></i> School management, results, and CBT</span>
+                    <h1>Run school operations from one secure system.</h1>
+                    <p>SchoolOS brings student records, score entry, result publishing, CBT, attendance, timetable, messaging, and parent access into one role-based platform.</p>
+                    <div class="home-hero-actions">
+                        <a class="home-btn primary" href="{{ url_for('login') }}"><i class="fas fa-sign-in-alt"></i> Login to Portal</a>
+                        <a class="home-btn" href="{{ url_for('school_access_request') }}"><i class="fas fa-building"></i> Request School Access</a>
+                        <a class="home-btn" href="{{ url_for('student_portal') }}"><i class="fas fa-chart-bar"></i> Check Result</a>
+                    </div>
+                    <div class="home-proof" aria-label="Highlights">
+                        <span><i class="fas fa-shield-alt"></i> Role-based access</span>
+                        <span><i class="fas fa-file-alt"></i> Published result records</span>
+                        <span><i class="fas fa-laptop-code"></i> CBT workflows</span>
+                    </div>
+                </div>
+                <div class="home-hero-visual" aria-label="Student using SchoolOS">
+                    <img src="{{ url_for('static', filename='img/student-using-schoolos.svg', v='20260528a') }}" alt="Student using SchoolOS on a laptop">
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <section class="home-section" id="features">
+                <div class="section-head">
+                    <h2>Built for daily school work</h2>
+                    <p>Each role gets the tools they need, with school data kept scoped and organized across terms, classes, and academic years.</p>
+                </div>
+                <div class="feature-grid">
+                    <article class="feature-card">
+                        <i class="fas fa-users"></i>
+                        <h3>Student Records</h3>
+                        <p>Manage students, classes, parents, profiles, promotion history, and subject setup.</p>
+                    </article>
+                    <article class="feature-card">
+                        <i class="fas fa-chart-line"></i>
+                        <h3>Results</h3>
+                        <p>Enter scores, review submissions, publish results, correct records, and preserve historical snapshots.</p>
+                    </article>
+                    <article class="feature-card">
+                        <i class="fas fa-laptop-code"></i>
+                        <h3>CBT</h3>
+                        <p>Create tests, add questions, monitor attempts, retrieve scores, and sync assessment marks.</p>
+                    </article>
+                    <article class="feature-card">
+                        <i class="fas fa-calendar-check"></i>
+                        <h3>Operations</h3>
+                        <p>Coordinate timetable, attendance, messages, term programs, audits, reports, and access controls.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="home-section home-section-soft" aria-label="Role workflows">
+                <div class="section-head">
+                    <h2>Clear access for every user</h2>
+                    <p>Everyone lands in the right place: administrators manage setup, teachers handle classroom work, students take CBT and view records, and parents follow progress.</p>
+                </div>
+                <div class="role-grid">
+                    <article class="role-card">
+                        <span><i class="fas fa-user-tie"></i></span>
+                        <h3>School Admin</h3>
+                        <p>Setup, approvals, publishing, correction, CBT management, reports, and audits.</p>
+                    </article>
+                    <article class="role-card">
+                        <span><i class="fas fa-chalkboard-teacher"></i></span>
+                        <h3>Teacher</h3>
+                        <p>Assigned classes, score entry, attendance, subject work, CBT, and messages.</p>
+                    </article>
+                    <article class="role-card">
+                        <span><i class="fas fa-user-graduate"></i></span>
+                        <h3>Student</h3>
+                        <p>CBT sessions, published results, messages, profile, and subject requests.</p>
+                    </article>
+                    <article class="role-card">
+                        <span><i class="fas fa-users"></i></span>
+                        <h3>Parent</h3>
+                        <p>Linked-child results, comparisons, attendance, timetable, messages, and disputes.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="home-band" aria-label="Portal links">
+                <div>
+                    <h2>Already have an account?</h2>
+                    <p>Use the secure login page for super admin, school admin, teachers, students, and parents.</p>
+                </div>
+                <a class="home-btn primary" href="{{ url_for('login') }}"><i class="fas fa-lock"></i> Go to Login</a>
+            </section>
+        </main>
+
+        <footer class="home-footer">
+            <span>&copy; {{ now.year if now else 2026 }} OSARtech SchoolOS</span>
+            <span>
+                <a href="{{ url_for('terms_privacy') }}">Terms & Privacy</a>
+            </span>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,327 @@
+:root {
+    --home-ink: #102a43;
+    --home-muted: #52657a;
+    --home-line: #dbe6f4;
+    --home-brand: #0f4c81;
+    --home-brand-2: #1f7a8c;
+    --home-bg: #f5f8fc;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    color: var(--home-ink);
+    background: var(--home-bg);
+}
+
+.home-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.home-nav {
+    position: fixed;
+    z-index: 20;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px clamp(18px, 4vw, 54px);
+    background: rgba(255, 255, 255, 0.94);
+    border-bottom: 1px solid rgba(219, 230, 244, 0.86);
+    backdrop-filter: blur(14px);
+}
+
+.home-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--home-ink);
+    text-decoration: none;
+    font-weight: 850;
+}
+
+.home-brand img {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+}
+
+.home-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.home-link {
+    color: #334155;
+    text-decoration: none;
+    font-weight: 750;
+    font-size: 0.95rem;
+}
+
+.home-link:hover {
+    color: var(--home-brand);
+}
+
+.home-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 10px 16px;
+    border: 1px solid var(--home-line);
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--home-brand);
+    text-decoration: none;
+    font-weight: 800;
+}
+
+.home-btn.primary {
+    border-color: var(--home-brand);
+    background: var(--home-brand);
+    color: #ffffff;
+}
+
+.home-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.1);
+}
+
+.home-hero {
+    min-height: 92vh;
+    display: grid;
+    align-items: center;
+    padding: 112px clamp(18px, 5vw, 72px) 48px;
+    color: #ffffff;
+    background:
+        linear-gradient(90deg, rgba(5, 24, 44, 0.92) 0%, rgba(5, 24, 44, 0.78) 42%, rgba(5, 24, 44, 0.32) 100%),
+        url("/static/img/schoolos-branding.png") center right 8% / min(520px, 52vw) auto no-repeat,
+        linear-gradient(135deg, #08213d 0%, #0f4c81 58%, #1f7a8c 100%);
+}
+
+.home-hero-content {
+    width: min(760px, 100%);
+}
+
+.home-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.82rem;
+    font-weight: 850;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.home-hero h1 {
+    margin: 18px 0 14px;
+    max-width: 12ch;
+    color: #ffffff;
+    font-size: clamp(2.4rem, 6vw, 5rem);
+    line-height: 1;
+    letter-spacing: 0;
+}
+
+.home-hero p {
+    margin: 0;
+    max-width: 64ch;
+    color: rgba(255, 255, 255, 0.86);
+    font-size: clamp(1rem, 1.7vw, 1.2rem);
+    line-height: 1.6;
+}
+
+.home-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 26px;
+}
+
+.home-hero-actions .home-btn {
+    border-color: rgba(255, 255, 255, 0.24);
+}
+
+.home-hero-actions .home-btn:not(.primary) {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.home-proof {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 30px;
+}
+
+.home-proof span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    padding: 8px 12px;
+    color: rgba(255, 255, 255, 0.88);
+    background: rgba(255, 255, 255, 0.1);
+    font-weight: 700;
+}
+
+.home-section {
+    padding: 56px clamp(18px, 5vw, 72px);
+    scroll-margin-top: 88px;
+}
+
+.section-head {
+    max-width: 760px;
+    margin-bottom: 24px;
+}
+
+.section-head h2 {
+    margin: 0 0 10px;
+    color: var(--home-ink);
+    font-size: clamp(1.6rem, 3vw, 2.35rem);
+    letter-spacing: 0;
+}
+
+.section-head p {
+    margin: 0;
+    color: var(--home-muted);
+    line-height: 1.6;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.feature-card {
+    border: 1px solid var(--home-line);
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 20px;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+}
+
+.feature-card i {
+    color: var(--home-brand-2);
+    font-size: 1.5rem;
+    margin-bottom: 14px;
+}
+
+.feature-card h3 {
+    margin: 0 0 8px;
+    font-size: 1.05rem;
+    color: var(--home-ink);
+}
+
+.feature-card p {
+    margin: 0;
+    color: var(--home-muted);
+    line-height: 1.55;
+}
+
+.home-band {
+    margin: 0 clamp(18px, 5vw, 72px) 56px;
+    padding: 28px;
+    border: 1px solid #d8e4f2;
+    border-radius: 8px;
+    background: #ffffff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+}
+
+.home-band h2 {
+    margin: 0 0 6px;
+    font-size: clamp(1.35rem, 2.3vw, 1.9rem);
+}
+
+.home-band p {
+    margin: 0;
+    color: var(--home-muted);
+}
+
+.home-footer {
+    margin-top: auto;
+    padding: 22px clamp(18px, 5vw, 72px);
+    border-top: 1px solid var(--home-line);
+    background: #ffffff;
+    color: #64748b;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.home-footer a {
+    color: var(--home-brand);
+    text-decoration: none;
+    font-weight: 750;
+}
+
+@media (max-width: 980px) {
+    .feature-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .home-hero {
+        background:
+            linear-gradient(90deg, rgba(5, 24, 44, 0.92), rgba(5, 24, 44, 0.74)),
+            url("/static/img/schoolos-branding.png") center bottom 22px / min(360px, 70vw) auto no-repeat,
+            linear-gradient(135deg, #08213d 0%, #0f4c81 58%, #1f7a8c 100%);
+        padding-bottom: 300px;
+    }
+}
+
+@media (max-width: 680px) {
+    .home-nav {
+        position: static;
+        align-items: flex-start;
+    }
+
+    .home-nav-actions {
+        justify-content: flex-end;
+    }
+
+    .home-link {
+        display: none;
+    }
+
+    .home-hero {
+        min-height: auto;
+        padding-top: 46px;
+    }
+
+    .feature-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .home-band {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .home-band .home-btn {
+        width: 100%;
+    }
+}

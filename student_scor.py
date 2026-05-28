@@ -28089,8 +28089,11 @@ def school_logo_proxy(school_id):
 
 @app.route('/')
 def home():
-    # Render the login page directly as the landing page
-    return render_template('shared/login.html')
+    if session.get('cbt_only') and session.get('role') == 'student':
+        return redirect(url_for('student_cbt'))
+    if session.get('role'):
+        return redirect(url_for('menu'))
+    return render_template('shared/home.html', now=datetime.now())
 
 
 def _issue_school_access_challenge():

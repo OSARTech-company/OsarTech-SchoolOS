@@ -7,37 +7,30 @@
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cbt-manager.css', v='20260528a') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .container { width: min(1220px, 100%); margin: 0 auto; padding: 24px; }
-        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .header h1 { margin: 0; font-size: 1.8rem; }
-        .header .back { color: white; text-decoration: none; font-weight: 700; }
-        .grid-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
-        .summary-strip { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
-        .summary-chip { border-radius: 999px; padding: 6px 12px; font-size: 0.86rem; background: #eef4ff; color: #1f3b5c; border: 1px solid #c9daf7; }
-        .table-wrap { overflow-x: auto; border: 1px solid #dbe5f2; border-radius: 10px; }
-        .table-wrap table { width: 100%; min-width: 1080px; border-collapse: collapse; }
-        .table-wrap th, .table-wrap td { border-bottom: 1px solid #e7edf7; padding: 10px 12px; text-align: left; vertical-align: top; }
-        .table-wrap th { background: #f7fbff; color: #1e3a5f; font-weight: 700; }
-        .status-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.8rem; text-transform: capitalize; }
-        .status-pill.draft { background: #edf2f7; color: #334155; }
-        .status-pill.published { background: #dcfce7; color: #166534; }
-        .status-pill.closed { background: #fee2e2; color: #991b1b; }
-        .inline-action { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-        .muted { color: #64748b; font-size: 0.9rem; }
-    </style>
 </head>
 <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
 <div class="app-shell topbar-layout">
     {% set active_page = 'cbt' %}
     {% include 'teacher/_teacher_sidebar.html' %}
     <div class="main-content">
-        <div class="container">
-            <div class="header">
-                <h1><i class="fas fa-laptop-code"></i> CBT Manager</h1>
-                <a href="{{ url_for('teacher_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
-            </div>
+        <main class="cbt-page">
+            <section class="cbt-hero">
+                <div class="cbt-hero-main">
+                    <span class="cbt-eyebrow"><i class="fas fa-laptop-code"></i> Teacher CBT</span>
+                    <h1>Create tests, publish questions, and retrieve scores.</h1>
+                    <p>Build CBT assessments for your assigned class-subject scope and track results from one workspace.</p>
+                    <div class="cbt-hero-actions">
+                        <a href="{{ url_for('teacher_dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Dashboard</a>
+                    </div>
+                </div>
+                <div class="cbt-hero-panel">
+                    <div class="cbt-panel-row"><span>Current Term</span><strong>{{ current_term }}</strong></div>
+                    <div class="cbt-panel-row"><span>Academic Year</span><strong>{{ current_year or '-' }}</strong></div>
+                    <div class="cbt-panel-row"><span>Visible Tests</span><strong>{{ tests|length if tests else 0 }}</strong></div>
+                </div>
+            </section>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -47,160 +40,175 @@
                 {% endif %}
             {% endwith %}
 
-            <div class="summary-strip">
-                <span class="summary-chip">All: {{ status_counts.all }}</span>
-                <span class="summary-chip">Draft: {{ status_counts.draft }}</span>
-                <span class="summary-chip">Published: {{ status_counts.published }}</span>
-                <span class="summary-chip">Closed: {{ status_counts.closed }}</span>
-            </div>
+            <section class="cbt-stat-grid">
+                <div class="cbt-stat"><span>All Tests</span><strong>{{ status_counts.all }}</strong></div>
+                <div class="cbt-stat"><span>Draft</span><strong>{{ status_counts.draft }}</strong></div>
+                <div class="cbt-stat"><span>Published</span><strong>{{ status_counts.published }}</strong></div>
+                <div class="cbt-stat"><span>Closed</span><strong>{{ status_counts.closed }}</strong></div>
+            </section>
 
-            <div class="grid-two">
-                <div class="card">
-                    <h2><i class="fas fa-plus-circle"></i> Create CBT Test</h2>
-                    {% if not class_options %}
-                    <p class="muted">No class-subject assignment found for your account this term/year.</p>
-                    {% else %}
-                    <form method="post" action="{{ url_for('teacher_cbt_create') }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div class="form-group">
-                            <label>Title</label>
-                            <input type="text" name="title" maxlength="180" placeholder="e.g. SS2 Biology CBT 1" required>
+            <section class="cbt-layout">
+                <div class="cbt-card">
+                    <div class="cbt-card-header">
+                        <h2><i class="fas fa-plus-circle"></i> Create CBT Test</h2>
+                    </div>
+                    <div class="cbt-card-body">
+                        {% if not class_options %}
+                        <div class="cbt-empty">
+                            <i class="fas fa-user-lock"></i>
+                            No class-subject assignment found for your account this term/year.
                         </div>
-                        <div class="form-group">
-                            <label>Class</label>
-                            <select name="classname" id="cbtClassSelect" required>
-                                <option value="">Select class</option>
-                                {% for cls in class_options %}
-                                <option value="{{ cls }}">{{ cls }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Subject</label>
-                            <select name="subject" id="cbtSubjectSelect" required>
-                                <option value="">Select subject</option>
-                                {% for subject in all_subjects %}
-                                <option value="{{ subject }}">{{ subject }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Assessment Type</label>
-                            <select name="assessment_type" id="cbtAssessmentType" required>
-                                <option value="test">Test</option>
-                                <option value="exam">Exam</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Score Over</label>
-                            <input type="number" min="1" max="100" step="0.5" name="score_over" value="20" required>
-                        </div>
-                        <div class="form-group" id="cbtTestSlotGroup">
-                            <label>Score Sheet Slot (CA)</label>
-                            <select name="test_slot">
-                                {% set max_tests = school.max_tests if school and school.max_tests else 3 %}
-                                {% for i in range(1, (max_tests|int) + 1) %}
-                                <option value="{{ i }}">{{ format_ca_slot_label(i, school) }}</option>
-                                {% endfor %}
-                            </select>
-                            <small class="muted">CBT score auto-sync will write into this CA slot.</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Term</label>
-                            <select name="term" required>
-                                <option value="First Term" {% if current_term == 'First Term' %}selected{% endif %}>First Term</option>
-                                <option value="Second Term" {% if current_term == 'Second Term' %}selected{% endif %}>Second Term</option>
-                                <option value="Third Term" {% if current_term == 'Third Term' %}selected{% endif %}>Third Term</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Academic Year</label>
-                            <input type="text" name="academic_year" value="{{ current_year }}" maxlength="32" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Duration (minutes)</label>
-                            <input type="number" min="5" max="240" name="duration_minutes" value="30" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Questions to Answer (optional)</label>
-                            <input type="number" min="1" max="500" name="questions_to_answer" placeholder="Leave empty to use all questions">
-                            <small class="muted">Example: set 10 so each student answers 10 random questions from your full pool.</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Anti-Cheat Strict Mode</label>
-                            <select name="strict_mode">
-                                <option value="1" selected>Strict (recommended)</option>
-                                <option value="0">Standard</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Fullscreen Required</label>
-                            <select name="fullscreen_required">
-                                <option value="1" selected>Yes</option>
-                                <option value="0">No</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Tab/Window Leave Limit</label>
-                            <input type="number" min="0" max="30" name="tab_switch_limit" value="3">
-                            <small class="muted">Strict mode auto-submits if focus leaves exam too many times.</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Block Copy/Paste</label>
-                            <select name="block_clipboard">
-                                <option value="1" selected>Yes</option>
-                                <option value="0">No</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Instructions (optional)</label>
-                            <textarea name="instructions" rows="4" maxlength="2000" placeholder="Any directions students should read before starting..."></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Create Test</button>
-                    </form>
-                    {% endif %}
+                        {% else %}
+                        <form method="post" action="{{ url_for('teacher_cbt_create') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="cbt-form-grid">
+                                <div class="form-group is-wide">
+                                    <label>Title</label>
+                                    <input type="text" name="title" maxlength="180" placeholder="e.g. SS2 Biology CBT 1" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Class</label>
+                                    <select name="classname" id="cbtClassSelect" required>
+                                        <option value="">Select class</option>
+                                        {% for cls in class_options %}
+                                        <option value="{{ cls }}">{{ cls }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Subject</label>
+                                    <select name="subject" id="cbtSubjectSelect" required>
+                                        <option value="">Select subject</option>
+                                        {% for subject in all_subjects %}
+                                        <option value="{{ subject }}">{{ subject }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Assessment Type</label>
+                                    <select name="assessment_type" id="cbtAssessmentType" required>
+                                        <option value="test">Test</option>
+                                        <option value="exam">Exam</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Score Over</label>
+                                    <input type="number" min="1" max="100" step="0.5" name="score_over" value="20" required>
+                                </div>
+                                <div class="form-group" id="cbtTestSlotGroup">
+                                    <label>Score Sheet Slot</label>
+                                    <select name="test_slot">
+                                        {% set max_tests = school.max_tests if school and school.max_tests else 3 %}
+                                        {% for i in range(1, (max_tests|int) + 1) %}
+                                        <option value="{{ i }}">{{ format_ca_slot_label(i, school) }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="cbt-muted">CBT score syncs into this CA slot.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label>Term</label>
+                                    <select name="term" required>
+                                        <option value="First Term" {% if current_term == 'First Term' %}selected{% endif %}>First Term</option>
+                                        <option value="Second Term" {% if current_term == 'Second Term' %}selected{% endif %}>Second Term</option>
+                                        <option value="Third Term" {% if current_term == 'Third Term' %}selected{% endif %}>Third Term</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Academic Year</label>
+                                    <input type="text" name="academic_year" value="{{ current_year }}" maxlength="32" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Duration</label>
+                                    <input type="number" min="5" max="240" name="duration_minutes" value="30" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Questions to Answer</label>
+                                    <input type="number" min="1" max="500" name="questions_to_answer" placeholder="Use all questions">
+                                    <small class="cbt-muted">Set a number to randomize from the full question pool.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label>Strict Mode</label>
+                                    <select name="strict_mode">
+                                        <option value="1" selected>Strict</option>
+                                        <option value="0">Standard</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Fullscreen</label>
+                                    <select name="fullscreen_required">
+                                        <option value="1" selected>Required</option>
+                                        <option value="0">Optional</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Tab Leave Limit</label>
+                                    <input type="number" min="0" max="30" name="tab_switch_limit" value="3">
+                                    <small class="cbt-muted">Strict mode auto-submits after the limit.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label>Copy/Paste</label>
+                                    <select name="block_clipboard">
+                                        <option value="1" selected>Blocked</option>
+                                        <option value="0">Allowed</option>
+                                    </select>
+                                </div>
+                                <div class="form-group is-wide">
+                                    <label>Instructions</label>
+                                    <textarea name="instructions" rows="4" maxlength="2000" placeholder="Directions students should read before starting"></textarea>
+                                </div>
+                            </div>
+                            <div class="cbt-actions" style="margin-top: 16px;">
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Create Test</button>
+                            </div>
+                        </form>
+                        {% endif %}
+                    </div>
                 </div>
 
-                <div class="card">
-                    <h2><i class="fas fa-filter"></i> Filter</h2>
-                    <form method="get">
-                        <div class="form-group">
-                            <label>Term</label>
-                            <select name="term">
-                                <option value="First Term" {% if selected_term == 'First Term' %}selected{% endif %}>First Term</option>
-                                <option value="Second Term" {% if selected_term == 'Second Term' %}selected{% endif %}>Second Term</option>
-                                <option value="Third Term" {% if selected_term == 'Third Term' %}selected{% endif %}>Third Term</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Academic Year</label>
-                            <input type="text" name="academic_year" value="{{ selected_year or current_year }}" maxlength="32">
-                        </div>
-                        <div class="form-group">
-                            <label>Status</label>
-                            <select name="status">
-                                <option value="" {% if not status_filter %}selected{% endif %}>All</option>
-                                <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>Draft</option>
-                                <option value="published" {% if status_filter == 'published' %}selected{% endif %}>Published</option>
-                                <option value="closed" {% if status_filter == 'closed' %}selected{% endif %}>Closed</option>
-                            </select>
-                        </div>
-                        <div class="inline-action">
-                            <button type="submit" class="btn btn-secondary"><i class="fas fa-search"></i> Apply</button>
-                            <a href="{{ url_for('teacher_cbt') }}" class="btn">Reset</a>
-                        </div>
-                    </form>
-                    <p class="muted" style="margin-top: 12px;">
-                        Workflow: Create test/exam -> Add questions -> Publish -> Monitor live attempts -> Retrieve results.
-                    </p>
+                <div class="cbt-card">
+                    <div class="cbt-card-header">
+                        <h2><i class="fas fa-filter"></i> Find Tests</h2>
+                    </div>
+                    <div class="cbt-card-body">
+                        <form method="get" class="cbt-filter-row">
+                            <div class="form-group">
+                                <label>Term</label>
+                                <select name="term">
+                                    <option value="First Term" {% if selected_term == 'First Term' %}selected{% endif %}>First Term</option>
+                                    <option value="Second Term" {% if selected_term == 'Second Term' %}selected{% endif %}>Second Term</option>
+                                    <option value="Third Term" {% if selected_term == 'Third Term' %}selected{% endif %}>Third Term</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Academic Year</label>
+                                <input type="text" name="academic_year" value="{{ selected_year or current_year }}" maxlength="32">
+                            </div>
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select name="status">
+                                    <option value="" {% if not status_filter %}selected{% endif %}>All</option>
+                                    <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>Draft</option>
+                                    <option value="published" {% if status_filter == 'published' %}selected{% endif %}>Published</option>
+                                    <option value="closed" {% if status_filter == 'closed' %}selected{% endif %}>Closed</option>
+                                </select>
+                            </div>
+                            <div class="cbt-actions">
+                                <button type="submit" class="btn btn-secondary"><i class="fas fa-search"></i> Apply</button>
+                                <a href="{{ url_for('teacher_cbt') }}" class="btn">Reset</a>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            </div>
+            </section>
 
-            <div class="card">
-                <h2><i class="fas fa-list"></i> CBT Tests</h2>
+            <section class="cbt-card" style="margin-top: 16px;">
+                <div class="cbt-card-header">
+                    <h2><i class="fas fa-list"></i> CBT Tests</h2>
+                    <span class="cbt-muted">{{ tests|length if tests else 0 }} shown</span>
+                </div>
                 {% if tests %}
-                <div class="table-wrap">
-                    <table>
+                <div class="cbt-table-wrap">
+                    <table class="cbt-table">
                         <thead>
                             <tr>
                                 <th>Title</th>
@@ -217,25 +225,25 @@
                         <tbody>
                             {% for test in tests %}
                             <tr>
-                                <td>
+                                <td class="cbt-title-cell">
                                     <strong>{{ test.title }}</strong>
                                     {% if test.instructions %}
-                                    <div class="muted">{{ test.instructions[:120] }}{% if test.instructions|length > 120 %}...{% endif %}</div>
+                                    <span class="cbt-muted">{{ test.instructions[:120] }}{% if test.instructions|length > 120 %}...{% endif %}</span>
                                     {% endif %}
                                 </td>
                                 <td>{{ test.classname }}</td>
                                 <td>{{ test.subject }}</td>
                                 <td>
                                     {{ (test.assessment_type or 'test')|title }}<br>
-                                    <span class="muted">Over {{ '%.2f'|format(test.score_over or 0) }}{% if (test.assessment_type or 'test') == 'test' %}, Slot {{ test.test_slot or 1 }}{% endif %}</span>
+                                    <span class="cbt-muted">Over {{ '%.2f'|format(test.score_over or 0) }}{% if (test.assessment_type or 'test') == 'test' %}, Slot {{ test.test_slot or 1 }}{% endif %}</span>
                                 </td>
-                                <td>{{ test.term }}<br><span class="muted">{{ test.academic_year or '-' }}</span></td>
+                                <td>{{ test.term }}<br><span class="cbt-muted">{{ test.academic_year or '-' }}</span></td>
                                 <td>{{ test.duration_minutes }} mins</td>
                                 {% set answer_count = test.questions_to_answer if (test.questions_to_answer or 0) > 0 else test.total_questions %}
-                                <td>{{ answer_count or 0 }} of {{ test.total_questions or 0 }}<br><span class="muted">{{ '%.2f'|format(test.total_marks or 0) }} marks pool</span></td>
-                                <td><span class="status-pill {{ test.status|lower }}">{{ test.status }}</span></td>
+                                <td>{{ answer_count or 0 }} of {{ test.total_questions or 0 }}<br><span class="cbt-muted">{{ '%.2f'|format(test.total_marks or 0) }} marks pool</span></td>
+                                <td><span class="cbt-status {{ test.status|lower }}">{{ test.status }}</span></td>
                                 <td>
-                                    <div class="inline-action">
+                                    <div class="cbt-actions">
                                         <a class="btn btn-sm btn-primary" href="{{ url_for('teacher_cbt_questions', test_id=test.test_id) }}">
                                             <i class="fas fa-edit"></i> Questions
                                         </a>
@@ -250,10 +258,13 @@
                     </table>
                 </div>
                 {% else %}
-                <p class="muted">No CBT tests found for this term/year.</p>
+                <div class="cbt-empty">
+                    <i class="fas fa-clipboard-list"></i>
+                    No CBT tests found for this term/year.
+                </div>
                 {% endif %}
-            </div>
-        </div>
+            </section>
+        </main>
     </div>
 </div>
 <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
