@@ -28,6 +28,7 @@ from io import StringIO, BytesIO
 from datetime import date, datetime, timedelta
 import smtplib
 from email.message import EmailMessage
+from email.utils import formatdate, make_msgid
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.exceptions import HTTPException
 import mimetypes
@@ -64,8 +65,16 @@ except Exception:
     qrcode = None
 from services import parent_queries as parent_queries_service
 
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DOTENV_PATH = os.path.join(PROJECT_ROOT, '.env')
+
 if load_dotenv:
-    load_dotenv()
+    # Pin dotenv loading to this project so SMTP and other settings do not depend
+    # on whichever directory or inherited shell environment launched the app.
+    if os.path.isfile(PROJECT_DOTENV_PATH):
+        load_dotenv(dotenv_path=PROJECT_DOTENV_PATH, override=True)
+    else:
+        load_dotenv(override=True)
 
 app = Flask(__name__, template_folder='frontend/templates', static_folder='static')
 
@@ -4865,12 +4874,37 @@ def _is_transient_db_transport_error(exc):
     )
     return any(m in text for m in markers)
 
+SUPPORTED_CLASS_SEQUENCE = [
+    'NURSERY1', 'NURSERY2', 'NURSERY3',
+    'PRIMARY1', 'PRIMARY2', 'PRIMARY3', 'PRIMARY4', 'PRIMARY5', 'PRIMARY6',
+    'JSS1', 'JSS2', 'JSS3',
+    'SS1', 'SS2', 'SS3',
+]
+ASSESSMENT_LEVELS = ('nursery', 'primary', 'jss', 'ss')
+
 def canonicalize_classname(value):
-    """Canonical class key used for shared subject catalog (e.g. 'JSS 1' -> 'JSS1')."""
+    """Canonical class key used for shared subject catalog (e.g. 'Primary 1' -> 'PRIMARY1')."""
     cleaned = re.sub(r'[^A-Za-z0-9]+', '', (value or '').strip()).upper()
     if not cleaned:
         return ''
-    # Normalize common aliases for secondary-only classes.
+    # Normalize common aliases for primary and secondary classes.
+    if cleaned.startswith('KINDERGARTEN'):
+        cleaned = 'NURSERY' + cleaned[len('KINDERGARTEN'):]
+    elif cleaned.startswith('NURSERY'):
+        cleaned = 'NURSERY' + cleaned[len('NURSERY'):]
+    elif cleaned.startswith('NUR'):
+        cleaned = 'NURSERY' + cleaned[len('NUR'):]
+    elif cleaned.startswith('KG'):
+        cleaned = 'NURSERY' + cleaned[len('KG'):]
+    elif cleaned.startswith('PRIMARY'):
+        cleaned = 'PRIMARY' + cleaned[len('PRIMARY'):]
+    elif cleaned.startswith('BASIC'):
+        cleaned = 'PRIMARY' + cleaned[len('BASIC'):]
+    elif cleaned.startswith('PRY'):
+        cleaned = 'PRIMARY' + cleaned[len('PRY'):]
+    elif cleaned.startswith('PRI'):
+        cleaned = 'PRIMARY' + cleaned[len('PRI'):]
+
     # Handle long-form labels first (e.g., JUNIORSECONDARY1A / SENIORSECONDARY2B).
     if cleaned.startswith('JUNIORSECONDARY'):
         cleaned = 'JSS' + cleaned[len('JUNIORSECONDARY'):]
@@ -4893,6 +4927,30 @@ def canonicalize_classname(value):
     cleaned = re.sub(r'^JSSS', 'JSS', cleaned)
     return cleaned
 
+def _class_sort_key(value):
+    cls = canonicalize_classname(value)
+    level, number, arm = _split_class_level_number_arm(cls)
+    level_order = {'NURSERY': 0, 'PRIMARY': 1, 'JSS': 2, 'SS': 3}
+    if level and number is not None:
+        return (level_order.get(level, 99), number, arm, cls)
+    if cls == 'GRADUATED':
+        return (98, 0, '', cls)
+    return (99, 0, '', cls)
+
+def is_primary_classname(value):
+    """Return True if classname is a valid nursery/primary class with optional arm."""
+    cls = canonicalize_classname(value)
+    if not cls:
+        return False
+    match = re.fullmatch(r'(NURSERY|PRIMARY)(\d)([A-Z]*)', cls)
+    if not match:
+        return False
+    level = match.group(1)
+    level_num = int(match.group(2))
+    if level == 'NURSERY':
+        return 1 <= level_num <= 3
+    return 1 <= level_num <= 6
+
 def is_secondary_classname(value):
     """Return True if classname is a valid secondary class (JSS/SS with optional arm)."""
     cls = canonicalize_classname(value)
@@ -4904,6 +4962,22 @@ def is_secondary_classname(value):
     level_num = int(match.group(2))
     return 1 <= level_num <= 3
 
+def is_supported_classname(value):
+    """Return True if classname is supported for primary or secondary workflows."""
+    return is_primary_classname(value) or is_secondary_classname(value)
+
+def filter_supported_classnames(classnames):
+    """Return supported nursery/primary/JSS/SS classnames, sorted in school order."""
+    normalized = _dedupe_keep_order([
+        canonicalize_classname(str(c).strip())
+        for c in (classnames or [])
+        if str(c).strip()
+    ])
+    return sorted(
+        [c for c in normalized if is_supported_classname(c)],
+        key=_class_sort_key,
+    )
+
 def filter_secondary_classnames(classnames):
     """Return only JSS/SS classnames, sorted."""
     normalized = _dedupe_keep_order([
@@ -4913,7 +4987,7 @@ def filter_secondary_classnames(classnames):
     ])
     return sorted(
         [c for c in normalized if is_secondary_classname(c)],
-        key=lambda value: str(value).lower(),
+        key=_class_sort_key,
     )
 
 def normalize_school_logo_url(raw_url):
@@ -5211,6 +5285,18 @@ def build_result_verification_context(school_id, student_id, term, academic_year
 
 def _catalog_defaults_for_class(classname_key):
     key = canonicalize_classname(classname_key)
+    nursery_core = [
+        'Literacy', 'Numeracy', 'Phonics', 'Handwriting', 'Rhymes',
+        'Basic Science', 'Social Habits', 'Health Habits',
+        'Creative Arts', 'Physical Education',
+    ]
+    primary_core = [
+        'English Language', 'Mathematics', 'Basic Science and Technology',
+        'Social Studies', 'Civic Education', 'Christian Religious Studies',
+        'Computer Studies', 'Agricultural Science',
+        'Physical and Health Education', 'Cultural and Creative Arts',
+        'Verbal Reasoning', 'Quantitative Reasoning',
+    ]
     jss_core = [
         'English Language', 'Mathematics', 'Basic Science', 'Basic Technology',
         'Civic Education', 'Social Studies', 'Christian Religious Studies',
@@ -5223,6 +5309,10 @@ def _catalog_defaults_for_class(classname_key):
     ss_commercial = ['Financial Accounting', 'Commerce', 'Economics']
     ss_optional = ['Data Processing', 'Agricultural Science', 'French', 'Further Mathematics']
 
+    if key.startswith('NURSERY'):
+        return {'core': nursery_core, 'science': [], 'art': [], 'commercial': [], 'optional': []}
+    if key.startswith('PRIMARY'):
+        return {'core': primary_core, 'science': [], 'art': [], 'commercial': [], 'optional': []}
     if key.startswith('JSS'):
         return {'core': jss_core, 'science': [], 'art': [], 'commercial': [], 'optional': []}
     if key.startswith('SS') or key.startswith('SSS'):
@@ -5255,6 +5345,8 @@ def _upsert_global_catalog_subject_with_cursor(c, classname_key, bucket, subject
 
 def _seed_global_subject_catalog_defaults_with_cursor(c):
     classes = [
+        'NURSERY1', 'NURSERY2', 'NURSERY3',
+        'PRIMARY1', 'PRIMARY2', 'PRIMARY3', 'PRIMARY4', 'PRIMARY5', 'PRIMARY6',
         'JSS1', 'JSS2', 'JSS3',
         'SS1', 'SS2', 'SS3',
     ]
@@ -9170,12 +9262,13 @@ def _split_class_level_number_arm(classname):
     """
     Parse normalized class names into (level, number, arm_suffix).
     Examples:
+    - PRIMARY1 -> ('PRIMARY', 1, '')
     - JSS1 -> ('JSS', 1, '')
     - JSS1A -> ('JSS', 1, 'A')
     - SS2B -> ('SS', 2, 'B')
     """
     normalized = re.sub(r'[^A-Za-z0-9]+', '', (classname or '')).upper()
-    m = re.fullmatch(r'(JSS|SSS|SS)(\d+)([A-Z]+)?', normalized)
+    m = re.fullmatch(r'(NURSERY|PRIMARY|JSS|SSS|SS)(\d+)([A-Z]+)?', normalized)
     if not m:
         return '', None, ''
     level = m.group(1)
@@ -9199,6 +9292,8 @@ def _entry_year_for_first_level(current_year, first_year_class):
     """
     normalized = re.sub(r'[^A-Za-z0-9]+', '', (first_year_class or '')).upper()
     class_no = _extract_class_number(first_year_class) or 1
+    if normalized.startswith('NURSERY') or normalized.startswith('PRIMARY'):
+        return current_year - max(0, class_no - 1)
     if normalized.startswith('JSS'):
         return current_year - max(0, class_no - 1)
     if normalized.startswith('SS') or normalized.startswith('SSS'):
@@ -9262,6 +9357,10 @@ def class_uses_stream_for_school(school, classname):
         return False
     return True
 
+def class_uses_subject_teachers(classname):
+    """Secondary classes may use subject teachers; primary/nursery classes use class teachers."""
+    return is_secondary_classname(classname)
+
 def class_arm_ranking_group(classname, mode='separate'):
     """
     Return ranking group key for class arm handling.
@@ -9292,10 +9391,10 @@ def class_belongs_to_school_or_arm(school_id, classname, class_candidates=None):
     cls = (classname or '').strip()
     if not cls:
         return False
-    candidates = class_candidates or get_secondary_school_classnames(school_id) or []
+    candidates = class_candidates or get_supported_school_classnames(school_id) or []
     if not candidates:
-        # Allow first-time setup for valid secondary classes even before records/configs exist.
-        return is_secondary_classname(cls)
+        # Allow first-time setup for valid classes even before records/configs exist.
+        return is_supported_classname(cls)
     normalized = canonicalize_classname(cls)
     if normalized in {canonicalize_classname(c) for c in candidates if str(c).strip()}:
         return True
@@ -9307,8 +9406,8 @@ def class_belongs_to_school_or_arm(school_id, classname, class_candidates=None):
             if class_arm_ranking_group(c, mode='together') == target_group:
                 return True
         return False
-    # Non-arm classes can be introduced directly if they are valid secondary classes.
-    return is_secondary_classname(normalized)
+    # Non-arm classes can be introduced directly if they are valid classes.
+    return is_supported_classname(normalized)
 
 
 def class_arm_variants_for_base(class_candidates, classname):
@@ -9337,7 +9436,7 @@ def related_classnames_for_class_arm_mode(school_id, classname, school=None):
     if mode != 'together':
         return [cls]
     target_group = class_arm_ranking_group(cls, mode='together')
-    classnames = get_secondary_school_classnames(school_id) or []
+    classnames = get_supported_school_classnames(school_id) or []
     scoped = []
     for item in classnames:
         canonical = canonicalize_classname(item)
@@ -9350,17 +9449,30 @@ def related_classnames_for_class_arm_mode(school_id, classname, school=None):
     return sorted(set(scoped), key=lambda x: str(x).lower())
 
 def get_class_level(classname):
-    """Map class name to level key: jss or ss."""
+    """Map class name to level key: nursery, primary, jss, or ss."""
     normalized = re.sub(r'[^A-Za-z0-9]+', '', (classname or '')).upper()
     if normalized.startswith('SS') or normalized.startswith('SSS'):
         return 'ss'
     if normalized.startswith('JSS'):
         return 'jss'
+    if normalized.startswith('PRIMARY') or normalized.startswith('PRY') or normalized.startswith('BASIC'):
+        return 'primary'
+    if normalized.startswith('NURSERY') or normalized.startswith('NUR') or normalized.startswith('KG'):
+        return 'nursery'
     return 'jss'
 
 def next_class_in_sequence(classname):
     """Return next class in progression sequence, or None if terminal/unknown."""
     progression = {
+        'NURSERY1': 'NURSERY2',
+        'NURSERY2': 'NURSERY3',
+        'NURSERY3': 'PRIMARY1',
+        'PRIMARY1': 'PRIMARY2',
+        'PRIMARY2': 'PRIMARY3',
+        'PRIMARY3': 'PRIMARY4',
+        'PRIMARY4': 'PRIMARY5',
+        'PRIMARY5': 'PRIMARY6',
+        'PRIMARY6': 'JSS1',
         'JSS1': 'JSS2',
         'JSS2': 'JSS3',
         'JSS3': 'SS1',
@@ -9480,6 +9592,12 @@ SUBJECT_NAME_ALIASES = {
     'general math': 'Mathematics',
     'maths': 'Mathematics',
     'math': 'Mathematics',
+    'mathimatic': 'Mathematics',
+    'mathimatics': 'Mathematics',
+    'mathematic': 'Mathematics',
+    'mathematics': 'Mathematics',
+    'mathemathics': 'Mathematics',
+    'mathematicss': 'Mathematics',
     'general mathematics or mathematics': 'Mathematics',
     'mathematics or general mathematics': 'Mathematics',
     'further maths': 'Further Mathematics',
@@ -9677,12 +9795,9 @@ def get_all_class_subject_configs(school_id):
 def get_global_subject_catalog_map():
     """
     Return global subject catalog grouped by class.
-    Format: { 'JSS1': {'core': [...], 'science': [...], ...}, ... }
+    Format: { 'PRIMARY1': {'core': [...], 'science': [...], ...}, ... }
     """
-    classes = [
-        'JSS1', 'JSS2', 'JSS3',
-        'SS1', 'SS2', 'SS3',
-    ]
+    classes = list(SUPPORTED_CLASS_SEQUENCE)
     catalog = {
         cls: {k: list(v) for k, v in _catalog_defaults_for_class(cls).items()}
         for cls in classes
@@ -10414,7 +10529,7 @@ def _cbt_collect_subjects_for_class_config(config):
 
 
 def _cbt_class_subject_options(school_id):
-    class_options = get_secondary_school_classnames(school_id) or []
+    class_options = get_supported_school_classnames(school_id) or []
     class_subject_options = {}
     all_subjects = []
     catalog = get_school_subject_catalog_map(school_id) or {}
@@ -11560,10 +11675,17 @@ def get_student_offered_subjects_for_class(student, school_id, school=None):
 def _default_assessment_config(level):
     """Default exam setup per level."""
     defaults = {
+        'nursery': {'exam_mode': 'combined', 'objective_max': 0, 'theory_max': 0, 'exam_score_max': 70},
+        'primary': {'exam_mode': 'combined', 'objective_max': 0, 'theory_max': 0, 'exam_score_max': 70},
         'jss': {'exam_mode': 'combined', 'objective_max': 0, 'theory_max': 0, 'exam_score_max': 70},
         'ss': {'exam_mode': 'separate', 'objective_max': 30, 'theory_max': 40, 'exam_score_max': 70},
     }
     return defaults.get(level, defaults['jss'])
+
+def get_default_assessment_config(level):
+    """Return a default assessment config dict for callers that need one without DB lookup."""
+    normalized_level = (level or 'jss').strip().lower()
+    return {'level': normalized_level, **_default_assessment_config(normalized_level)}
 
 def get_assessment_config(school_id, level):
     """Get one assessment config for level."""
@@ -11644,6 +11766,39 @@ def build_subject_key_map(subjects):
         seen.add(key)
         key_map[subject] = key
     return key_map
+
+def build_class_teacher_subject_rows_for_non_subject_classes(school_id, class_assignments, term='', academic_year='', school=None):
+    """Create synthetic score-coverage rows for classes handled only by class teachers."""
+    rows = []
+    for assignment in class_assignments or []:
+        cls = canonicalize_classname(assignment.get('classname', ''))
+        if not cls or class_uses_subject_teachers(cls):
+            continue
+        if term and (assignment.get('term') or '').strip() != term:
+            continue
+        if academic_year and (assignment.get('academic_year') or '').strip() != academic_year:
+            continue
+        config = get_class_subject_config(school_id, cls) or {}
+        subjects = normalize_subjects_list(
+            (config.get('core_subjects') or [])
+            + (config.get('optional_subjects') or [])
+        )
+        if not subjects:
+            defaults = _catalog_defaults_for_class(cls)
+            subjects = normalize_subjects_list(
+                (defaults.get('core') or [])
+                + (defaults.get('optional') or [])
+            )
+        for subject in subjects:
+            rows.append({
+                'classname': cls,
+                'classname_canonical': cls,
+                'subject': subject,
+                'teacher_id': assignment.get('teacher_id', ''),
+                'academic_year': academic_year or (assignment.get('academic_year') or ''),
+                'term': term or (assignment.get('term') or ''),
+            })
+    return rows
 
 def calculate_positions(students_list, ss_ranking_mode='together', school=None):
     """Calculate class positions, with optional SS stream-separated ranking."""
@@ -12163,7 +12318,55 @@ def issue_school_onboarding_email_verification_code(request_id, ttl_minutes=30, 
         'sent': int(send_result.get('sent', 0) or 0),
         'errors': send_result.get('errors') or [],
         'masked_email': _mask_email_address(school_email),
+        'masked_recipients': send_result.get('masked_recipients') or [],
+        'masked_accepted_recipients': send_result.get('masked_accepted_recipients') or [],
+        'masked_rejected_recipients': send_result.get('masked_rejected_recipients') or [],
+        'smtp_accepted': bool(send_result.get('smtp_accepted')),
+        'message_ids': send_result.get('message_ids') or [],
+        'delivery_note': (send_result.get('delivery_note') or '').strip(),
         'expires_at': format_timestamp(expires_at),
+    }
+
+
+def send_school_onboarding_smtp_test(request_id, school_email='', admin_email=''):
+    rid = (request_id or '').strip().upper()
+    if not rid:
+        raise ValueError('Request reference is required.')
+    onboarding = get_school_onboarding_request(rid)
+    if not onboarding:
+        raise ValueError('Request not found.')
+
+    target_emails = []
+    primary_school_email = (school_email or onboarding.get('school_email') or '').strip().lower()
+    primary_admin_email = (admin_email or onboarding.get('admin_email') or '').strip().lower()
+    for candidate in (primary_school_email, primary_admin_email):
+        if candidate and is_valid_email(candidate) and candidate not in target_emails:
+            target_emails.append(candidate)
+    if not target_emails:
+        raise ValueError('No valid recipient email found for SMTP test.')
+
+    subject = f'SMTP diagnostic test for {rid}'
+    body = (
+        f"Hello,\n\n"
+        f"This is a diagnostic email from the School Result system.\n\n"
+        f"Reference: {rid}\n"
+        f"Target: {', '.join(target_emails)}\n"
+        f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        f"If you received this, SMTP authentication and recipient handoff are working.\n"
+        f"If this does not arrive, check Gmail app-password settings, spam, and inbox filters."
+    )
+    send_result = send_plain_email_message(subject, body, target_emails)
+    return {
+        'request_id': rid,
+        'sent': int(send_result.get('sent', 0) or 0),
+        'errors': send_result.get('errors') or [],
+        'masked_email': _mask_email_address(primary_school_email) or 'school email',
+        'masked_recipients': send_result.get('masked_recipients') or [],
+        'masked_accepted_recipients': send_result.get('masked_accepted_recipients') or [],
+        'masked_rejected_recipients': send_result.get('masked_rejected_recipients') or [],
+        'smtp_accepted': bool(send_result.get('smtp_accepted')),
+        'message_ids': send_result.get('message_ids') or [],
+        'delivery_note': (send_result.get('delivery_note') or '').strip(),
     }
 
 
@@ -12467,10 +12670,35 @@ def send_plain_email_message(subject, body_text, recipients):
         email = (item or '').strip().lower()
         if email and is_valid_email(email) and email not in clean_recipients:
             clean_recipients.append(email)
+    masked_recipients = [_mask_email_address(email) or email for email in clean_recipients]
     if not clean_recipients:
-        return {'sent': 0, 'errors': ['No valid recipient email found.'], 'recipients': []}
+        return {
+            'sent': 0,
+            'errors': ['No valid recipient email found.'],
+            'recipients': [],
+            'masked_recipients': [],
+            'accepted_recipients': [],
+            'masked_accepted_recipients': [],
+            'rejected_recipients': [],
+            'masked_rejected_recipients': [],
+            'smtp_accepted': False,
+            'message_ids': [],
+            'delivery_note': 'No valid recipient email was available for SMTP delivery.',
+        }
     if not get_email_sending_enabled():
-        return {'sent': 0, 'errors': ['Email sending is disabled by admin.'], 'recipients': clean_recipients}
+        return {
+            'sent': 0,
+            'errors': ['Email sending is disabled by admin.'],
+            'recipients': clean_recipients,
+            'masked_recipients': masked_recipients,
+            'accepted_recipients': [],
+            'masked_accepted_recipients': [],
+            'rejected_recipients': clean_recipients,
+            'masked_rejected_recipients': masked_recipients,
+            'smtp_accepted': False,
+            'message_ids': [],
+            'delivery_note': 'Email sending is disabled before SMTP delivery could be attempted.',
+        }
 
     smtp_host = (os.environ.get('SMTP_HOST', '') or '').strip()
     smtp_port_raw = (os.environ.get('SMTP_PORT', '587') or '587').strip()
@@ -12492,11 +12720,25 @@ def send_plain_email_message(subject, body_text, recipients):
         smtp_port = 587
 
     if not smtp_host:
-        return {'sent': 0, 'errors': ['SMTP_HOST is not configured.'], 'recipients': clean_recipients}
+        return {
+            'sent': 0,
+            'errors': ['SMTP_HOST is not configured.'],
+            'recipients': clean_recipients,
+            'masked_recipients': masked_recipients,
+            'accepted_recipients': [],
+            'masked_accepted_recipients': [],
+            'rejected_recipients': clean_recipients,
+            'masked_rejected_recipients': masked_recipients,
+            'smtp_accepted': False,
+            'message_ids': [],
+            'delivery_note': 'SMTP delivery was not attempted because SMTP_HOST is missing.',
+        }
 
     base_msg = EmailMessage()
     base_msg['Subject'] = (subject or 'Notification').strip()[:200]
     base_msg['From'] = smtp_from
+    base_msg['Date'] = formatdate(localtime=True)
+    base_msg['Reply-To'] = smtp_from
     base_msg.set_content((body_text or '').strip() or 'No content.')
 
     def _send_once(force_ipv4=False):
@@ -12539,6 +12781,51 @@ def send_plain_email_message(subject, body_text, recipients):
 
     errors = []
     sent = 0
+    accepted_message_ids = []
+    accepted_recipients = []
+    rejected_recipients = []
+
+    def _extend_rejections(refused_map):
+        for refused_recipient, refusal in (refused_map or {}).items():
+            normalized = (refused_recipient or '').strip().lower()
+            if normalized and normalized not in rejected_recipients:
+                rejected_recipients.append(normalized)
+            if isinstance(refusal, tuple) and len(refusal) >= 2:
+                errors.append(f'Email rejected for {normalized or refused_recipient}: {refusal[0]} {refusal[1]}')
+            else:
+                errors.append(f'Email rejected for {normalized or refused_recipient}: {refusal}')
+
+    def _success_payload(delivery_note):
+        masked_accepted = [_mask_email_address(email) or email for email in accepted_recipients]
+        masked_rejected = [_mask_email_address(email) or email for email in rejected_recipients]
+        if accepted_recipients:
+            logging.info(
+                "SMTP accepted email for %s subject=%r message_ids=%s",
+                ', '.join(masked_accepted),
+                base_msg['Subject'],
+                [mid for mid in accepted_message_ids if mid],
+            )
+        if rejected_recipients:
+            logging.warning(
+                "SMTP rejected email for %s subject=%r errors=%s",
+                ', '.join(masked_rejected),
+                base_msg['Subject'],
+                errors,
+            )
+        return {
+            'sent': sent,
+            'errors': errors,
+            'recipients': clean_recipients,
+            'masked_recipients': masked_recipients,
+            'accepted_recipients': accepted_recipients,
+            'masked_accepted_recipients': masked_accepted,
+            'rejected_recipients': rejected_recipients,
+            'masked_rejected_recipients': masked_rejected,
+            'smtp_accepted': sent > 0,
+            'message_ids': [mid for mid in accepted_message_ids if mid],
+            'delivery_note': delivery_note,
+        }
+
     try:
         client = _send_once(force_ipv4=smtp_force_ipv4)
         try:
@@ -12548,56 +12835,149 @@ def send_plain_email_message(subject, body_text, recipients):
                     msg['Subject'] = base_msg['Subject']
                     msg['From'] = smtp_from
                     msg['To'] = recipient
+                    msg['Message-ID'] = make_msgid()
+                    msg['Date'] = base_msg['Date']
+                    msg['Reply-To'] = base_msg['Reply-To']
                     msg.set_content(base_msg.get_content())
-                    client.send_message(msg)
-                    sent += 1
+                    refused = client.send_message(msg) or {}
+                    if refused:
+                        _extend_rejections(refused)
+                    else:
+                        accepted_message_ids.append((msg.get('Message-ID') or '').strip())
+                        accepted_recipients.append(recipient)
+                        sent += 1
             elif smtp_send_mode == 'bcc':
                 msg = EmailMessage()
                 msg['Subject'] = base_msg['Subject']
                 msg['From'] = smtp_from
                 msg['To'] = smtp_from
                 msg['Bcc'] = ', '.join(clean_recipients)
+                msg['Message-ID'] = make_msgid()
+                msg['Date'] = base_msg['Date']
+                msg['Reply-To'] = base_msg['Reply-To']
                 msg.set_content(base_msg.get_content())
-                client.send_message(msg)
-                sent = len(clean_recipients)
+                refused = client.send_message(msg) or {}
+                _extend_rejections(refused)
+                accepted_recipients = [email for email in clean_recipients if email not in rejected_recipients]
+                if accepted_recipients:
+                    accepted_message_ids.append((msg.get('Message-ID') or '').strip())
+                sent = len(accepted_recipients)
             else:
                 msg = EmailMessage()
                 msg['Subject'] = base_msg['Subject']
                 msg['From'] = smtp_from
                 msg['To'] = ', '.join(clean_recipients)
+                msg['Message-ID'] = make_msgid()
+                msg['Date'] = base_msg['Date']
+                msg['Reply-To'] = base_msg['Reply-To']
                 msg.set_content(base_msg.get_content())
-                client.send_message(msg)
-                sent = len(clean_recipients)
+                refused = client.send_message(msg) or {}
+                _extend_rejections(refused)
+                accepted_recipients = [email for email in clean_recipients if email not in rejected_recipients]
+                if accepted_recipients:
+                    accepted_message_ids.append((msg.get('Message-ID') or '').strip())
+                sent = len(accepted_recipients)
         finally:
             try:
                 client.quit()
             except Exception:
                 pass
-        return {'sent': sent, 'errors': [], 'recipients': clean_recipients}
+        if sent == len(clean_recipients):
+            return _success_payload(
+                'SMTP accepted the message, but mailbox delivery can still be delayed or filtered after handoff.'
+            )
+        if sent > 0:
+            return _success_payload(
+                'SMTP accepted the message for some recipients, but others were rejected before delivery.'
+            )
+        return _success_payload(
+            'SMTP connection succeeded, but the server rejected every recipient before delivery.'
+        )
     except Exception as exc:
         # Automatic IPv4 retry when primary failure indicates missing route.
         if (not smtp_force_ipv4) and ('Network is unreachable' in str(exc)):
             try:
                 client = _send_once(force_ipv4=True)
                 try:
-                    msg = EmailMessage()
-                    msg['Subject'] = base_msg['Subject']
-                    msg['From'] = smtp_from
-                    msg['To'] = ', '.join(clean_recipients)
-                    msg.set_content(base_msg.get_content())
-                    client.send_message(msg)
-                    sent = len(clean_recipients)
+                    if smtp_send_mode == 'individual':
+                        for recipient in clean_recipients:
+                            msg = EmailMessage()
+                            msg['Subject'] = base_msg['Subject']
+                            msg['From'] = smtp_from
+                            msg['To'] = recipient
+                            msg['Message-ID'] = make_msgid()
+                            msg['Date'] = base_msg['Date']
+                            msg['Reply-To'] = base_msg['Reply-To']
+                            msg.set_content(base_msg.get_content())
+                            refused = client.send_message(msg) or {}
+                            if refused:
+                                _extend_rejections(refused)
+                            else:
+                                accepted_message_ids.append((msg.get('Message-ID') or '').strip())
+                                accepted_recipients.append(recipient)
+                                sent += 1
+                    else:
+                        msg = EmailMessage()
+                        msg['Subject'] = base_msg['Subject']
+                        msg['From'] = smtp_from
+                        msg['To'] = smtp_from if smtp_send_mode == 'bcc' else ', '.join(clean_recipients)
+                        if smtp_send_mode == 'bcc':
+                            msg['Bcc'] = ', '.join(clean_recipients)
+                        msg['Message-ID'] = make_msgid()
+                        msg['Date'] = base_msg['Date']
+                        msg['Reply-To'] = base_msg['Reply-To']
+                        msg.set_content(base_msg.get_content())
+                        refused = client.send_message(msg) or {}
+                        _extend_rejections(refused)
+                        accepted_recipients = [email for email in clean_recipients if email not in rejected_recipients]
+                        if accepted_recipients:
+                            accepted_message_ids.append((msg.get('Message-ID') or '').strip())
+                        sent = len(accepted_recipients)
                 finally:
                     try:
                         client.quit()
                     except Exception:
                         pass
-                return {'sent': sent, 'errors': [], 'recipients': clean_recipients}
+                if sent == len(clean_recipients):
+                    return _success_payload(
+                        'SMTP accepted the message after an IPv4 retry, but mailbox delivery can still be delayed or filtered after handoff.'
+                    )
+                if sent > 0:
+                    return _success_payload(
+                        'SMTP accepted the message for some recipients after an IPv4 retry, but others were rejected before delivery.'
+                    )
+                return _success_payload(
+                    'SMTP connected after an IPv4 retry, but the server still rejected every recipient before delivery.'
+                )
             except Exception as exc2:
                 errors.append(f'Email send failed: {exc}; IPv4 retry failed: {exc2}')
-                return {'sent': 0, 'errors': errors, 'recipients': clean_recipients}
+                return {
+                    'sent': 0,
+                    'errors': errors,
+                    'recipients': clean_recipients,
+                    'masked_recipients': masked_recipients,
+                    'accepted_recipients': accepted_recipients,
+                    'masked_accepted_recipients': [_mask_email_address(email) or email for email in accepted_recipients],
+                    'rejected_recipients': rejected_recipients,
+                    'masked_rejected_recipients': [_mask_email_address(email) or email for email in rejected_recipients],
+                    'smtp_accepted': False,
+                    'message_ids': [],
+                    'delivery_note': 'SMTP did not accept the message after both the normal attempt and IPv4 retry failed.',
+                }
         errors.append(f'Email send failed: {exc}')
-        return {'sent': 0, 'errors': errors, 'recipients': clean_recipients}
+        return {
+            'sent': 0,
+            'errors': errors,
+            'recipients': clean_recipients,
+            'masked_recipients': masked_recipients,
+            'accepted_recipients': accepted_recipients,
+            'masked_accepted_recipients': [_mask_email_address(email) or email for email in accepted_recipients],
+            'rejected_recipients': rejected_recipients,
+            'masked_rejected_recipients': [_mask_email_address(email) or email for email in rejected_recipients],
+            'smtp_accepted': False,
+            'message_ids': [],
+            'delivery_note': 'SMTP did not accept the message for delivery.',
+        }
 
 
 def send_onboarding_event_notifications(event_name, request_payload, actor_user='', linked_school_id='', admin_username=''):
@@ -13939,6 +14319,7 @@ def build_school_setup_wizard_summary(school_id):
     student_count = get_total_student_count(sid)
     class_assignments = get_class_assignments(sid) or []
     subject_assignments = get_teacher_subject_assignments(sid, term=current_term) or []
+    secondary_class_names = filter_secondary_classnames(class_names)
     timetable_rows = get_school_timetable_rows(sid) or []
     term_program = get_school_term_program(sid, current_year, current_term) or {}
     term_events = build_term_program_events(term_program)
@@ -13965,7 +14346,7 @@ def build_school_setup_wizard_summary(school_id):
         {
             'key': 'classes',
             'title': 'Configure Classes and Subjects',
-            'description': 'Create secondary class subjects so score entry and teacher assignment work correctly.',
+            'description': 'Create class subjects so score entry and teacher assignment work correctly.',
             'done': bool(class_names) and bool(profile_rows.get('class subject config exists', False)),
             'required': True,
             'action_endpoint': 'school_admin_class_subjects',
@@ -13995,8 +14376,8 @@ def build_school_setup_wizard_summary(school_id):
         {
             'key': 'assignments',
             'title': 'Assign Teachers',
-            'description': 'Assign class teachers and subject teachers for the current term.',
-            'done': bool(class_assignments) and bool(subject_assignments),
+            'description': 'Assign class teachers for all classes and subject teachers for secondary classes.',
+            'done': bool(class_assignments) and (not secondary_class_names or bool(subject_assignments)),
             'required': True,
             'action_endpoint': 'school_admin_teacher_assignments',
             'action_label': 'Assign Teachers',
@@ -14099,9 +14480,9 @@ def build_school_setup_wizard_flow(school_id):
             'subtitle': 'Set the subjects each class will offer.',
             'description': 'Create or review class subject configurations before you assign teachers.',
             'bullets': [
-                'Add JSS and SS classes',
-                'Configure core, science, art, and commercial subjects',
-                'Check that SS1, SS2, and SS3 are included where needed',
+                'Add Nursery, Primary, JSS, and SS classes',
+                'Configure subjects offered for each class',
+                'Use SS streams only where the school needs Science, Art, or Commercial tracks',
             ],
             'primary_label': 'Open Class Subjects',
             'primary_endpoint': 'school_admin_class_subjects',
@@ -21792,7 +22173,7 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
                     'reviewed_by': '',
                     'review_note': '',
                 }
-    all_classes = filter_secondary_classnames(
+    all_classes = filter_supported_classnames(
         {c for c in classes if c} | {c for c in publication_rows.keys() if c}
     )
     counts_by_class = get_class_published_view_counts(school_id, term, academic_year, all_classes)
@@ -21801,7 +22182,7 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
     seen_classes = set()
     for a in assignments:
         classname = a.get('classname', '')
-        if not is_secondary_classname(classname):
+        if not is_supported_classname(classname):
             continue
         pub = publication_rows.get(classname, {})
         cnt = counts_by_class.get(classname, {})
@@ -21830,7 +22211,7 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
     for classname, pub in publication_rows.items():
         if not classname or classname in seen_classes:
             continue
-        if not is_secondary_classname(classname):
+        if not is_supported_classname(classname):
             continue
         cnt = counts_by_class.get(classname, {})
         lock_status = get_term_edit_lock_status(school_id, classname, term, academic_year or '')
@@ -22339,7 +22720,7 @@ def get_student_filter_options(school_id, classnames=None):
                 ORDER BY classname""",
             tuple(params),
         )
-        available_classes = filter_secondary_classnames([
+        available_classes = filter_supported_classnames([
             canonicalize_classname((row[0] or '').strip()) if row else ''
             for row in (c.fetchall() or [])
         ])
@@ -22649,6 +23030,10 @@ def get_school_classnames(school_id):
 def get_secondary_school_classnames(school_id):
     """Return only JSS/SS classnames for a school."""
     return filter_secondary_classnames(get_school_classnames(school_id))
+
+def get_supported_school_classnames(school_id):
+    """Return supported nursery/primary/JSS/SS classnames for a school."""
+    return filter_supported_classnames(get_school_classnames(school_id))
 
 def get_total_student_count(school_id):
     """Get total student count for one school."""
@@ -26263,6 +26648,8 @@ def teacher_can_score_subject(school_id, teacher_id, classname, subject_name, te
         return True
     if school_uses_dean_led_score_entry(school):
         return teacher_has_class_access(school_id, teacher_id, classname, term=term, academic_year=academic_year)
+    if not class_uses_subject_teachers(classname):
+        return False
     assigned = get_teacher_subjects_for_class_term(
         school_id, teacher_id, classname, term=term, academic_year=academic_year
     )
@@ -27454,12 +27841,167 @@ def _validate_school_access_challenge(user_answer):
     return (str(user_answer or '').strip() == expected)
 
 
+def _remember_recent_school_onboarding_request(request_id='', school_email='', admin_email=''):
+    payload = {}
+    rid = (request_id or '').strip().upper()
+    school_email_text = (school_email or '').strip().lower()
+    admin_email_text = (admin_email or '').strip().lower()
+    if rid:
+        payload['request_id'] = rid
+    if school_email_text:
+        payload['school_email'] = school_email_text
+    if admin_email_text:
+        payload['admin_email'] = admin_email_text
+    if payload:
+        session['recent_school_onboarding_request'] = payload
+    else:
+        session.pop('recent_school_onboarding_request', None)
+    return payload
+
+
+def _get_recent_school_onboarding_request_context():
+    raw = session.get('recent_school_onboarding_request')
+    if not isinstance(raw, dict):
+        return {}
+    payload = {}
+    rid = (raw.get('request_id') or '').strip().upper()
+    school_email = (raw.get('school_email') or '').strip().lower()
+    admin_email = (raw.get('admin_email') or '').strip().lower()
+    if rid:
+        payload['request_id'] = rid
+    if school_email:
+        payload['school_email'] = school_email
+    if admin_email:
+        payload['admin_email'] = admin_email
+    return payload
+
+
+def _build_school_onboarding_status_overview(onboarding):
+    if not onboarding:
+        return {}
+
+    status = normalize_school_onboarding_status(onboarding.get('status'), default='pending')
+    school_email_verified = int(onboarding.get('school_email_verified', 0) or 0) == 1
+    phone_verified = int(onboarding.get('phone_verified', 0) or 0) == 1
+    document_verified = int(onboarding.get('document_verified', 0) or 0) == 1
+    payment_uploaded = bool((onboarding.get('payment_proof_path') or '').strip())
+    meta = _safe_json_object(onboarding.get('verification_meta'))
+    verification_target = (meta.get('last_code_target') or '').strip()
+    verification_sent_at = (meta.get('last_code_sent_at') or '').strip()
+    verification_expires_at = (onboarding.get('school_email_verify_expires_at') or '').strip()
+    manual_verification_done = phone_verified and document_verified
+    review_done = status in {'approved', 'rejected', 'cancelled'}
+
+    status_labels = {
+        'pending_verification': 'Pending email verification',
+        'pending': 'Pending super-admin review',
+        'approved': 'Approved',
+        'rejected': 'Rejected',
+        'cancelled': 'Cancelled',
+    }
+    badge_classes = {
+        'pending_verification': 'status-pending',
+        'pending': 'status-pending',
+        'approved': 'status-approved',
+        'rejected': 'status-rejected',
+        'cancelled': 'status-closed',
+    }
+    next_actions = {
+        'pending_verification': 'Verify the school email with the latest 6-digit code to move this request into the review queue.',
+        'pending': 'Wait for the super admin to complete phone and document checks, then review your request.',
+        'approved': 'Your request is approved. Check the admin email inbox for the invite link and finish account setup.',
+        'rejected': 'Review the super-admin note and submit a fresh request if you still want onboarding.',
+        'cancelled': 'This request is closed. Submit a new request if your school still needs access.',
+    }
+
+    verification_detail = 'Verified'
+    if not school_email_verified:
+        target_text = verification_target or _mask_email_address(onboarding.get('school_email', '')) or 'your school email'
+        verification_detail = f'Waiting for code confirmation sent to {target_text}'
+        if verification_expires_at:
+            verification_detail += f' (expires {verification_expires_at})'
+
+    manual_detail = (
+        f"Phone: {'Done' if phone_verified else 'Waiting'} | "
+        f"Document: {'Done' if document_verified else 'Waiting'}"
+    )
+    review_detail = status_labels.get(status, status.replace('_', ' ').title())
+    if status == 'approved' and (onboarding.get('linked_school_id') or '').strip():
+        review_detail = f"Approved and linked to school ID {(onboarding.get('linked_school_id') or '').strip()}"
+    elif status == 'rejected' and (onboarding.get('review_note') or '').strip():
+        review_detail = (onboarding.get('review_note') or '').strip()
+    elif status == 'pending' and (onboarding.get('review_note') or '').strip():
+        review_detail = (onboarding.get('review_note') or '').strip()
+
+    steps = [
+        {
+            'key': 'submitted',
+            'label': 'Request submitted',
+            'done': True,
+            'detail': (onboarding.get('created_at') or '').strip() or 'Recorded',
+            'optional': False,
+        },
+        {
+            'key': 'email_verified',
+            'label': 'School email verified',
+            'done': school_email_verified,
+            'detail': verification_detail,
+            'optional': False,
+        },
+        {
+            'key': 'manual_verification',
+            'label': 'Manual verification checks',
+            'done': manual_verification_done,
+            'detail': manual_detail,
+            'optional': False,
+        },
+        {
+            'key': 'payment_proof',
+            'label': 'Payment proof uploaded',
+            'done': payment_uploaded,
+            'detail': 'Optional. Use this only if your school paid by transfer.' if not payment_uploaded else 'Received and ready for review',
+            'optional': True,
+        },
+        {
+            'key': 'final_review',
+            'label': 'Final review and account setup',
+            'done': review_done,
+            'detail': review_detail,
+            'optional': False,
+        },
+    ]
+
+    percent_complete = int(round((sum(1 for step in steps if step['done']) / max(1, len(steps))) * 100))
+    flags = []
+    if meta.get('generic_email_domain'):
+        flags.append('Your school email uses a public email domain, so manual review may be stricter.')
+    if not (onboarding.get('website_url') or '').strip():
+        flags.append('Adding an official website or social page can help the review team verify your school faster.')
+
+    return {
+        'status': status,
+        'status_label': status_labels.get(status, status.replace('_', ' ').title()),
+        'badge_class': badge_classes.get(status, 'status-pending'),
+        'next_action': next_actions.get(status, ''),
+        'percent_complete': percent_complete,
+        'steps': steps,
+        'verification_target': verification_target,
+        'verification_sent_at': verification_sent_at,
+        'verification_expires_at': verification_expires_at,
+        'flags': flags,
+    }
+
+
 @app.route('/request-school-access', methods=['GET', 'POST'])
 @require_rate_limit('school_access_request_public', 8, 3600, redirect_endpoint='school_access_request', methods=('POST',))
 def school_access_request():
     """Public school onboarding request form for remote registrations."""
     challenge_text = session.get('school_access_challenge_text') or _issue_school_access_challenge()
+    recent_request = _get_recent_school_onboarding_request_context()
     tracked_request = None
+    smtp_test_result = None
+    if request.method != 'POST' and recent_request.get('request_id'):
+        tracked_request = get_school_onboarding_request(recent_request.get('request_id'))
     if request.method == 'POST':
         action = (request.form.get('form_action') or 'submit').strip().lower()
         if action == 'track':
@@ -27472,6 +28014,11 @@ def school_access_request():
                 tracked_request = None
                 flash('Request reference and admin email do not match.', 'error')
             else:
+                recent_request = _remember_recent_school_onboarding_request(
+                    request_id=request_id,
+                    school_email=tracked_request.get('school_email', ''),
+                    admin_email=tracked_request.get('admin_email', ''),
+                )
                 flash(f'Request {request_id} found.', 'success')
         elif action == 'verify_email':
             request_id = (request.form.get('verify_request_id') or '').strip().upper()
@@ -27484,6 +28031,11 @@ def school_access_request():
                     school_email=school_email,
                 )
                 tracked_request = get_school_onboarding_request(request_id)
+                recent_request = _remember_recent_school_onboarding_request(
+                    request_id=request_id,
+                    school_email=(tracked_request or {}).get('school_email') or school_email,
+                    admin_email=(tracked_request or {}).get('admin_email', ''),
+                )
                 if result.get('already_verified'):
                     flash(f'{request_id} is already email-verified and pending review.', 'success')
                 else:
@@ -27500,6 +28052,11 @@ def school_access_request():
             elif school_email and school_email != (tracked_request.get('school_email') or '').strip().lower():
                 flash('School email does not match this request.', 'error')
             else:
+                recent_request = _remember_recent_school_onboarding_request(
+                    request_id=request_id,
+                    school_email=tracked_request.get('school_email', ''),
+                    admin_email=tracked_request.get('admin_email', ''),
+                )
                 try:
                     send_result = issue_school_onboarding_email_verification_code(
                         request_id=request_id,
@@ -27508,21 +28065,73 @@ def school_access_request():
                     )
                     tracked_request = get_school_onboarding_request(request_id)
                     if int(send_result.get('sent', 0) or 0) > 0:
+                        masked_targets = ', '.join(send_result.get('masked_accepted_recipients') or send_result.get('masked_recipients') or [])
+                        delivery_note = (send_result.get('delivery_note') or '').strip()
                         flash(
-                            f'New verification code sent to {send_result.get("masked_email") or "school email"}. '
-                            'Check Inbox/Spam/Promotions.',
+                            f'New verification code email was handed to the mail server for {masked_targets or send_result.get("masked_email") or "school email"}. '
+                            'It can still take a few minutes to appear. Check Inbox/Spam/Promotions/All Mail.'
+                            + (f' {delivery_note}' if delivery_note else ''),
                             'success',
                         )
                     else:
                         err_text = '; '.join([str(e).strip() for e in (send_result.get('errors') or []) if str(e).strip()])
+                        masked_target = send_result.get('masked_email') or _mask_email_address(
+                            (tracked_request or {}).get('school_email', '')
+                        ) or 'the school email on this request'
                         flash(
-                            'Verification email could not be delivered right now.'
+                            f'Verification email could not be delivered to {masked_target} right now. '
+                            'Please check the address and try again.'
                             + (f' Detail: {err_text}' if err_text else ''),
                             'warning',
                         )
                 except Exception:
                     logging.exception("Could not resend onboarding verification code.")
                     flash('Could not resend verification code. Please retry.', 'error')
+        elif action == 'smtp_test':
+            request_id = (request.form.get('smtp_test_request_id') or '').strip().upper()
+            school_email = (request.form.get('smtp_test_school_email') or '').strip().lower()
+            admin_email = (request.form.get('smtp_test_admin_email') or '').strip().lower()
+            tracked_request = get_school_onboarding_request(request_id)
+            if not tracked_request:
+                flash('Request reference not found.', 'error')
+            else:
+                recent_request = _remember_recent_school_onboarding_request(
+                    request_id=request_id,
+                    school_email=tracked_request.get('school_email', ''),
+                    admin_email=tracked_request.get('admin_email', ''),
+                )
+                try:
+                    test_result = send_school_onboarding_smtp_test(
+                        request_id=request_id,
+                        school_email=school_email,
+                        admin_email=admin_email,
+                    )
+                    smtp_test_result = test_result
+                    tracked_targets = ', '.join(
+                        test_result.get('masked_accepted_recipients')
+                        or test_result.get('masked_recipients')
+                        or []
+                    )
+                    delivery_note = (test_result.get('delivery_note') or '').strip()
+                    if int(test_result.get('sent', 0) or 0) > 0:
+                        flash(
+                            f'SMTP test email was accepted for {tracked_targets or test_result.get("masked_email") or "the request email"}. '
+                            'If it still does not appear, check spam/promotions and the recipient mailbox settings.'
+                            + (f' {delivery_note}' if delivery_note else ''),
+                            'success',
+                        )
+                    else:
+                        err_text = '; '.join([str(e).strip() for e in (test_result.get('errors') or []) if str(e).strip()])
+                        flash(
+                            f'SMTP test could not be delivered for {test_result.get("masked_email") or "the request email"}. '
+                            'This usually means Gmail rejected the login or the recipient was rejected.'
+                            + (f' Detail: {err_text}' if err_text else '')
+                            + (f' {delivery_note}' if delivery_note else ''),
+                            'warning',
+                        )
+                except Exception:
+                    logging.exception("Could not run SMTP diagnostic test.")
+                    flash('Could not run SMTP test. Please retry.', 'error')
         elif action == 'submit_payment_proof':
             request_id = (request.form.get('payment_request_id') or '').strip().upper()
             school_email = (request.form.get('payment_school_email') or '').strip().lower()
@@ -27534,6 +28143,11 @@ def school_access_request():
             elif school_email and school_email != (tracked_request.get('school_email') or '').strip().lower():
                 flash('School email does not match this request.', 'error')
             else:
+                recent_request = _remember_recent_school_onboarding_request(
+                    request_id=request_id,
+                    school_email=tracked_request.get('school_email', ''),
+                    admin_email=tracked_request.get('admin_email', ''),
+                )
                 try:
                     proof_path = save_school_onboarding_payment_proof(request.files.get('payment_proof'))
                     amt = safe_float(payment_amount, 0.0)
@@ -27590,23 +28204,31 @@ def school_access_request():
                         user_agent=(request.headers.get('User-Agent', '') or '').strip(),
                     )
                     request_id = (submission or {}).get('request_id', '')
+                    recent_request = _remember_recent_school_onboarding_request(
+                        request_id=request_id,
+                        school_email=school_email,
+                        admin_email=admin_email,
+                    )
                     verify_send = (submission or {}).get('verification_send_result') or {}
                     masked_target = verify_send.get('masked_email') or _mask_email_address(school_email)
+                    masked_targets = ', '.join(verify_send.get('masked_accepted_recipients') or verify_send.get('masked_recipients') or [])
+                    delivery_note = (verify_send.get('delivery_note') or '').strip()
                     if int(verify_send.get('sent', 0) or 0) > 0:
                         verification_note = (
-                            f'Verify school email with the code sent to {masked_target} '
+                            f'Verify school email with the code sent through the mail server to {masked_targets or masked_target} '
                             'to move this request to super-admin review queue.'
                         )
                         flash(
-                            f'Request submitted successfully. Reference: {request_id}. '
-                            f'{verification_note}',
+                            f'Request saved successfully. Reference: {request_id}. '
+                            f'{verification_note}'
+                            + (f' {delivery_note}' if delivery_note else ''),
                             'success',
                         )
                     else:
                         err_text = '; '.join([str(e).strip() for e in (verify_send.get('errors') or []) if str(e).strip()])
                         flash(
-                            f'Request submitted successfully. Reference: {request_id}. '
-                            'Verification email could not be delivered right now. '
+                            f'Request saved successfully. Reference: {request_id}. '
+                            f'Verification email could not be delivered to {masked_target} right now. '
                             'Use "Resend Code" after SMTP is configured.'
                             + (f' Detail: {err_text}' if err_text else ''),
                             'warning',
@@ -27654,11 +28276,15 @@ def school_access_request():
                     flash('Could not submit request. Please retry in a moment.', 'error')
         # Rotate challenge after any post attempt.
         challenge_text = _issue_school_access_challenge()
+    tracked_request_status = _build_school_onboarding_status_overview(tracked_request)
     return render_template(
         'shared/school_access_request.html',
         challenge_text=challenge_text,
         tracked_request=tracked_request,
+        tracked_request_status=tracked_request_status,
+        recent_request=recent_request,
         manual_payment_info=get_manual_payment_info(),
+        smtp_test_result=smtp_test_result,
     )
 
 
@@ -30678,7 +31304,7 @@ def school_admin_dashboard():
 
     class_subject_options = {}
     try:
-        classnames_for_options = get_secondary_school_classnames(school_id)
+        classnames_for_options = get_supported_school_classnames(school_id)
     except Exception as exc:
         logging.warning("Failed to load school class names for dashboard subject options: %s", exc)
         classnames_for_options = []
@@ -30744,6 +31370,13 @@ def school_admin_dashboard():
         except Exception as exc:
             logging.warning("Failed to load subject assignments for missing score alerts: %s", exc)
             all_term_subject_assignments = []
+        all_term_subject_assignments = list(all_term_subject_assignments or []) + build_class_teacher_subject_rows_for_non_subject_classes(
+            school_id,
+            assignments,
+            term=current_term,
+            academic_year=current_year,
+            school=school,
+        )
 
     assigned_pairs = {}
     for row in (all_term_subject_assignments or []):
@@ -31038,14 +31671,9 @@ def school_admin_notifications():
 
     if school_uses_dean_led_score_entry(school):
         try:
-            class_candidates = filter_secondary_classnames(
-                {str(name).strip() for name in get_secondary_school_classnames(school_id) if str(name).strip()}
-                | {str(name).strip() for name in class_options if str(name).strip()}
-            )
+            class_candidates = get_supported_school_classnames(school_id)
         except Exception:
-            class_candidates = filter_secondary_classnames(
-                [str(name).strip() for name in class_options if str(name).strip()]
-            )
+            class_candidates = []
         all_term_subject_assignments = []
         for cls in class_candidates:
             config = get_class_subject_config(school_id, cls) or {}
@@ -31078,6 +31706,13 @@ def school_admin_notifications():
         except Exception as exc:
             logging.warning("Failed to load subject assignments for school-admin notifications: %s", exc)
             all_term_subject_assignments = []
+        all_term_subject_assignments = list(all_term_subject_assignments or []) + build_class_teacher_subject_rows_for_non_subject_classes(
+            school_id,
+            get_class_assignments(school_id) or [],
+            term=current_term,
+            academic_year=current_year,
+            school=school,
+        )
 
     assigned_pairs = {}
     for row in (all_term_subject_assignments or []):
@@ -31256,15 +31891,16 @@ def school_admin_teacher_assignments():
         academic_year=current_year,
     ) or []
 
-    configured_classes = set(get_secondary_school_classnames(school_id) or [])
-    class_options = filter_secondary_classnames(
+    configured_classes = set(get_supported_school_classnames(school_id) or [])
+    class_options = filter_supported_classnames(
         {str(name).strip() for name in class_counts.keys() if str(name).strip()}
         | {str((row.get('classname') or '')).strip() for row in class_assignments if str((row.get('classname') or '')).strip()}
         | {str(c).strip() for c in configured_classes if str(c).strip()}
     )
 
+    secondary_class_options = filter_secondary_classnames(class_options)
     class_subject_options = {}
-    for cls in class_options:
+    for cls in secondary_class_options:
         config = get_class_subject_config(school_id, cls) or {}
         subjects = normalize_subjects_list(
             (config.get('core_subjects') or [])
@@ -31314,6 +31950,10 @@ def school_admin_teacher_assignments():
         str(r.get('classname') or '').lower(),
         str(r.get('teacher_name') or '').lower(),
     ))
+    subject_assignments = [
+        row for row in (subject_assignments or [])
+        if class_uses_subject_teachers(row.get('classname', ''))
+    ]
     subject_assignments.sort(key=lambda r: (
         str(r.get('classname') or '').lower(),
         str(r.get('subject') or '').lower(),
@@ -31456,12 +32096,12 @@ def school_admin_messages():
     class_counts = get_student_count_by_class(school_id) or {}
 
     try:
-        class_options = filter_secondary_classnames(
-            {str(name).strip() for name in get_secondary_school_classnames(school_id) if str(name).strip()}
+        class_options = filter_supported_classnames(
+            {str(name).strip() for name in get_supported_school_classnames(school_id) if str(name).strip()}
             | {str(name).strip() for name in class_counts.keys() if str(name).strip()}
         )
     except Exception:
-        class_options = filter_secondary_classnames(
+        class_options = filter_supported_classnames(
             [str(name).strip() for name in class_counts.keys() if str(name).strip()]
         )
 
@@ -32694,8 +33334,8 @@ def school_admin_class_subjects():
         if not classname:
             flash('Class name is required.', 'error')
             return redirect(url_for('school_admin_class_subjects'))
-        if not is_secondary_classname(classname):
-            flash('Only secondary classes are supported (JSS/SS).', 'error')
+        if not is_supported_classname(classname):
+            flash('Only Nursery, Primary, JSS, and SS classes are supported.', 'error')
             return redirect(url_for('school_admin_class_subjects'))
         school = get_school(school_id) or {}
 
@@ -32779,7 +33419,7 @@ def school_admin_class_subjects():
 
     configs = get_all_class_subject_configs(school_id)
     school = get_school(school_id) or {}
-    class_options = filter_secondary_classnames(subject_catalog_map.keys())
+    class_options = filter_supported_classnames(subject_catalog_map.keys())
     return render_template(
         'school/school_admin_class_subjects.html',
         configs=configs,
@@ -33762,7 +34402,7 @@ def _build_school_settings_assessment_configs_from_request(school_id, form_data)
             100 - _normalize_non_negative_int(form_data.get('test_score_max', 30), 30, 100),
         ),
     )
-    for level in ('jss', 'ss'):
+    for level in ASSESSMENT_LEVELS:
         current = current_configs.get(level) or get_default_assessment_config(level)
         exam_mode = (form_data.get(f'exam_mode_{level}', current.get('exam_mode', 'separate')) or 'separate').strip().lower()
         if exam_mode not in {'combined', 'separate'}:
@@ -35266,18 +35906,14 @@ def school_admin_promote():
         sid: data for sid, data in students.items()
         if not selected_class or canonicalize_classname(data.get('classname', '')) == selected_class_key
     }
-    base_to_classes = [
-        'JSS1', 'JSS2', 'JSS3',
-        'SS1', 'SS2', 'SS3',
-        'GRADUATED',
-    ]
+    base_to_classes = list(SUPPORTED_CLASS_SEQUENCE) + ['GRADUATED']
     suggested_next_class = next_class_in_sequence(selected_class_display or selected_class) if selected_class else ''
     to_class_options = _dedupe_keep_order(
         [x for x in (base_to_classes + sorted(classes) + ([suggested_next_class] if suggested_next_class else [])) if x]
     )
     return render_template(
         'school/promote_students.html',
-        classes=sorted(classes),
+        classes=sorted(classes, key=_class_sort_key),
         to_class_options=to_class_options,
         suggested_next_class=suggested_next_class,
         students=class_students,
@@ -35344,7 +35980,7 @@ def school_admin_timetable():
     current_year = (school or {}).get('academic_year', '')
     dean_led_mode = school_uses_dean_led_score_entry(school)
     assignments = get_class_assignments(school_id)
-    classes = filter_secondary_classnames(
+    classes = filter_supported_classnames(
         set(get_student_count_by_class(school_id).keys())
         | {a.get('classname', '') for a in assignments if a.get('classname')}
     )
@@ -35361,6 +35997,33 @@ def school_admin_timetable():
         teacher_id_key = (row.get('teacher_id', '') or '').strip()
         if cls_key and subj_key and teacher_id_key:
             subject_teacher_by_key[(cls_key, subj_key)] = teacher_id_key
+    class_teacher_by_class = {}
+    for row in assignments or []:
+        if (row.get('term') or '').strip() != current_term:
+            continue
+        if (row.get('academic_year') or '').strip() != (current_year or ''):
+            continue
+        cls_key = canonicalize_classname(row.get('classname', '')).strip().lower()
+        teacher_id_key = (row.get('teacher_id', '') or '').strip()
+        if cls_key and teacher_id_key and cls_key not in class_teacher_by_class:
+            class_teacher_by_class[cls_key] = teacher_id_key
+
+    def resolve_timetable_teacher_id(classname, subject):
+        cls_key = canonicalize_classname(classname).strip().lower()
+        if not cls_key:
+            return ''
+        if class_uses_subject_teachers(classname):
+            return subject_teacher_by_key.get((cls_key, normalize_subject_name(subject).strip().lower()), '')
+        return class_teacher_by_class.get(cls_key, '')
+
+    def missing_timetable_teacher_message(classname, subject):
+        if class_uses_subject_teachers(classname):
+            return (
+                f'No teacher subject assignment found for "{subject}" in class "{classname}" '
+                f'for {current_term} {current_year}.'
+            )
+        return f'No class teacher assignment found for "{classname}" ({current_term}, {current_year}).'
+
     if request.method == 'POST':
         action = (request.form.get('action', '') or '').strip().lower()
         actor_user_id = (session.get('user_id') or '').strip()
@@ -35444,12 +36107,9 @@ def school_admin_timetable():
                     room = (source_payload.get('room') or '').strip()
                     if not classname or not period_label or not subject or day_of_week < 1 or day_of_week > 7:
                         raise ValueError('History entry is incomplete and cannot be restored.')
-                    teacher_id = subject_teacher_by_key.get((classname.strip().lower(), subject.strip().lower()), '')
+                    teacher_id = resolve_timetable_teacher_id(classname, subject)
                     if not teacher_id and not dean_led_mode:
-                        raise ValueError(
-                            f'No teacher subject assignment found for "{subject}" in class "{classname}" '
-                            f'for {current_term} {current_year}.'
-                        )
+                        raise ValueError(missing_timetable_teacher_message(classname, subject))
                     existing_before = _slot_lookup_row(c, classname, day_of_week, period_label)
                     existing_id = int(existing_before.get('id') or 0)
                     conflicts = find_timetable_time_conflicts(
@@ -35533,8 +36193,8 @@ def school_admin_timetable():
                         if not classname or not day_raw or not period_label or not subject:
                             row_errors.append(f'Row {idx}: classname/day/period_label/subject are required.')
                             continue
-                        if not is_secondary_classname(classname):
-                            row_errors.append(f'Row {idx}: only secondary classes are supported (JSS/SS).')
+                        if not is_supported_classname(classname):
+                            row_errors.append(f'Row {idx}: only Nursery, Primary, JSS, and SS classes are supported.')
                             continue
                         day_of_week = day_map.get(day_raw)
                         if day_of_week is None:
@@ -35546,11 +36206,9 @@ def school_admin_timetable():
                         if end_time and not re.fullmatch(r'\d{2}:\d{2}', end_time):
                             row_errors.append(f'Row {idx}: end_time must be HH:MM.')
                             continue
-                        teacher_id = subject_teacher_by_key.get((classname.strip().lower(), subject.strip().lower()), '')
+                        teacher_id = resolve_timetable_teacher_id(classname, subject)
                         if not teacher_id and not dean_led_mode:
-                            row_errors.append(
-                                f'Row {idx}: no teacher subject assignment found for "{subject}" in class "{classname}" ({current_term}, {current_year}).'
-                            )
+                            row_errors.append(f'Row {idx}: {missing_timetable_teacher_message(classname, subject)}')
                             continue
                         existing_before = _slot_lookup_row(c, classname, day_of_week, period_label)
                         existing_id = int(existing_before.get('id') or 0)
@@ -35617,20 +36275,17 @@ def school_admin_timetable():
                     room = (request.form.get('room', '') or '').strip()
                     if not classname or not period_label or not subject:
                         raise ValueError('Class, period label, and subject are required.')
-                    if not is_secondary_classname(classname):
-                        raise ValueError('Only secondary classes are supported (JSS/SS).')
+                    if not is_supported_classname(classname):
+                        raise ValueError('Only Nursery, Primary, JSS, and SS classes are supported.')
                     if day_of_week < 1 or day_of_week > 7:
                         raise ValueError('Day must be between 1 and 7.')
                     if start_time and not re.fullmatch(r'\d{2}:\d{2}', start_time):
                         raise ValueError('Start time must be HH:MM.')
                     if end_time and not re.fullmatch(r'\d{2}:\d{2}', end_time):
                         raise ValueError('End time must be HH:MM.')
-                    teacher_id = subject_teacher_by_key.get((classname.strip().lower(), subject.strip().lower()), '')
+                    teacher_id = resolve_timetable_teacher_id(classname, subject)
                     if not teacher_id and not dean_led_mode:
-                        raise ValueError(
-                            f'No teacher subject assignment found for "{subject}" in class "{classname}" '
-                            f'for {current_term} {current_year}. Assign subject teacher first on dashboard.'
-                        )
+                        raise ValueError(missing_timetable_teacher_message(classname, subject))
                     existing_before = _slot_lookup_row(c, classname, day_of_week, period_label)
                     existing_id = int(existing_before.get('id') or 0)
                     conflicts = find_timetable_time_conflicts(
@@ -35746,8 +36401,8 @@ def school_admin_timetable_template():
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow(['classname', 'day_of_week', 'period_label', 'subject', 'start_time', 'end_time', 'room'])
-    writer.writerow(['JSS1', '1', 'Period 1', 'Mathematics', '08:00', '08:40', 'Room A1'])
-    writer.writerow(['JSS1', 'Monday', 'Period 2', 'English Language', '08:40', '09:20', 'Room A1'])
+    writer.writerow(['PRIMARY1', '1', 'Period 1', 'Mathematics', '08:00', '08:40', 'Room A1'])
+    writer.writerow(['PRIMARY1', 'Monday', 'Period 2', 'English Language', '08:40', '09:20', 'Room A1'])
 
     return Response(
         output.getvalue(),
@@ -35848,7 +36503,7 @@ def teacher_subject_rank_history():
         if (r.get('academic_year') or '').strip() == selected_year
         and (r.get('term') or '').strip() == selected_term
     ]
-    class_options = filter_secondary_classnames(
+    class_options = filter_supported_classnames(
         {(r.get('classname') or '').strip() for r in scoped_assignments if (r.get('classname') or '').strip()}
     )
     selected_class = (request.args.get('classname', '') or '').strip()
@@ -36516,8 +37171,8 @@ def school_admin_historical_results_template_prefill():
     if not classname:
         flash('Select a class to generate the prefilled historical template.', 'error')
         return redirect(url_for('school_admin_bulk_tools'))
-    if not is_secondary_classname(classname):
-        flash('Historical template class must be a secondary class (JSS/SS).', 'error')
+    if not is_supported_classname(classname):
+        flash('Historical template class must be Nursery, Primary, JSS, or SS.', 'error')
         return redirect(url_for('school_admin_bulk_tools'))
 
     school = get_school(school_id) or {}
@@ -36582,7 +37237,7 @@ def school_admin_bulk_tools():
         flash('School session is missing. Please log in again.', 'error')
         return redirect(url_for('login'))
     school = get_school(school_id) or {}
-    historical_class_options = get_secondary_school_classnames(school_id) or []
+    historical_class_options = get_supported_school_classnames(school_id) or []
     schedule = get_backup_schedule_settings(school_id)
     storage_usage = compute_school_storage_usage(school_id)
     backup_health = get_backup_health_summary(school_id, days=30)
@@ -36912,7 +37567,7 @@ def school_admin_attendance_summary():
     school = get_school(school_id) or {}
     selected_term = (request.args.get('term', '') or '').strip() or get_current_term(school)
     selected_year = (request.args.get('academic_year', '') or '').strip() or (school.get('academic_year', '') or '')
-    classnames = get_secondary_school_classnames(school_id) or []
+    classnames = get_supported_school_classnames(school_id) or []
     rows = []
     for cls in classnames:
         summary = get_class_attendance_summary(
@@ -37319,14 +37974,14 @@ def school_admin_import_target(target):
                 if not classname:
                     add_error(idx, row, 'classname is required.')
                     continue
-                if not is_secondary_classname(classname):
-                    add_error(idx, row, 'classname must be a secondary class (JSS/SS).')
+                if not is_supported_classname(classname):
+                    add_error(idx, row, 'classname must be Nursery, Primary, JSS, or SS.')
                     continue
                 first_year_class = canonicalize_classname(student_cell(row, first_year_class_header, '') or student_cell(row, classname_header, ''))
                 if not first_year_class:
                     first_year_class = classname
-                if not is_secondary_classname(first_year_class):
-                    add_error(idx, row, 'first_year_class must be a secondary class (JSS/SS).')
+                if not is_supported_classname(first_year_class):
+                    add_error(idx, row, 'first_year_class must be Nursery, Primary, JSS, or SS.')
                     continue
                 sid_raw = (
                     (student_cell(row, firstname_header, '') or '').strip()
@@ -37494,7 +38149,7 @@ def school_admin_import_target(target):
         elif target_key == 'class_assignments':
             teachers_map = get_teachers(school_id)
             teacher_ids = {k.lower() for k in (teachers_map or {}).keys()}
-            class_candidates = [str(c).strip() for c in (get_secondary_school_classnames(school_id) or []) if str(c).strip()]
+            class_candidates = [str(c).strip() for c in (get_supported_school_classnames(school_id) or []) if str(c).strip()]
             school = get_school(school_id) or {}
             default_year = (school.get('academic_year', '') or '').strip()
             for idx, row in enumerate(rows, start=2):
@@ -37516,8 +38171,8 @@ def school_admin_import_target(target):
                 if class_candidates and not class_belongs_to_school_or_arm(school_id, classname, class_candidates=class_candidates):
                     add_error(idx, row, f'classname "{classname}" is not a valid class for this school.')
                     continue
-                if not is_secondary_classname(classname):
-                    add_error(idx, row, 'classname must be a secondary class (JSS/SS).')
+                if not is_supported_classname(classname):
+                    add_error(idx, row, 'classname must be a supported Nursery, Primary, JSS, or SS class.')
                     continue
                 arm_variants = class_arm_variants_for_base(class_candidates, classname)
                 if arm_variants and not is_class_arm_variant(classname):
@@ -37552,8 +38207,8 @@ def school_admin_import_target(target):
             if not classname:
                 flash('Enter the historical class for this import.', 'error')
                 return redirect(url_for('school_admin_bulk_tools'))
-            if not is_secondary_classname(classname):
-                flash('Historical class must be a secondary class (JSS/SS).', 'error')
+            if not is_supported_classname(classname):
+                flash('Historical class must be Nursery, Primary, JSS, or SS.', 'error')
                 return redirect(url_for('school_admin_bulk_tools'))
             if term not in {'First Term', 'Second Term', 'Third Term'}:
                 flash('Select a valid historical term.', 'error')
@@ -39049,8 +39704,8 @@ def school_admin_add_students_by_class():
         if term not in valid_terms:
             flash('Invalid term selected.', 'error')
             return redirect(url_for('school_admin_add_students_by_class'))
-        if not is_secondary_classname(classname):
-            flash('Only secondary classes are supported (JSS/SS).', 'error')
+        if not is_supported_classname(classname):
+            flash('Only Nursery, Primary, JSS, and SS classes are supported.', 'error')
             return redirect(url_for('school_admin_add_students_by_class'))
         if not config:
             defaults = _catalog_defaults_for_class(classname)
@@ -39276,7 +39931,7 @@ def school_admin_add_students_by_class():
             )
 
     # Keep the follow-up GET light: only load the selected class roster instead of the whole school.
-    class_options = get_secondary_school_classnames(school_id)
+    class_options = get_supported_school_classnames(school_id)
     class_students_map = load_students(school_id, class_filter=selected_class, include_archived=True) if selected_class else {}
     class_students = [
         {
@@ -39319,8 +39974,8 @@ def school_admin_assign_teacher():
     if term not in valid_terms:
         flash('Invalid term selected.', 'error')
         return redirect(fallback_redirect)
-    if classname and not is_secondary_classname(classname):
-        flash('Only secondary classes are supported (JSS/SS).', 'error')
+    if classname and not is_supported_classname(classname):
+        flash('Only Nursery, Primary, JSS, and SS classes are supported.', 'error')
         return redirect(fallback_redirect)
     
     if teacher_id and classname:
@@ -39332,7 +39987,7 @@ def school_admin_assign_teacher():
             if int(teacher_profile.get('is_archived', 0) or 0):
                 flash('Selected teacher is archived. Restore teacher before assigning.', 'error')
                 return redirect(fallback_redirect)
-            class_candidates = get_secondary_school_classnames(school_id)
+            class_candidates = get_supported_school_classnames(school_id)
             if not class_belongs_to_school_or_arm(school_id, classname, class_candidates=class_candidates):
                 flash('Selected class does not exist for your school.', 'error')
                 return redirect(fallback_redirect)
@@ -39410,7 +40065,7 @@ def school_admin_assign_subject_teacher():
         return redirect(fallback_redirect)
     invalid_classnames = [cls for cls in selected_classnames if cls and not is_secondary_classname(cls)]
     if invalid_classnames:
-        flash('Only secondary classes are supported (JSS/SS).', 'error')
+        flash('Subject teachers are only assigned to secondary classes (JSS/SS). Use class teacher assignment for Nursery/Primary.', 'error')
         return redirect(fallback_redirect)
 
     try:
@@ -39419,7 +40074,7 @@ def school_admin_assign_subject_teacher():
 
         class_candidates = get_secondary_school_classnames(school_id)
         if not class_candidates:
-            flash('No classes available for subject assignment yet.', 'error')
+            flash('No secondary classes available for subject assignment yet.', 'error')
             return redirect(fallback_redirect)
         class_candidates = _dedupe_keep_order([
             canonicalize_classname(str(c).strip())
@@ -39432,6 +40087,9 @@ def school_admin_assign_subject_teacher():
             if not selected_classnames and legacy_classname:
                 selected_classnames = [legacy_classname]
             for cls in selected_classnames:
+                if not is_secondary_classname(cls):
+                    flash('Subject teachers are only assigned to secondary classes (JSS/SS). Use class teacher assignment for Nursery/Primary.', 'error')
+                    return redirect(fallback_redirect)
                 if cls in class_candidates:
                     continue
                 if class_belongs_to_school_or_arm(school_id, cls, class_candidates=class_candidates):
@@ -39641,14 +40299,14 @@ def school_admin_send_student_message():
             flash('Select class for stream-targeted message.', 'error')
             return redirect(url_for('school_admin_messages'))
     school = get_school(school_id) or {}
-    class_candidates = get_secondary_school_classnames(school_id) or []
+    class_candidates = get_supported_school_classnames(school_id) or []
     class_candidates_canon = {canonicalize_classname(c) for c in class_candidates if str(c).strip()}
     if target_mode in {'class', 'stream'}:
         if target_classname and target_classname not in class_candidates_canon:
             flash('Selected class is not valid for your school.', 'error')
             return redirect(url_for('school_admin_messages'))
-        if target_classname and not is_secondary_classname(target_classname):
-            flash('Only secondary classes are supported (JSS/SS).', 'error')
+        if target_classname and not is_supported_classname(target_classname):
+            flash('Only Nursery, Primary, JSS, and SS classes are supported.', 'error')
             return redirect(url_for('school_admin_messages'))
     if target_mode == 'stream':
         normalized_stream, stream_error = normalize_stream_for_class(target_classname, target_stream, school)
@@ -39808,14 +40466,14 @@ def school_admin_send_teacher_message():
             flash('Select both class and subject for this teacher message target.', 'error')
             return redirect(url_for('school_admin_messages'))
 
-    class_candidates = get_secondary_school_classnames(school_id) or []
+    class_candidates = get_supported_school_classnames(school_id) or []
     class_candidates_canon = {canonicalize_classname(c) for c in class_candidates if str(c).strip()}
     if target_mode in {'class', 'class_subject'}:
         if target_classname and target_classname not in class_candidates_canon:
             flash('Selected class is not valid for your school.', 'error')
             return redirect(url_for('school_admin_messages'))
-        if target_classname and not is_secondary_classname(target_classname):
-            flash('Only secondary classes are supported (JSS/SS).', 'error')
+        if target_classname and not is_supported_classname(target_classname):
+            flash('Only Nursery, Primary, JSS, and SS classes are supported.', 'error')
             return redirect(url_for('school_admin_messages'))
 
     def _subjects_for_class(cls_name):
@@ -41633,7 +42291,7 @@ def teacher_attendance():
     if not classes:
         flash('No class assignment found for attendance.', 'error')
         return redirect(url_for('teacher_dashboard'))
-    classes = filter_secondary_classnames(set(classes))
+    classes = filter_supported_classnames(set(classes))
 
     selected_class = (request.values.get('classname', '') or '').strip()
     if selected_class not in classes:
@@ -43022,9 +43680,12 @@ def teacher_enter_scores():
         term=current_term,
         academic_year=current_year,
     )
-    subject_access = True if role == 'school_admin' else (False if dean_led_mode else bool(get_teacher_subjects_for_class_term(
-        school_id, teacher_id, class_name, term=current_term, academic_year=current_year
-    )))
+    subject_access = True if role == 'school_admin' else (
+        False if dean_led_mode or not class_uses_subject_teachers(class_name)
+        else bool(get_teacher_subjects_for_class_term(
+            school_id, teacher_id, class_name, term=current_term, academic_year=current_year
+        ))
+    )
     if dean_led_mode:
         if role == 'teacher' and not class_access:
             flash('You are not assigned to this student class.', 'error')
@@ -43056,19 +43717,23 @@ def teacher_enter_scores():
         get_student_offered_subjects_for_class(student, school_id, school=school),
         key=lambda x: str(x).lower(),
     )
-    assigned_subjects = get_teacher_subjects_for_class_term(
-        school_id,
-        teacher_id,
-        student.get('classname', ''),
-        term=current_term,
-        academic_year=current_year,
+    assigned_subjects = (
+        get_teacher_subjects_for_class_term(
+            school_id,
+            teacher_id,
+            student.get('classname', ''),
+            term=current_term,
+            academic_year=current_year,
+        )
+        if class_uses_subject_teachers(student.get('classname', ''))
+        else []
     )
     assigned_subjects_set = {s.lower() for s in assigned_subjects}
     can_edit_teacher_comment = bool(class_access)
     can_edit_behaviour = bool(class_access) and role == 'school_admin'
     behaviour_entry_is_separate = bool(class_access) and role == 'teacher'
     locked_subjects_for_class = []
-    if class_access and not dean_led_mode and role != 'school_admin':
+    if class_access and not dean_led_mode and role != 'school_admin' and class_uses_subject_teachers(class_name):
         class_subject_assignments = get_teacher_subject_assignments(
             school_id,
             classname=class_name,

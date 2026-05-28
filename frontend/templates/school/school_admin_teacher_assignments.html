@@ -153,8 +153,8 @@
                 </div>
                 <div class="form-group">
                   <label for="class_name">Class</label>
-                  <input id="class_name" name="classname" list="class_options_list" placeholder="e.g., JSS1A" required />
-                  <p class="note-line">You can type class arms like JSS1A, JSS1B, SS2C.</p>
+                  <input id="class_name" name="classname" list="class_options_list" placeholder="e.g., Primary1A" required />
+                  <p class="note-line">You can type class arms like Primary1A, JSS1B, SS2C.</p>
                 </div>
                 <div class="form-group">
                   <label for="class_term">Term</label>
@@ -171,7 +171,8 @@
             {% if not school or school.score_entry_mode != 'dean_led' %}
             <div class="card">
               <h2><i class="fas fa-list-check"></i> Assign Subject Teacher</h2>
-              <p class="note-line">Choose a teacher, choose a subject, then mark the classes that offer that subject for {{ current_term }} {{ current_year }}.</p>
+              <p class="note-line">Secondary classes only. Nursery and Primary use their class teacher for all subjects.</p>
+              <p class="note-line">Choose a teacher, choose a subject, then mark the secondary classes that offer that subject for {{ current_term }} {{ current_year }}.</p>
               <form action="{{ url_for('school_admin_assign_subject_teacher') }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                 <input type="hidden" name="return_to" value="school_admin_teacher_assignments" />
@@ -364,7 +365,7 @@
         }
         function baseClassKey(value) {
           var canon = canonicalizeClassName(value);
-          var m = canon.match(/^(JSS|SSS|SS)(\d+)/);
+          var m = canon.match(/^(NURSERY|PRIMARY|JSS|SSS|SS)(\d+)/);
           if (!m) return canon;
           var level = m[1] === 'SSS' ? 'SS' : m[1];
           return '' + level + m[2];
@@ -487,4 +488,3 @@
       {% include "shared/_loading_overlay.html" %}
 </body>
 </html>
-

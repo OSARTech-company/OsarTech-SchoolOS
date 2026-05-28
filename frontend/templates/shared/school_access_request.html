@@ -8,6 +8,116 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308b') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .onboarding-journey,
+        .quick-facts,
+        .timeline-list {
+            display: grid;
+            gap: 14px;
+        }
+        .onboarding-journey {
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        }
+        .journey-step,
+        .fact-box,
+        .timeline-step {
+            border: 1px solid rgba(18, 49, 77, 0.12);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.88);
+            padding: 14px 16px;
+        }
+        .journey-step span,
+        .fact-box span,
+        .timeline-step span {
+            display: block;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #6b7a8f;
+            margin-bottom: 6px;
+        }
+        .journey-step strong,
+        .fact-box strong,
+        .timeline-step strong {
+            color: #12314d;
+        }
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .status-badge.status-pending {
+            background: rgba(245, 158, 11, 0.14);
+            color: #9a6700;
+        }
+        .status-badge.status-approved {
+            background: rgba(22, 163, 74, 0.14);
+            color: #166534;
+        }
+        .status-badge.status-rejected,
+        .status-badge.status-closed {
+            background: rgba(220, 38, 38, 0.12);
+            color: #991b1b;
+        }
+        .progress-track {
+            margin: 12px 0 8px;
+            width: 100%;
+            height: 12px;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(18, 49, 77, 0.1);
+        }
+        .progress-track span {
+            display: block;
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #0f766e 0%, #14b8a6 100%);
+        }
+        .timeline-list {
+            margin-top: 16px;
+        }
+        .timeline-step.done {
+            border-color: rgba(22, 163, 74, 0.25);
+        }
+        .timeline-step.optional {
+            background: rgba(248, 250, 252, 0.95);
+        }
+        .callout-note {
+            border-left: 4px solid #0f766e;
+            background: rgba(15, 118, 110, 0.08);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-top: 14px;
+        }
+        .flag-list {
+            margin: 12px 0 0;
+            padding-left: 18px;
+            color: #4b5563;
+        }
+        .mini-label {
+            margin: 0 0 6px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #6b7a8f;
+        }
+        @media (max-width: 640px) {
+            .status-header {
+                flex-direction: column;
+            }
+        }
+    </style>
 </head>
 <body>
     {% include "shared/_loading_overlay.html" %}
@@ -24,6 +134,59 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
+
+        {% if recent_request and recent_request.request_id %}
+        <div class="card">
+            <div class="status-header">
+                <div>
+                    <p class="mini-label">Recent Request</p>
+                    <h2><i class="fas fa-bookmark"></i> Continue Your Onboarding</h2>
+                    <p class="note">Your latest request details stay here so you can verify email, upload payment proof, or track progress without retyping everything.</p>
+                </div>
+                <span class="status-badge status-pending">Saved for this browser session</span>
+            </div>
+            <div class="quick-facts">
+                <div class="fact-box">
+                    <span>Request Reference</span>
+                    <strong>{{ recent_request.request_id }}</strong>
+                </div>
+                <div class="fact-box">
+                    <span>School Email</span>
+                    <strong>{{ recent_request.school_email or '-' }}</strong>
+                </div>
+                <div class="fact-box">
+                    <span>Admin Email</span>
+                    <strong>{{ recent_request.admin_email or '-' }}</strong>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <h2><i class="fas fa-route"></i> How Onboarding Works</h2>
+            <div class="onboarding-journey">
+                <div class="journey-step">
+                    <span>Step 1</span>
+                    <strong>Submit your school details</strong>
+                    <p class="note">Provide the school profile, official contacts, and proof document once.</p>
+                </div>
+                <div class="journey-step">
+                    <span>Step 2</span>
+                    <strong>Verify the school email</strong>
+                    <p class="note">Use the 6-digit code sent after submission to enter the review queue.</p>
+                </div>
+                <div class="journey-step">
+                    <span>Step 3</span>
+                    <strong>Manual verification</strong>
+                    <p class="note">The super admin confirms phone and document checks before approval.</p>
+                </div>
+                <div class="journey-step">
+                    <span>Step 4</span>
+                    <strong>Approval and invite</strong>
+                    <p class="note">Once approved, the proposed admin receives an account setup invite.</p>
+                </div>
+            </div>
+        </div>
 
         <div class="card">
             <h2><i class="fas fa-file-signature"></i> School Registration Request</h2>
@@ -97,11 +260,11 @@
                 <input type="hidden" name="form_action" value="verify_email">
                 <div>
                     <label for="verify_request_id">Request Reference</label>
-                    <input id="verify_request_id" name="verify_request_id" type="text" placeholder="REQ-20260308-ABC123" required>
+                    <input id="verify_request_id" name="verify_request_id" type="text" placeholder="REQ-20260308-ABC123" value="{{ recent_request.request_id if recent_request else '' }}" required>
                 </div>
                 <div>
                     <label for="verify_school_email">School Email</label>
-                    <input id="verify_school_email" name="verify_school_email" type="email" placeholder="info@school.com">
+                    <input id="verify_school_email" name="verify_school_email" type="email" placeholder="info@school.com" value="{{ recent_request.school_email if recent_request else '' }}">
                 </div>
                 <div>
                     <label for="verify_code">Verification Code</label>
@@ -114,14 +277,80 @@
                 <input type="hidden" name="form_action" value="resend_verify_code">
                 <div>
                     <label for="resend_request_id">Request Reference</label>
-                    <input id="resend_request_id" name="resend_request_id" type="text" placeholder="REQ-20260308-ABC123" required>
+                    <input id="resend_request_id" name="resend_request_id" type="text" placeholder="REQ-20260308-ABC123" value="{{ recent_request.request_id if recent_request else '' }}" required>
                 </div>
                 <div>
                     <label for="resend_school_email">School Email</label>
-                    <input id="resend_school_email" name="resend_school_email" type="email" placeholder="info@school.com">
+                    <input id="resend_school_email" name="resend_school_email" type="email" placeholder="info@school.com" value="{{ recent_request.school_email if recent_request else '' }}">
                 </div>
                 <button type="submit" class="btn btn-secondary"><i class="fas fa-paper-plane"></i> Resend Code</button>
             </form>
+            <form method="POST" action="{{ url_for('school_access_request') }}" class="toolbar" style="margin-top:10px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="form_action" value="smtp_test">
+                <div>
+                    <label for="smtp_test_request_id">Request Reference</label>
+                    <input id="smtp_test_request_id" name="smtp_test_request_id" type="text" placeholder="REQ-20260308-ABC123" value="{{ recent_request.request_id if recent_request else '' }}" required>
+                </div>
+                <div>
+                    <label for="smtp_test_school_email">School Email</label>
+                    <input id="smtp_test_school_email" name="smtp_test_school_email" type="email" placeholder="info@school.com" value="{{ recent_request.school_email if recent_request else '' }}">
+                </div>
+                <div>
+                    <label for="smtp_test_admin_email">Admin Email (optional)</label>
+                    <input id="smtp_test_admin_email" name="smtp_test_admin_email" type="email" placeholder="admin@school.com" value="{{ recent_request.admin_email if recent_request else '' }}">
+                </div>
+                <button type="submit" class="btn btn-secondary"><i class="fas fa-vial"></i> Send SMTP Test</button>
+            </form>
+            {% if smtp_test_result %}
+            <div class="callout-note" style="margin-top:14px;">
+                <strong>SMTP test result</strong>
+                <div class="quick-facts" style="margin-top:10px;">
+                    <div class="fact-box">
+                        <span>Status</span>
+                        <strong>{% if smtp_test_result.smtp_accepted %}Accepted{% else %}Not accepted{% endif %}</strong>
+                    </div>
+                    <div class="fact-box">
+                        <span>Sent Count</span>
+                        <strong>{{ smtp_test_result.sent if smtp_test_result.sent is not none else 0 }}</strong>
+                    </div>
+                    <div class="fact-box">
+                        <span>Recipients</span>
+                        <strong>
+                            {% if smtp_test_result.masked_accepted_recipients %}
+                                {{ smtp_test_result.masked_accepted_recipients | join(', ') }}
+                            {% elif smtp_test_result.masked_recipients %}
+                                {{ smtp_test_result.masked_recipients | join(', ') }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </strong>
+                    </div>
+                    <div class="fact-box">
+                        <span>Message IDs</span>
+                        <strong>{% if smtp_test_result.message_ids %}{{ smtp_test_result.message_ids | join(', ') }}{% else %}-{% endif %}</strong>
+                    </div>
+                </div>
+                {% if smtp_test_result.delivery_note %}
+                <p class="note" style="margin:10px 0 0;"><strong>Delivery note:</strong> {{ smtp_test_result.delivery_note }}</p>
+                {% endif %}
+                {% if smtp_test_result.errors %}
+                <p class="note" style="margin:10px 0 0;"><strong>Errors:</strong></p>
+                <ul class="flag-list">
+                    {% for err in smtp_test_result.errors %}
+                    <li>{{ err }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% if smtp_test_result.masked_rejected_recipients %}
+                <p class="note" style="margin:10px 0 0;"><strong>Rejected recipients:</strong> {{ smtp_test_result.masked_rejected_recipients | join(', ') }}</p>
+                {% endif %}
+                <details style="margin-top:12px;">
+                    <summary class="note" style="cursor:pointer;"><strong>Raw SMTP result</strong></summary>
+                    <pre style="white-space: pre-wrap; word-break: break-word; background: rgba(18, 49, 77, 0.06); border-radius: 10px; padding: 12px; margin-top: 10px; overflow-x: auto;">{{ smtp_test_result | tojson(indent=2) }}</pre>
+                </details>
+            </div>
+            {% endif %}
         </div>
 
         {% if manual_payment_info %}
@@ -133,11 +362,11 @@
                 <input type="hidden" name="form_action" value="submit_payment_proof">
                 <div>
                     <label for="payment_request_id">Request Reference</label>
-                    <input id="payment_request_id" name="payment_request_id" type="text" placeholder="REQ-20260308-ABC123" required>
+                    <input id="payment_request_id" name="payment_request_id" type="text" placeholder="REQ-20260308-ABC123" value="{{ recent_request.request_id if recent_request else '' }}" required>
                 </div>
                 <div>
                     <label for="payment_school_email">School Email</label>
-                    <input id="payment_school_email" name="payment_school_email" type="email" placeholder="info@school.com">
+                    <input id="payment_school_email" name="payment_school_email" type="email" placeholder="info@school.com" value="{{ recent_request.school_email if recent_request else '' }}">
                 </div>
                 <div>
                     <label for="payment_reference">Payment Reference (optional)</label>
@@ -163,30 +392,86 @@
                 <input type="hidden" name="form_action" value="track">
                 <div>
                     <label for="track_request_id">Request Reference</label>
-                    <input id="track_request_id" name="track_request_id" type="text" placeholder="e.g., REQ-20260308-ABC123" required>
+                    <input id="track_request_id" name="track_request_id" type="text" placeholder="e.g., REQ-20260308-ABC123" value="{{ recent_request.request_id if recent_request else '' }}" required>
                 </div>
                 <div>
                     <label for="track_admin_email">Admin Email (optional)</label>
-                    <input id="track_admin_email" name="track_admin_email" type="email" placeholder="admin@school.com">
+                    <input id="track_admin_email" name="track_admin_email" type="email" placeholder="admin@school.com" value="{{ recent_request.admin_email if recent_request else '' }}">
                 </div>
                 <button type="submit" class="btn btn-secondary"><i class="fas fa-magnifying-glass"></i> Check Status</button>
             </form>
             {% if tracked_request %}
             <div class="stack-card">
-                <p><strong>Request:</strong> {{ tracked_request.request_id }}</p>
-                <p><strong>School:</strong> {{ tracked_request.school_name }}</p>
-                <p><strong>Status:</strong> {{ tracked_request.status|replace('_', ' ')|title }}</p>
-                <p><strong>Website/Social:</strong> {{ tracked_request.website_url or '-' }}</p>
-                <p><strong>Proof Document:</strong> {{ 'Received' if tracked_request.proof_document_path else 'Not received' }}</p>
-                <p><strong>Submitted:</strong> {{ tracked_request.created_at }}</p>
-                <p><strong>School Email Verified:</strong> {{ 'Yes' if tracked_request.school_email_verified else 'No' }}</p>
-                <p><strong>Phone Verified (Admin Checklist):</strong> {{ 'Yes' if tracked_request.phone_verified else 'No' }}</p>
-                <p><strong>Document Verified (Admin Checklist):</strong> {{ 'Yes' if tracked_request.document_verified else 'No' }}</p>
+                <div class="status-header">
+                    <div>
+                        <p class="mini-label">Tracking Request</p>
+                        <h3 style="margin:0 0 6px;">{{ tracked_request.school_name }}</h3>
+                        <p class="note" style="margin:0;">Reference {{ tracked_request.request_id }}</p>
+                    </div>
+                    <span class="status-badge {{ tracked_request_status.badge_class }}">{{ tracked_request_status.status_label }}</span>
+                </div>
+
+                <div class="progress-track">
+                    <span style="width: {{ tracked_request_status.percent_complete }}%;"></span>
+                </div>
+                <p class="note">Progress: {{ tracked_request_status.percent_complete }}% complete</p>
+
+                <div class="quick-facts">
+                    <div class="fact-box">
+                        <span>Submitted</span>
+                        <strong>{{ tracked_request.created_at }}</strong>
+                    </div>
+                    <div class="fact-box">
+                        <span>School Email</span>
+                        <strong>{{ tracked_request.school_email or '-' }}</strong>
+                    </div>
+                    <div class="fact-box">
+                        <span>Admin Email</span>
+                        <strong>{{ tracked_request.admin_email or '-' }}</strong>
+                    </div>
+                    <div class="fact-box">
+                        <span>Website / Social</span>
+                        <strong>{{ tracked_request.website_url or '-' }}</strong>
+                    </div>
+                </div>
+
+                {% if tracked_request_status.next_action %}
+                <div class="callout-note">
+                    <strong>Next action:</strong> {{ tracked_request_status.next_action }}
+                </div>
+                {% endif %}
+
+                {% if tracked_request_status.verification_target or tracked_request_status.verification_sent_at or tracked_request_status.verification_expires_at %}
+                <p class="note" style="margin-top:12px;">
+                    {% if tracked_request_status.verification_target %}<strong>Verification target:</strong> {{ tracked_request_status.verification_target }}{% endif %}
+                    {% if tracked_request_status.verification_sent_at %}{% if tracked_request_status.verification_target %} | {% endif %}<strong>Last code sent:</strong> {{ tracked_request_status.verification_sent_at }}{% endif %}
+                    {% if tracked_request_status.verification_expires_at %} | <strong>Code expires:</strong> {{ tracked_request_status.verification_expires_at }}{% endif %}
+                </p>
+                {% endif %}
+
+                {% if tracked_request_status.flags %}
+                <ul class="flag-list">
+                    {% for flag in tracked_request_status.flags %}
+                    <li>{{ flag }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                <div class="timeline-list">
+                    {% for step in tracked_request_status.steps %}
+                    <div class="timeline-step {% if step.done %}done{% endif %} {% if step.optional %}optional{% endif %}">
+                        <span>{% if step.optional %}Optional{% else %}Required{% endif %}</span>
+                        <strong>{{ step.label }}</strong>
+                        <p class="note" style="margin:6px 0 0;">{{ step.detail }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+
                 {% if tracked_request.reviewed_at %}
                 <p><strong>Reviewed:</strong> {{ tracked_request.reviewed_at }}</p>
                 {% endif %}
                 {% if tracked_request.review_note %}
-                <p><strong>Note:</strong> {{ tracked_request.review_note }}</p>
+                <p><strong>Review Note:</strong> {{ tracked_request.review_note }}</p>
                 {% endif %}
                 {% if tracked_request.linked_school_id %}
                 <p><strong>School ID:</strong> {{ tracked_request.linked_school_id }}</p>
@@ -219,4 +504,3 @@
     </div>
 </body>
 </html>
-

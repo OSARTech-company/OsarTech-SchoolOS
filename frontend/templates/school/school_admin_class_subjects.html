@@ -80,14 +80,14 @@
 
         <div class="card">
             <h2>Configure a Class</h2>
-            <p class="hint">Tick subjects with the mark box. Non-SS classes and SS1 (when combined) use only Subjects Offered.</p>
+            <p class="hint">Tick subjects with the mark box. Nursery, Primary, JSS, and SS1 (when combined) use only Subjects Offered.</p>
             <form method="post">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="grid">
                     <div>
                         <div class="form-group">
                             <label for="classname">Class Name</label>
-                            <input type="text" id="classname" name="classname" list="classSuggestions" placeholder="e.g. JSS1, JSS2A, SS1" required>
+                            <input type="text" id="classname" name="classname" list="classSuggestions" placeholder="e.g. Primary1, Primary2A, JSS1, SS1" required>
                             <datalist id="classSuggestions">
                                 {% for class_name in class_options %}
                                 <option value="{{ class_name }}"></option>
@@ -215,7 +215,15 @@
         function normalizeClassName(v) {
             let n = (v || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
             if (!n) return '';
-            if (n.startsWith('JUNIORSECONDARY')) n = 'JSS' + n.slice('JUNIORSECONDARY'.length);
+            if (n.startsWith('KINDERGARTEN')) n = 'NURSERY' + n.slice('KINDERGARTEN'.length);
+            else if (n.startsWith('NURSERY')) n = 'NURSERY' + n.slice('NURSERY'.length);
+            else if (n.startsWith('NUR')) n = 'NURSERY' + n.slice('NUR'.length);
+            else if (n.startsWith('KG')) n = 'NURSERY' + n.slice('KG'.length);
+            else if (n.startsWith('PRIMARY')) n = 'PRIMARY' + n.slice('PRIMARY'.length);
+            else if (n.startsWith('BASIC')) n = 'PRIMARY' + n.slice('BASIC'.length);
+            else if (n.startsWith('PRY')) n = 'PRIMARY' + n.slice('PRY'.length);
+            else if (n.startsWith('PRI')) n = 'PRIMARY' + n.slice('PRI'.length);
+            else if (n.startsWith('JUNIORSECONDARY')) n = 'JSS' + n.slice('JUNIORSECONDARY'.length);
             else if (n.startsWith('JUNIORSEC')) n = 'JSS' + n.slice('JUNIORSEC'.length);
             else if (n.startsWith('JUNIOR')) n = 'JSS' + n.slice('JUNIOR'.length);
             else if (n.startsWith('SENIORSECONDARY')) n = 'SS' + n.slice('SENIORSECONDARY'.length);
@@ -228,7 +236,7 @@
         }
         function classParts(v) {
             const n = normalizeClassName(v);
-            const m = n.match(/^(JSS|SSS|SS)(\d+)([A-Z]+)?$/);
+            const m = n.match(/^(NURSERY|PRIMARY|JSS|SSS|SS)(\d+)([A-Z]+)?$/);
             if (!m) return { level: '', num: '', arm: '', key: n };
             const level = (m[1] === 'SSS') ? 'SS' : m[1];
             return { level: level, num: m[2], arm: m[3] || '', key: `${level}${m[2]}` };
@@ -281,6 +289,5 @@
     </script>
 </body>
 </html>
-
 
 

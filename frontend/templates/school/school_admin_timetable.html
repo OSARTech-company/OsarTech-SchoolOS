@@ -39,7 +39,7 @@
         <form method="post" id="period-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="grid">
-                <div><label>Class (JSS/SS only)</label><input id="period-classname" name="classname" required placeholder="e.g. JSS1, SS2B"></div>
+                <div><label>Class</label><input id="period-classname" name="classname" required placeholder="e.g. Primary1, JSS1, SS2B"></div>
                 <div><label>Day</label>
                     <select id="period-day" name="day_of_week" required>
                         {% for d, name in day_options %}<option value="{{ d }}">{{ name }}</option>{% endfor %}
@@ -285,5 +285,4 @@
 </script>
 </body>
 </html>
-
 
