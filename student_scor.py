@@ -652,7 +652,7 @@ APP_ASSISTANT_OPENAI_MODEL = (os.environ.get('APP_ASSISTANT_OPENAI_MODEL', 'gpt-
 APP_ASSISTANT_OPENAI_TIMEOUT_SECONDS = max(4, int((os.environ.get('APP_ASSISTANT_OPENAI_TIMEOUT_SECONDS', '18') or '18').strip() or '18'))
 APP_ASSISTANT_FUZZY_CUTOFF = 0.76
 APP_ASSISTANT_RESPONSE_MODES = {'standard', 'simple', 'detailed', 'local', 'pidgin', 'checklist', 'ultra_simple'}
-APP_ASSISTANT_ANSWER_VERSION = (os.environ.get('APP_ASSISTANT_ANSWER_VERSION', '2026.03.28.1') or '2026.03.28.1').strip()
+APP_ASSISTANT_ANSWER_VERSION = (os.environ.get('APP_ASSISTANT_ANSWER_VERSION', '2026.05.28.knowledge.1') or '2026.05.28.knowledge.1').strip()
 APP_ASSISTANT_SAFETY_NOTE = 'Guidance only: I cannot execute actions, publish results, or change app data.'
 APP_ASSISTANT_ENABLE_OPENAI = (os.environ.get('APP_ASSISTANT_ENABLE_OPENAI', '0') or '0').strip().lower() in ('1', 'true', 'yes')
 APP_ASSISTANT_LOCAL_QA_MATCH_CUTOFF = max(0.70, min(0.98, float((os.environ.get('APP_ASSISTANT_LOCAL_QA_MATCH_CUTOFF', '0.83') or '0.83').strip() or '0.83')))
@@ -758,6 +758,13 @@ APP_ASSISTANT_TYPO_MAP = {
     'ansr': 'answer',
     'scoore': 'score',
     'scorre': 'score',
+    'primarry': 'primary',
+    'primaryy': 'primary',
+    'secondry': 'secondary',
+    'secodary': 'secondary',
+    'nurserry': 'nursery',
+    'clas teacher': 'class teacher',
+    'classteacher': 'class teacher',
 }
 APP_ASSISTANT_FALLBACK_LANGUAGE_MAP = {
     'wetin': 'what',
@@ -840,6 +847,8 @@ APP_ASSISTANT_INDIRECT_ALIASES = {
         (('production', 'go live', 'deploy', 'release', 'production readiness'), 'production readiness checklist'),
         (('handover', 'onboarding', 'first setup', 'go live', 'launch', 'give to school'), 'school onboarding checklist first setup'),
         (('what can i do here', 'this page use', 'this page for what'), 'page help guidance workflow'),
+        (('primary school', 'nursery school', 'primary class', 'nursery class'), 'primary nursery setup class teacher subjects'),
+        (('primary teacher', 'class teacher only', 'primary subject teacher'), 'primary class teacher handles all subjects'),
     ],
     'teacher': [
         (('score entry', 'enter mark', 'upload result csv'), 'enter scores upload csv submit result'),
@@ -853,6 +862,7 @@ APP_ASSISTANT_INDIRECT_ALIASES = {
         (('can i do admin work', 'can teacher do admin work', 'admin work as teacher'), 'teacher role boundary admin workflow'),
         (('production', 'go live', 'deploy', 'release', 'production readiness'), 'production readiness checklist'),
         (('handover', 'onboarding', 'first setup', 'go live', 'launch', 'prepare school'), 'teacher onboarding checklist'),
+        (('primary teacher', 'primary class teacher', 'class teacher only'), 'primary class teacher handles all subjects score attendance'),
     ],
     'student': [
         (('result card', 'report card', 'my score'), 'view result grade'),
@@ -968,9 +978,16 @@ APP_ASSISTANT_ROLE_KB = {
         {
             'topic': 'teacher_management',
             'title': 'Manage teachers and assignments',
-            'summary': 'You can add teachers, assign class/subject responsibilities, and update role coverage.',
-            'steps': ['Open dashboard teacher management sections.', 'Assign class/subject carefully by term/year.', 'Save and verify assignment lists.'],
+            'summary': 'You can add teachers, assign class-teacher responsibilities for all classes, and assign subject teachers only for secondary classes.',
+            'steps': ['Open Teachers or Assign Teachers.', 'Assign class teachers for Nursery/Primary/JSS/SS by term/year.', 'Assign subject teachers only for JSS/SS where needed.', 'Save and verify assignment lists.'],
             'keywords': ['add teacher', 'assign teacher', 'subject teacher', 'class teacher', 'teacher assignment', 'remove assignment', 'archive teacher', 'restore teacher', '/school-admin/add-teacher', '/school-admin/assign-teacher', '/school-admin/assign-subject-teacher'],
+        },
+        {
+            'topic': 'primary_nursery_setup',
+            'title': 'Primary and nursery setup',
+            'summary': 'Nursery and Primary classes use a class-teacher-led flow: one class teacher handles scores, attendance, timetable ownership, and class workflow for all subjects.',
+            'steps': ['Configure Nursery/Primary subjects in Class Subjects.', 'Add pupils by class in Add Students.', 'Assign one class teacher to each Nursery/Primary class.', 'Do not assign subject teachers for Nursery/Primary; reserve subject assignment for JSS/SS.'],
+            'keywords': ['primary school', 'nursery school', 'primary class', 'nursery class', 'primary teacher', 'class teacher only', 'subject teacher primary', 'primary subjects', 'primary setup'],
         },
         {
             'topic': 'messaging',
@@ -997,8 +1014,8 @@ APP_ASSISTANT_ROLE_KB = {
             'topic': 'class_subject_config',
             'title': 'Class subject configuration',
             'summary': 'Configure subjects per class to control score entry structure and compatibility checks.',
-            'steps': ['Open Class Subjects.', 'Set subject groups per class.', 'Save and remove outdated configs where needed.'],
-            'keywords': ['class subjects', 'subject config', 'configure subjects', '/school-admin/class-subjects', '/school-admin/delete-class-subject-config'],
+            'steps': ['Open Class Subjects.', 'For Nursery/Primary, set one Subjects Offered list.', 'For SS, configure stream subjects where needed.', 'Save and remove outdated configs where needed.'],
+            'keywords': ['class subjects', 'subject config', 'configure subjects', 'primary subjects', 'nursery subjects', '/school-admin/class-subjects', '/school-admin/delete-class-subject-config'],
         },
         {
             'topic': 'parents',
@@ -1220,9 +1237,16 @@ APP_ASSISTANT_ROLE_KB.setdefault('teacher', []).extend([
     {
         'topic': 'teacher_assignment_scope',
         'title': 'Teacher assignment scope',
-        'summary': 'Teacher actions are limited by class assignment and subject assignment for current term/year.',
-        'steps': ['Check assigned classes and subjects in dashboard context.', 'Enter scores only for assigned subject-class scope.', 'Class-only tasks (attendance/behaviour) require class-teacher assignment.'],
-        'keywords': ['assigned class', 'assigned subject', 'scope', 'what can i do', 'teacher role', 'subject assigned', 'class assigned'],
+        'summary': 'Teacher actions are limited by assignment for current term/year. Nursery/Primary class teachers handle all class subjects; JSS/SS may also use subject assignments.',
+        'steps': ['Check assigned classes and subjects in dashboard context.', 'For Nursery/Primary class-teacher scope, enter scores for all class subjects.', 'For JSS/SS subject scope, enter only assigned subjects.', 'Class-only tasks (attendance/behaviour) require class-teacher assignment.'],
+        'keywords': ['assigned class', 'assigned subject', 'scope', 'what can i do', 'teacher role', 'subject assigned', 'class assigned', 'primary class teacher'],
+    },
+    {
+        'topic': 'primary_class_teacher_scope',
+        'title': 'Primary class teacher scope',
+        'summary': 'Primary and Nursery teachers do not need subject-teacher assignment. A class-teacher assignment gives access to score, attendance, and class workflow for that class.',
+        'steps': ['Confirm your class-teacher assignment for the current term/year.', 'Open Enter Scores or Class List for that class.', 'Enter all offered subjects for pupils in the class.', 'Contact school admin only if the class assignment is missing.'],
+        'keywords': ['primary teacher', 'nursery teacher', 'primary class teacher', 'class teacher only', 'all subjects', 'can primary teacher enter all subjects'],
     },
     {
         'topic': 'teacher_student_messages',
@@ -1630,6 +1654,31 @@ APP_ASSISTANT_MICRO_FAQ = {
 # Additional high-frequency workflow intents.
 APP_ASSISTANT_MICRO_FAQ.setdefault('school_admin', []).extend([
     {
+        'aliases': ['what can the app do', 'app features', 'what does this app support', 'school admin overview', 'main app workflows'],
+        'use': 'The app supports student records, teachers, class subjects, attendance, score entry, result publishing, messages, CBT, timetable, promotion, analytics, audits, backups, and parent/student portals.',
+        'steps': ['Start with Setup Wizard for a new school.', 'Use Students and Teachers groups for records and assignments.', 'Use Academics for subjects, timetable, CBT, promotions, and results.', 'Use Monitoring/System for audits, analytics, backups, security, and health.'],
+        'next_question': 'Which area do you want: setup, students, teachers, results, messages, or system checks?',
+    },
+    {
+        'aliases': ['where should i start', 'first setup order', 'new school setup order', 'setup flow', 'how to setup school'],
+        'use': 'A good setup order is profile, classes/subjects, teachers, students, assignments, timetable, then test result publishing.',
+        'steps': ['Open Setup Wizard first.', 'Configure Class Subjects before adding scores.', 'Add students and teachers.', 'Assign class teachers; add subject teachers only for JSS/SS.', 'Create timetable and run a small publish test.'],
+        'next_question': 'Do you want this as a checklist for Primary school or Secondary school?',
+    },
+    {
+        'aliases': ['primary class teacher flow', 'primary teacher flow', 'primary class setup', 'nursery class setup', 'how primary should work'],
+        'where': 'Use Class Subjects, Add Students, then Assign Teachers.',
+        'use': 'Nursery/Primary uses one class teacher per class. That class teacher handles all subjects, attendance, timetable ownership, and score entry for the class.',
+        'steps': ['Configure Nursery/Primary subjects in Class Subjects.', 'Add pupils in Add Students by Class.', 'Assign one class teacher to the class for the current term/year.', 'Skip subject-teacher assignment for Nursery/Primary.'],
+        'next_question': 'Do you want the exact setup order for a new Primary school?',
+    },
+    {
+        'aliases': ['do primary classes need subject teachers', 'primary subject teacher', 'nursery subject teacher', 'should primary have subject teacher', 'primary only class teacher'],
+        'yesno': 'No. Nursery and Primary classes should use class teacher only in this app.',
+        'steps': ['Assign a class teacher to each Nursery/Primary class.', 'The class teacher can enter all offered subjects for pupils in that class.', 'Use subject-teacher assignment only for JSS/SS classes.'],
+        'next_question': 'Do you want me to explain how this affects timetable and score entry?',
+    },
+    {
         'aliases': ['add teacher', 'create teacher', 'register teacher', 'teacher onboarding'],
         'where': 'Open Teachers group > Add Teacher.',
         'use': 'Add Teacher creates a teacher record and login under your school.',
@@ -1646,9 +1695,9 @@ APP_ASSISTANT_MICRO_FAQ.setdefault('school_admin', []).extend([
     {
         'aliases': ['assign subject teacher', 'subject assignment', 'assign teacher subject'],
         'where': 'Open Teachers group > Assign Teachers (Subject Assignment section).',
-        'use': 'Subject assignment controls who can enter scores for each subject/class.',
-        'steps': ['Select teacher, class, subject, term, and year.', 'Save assignment.', 'Confirm in current subject assignments list.'],
-        'next_question': 'Do you want a rule guide for avoiding duplicate assignments?',
+        'use': 'Subject assignment controls who can enter scores for each subject/class in secondary classes only.',
+        'steps': ['Use this for JSS/SS classes.', 'Select teacher, class, subject, term, and year.', 'Save assignment and confirm in current subject assignments list.', 'For Nursery/Primary, assign class teacher instead.'],
+        'next_question': 'Do you want a rule guide for primary vs secondary assignments?',
     },
     {
         'aliases': ['why cant publish results', 'cannot publish result', 'publish results blocked', 'publish error'],
@@ -1673,7 +1722,7 @@ APP_ASSISTANT_MICRO_FAQ.setdefault('school_admin', []).extend([
     {
         'aliases': ['fix missing score alert', 'missing score alert fix', 'why missing score alert'],
         'use': 'Missing score alerts clear only when required assigned-subject entries are complete.',
-        'steps': ['Confirm teacher-subject assignment exists for that class/term/year.', 'Enter or upload missing scores for assigned subjects.', 'Refresh notifications/alerts after save.'],
+        'steps': ['For Nursery/Primary, confirm class teacher assignment exists for that class/term/year.', 'For JSS/SS, confirm teacher-subject assignment exists where subject teachers are used.', 'Enter or upload missing scores, then refresh notifications/alerts after save.'],
         'next_question': 'Do you want me to list likely causes when alert still remains?',
     },
     {
@@ -1741,6 +1790,18 @@ APP_ASSISTANT_MICRO_FAQ.setdefault('school_admin', []).extend([
 
 APP_ASSISTANT_MICRO_FAQ.setdefault('teacher', []).extend([
     {
+        'aliases': ['what can teacher do', 'teacher app features', 'teacher overview', 'teacher dashboard overview'],
+        'use': 'Teacher account is assignment-based. Depending on scope, a teacher can enter scores, mark attendance, send notes, create CBTs, review class lists, and read school messages.',
+        'steps': ['Check Dashboard assignment scope first.', 'Use Class List or Enter Scores for score work.', 'Use Attendance only when class-teacher assignment is active.', 'Use CBT and messages within your allowed class/subject scope.'],
+        'next_question': 'Do you want the exact workflow for score entry, attendance, CBT, or messages?',
+    },
+    {
+        'aliases': ['can primary class teacher enter all subjects', 'primary class teacher all subjects', 'primary teacher enter scores', 'nursery teacher enter scores'],
+        'yesno': 'Yes. If you are assigned as Nursery/Primary class teacher, you can enter scores for all subjects offered by that class.',
+        'steps': ['Confirm the class appears in your assigned classes.', 'Open Class List or Enter Scores.', 'Choose a pupil and enter scores for all offered subjects.', 'If the class is missing, ask school admin to assign you as class teacher for the current term/year.'],
+        'next_question': 'Do you want score entry steps for one pupil or whole class?',
+    },
+    {
         'aliases': ['create cbt', 'how to create cbt', 'cbt setup'],
         'where': 'Open Academics > CBT.',
         'use': 'CBT page creates test/exam with class, subject, slot, and timing.',
@@ -1770,6 +1831,12 @@ APP_ASSISTANT_MICRO_FAQ.setdefault('teacher', []).extend([
 
 APP_ASSISTANT_MICRO_FAQ.setdefault('parent', []).extend([
     {
+        'aliases': ['what can parent do', 'parent portal features', 'parent overview'],
+        'use': 'Parent portal helps guardians view linked-child results, compare terms, check attendance, view timetable, read messages, and raise result disputes.',
+        'steps': ['Select the correct child first.', 'Open result, compare, attendance, timetable, or messages.', 'Raise a dispute only for the affected child/term.'],
+        'next_question': 'Do you want help with result, attendance, timetable, or dispute?',
+    },
+    {
         'aliases': ['where can parent see timetable', 'parent timetable page', 'how parent view timetable'],
         'where': 'Open child-specific Timetable from parent dashboard/sidebar.',
         'use': 'Parent timetable shows only the linked child class and offered-subject schedule.',
@@ -1779,6 +1846,12 @@ APP_ASSISTANT_MICRO_FAQ.setdefault('parent', []).extend([
 ])
 
 APP_ASSISTANT_MICRO_FAQ.setdefault('super_admin', []).extend([
+    {
+        'aliases': ['what can super admin do', 'super admin features', 'platform admin overview'],
+        'use': 'Super admin manages schools, operations status, plans/features, reported issues, privacy requests, error logs, and assistant quality across the platform.',
+        'steps': ['Use Add School/View Schools for tenant management.', 'Use Reported Issues for support/bug reports.', 'Use Privacy Requests for data-right workflows.', 'Use Error Logs and Assistant Analytics for monitoring.'],
+        'next_question': 'Do you want school setup, support queue, privacy request, or error log guidance?',
+    },
     {
         'aliases': ['difference report issue and data request', 'report issue vs data request', 'report issue and data request difference'],
         'use': 'Report Issue is support/bug tracking; Data Request is privacy-rights workflow with formal approval/resolution states.',
@@ -1795,6 +1868,12 @@ APP_ASSISTANT_MICRO_FAQ.setdefault('super_admin', []).extend([
 ])
 
 APP_ASSISTANT_MICRO_FAQ.setdefault('common', []).extend([
+    {
+        'aliases': ['what is this app', 'what can this system do', 'student score management system features', 'app overview'],
+        'use': 'This is a school result and operations system covering users, classes, scores, results, attendance, timetable, messages, CBT, promotion, audits, and parent/student access.',
+        'steps': ['Ask by role: school admin, teacher, student, parent, or super admin.', 'Name the page or workflow you are using.', 'The assistant will give step-by-step guidance, but it will not execute actions.'],
+        'next_question': 'Which role are you using right now?',
+    },
     {
         'aliases': ['request reference not found', 'reference not found', 'invalid request reference'],
         'use': 'This means the reference ID is wrong, expired, or from another environment (local vs deployed).',
@@ -1921,6 +2000,8 @@ def _assistant_get_teacher_scope():
             'subject_assignments_by_class': {},
             'subject_assigned_classes': [],
             'all_scope_classes': [],
+            'primary_class_assignments': [],
+            'secondary_class_assignments': [],
             'all_scope_subjects': [],
             'has_class_assignment': False,
             'has_subject_assignment': False,
@@ -1961,6 +2042,14 @@ def _assistant_get_teacher_scope():
     }
     subject_assigned_classes = sorted(subject_assignments_by_class.keys(), key=lambda x: str(x).lower())
     all_scope_classes = sorted(set(class_assignments) | set(subject_assigned_classes), key=lambda x: str(x).lower())
+    primary_class_assignments = sorted(
+        [cls for cls in class_assignments if is_primary_classname(cls)],
+        key=lambda x: str(x).lower(),
+    )
+    secondary_class_assignments = sorted(
+        [cls for cls in class_assignments if is_secondary_classname(cls)],
+        key=lambda x: str(x).lower(),
+    )
     all_scope_subjects = sorted(
         {subj for values in subject_assignments_by_class.values() for subj in values},
         key=lambda x: str(x).lower(),
@@ -1985,6 +2074,8 @@ def _assistant_get_teacher_scope():
         'subject_assignments_by_class': subject_assignments_by_class,
         'subject_assigned_classes': subject_assigned_classes,
         'all_scope_classes': all_scope_classes,
+        'primary_class_assignments': primary_class_assignments,
+        'secondary_class_assignments': secondary_class_assignments,
         'all_scope_subjects': all_scope_subjects,
         'has_class_assignment': has_class_assignment,
         'has_subject_assignment': has_subject_assignment,
@@ -2078,8 +2169,10 @@ def _assistant_role_quick_prompts(role, teacher_scope=None):
             'Add student',
             'Reset student password',
             'Assign teacher',
+            'Primary class teacher flow',
             'Publish result',
             'Where do I manage teacher assignments?',
+            'Do primary classes need subject teachers?',
             'How do I send messages to teachers or students?',
             'How do I review privacy/data requests from my school?',
             'How do I move to next term safely?',
@@ -2089,6 +2182,7 @@ def _assistant_role_quick_prompts(role, teacher_scope=None):
             'Mark attendance',
             'Create CBT',
             'How do I enter scores for my class?',
+            'Can a primary class teacher enter all subjects?',
             'How do I submit results to class teacher?',
             'What classes and subjects am I assigned to?',
             'Where do I mark period attendance?',
@@ -2701,6 +2795,8 @@ def _assistant_role_scope_note(role='', q_norm='', teacher_scope=None):
         scope_mode = ((teacher_scope or {}).get('mode') or '').strip().lower()
         if scope_mode in {'none', ''}:
             return 'Role scope: As Teacher, you can use teacher pages; score/attendance actions are limited until assignment is added by school admin.'
+        if (teacher_scope or {}).get('primary_class_assignments'):
+            return 'Role scope: As Teacher, your Nursery/Primary class-teacher assignment lets you handle all subjects for that class; subject-teacher assignment is mainly for JSS/SS.'
         return 'Role scope: As Teacher, you can enter scores and manage assigned class/subject workflows; you cannot change school-wide settings or super-admin operations.'
     if role_name == 'parent':
         return 'Role scope: As Parent, you can view linked-child records and submit disputes/requests; you cannot edit school academic records directly.'
@@ -3361,14 +3457,14 @@ def _assistant_page_guidance(role, source_page=''):
         'school_admin': [
             ('/school-admin', 'School Admin Dashboard', 'Use this page to monitor school operations and run admin workflows.', ['Review alerts and pending actions.', 'Open quick actions to manage teachers/students/results.', 'Use sidebar links for publish, disputes, audit, and settings.']),
             ('/school-admin/teachers', 'Teachers', 'Use this page to view teachers in tabular form and review their current class/subject assignments.', ['Review active/archived teachers.', 'Check current class/subject assignment columns.', 'Archive or restore teacher records when needed.']),
-            ('/school-admin/teacher-assignments', 'Assign Teachers', 'Use this page to assign teachers to classes/subjects and review current assignment tables.', ['Assign class teacher for term/year.', 'Assign subject teacher to class/subject.', 'Review and remove current class/subject assignments as needed.']),
+            ('/school-admin/teacher-assignments', 'Assign Teachers', 'Use this page to assign class teachers for all classes and subject teachers only for JSS/SS.', ['Assign class teacher for Nursery/Primary/JSS/SS by term/year.', 'Assign subject teachers only for secondary classes.', 'Review and remove current class/subject assignments as needed.']),
             ('/school-admin/teacher-workload', 'Teacher Workload', 'Use this page to review class/subject load per teacher for the current term.', ['Check class and subject totals per teacher.', 'Review any conflict warnings.', 'Adjust assignments if load is imbalanced.']),
             ('/school-admin/messages', 'Messages', 'Use this page to send and track messages to teachers and students.', ['Compose student or teacher message.', 'Set target scope (all/class/stream/subject).', 'Review recent messages and update as needed.']),
             ('/school-admin/publish-results', 'Publish Results', 'Use this page to review submissions, approve/reject, and publish class results.', ['Select class, term, and academic year.', 'Check readiness and validation status.', 'Approve/reject then publish when ready.']),
             ('/school-admin/disputes', 'Result Disputes', 'Use this page to review and resolve result complaints.', ['Open dispute details and evidence.', 'Set status to pending/resolved/rejected.', 'Communicate resolution and keep audit clarity.']),
             ('/school-admin/promotion-audit', 'Promotion Audit', 'Use this page to review class-promotion history and decisions.', ['Filter by class, term, and year.', 'Review who changed what and when.', 'Confirm records before new promotion actions.']),
             ('/school-admin/score-audit', 'Score Audit', 'Use this page to inspect score change history and controlled revert actions.', ['Filter to student/subject/term.', 'Review editor, source, and reason.', 'Use revert only when policy allows.']),
-            ('/school-admin/class-subjects', 'Class Subjects', 'Use this page to configure subjects available per class.', ['Set core/elective subjects for each class.', 'Save configuration changes.', 'Verify teacher assignments remain valid.']),
+            ('/school-admin/class-subjects', 'Class Subjects', 'Use this page to configure subjects available per Nursery/Primary/JSS/SS class.', ['For Nursery/Primary, set the Subjects Offered list.', 'For SS, configure stream subjects where needed.', 'Save configuration changes and verify assignments remain valid.']),
             ('/school-admin/timetable', 'Timetable', 'Use this page to manage class schedule and import timetable CSV.', ['Create or edit timetable rows.', 'Import timetable CSV template.', 'Validate day/period conflicts after updates.']),
             ('/school-admin/new-term-wizard', 'New Term Wizard', 'Use this page to advance term/year and copy current assignments.', ['Confirm the new term/year.', 'Run rollover to copy class/subject assignments.', 'Optionally lock previous term edits.']),
             ('/school-admin/analytics', 'Analytics', 'Use this page to review performance and operational trends.', ['Filter by term and academic year.', 'Review pass rate, subject performance, and attendance impact.', 'Check AI assistant usage trends.']),
@@ -3390,7 +3486,7 @@ def _assistant_page_guidance(role, source_page=''):
             ('/teacher/class-list', 'Class List', 'Use this page to review students in your class-teacher scope and subject-assigned scope.', ['Use status and scope indicators on each row.', 'Open score actions only for allowed students/subjects.', 'Use this page to quickly find pending student records.']),
             ('/teacher/messages', 'Teacher Messages', 'Use this page to read school notices and mark read status.', ['Review unread items.', 'Mark one or all as read.', 'Follow linked workflow instructions.']),
             ('/teacher/notifications', 'Teacher Notifications', 'Use this page to review missing score alerts for your class/subject scope.', ['Open each alert and identify pending students.', 'Complete missing score entries in Enter Scores.', 'Refresh notifications to confirm reduction.']),
-            ('/teacher/enter-scores', 'Enter Scores', 'Use this page to enter/edit scores only for your assigned scope.', ['Pick class/subject/term context.', 'Enter CA and exam components.', 'Save and submit according to your assignment role.']),
+            ('/teacher/enter-scores', 'Enter Scores', 'Use this page to enter/edit scores only for your assigned scope.', ['For Nursery/Primary class-teacher scope, enter all offered subjects.', 'For JSS/SS subject scope, enter assigned subjects only.', 'Enter CA/exam components, save, and submit according to your role.']),
             ('/teacher/enter-subject-scores', 'Enter Subject Scores', 'Use this page to enter one subject score block for eligible students in your assignment scope.', ['Confirm selected subject and class.', 'Enter score components and save.', 'Repeat for pending students in that subject/class.']),
             ('/teacher/period-attendance', 'Period Attendance', 'Use this page to mark attendance by period/date.', ['Select class, date, and period.', 'Mark student attendance states.', 'Submit and verify summary.']),
             ('/teacher/attendance', 'Attendance', 'Use this page to mark class attendance for valid school days.', ['Pick class and date.', 'Set student statuses.', 'Save and confirm summary counts.']),
@@ -3849,6 +3945,36 @@ def _assistant_build_response(role, question, teacher_scope=None, source_page=''
             unresolved=True,
             clarification_needed=True,
             next_question='Tell me your exact page and one task you want to do.'
+        )
+
+    if role in {'school_admin', 'teacher'} and (
+        any(tok in q_norm for tok in ('primary', 'nursery'))
+        and any(tok in q_norm for tok in ('subject teacher', 'class teacher', 'teacher assignment', 'assign teacher', 'enter score', 'score entry', 'all subjects'))
+    ):
+        if role == 'teacher':
+            return _payload(
+                'For Nursery/Primary, the class teacher handles all subjects for that class.',
+                [
+                    'Confirm your class-teacher assignment for the current term/year.',
+                    'Open Class List or Enter Scores for that class.',
+                    'Enter scores for all subjects offered by pupils in the class.',
+                    'Ask school admin to add class-teacher assignment if the class is missing.',
+                ],
+                confidence=0.99,
+                unresolved=False,
+                next_question='Do you want the exact Enter Scores path for your class?'
+            )
+        return _payload(
+            'Nursery/Primary should use class teacher only. Subject-teacher assignment is for secondary classes.',
+            [
+                'Configure Nursery/Primary subjects in Class Subjects.',
+                'Add pupils through Add Students by Class.',
+                'Assign one class teacher to each Nursery/Primary class.',
+                'Do not assign subject teachers for Nursery/Primary; use subject teachers only for JSS/SS.',
+            ],
+            confidence=0.99,
+            unresolved=False,
+            next_question='Do you want the full setup order for a new Primary school?'
         )
 
     # High-priority disambiguation: "subject request" must not fall through to
@@ -14528,12 +14654,12 @@ def build_school_setup_wizard_flow(school_id):
         {
             'key': 'assignments',
             'title': 'Step 6: Assign Teachers',
-            'subtitle': 'Match teachers to the classes and subjects they handle.',
-            'description': 'Assign class teachers and subject teachers for the current term.',
+            'subtitle': 'Match teachers to classes first, then secondary subjects where needed.',
+            'description': 'Assign class teachers for all classes and subject teachers for secondary classes.',
             'bullets': [
-                'Assign subject teachers',
-                'Assign class teachers',
-                'Check the current subject assignment list',
+                'Assign class teachers for Nursery, Primary, JSS, and SS',
+                'Assign subject teachers only for JSS/SS classes',
+                'Check both assignment lists for the current term',
             ],
             'primary_label': 'Assign Teachers',
             'primary_endpoint': 'school_admin_teacher_assignments',
@@ -22740,6 +22866,112 @@ def get_student_filter_options(school_id, classnames=None):
         )
 
     return available_classes, available_terms
+
+def get_published_student_filter_options(school_id):
+    """Return class and term options from published result snapshots."""
+    sid = (school_id or '').strip()
+    if not sid:
+        return [], []
+    with db_connection() as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """SELECT DISTINCT classname
+               FROM published_student_results
+               WHERE school_id = ?
+                 AND classname IS NOT NULL
+                 AND classname <> ''
+               ORDER BY classname""",
+            (sid,),
+        )
+        available_classes = filter_supported_classnames([
+            canonicalize_classname((row[0] or '').strip()) if row else ''
+            for row in (c.fetchall() or [])
+        ])
+
+        db_execute(
+            c,
+            """SELECT DISTINCT term
+               FROM published_student_results
+               WHERE school_id = ?
+                 AND term IS NOT NULL
+                 AND CHAR_LENGTH(BTRIM(term)) > 0""",
+            (sid,),
+        )
+        available_terms = sorted(
+            {(row[0] or '').strip() for row in c.fetchall() if row and (row[0] or '').strip()},
+            key=lambda t: (term_sort_value(t), t),
+        )
+    return available_classes, available_terms
+
+def load_published_students_for_list(school_id, class_filter='', term_filter=''):
+    """Load published result snapshots in the same lightweight shape as live students."""
+    sid = (school_id or '').strip()
+    term_key = (term_filter or '').strip()
+    class_key = canonicalize_classname((class_filter or '').strip())
+    if not sid or not term_key:
+        return {}
+
+    query = (
+        """SELECT student_id, firstname, classname, academic_year, term, stream,
+                  number_of_subject, subjects, scores, average_marks, grade, status, published_at
+           FROM published_student_results
+           WHERE school_id = ?
+             AND LOWER(TRIM(COALESCE(term, ''))) = LOWER(TRIM(?))"""
+    )
+    params = [sid, term_key]
+    if class_key:
+        query += " AND REGEXP_REPLACE(UPPER(COALESCE(classname, '')), '[^A-Z0-9]+', '', 'g') = ?"
+        params.append(class_key)
+    query += ' ORDER BY published_at DESC'
+
+    with db_connection() as conn:
+        c = conn.cursor()
+        db_execute(c, query, tuple(params))
+        rows = c.fetchall() or []
+
+    students_data = {}
+    seen = set()
+    for row in rows:
+        student_id = (row[0] or '').strip()
+        academic_year = (row[3] or '').strip()
+        term = (row[4] or '').strip()
+        classname = canonicalize_classname(row[2] or '')
+        seen_key = (student_id, academic_year, term, classname)
+        if not student_id or seen_key in seen:
+            continue
+        seen.add(seen_key)
+        subjects = _safe_json_rows(row[7])
+        scores = build_ordered_subject_score_map(_safe_json_object(row[8]), subjects)
+        students_data[student_id] = {
+            'firstname': row[1] or '',
+            'email': '',
+            'student_phone': '',
+            'date_of_birth': '',
+            'gender': '',
+            'classname': classname,
+            'first_year_class': '',
+            'term': term,
+            'academic_year': academic_year,
+            'stream': row[5] or '',
+            'number_of_subject': row[6] or len(scores),
+            'subjects': list(scores.keys()),
+            'scores': scores,
+            'promoted': 0,
+            'parent_phone': '',
+            'parent_password_hash': '',
+            'parent_name': '',
+            'parent_gender': '',
+            'parent_name_2': '',
+            'parent_phone_2': '',
+            'parent_password_hash_2': '',
+            'parent_gender_2': '',
+            'is_archived': 0,
+            'is_published_snapshot': True,
+            'result_term_token': _term_token(academic_year, term),
+            'published_at': row[12] or '',
+        }
+    return students_data
 
 def load_student(school_id, student_id, include_archived=False):
     """Load a single student."""
@@ -48554,15 +48786,28 @@ def view_students():
             subject_map_by_class.setdefault(cls, set()).add(subj)
     else:
         # School admin path: query only currently requested class/term when provided.
-        available_classes, available_terms = get_student_filter_options(school_id)
+        live_classes, live_terms = get_student_filter_options(school_id)
+        published_classes, published_terms = get_published_student_filter_options(school_id)
+        available_classes = filter_supported_classnames(_dedupe_keep_order((live_classes or []) + (published_classes or [])))
+        available_terms = sorted(
+            set(live_terms or []) | set(published_terms or []),
+            key=lambda t: (term_sort_value(t), t),
+        )
         if selected_class and selected_class not in set(available_classes):
             selected_class = ''
         if selected_term and selected_term not in set(available_terms):
             selected_term = ''
         students_data = load_students(school_id, class_filter=selected_class, term_filter=selected_term)
+        published_students_data = load_published_students_for_list(
+            school_id,
+            class_filter=selected_class,
+            term_filter=selected_term,
+        ) if selected_term else {}
+        if selected_term and published_students_data and (not students_data or selected_term != current_term):
+            students_data = published_students_data
         # School admin usability fallback: if a class is selected but no rows match the selected term,
         # automatically show that class across all terms instead of appearing empty.
-        if selected_class and selected_term and not students_data:
+        if selected_class and selected_term and not students_data and not published_students_data:
             class_only_students = load_students(school_id, class_filter=selected_class, term_filter='')
             if class_only_students:
                 students_data = class_only_students
@@ -48593,7 +48838,7 @@ def view_students():
         else:
             is_class_owner = False
             subject_actions = []
-            if role == 'school_admin' and dean_led_mode:
+            if role == 'school_admin' and dean_led_mode and not student_data.get('is_published_snapshot'):
                 is_class_owner = True
         scores = student_data.get('scores', {}) if isinstance(student_data.get('scores', {}), dict) else {}
         average_marks = compute_average_marks_from_scores(scores, subjects=student_data.get('subjects', []))
@@ -48610,6 +48855,8 @@ def view_students():
             'profile_image_url': get_student_profile_image_url(student_data),
             'can_edit_full': bool(is_class_owner),
             'subject_actions': subject_actions,
+            'is_published_snapshot': bool(student_data.get('is_published_snapshot')),
+            'result_term_token': student_data.get('result_term_token', ''),
             'average_marks': average_marks,
             'Grade': grade,
             'Status': status

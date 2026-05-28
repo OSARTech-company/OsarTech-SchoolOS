@@ -1,43 +1,95 @@
 {
   "school_admin": [
     {
-      "prefix": "/school-admin/messages",
-      "title": "Messages",
-      "summary": "Use this page to compose and track official notices for teachers, students, and parents.",
+      "prefix": "/school-admin/setup-wizard",
+      "title": "Setup Wizard",
+      "summary": "Use this guided flow to finish first-time school setup before handing the app to staff.",
       "steps": [
-        "Select audience scope first (all/class/subject).",
-        "Write a clear title and action-focused message.",
-        "Send and monitor unread/read trends."
+        "Complete school profile, branding, class subjects, teachers, students, and assignments.",
+        "Use the suggested next step buttons instead of jumping randomly.",
+        "Finish only after the required setup checks are complete."
       ]
     },
     {
       "prefix": "/school-admin/teacher-assignments",
       "title": "Teacher Assignments",
-      "summary": "Use this page to assign class teachers and subject teachers by term and academic year.",
+      "summary": "Use this page to assign class teachers for all classes and subject teachers only for JSS/SS secondary classes.",
       "steps": [
-        "Choose the teacher, class, subject, term, and academic year.",
-        "Use the class-subject list configured for the school.",
+        "Assign one class teacher for each Nursery/Primary/JSS/SS class.",
+        "Use subject-teacher assignment only for JSS/SS classes.",
+        "For Nursery/Primary, the class teacher handles all offered subjects.",
         "Check current assignments below before adding a new one."
+      ]
+    },
+    {
+      "prefix": "/school-admin/teachers",
+      "title": "Teachers",
+      "summary": "Use this page to review teacher records, current assignments, and archive/restore status.",
+      "steps": [
+        "Search the teacher list before adding a duplicate.",
+        "Review class and subject assignment columns.",
+        "Archive inactive teachers instead of deleting records."
+      ]
+    },
+    {
+      "prefix": "/school-admin/teacher-workload",
+      "title": "Teacher Workload",
+      "summary": "Use this page to compare teacher class and subject load for the current term.",
+      "steps": [
+        "Review class count and subject count per teacher.",
+        "Check conflict warnings before publishing results.",
+        "Adjust assignments if one teacher has too many responsibilities."
       ]
     },
     {
       "prefix": "/school-admin/class-subjects",
       "title": "Class Subjects",
-      "summary": "Use this page to configure subjects available for each secondary class such as JSS1, JSS3, SS1, SS2, and SS3.",
+      "summary": "Use this page to configure subjects available for Nursery, Primary, JSS, and SS classes.",
       "steps": [
-        "Pick the class name exactly.",
-        "Save core and elective subjects for that class.",
+        "Pick the class name exactly, such as Primary1, Primary2A, JSS1, or SS1.",
+        "For Nursery/Primary, save the Subjects Offered list.",
+        "For SS, configure stream subjects where needed.",
         "Return to Teacher Assignments after saving subjects."
       ]
     },
     {
-      "prefix": "/school-admin/settings",
-      "title": "School Settings",
-      "summary": "Use this page to edit school profile, term/year, grading, operation flags, and logo/signature uploads.",
+      "prefix": "/school-admin/add-students-by-class",
+      "title": "Add Students",
+      "summary": "Use this page to add students manually or through CSV into a specific class and term.",
       "steps": [
-        "Update term/year and school profile fields carefully.",
-        "Upload logo or principal signature where needed.",
-        "Save and refresh the dashboard to confirm changes."
+        "Choose the class and term first.",
+        "Add names manually or import rows in bulk.",
+        "Review validation messages and the saved class list below."
+      ]
+    },
+    {
+      "prefix": "/school-admin/view-students",
+      "title": "View Students",
+      "summary": "Use this page to search, filter, correct, archive, restore, and reset student records.",
+      "steps": [
+        "Filter by class or term before taking action.",
+        "Open a student row to view result or correction options.",
+        "Use archive/restore for lifecycle changes and reset password only when needed."
+      ]
+    },
+    {
+      "prefix": "/school-admin/parents",
+      "title": "Parents",
+      "summary": "Use this page to review linked parent records and parent-student access relationships.",
+      "steps": [
+        "Search by parent contact or student name.",
+        "Confirm linked children before troubleshooting parent login.",
+        "Update parent links through supported correction actions."
+      ]
+    },
+    {
+      "prefix": "/school-admin/messages",
+      "title": "Messages",
+      "summary": "Use this page to compose and track official notices for teachers, students, and parents.",
+      "steps": [
+        "Select audience scope first: all, class, stream, subject, or class-subject.",
+        "Write a clear title and action-focused message.",
+        "Attach files only when useful and monitor delivery/read status."
       ]
     },
     {
@@ -45,9 +97,71 @@
       "title": "Timetable",
       "summary": "Use this page to create or import class timetable rows and verify schedule conflicts.",
       "steps": [
-        "Select the class and period details.",
-        "Add or import rows in CSV format.",
-        "Check for clashes before finalizing."
+        "Select the class, day, period, subject, time, and room.",
+        "For Nursery/Primary, timetable teacher resolves from class teacher assignment.",
+        "For JSS/SS, timetable teacher resolves from subject assignment unless dean-led mode is active.",
+        "Use CSV template for bulk import and fix conflict warnings."
+      ]
+    },
+    {
+      "prefix": "/school-admin/new-term-wizard",
+      "title": "New Term Wizard",
+      "summary": "Use this page to move into a new term/year while copying or validating assignments safely.",
+      "steps": [
+        "Confirm old and new term/year before applying changes.",
+        "Copy needed class/subject assignments and timetable context.",
+        "Verify students, locks, and alerts after the switch."
+      ]
+    },
+    {
+      "prefix": "/school-admin/term-programs",
+      "title": "Term Programs",
+      "summary": "Use this page to manage school events, term dates, reminders, parent visibility, and calendar export.",
+      "steps": [
+        "Add event title, dates, and audience visibility.",
+        "Use reminders for important deadlines.",
+        "Print or export ICS when families need offline calendars."
+      ]
+    },
+    {
+      "prefix": "/school-admin/promote-students",
+      "title": "Promote Students",
+      "summary": "Use this page to move students through Nursery, Primary, JSS, SS, repeat, or remove workflows.",
+      "steps": [
+        "Select source class and suggested target class.",
+        "Review each student action: promote, repeat, or remove.",
+        "Run promotion after result and attendance checks are complete."
+      ]
+    },
+    {
+      "prefix": "/school-admin/promotion-audit",
+      "title": "Promotion Audit",
+      "summary": "Use this page to review promotion history, who moved, from which class, and when.",
+      "steps": [
+        "Filter by class, term, year, or action.",
+        "Review audit rows before running another promotion.",
+        "Use the log to verify accidental movement claims."
+      ]
+    },
+    {
+      "prefix": "/school-admin/publish-results",
+      "title": "Publish Results",
+      "summary": "Use this page to review class submissions, approve or reject results, publish, unpublish, and manage correction locks.",
+      "steps": [
+        "Select class, term, and academic year.",
+        "Resolve missing scores, attendance gaps, and assignment warnings.",
+        "Approve/reject submitted results, then publish when ready.",
+        "Use unlock/relock only for controlled corrections."
+      ]
+    },
+    {
+      "prefix": "/school-admin/subject-requests",
+      "title": "Subject Requests",
+      "summary": "Use this page to approve or reject student requests to add or drop subjects.",
+      "steps": [
+        "Filter pending requests first.",
+        "Review student, class, requested subject, and reason.",
+        "Approve or reject, then verify student subject list."
       ]
     },
     {
@@ -57,27 +171,117 @@
       "steps": [
         "Choose class, subject, term, and academic year.",
         "Create the test, then add questions and set status.",
-        "Open results/monitor once students start submitting."
+        "Open monitor/results once students start submitting."
       ]
     },
     {
-      "prefix": "/school-admin/add-students-by-class",
-      "title": "Add Students",
-      "summary": "Use this page to add students manually or through CSV into a specific class and term.",
+      "prefix": "/school-admin/analytics",
+      "title": "Analytics",
+      "summary": "Use this page to review academic performance, attendance impact, assistant usage, and operational trends.",
       "steps": [
-        "Choose the class first.",
-        "Add names or import CSV rows.",
-        "Review the saved class student list below."
+        "Set term/year filters before reading metrics.",
+        "Compare pass rate, subject trends, and attendance summaries.",
+        "Use assistant analytics to improve help content."
+      ]
+    },
+    {
+      "prefix": "/school-admin/data-integrity",
+      "title": "Data Integrity",
+      "summary": "Use this page to find inconsistent records, orphan assignments, user links, and class-subject mismatch issues.",
+      "steps": [
+        "Run checks for the current term/year.",
+        "Fix high-severity issues first.",
+        "Re-run checks to confirm the data is clean."
+      ]
+    },
+    {
+      "prefix": "/school-admin/score-audit",
+      "title": "Score Audit",
+      "summary": "Use this page to inspect score change history and revert eligible changes when policy allows.",
+      "steps": [
+        "Filter by student, class, subject, term, or editor.",
+        "Review source, old value, new value, and reason.",
+        "Use revert carefully and verify result output after."
+      ]
+    },
+    {
+      "prefix": "/school-admin/disputes",
+      "title": "Result Disputes",
+      "summary": "Use this page to review and resolve parent/student complaints about published results.",
+      "steps": [
+        "Open dispute details and supporting context.",
+        "Investigate score, publication, or correction history.",
+        "Update status and resolution note after action."
+      ]
+    },
+    {
+      "prefix": "/school-admin/attendance-summary",
+      "title": "Attendance Summary",
+      "summary": "Use this page to review attendance totals by class and export attendance summary data.",
+      "steps": [
+        "Filter by term and academic year.",
+        "Compare present, absent, late, and excused counts.",
+        "Export CSV when records need external review."
       ]
     },
     {
       "prefix": "/school-admin/bulk-tools",
       "title": "Bulk Tools",
-      "summary": "Use this page for CSV import/export, backup, restore, and storage monitoring.",
+      "summary": "Use this page for CSV/Excel import/export, backups, restore dry-run, and storage monitoring.",
       "steps": [
-        "Export a backup before bulk import operations.",
+        "Export a backup before bulk imports.",
         "Use dry-run mode first to validate file quality.",
-        "Use restore dry-run to verify backup integrity before applying."
+        "Download import error reports and fix rejected rows."
+      ]
+    },
+    {
+      "prefix": "/school-admin/security",
+      "title": "Security",
+      "summary": "Use this page to review access controls, security logs, password practices, and operational restrictions.",
+      "steps": [
+        "Review suspicious login or access activity.",
+        "Apply password or account controls where needed.",
+        "Escalate global platform controls to super admin."
+      ]
+    },
+    {
+      "prefix": "/school-admin/health",
+      "title": "System Health",
+      "summary": "Use this page to check database, queue, backup, storage, and service readiness for the school.",
+      "steps": [
+        "Review failed health checks first.",
+        "Check backup and storage status.",
+        "Use recovery drill for deeper restore-readiness verification."
+      ]
+    },
+    {
+      "prefix": "/school-admin/disaster-recovery-drill",
+      "title": "Recovery Drill",
+      "summary": "Use this page to test whether backups and critical records are recoverable before an emergency.",
+      "steps": [
+        "Run drill when the system is stable.",
+        "Review failed sections and missing backup evidence.",
+        "Repeat after fixing backup or restore issues."
+      ]
+    },
+    {
+      "prefix": "/school-admin/privacy-requests",
+      "title": "School Privacy Requests",
+      "summary": "Use this page to review user data/privacy requests before super-admin final action.",
+      "steps": [
+        "Filter pending requests.",
+        "Approve or reject with a clear school review note.",
+        "Approved rows move to super admin for final resolution."
+      ]
+    },
+    {
+      "prefix": "/school-admin/settings",
+      "title": "School Settings",
+      "summary": "Use this page to edit school profile, term/year, grading, operation flags, theme, and logo/signature setup.",
+      "steps": [
+        "Update school profile and academic context carefully.",
+        "Configure result grading, ranking, and exam structure.",
+        "Save and refresh the dashboard to confirm changes."
       ]
     }
   ],
@@ -88,8 +292,110 @@
       "summary": "Use this page to manage score, attendance, messages, and assignment workflows for your current assignment scope.",
       "steps": [
         "Confirm term/year and assigned class-subject scope.",
-        "Open the relevant task card (scores, attendance, or message).",
-        "Submit only actions that match your assignment scope."
+        "For Nursery/Primary class-teacher scope, handle all class subjects.",
+        "For JSS/SS subject scope, handle only assigned subjects.",
+        "Open the relevant task card for scores, attendance, CBT, or messages."
+      ]
+    },
+    {
+      "prefix": "/teacher/class-list",
+      "title": "Class List",
+      "summary": "Use this page to view students in class-teacher scope and students offering your assigned subjects.",
+      "steps": [
+        "Check scope/status tags before taking action.",
+        "Open score actions only for eligible students.",
+        "Use the list to identify pending score-entry work quickly."
+      ]
+    },
+    {
+      "prefix": "/teacher/enter-scores",
+      "title": "Enter Scores",
+      "summary": "Use this page to enter or update results within your assignment scope. Nursery/Primary class teachers can enter all subjects for their class.",
+      "steps": [
+        "Select the correct class, student, term, and year.",
+        "For Nursery/Primary class-teacher scope, enter all offered subjects.",
+        "For JSS/SS subject-teacher scope, enter only assigned subjects.",
+        "Validate CA/exam entries before save."
+      ]
+    },
+    {
+      "prefix": "/teacher/subject-score-sheet",
+      "title": "Subject Score Sheet",
+      "summary": "Use this page to enter one subject for many students in an assigned class-subject scope.",
+      "steps": [
+        "Choose class, subject, and term.",
+        "Enter CA/exam rows for eligible students.",
+        "Submit when the subject sheet is complete."
+      ]
+    },
+    {
+      "prefix": "/teacher/upload-csv",
+      "title": "Upload CSV",
+      "summary": "Use this page to upload score CSV files for assigned classes or subjects.",
+      "steps": [
+        "Download or follow the expected CSV format.",
+        "Upload only rows within your assignment scope.",
+        "Fix rejected rows and upload again if validation fails."
+      ]
+    },
+    {
+      "prefix": "/teacher/notifications",
+      "title": "Teacher Notifications",
+      "summary": "Use this page to review missing-score alerts and pending-entry counts for your current scope.",
+      "steps": [
+        "Review each alert row by class and subject.",
+        "Open Enter Scores or Subject Score Sheet to complete pending entries.",
+        "Return to confirm alert count has reduced."
+      ]
+    },
+    {
+      "prefix": "/teacher/attendance",
+      "title": "Attendance",
+      "summary": "Use this page to mark attendance for your class-teacher scope only.",
+      "steps": [
+        "Pick the class and instructional date.",
+        "Mark every student present, absent, late, or excused.",
+        "Save and review the summary after submission."
+      ]
+    },
+    {
+      "prefix": "/teacher/period-attendance",
+      "title": "Period Attendance",
+      "summary": "Use this page to mark attendance by class, date, period, and subject where allowed.",
+      "steps": [
+        "Select class, date, period, and subject.",
+        "Mark each student status.",
+        "Save and verify the period summary."
+      ]
+    },
+    {
+      "prefix": "/teacher/behaviour-assessment",
+      "title": "Behaviour Assessment",
+      "summary": "Use this page to record behaviour traits for students in class-teacher scope.",
+      "steps": [
+        "Select the assigned class.",
+        "Complete required behaviour fields.",
+        "Save before result publish checks."
+      ]
+    },
+    {
+      "prefix": "/teacher/messages",
+      "title": "Teacher Messages",
+      "summary": "Use this page to read school notices and mark them as read.",
+      "steps": [
+        "Read the latest unread notices first.",
+        "Use mark-read or mark-all-read when finished.",
+        "Open linked instructions if a notice asks for action."
+      ]
+    },
+    {
+      "prefix": "/teacher/timetable",
+      "title": "Teacher Timetable",
+      "summary": "Use this page to view teaching periods by class, day, time, subject, and room.",
+      "steps": [
+        "Review today and week schedule.",
+        "Use period information for lesson planning and attendance.",
+        "Report missing or wrong periods to school admin."
       ]
     },
     {
@@ -103,57 +409,67 @@
       ]
     },
     {
-      "prefix": "/teacher/attendance",
-      "title": "Attendance",
-      "summary": "Use this page to mark attendance for your class-teacher scope only.",
+      "prefix": "/teacher/subject-comments",
+      "title": "Subject Comments",
+      "summary": "Use this page to review or manage subject-teacher comments within assignment scope.",
       "steps": [
-        "Pick the class and instructional date.",
-        "Mark every student present, absent, or late.",
-        "Save and review the summary after submission."
+        "Filter by class, subject, term, and year.",
+        "Review comments alongside student details.",
+        "Use comments for handover or result review."
       ]
     },
     {
-      "prefix": "/teacher/messages",
-      "title": "Teacher Messages",
-      "summary": "Use this page to read school notices and mark them as read.",
+      "prefix": "/teacher/subject-ranks",
+      "title": "Subject Ranks",
+      "summary": "Use this page to review subject ranking history and export ranked sheets.",
       "steps": [
-        "Read the latest notices first.",
-        "Use mark-read or mark-all-read when finished.",
-        "Open linked instructions if a notice asks for action."
-      ]
-    },
-    {
-      "prefix": "/teacher/class-list",
-      "title": "Class List",
-      "summary": "Use this page to view students in your class-teacher scope and students offering your assigned subjects.",
-      "steps": [
-        "Check scope/status tags before taking any action.",
-        "Open score actions only for eligible students.",
-        "Use the list to identify pending score-entry work quickly."
-      ]
-    },
-    {
-      "prefix": "/teacher/notifications",
-      "title": "Teacher Notifications",
-      "summary": "Use this page to review missing-score alerts and pending-entry counts for your current scope.",
-      "steps": [
-        "Review each alert row by class and subject.",
-        "Open Enter Scores and complete missing entries.",
-        "Return to confirm alert count has reduced."
-      ]
-    },
-    {
-      "prefix": "/teacher/enter-scores",
-      "title": "Enter Scores",
-      "summary": "Use this page to enter or update subject results for assigned classes only.",
-      "steps": [
-        "Select class, subject, term, and year correctly.",
-        "Validate CA/exam entries before save.",
-        "Submit according to class-teacher/subject-teacher workflow."
+        "Choose year, term, class, and subject.",
+        "Review ranked students and trends.",
+        "Export rank CSV when needed."
       ]
     }
   ],
   "parent": [
+    {
+      "prefix": "/parent",
+      "title": "Parent Dashboard",
+      "summary": "Use this page to switch between linked children and open result, attendance, timetable, messages, and dispute workflows.",
+      "steps": [
+        "Select the correct child first when multiple children are linked.",
+        "Open result, attendance, timetable, or messages from the child context.",
+        "Submit disputes only for the affected child and term."
+      ]
+    },
+    {
+      "prefix": "/parent/view-result",
+      "title": "Parent View Result",
+      "summary": "Use this page to view a published result for a linked child.",
+      "steps": [
+        "Pick the child and term/year.",
+        "Review subject scores, average, grade, and remarks.",
+        "Use print/download if available."
+      ]
+    },
+    {
+      "prefix": "/parent/compare-results",
+      "title": "Compare Results",
+      "summary": "Use this page to compare a child's academic performance across terms.",
+      "steps": [
+        "Select the child first.",
+        "Choose terms/year to compare.",
+        "Use trend differences to identify improvement or concern areas."
+      ]
+    },
+    {
+      "prefix": "/parent/attendance",
+      "title": "Parent Attendance",
+      "summary": "Use this page to view attendance records for a linked child.",
+      "steps": [
+        "Select the child and term/date range.",
+        "Review present, absent, late, and excused counts.",
+        "Contact school if records look wrong."
+      ]
+    },
     {
       "prefix": "/parent/timetable",
       "title": "Parent Timetable",
@@ -163,9 +479,39 @@
         "Review only periods shown for that child's class/subjects.",
         "Use print view if you need an offline copy."
       ]
+    },
+    {
+      "prefix": "/parent/messages",
+      "title": "Parent Messages",
+      "summary": "Use this page to read school notices and child-specific messages.",
+      "steps": [
+        "Open unread messages first.",
+        "Check deadlines and attachments.",
+        "Mark messages read after reviewing."
+      ]
+    },
+    {
+      "prefix": "/parent/disputes",
+      "title": "Parent Disputes",
+      "summary": "Use this page to raise or track result concerns for a linked child.",
+      "steps": [
+        "Choose the affected child, result, and term.",
+        "Write a clear complaint with evidence.",
+        "Track status until school resolves it."
+      ]
     }
   ],
   "student": [
+    {
+      "prefix": "/student",
+      "title": "Student Dashboard",
+      "summary": "Use this page to view personal notices, result links, messages, and account actions.",
+      "steps": [
+        "Read dashboard notices first.",
+        "Open messages or result pages from the sidebar.",
+        "Use change password to keep account secure."
+      ]
+    },
     {
       "prefix": "/student/view-result",
       "title": "View Result",
@@ -185,9 +531,79 @@
         "Check assignment or deadline details.",
         "Mark messages as read after reviewing."
       ]
+    },
+    {
+      "prefix": "/student/subject-requests",
+      "title": "Subject Requests",
+      "summary": "Use this page to request adding or dropping a subject for school-admin approval.",
+      "steps": [
+        "Choose the subject and request action.",
+        "Write a short reason.",
+        "Track pending, approved, or rejected status."
+      ]
+    },
+    {
+      "prefix": "/student/cbt",
+      "title": "Student CBT",
+      "summary": "Use this page to take assigned CBT tests and review available attempts.",
+      "steps": [
+        "Open only active CBTs assigned to your class/subject.",
+        "Read instructions and time limit before starting.",
+        "Submit before the timer ends."
+      ]
+    },
+    {
+      "prefix": "/student/profile",
+      "title": "Student Profile",
+      "summary": "Use this page to review profile details and request support for incorrect personal data.",
+      "steps": [
+        "Check name, class, email, and guardian details.",
+        "Report wrong details to school admin.",
+        "Use password/security actions where available."
+      ]
     }
   ],
   "super_admin": [
+    {
+      "prefix": "/super-admin/add-school",
+      "title": "Add School",
+      "summary": "Use this page to create a new school tenant and initial school-admin access.",
+      "steps": [
+        "Enter school identity and admin details.",
+        "Choose plan/features carefully.",
+        "Confirm admin credentials and school status after creation."
+      ]
+    },
+    {
+      "prefix": "/super-admin/schools",
+      "title": "View Schools",
+      "summary": "Use this page to review schools, edit school records, and control operations status.",
+      "steps": [
+        "Search for the school first.",
+        "Review status, plan, and operations controls.",
+        "Edit carefully and verify school admin access."
+      ]
+    },
+    {
+      "prefix": "/view-reports",
+      "title": "Reported Issues",
+      "summary": "Use this page to review user-submitted support/bug reports.",
+      "steps": [
+        "Filter by unread, role, school, or page.",
+        "Open details and use role/page context to reproduce.",
+        "Mark read/unread or delete duplicates."
+      ]
+    },
+    {
+      "prefix": "/super-admin/privacy-requests",
+      "title": "Privacy Requests",
+      "summary": "Use this page to finalize data/privacy requests after school-admin review.",
+      "steps": [
+        "Filter pending or school-approved rows.",
+        "Review school note and requested action.",
+        "Approve/reject with resolution note and apply final action where needed."
+      ]
+    },
     {
       "prefix": "/super-admin/error-logs",
       "title": "Error Logs",
@@ -206,6 +622,16 @@
         "Review repeated questions and low-confidence topics.",
         "Update app guidance for frequent unresolved workflows.",
         "Use the patterns to improve page help and KB entries."
+      ]
+    },
+    {
+      "prefix": "/assistant/health",
+      "title": "Assistant Health",
+      "summary": "Use this endpoint to verify assistant schema, database, and response-engine status.",
+      "steps": [
+        "Open the health JSON from assistant analytics.",
+        "Check failed schema/db/engine flags.",
+        "Run migrations or fix configuration if checks fail."
       ]
     }
   ]

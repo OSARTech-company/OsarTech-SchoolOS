@@ -39,8 +39,11 @@
 </div>
 {% endif %}
 {% set assistant_intro = 'Ask anything about how to use this app. I can guide you step-by-step, but I cannot execute actions.' %}
+{% if session.get('role') == 'school_admin' %}
+{% set assistant_intro = 'Ask me about setup, students, results, or teacher assignments. Nursery/Primary uses class-teacher flow; JSS/SS can use subject teachers.' %}
+{% endif %}
 {% if session.get('role') == 'teacher' %}
-{% set assistant_intro = 'Ask me any teacher workflow question. I will explain step-by-step based on your class/subject assignment, but I cannot execute actions.' %}
+{% set assistant_intro = 'Ask me any teacher workflow question. I will explain based on your assignment: Nursery/Primary class teachers handle all subjects; JSS/SS may use subject scope.' %}
 {% endif %}
 <div class="app-ai-assistant" data-role="{{ (session.get('role') or '')|e }}" data-preferred-mode="{{ assistant_preferred_mode|default('standard', true)|e }}">
     <input type="hidden" class="app-ai-csrf" value="{{ csrf_token() }}">
