@@ -166,6 +166,24 @@
     document.addEventListener('click', function(e) {
         const link = e.target.closest('a');
         if (link && link.href && !link.href.startsWith('#') && !link.target) {
+            const rawHref = (link.getAttribute('href') || '').trim();
+            const lowerHref = rawHref.toLowerCase();
+            const url = new URL(link.href, window.location.href);
+            const path = (url.pathname || '').toLowerCase();
+            const skipLoading =
+                (link.dataset && (link.dataset.loadingSkip === '1' || link.dataset.noLoading === '1')) ||
+                link.hasAttribute('download') ||
+                path.includes('/download') ||
+                path.endsWith('.pdf') ||
+                path.endsWith('.csv') ||
+                path.endsWith('.xlsx') ||
+                path.endsWith('.xls') ||
+                path.endsWith('.zip') ||
+                lowerHref.startsWith('blob:') ||
+                lowerHref.startsWith('data:');
+            if (skipLoading) {
+                return;
+            }
             // Only show for internal navigation
             if (link.href.includes(window.location.hostname)) {
                 showLoadingOverlay();

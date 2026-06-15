@@ -26776,6 +26776,15 @@ def school_access_request():
                     # Rotate challenge per successful submission.
                     challenge_text = _issue_school_access_challenge()
                     return redirect(url_for('school_access_request'))
+                except ValueError as exc:
+                    try:
+                        orphan_abs = _resolve_onboarding_proof_file_path(proof_document_path)
+                        if orphan_abs and os.path.isfile(orphan_abs):
+                            os.remove(orphan_abs)
+                    except Exception as exc2:
+                        _log_suppressed_exception('school_access_request', exc2)
+                    logging.warning("School access request validation failed: %s", exc)
+                    flash(str(exc), 'error')
                 except Exception:
                     try:
                         orphan_abs = _resolve_onboarding_proof_file_path(proof_document_path)

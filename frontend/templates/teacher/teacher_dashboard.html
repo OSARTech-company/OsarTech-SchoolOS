@@ -381,6 +381,40 @@
                     </div>
                     <p class="note">Counts official open days only (excludes Saturday, Sunday, and mid-term break).</p>
                 </div>
+                <div class="card" id="result-export-card">
+                    <h2><i class="fas fa-file-export"></i> End-of-Term Export</h2>
+                    {% if classes %}
+                    <p class="note">Open a print-friendly preview or download the class result as CSV or Excel. Subjects are ordered by how many students offer them, then the sheet ends with Total, Average, and Grade.</p>
+                    <form action="{{ url_for('teacher_class_results_preview') }}" method="GET">
+                        <input type="hidden" name="term" value="{{ current_term }}">
+                        <input type="hidden" name="academic_year" value="{{ current_year }}">
+                        <div class="form-group">
+                            <label for="export_classname">Class</label>
+                            <select id="export_classname" name="classname" required>
+                                {% for cls in classes %}
+                                <option value="{{ cls }}" {% if selected_export_class == cls %}selected{% endif %}>{{ cls }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-eye"></i>
+                            Open Preview
+                        </button>
+                        <button type="submit" class="btn btn-secondary" formaction="{{ url_for('teacher_class_results_export') }}">
+                            <i class="fas fa-download"></i>
+                            Download CSV
+                        </button>
+                        <button type="submit" class="btn btn-secondary" formaction="{{ url_for('teacher_class_results_export', format='xlsx') }}">
+                            <i class="fas fa-file-excel"></i>
+                            Download Excel
+                        </button>
+                        </div>
+                    </form>
+                    {% else %}
+                    <p class="note">No class assignment yet, so there is nothing to export.</p>
+                    {% endif %}
+                </div>
                 {% if has_class_assignment %}
                 <div class="card">
                     <h2><i class="fas fa-signature"></i> Teacher Signature</h2>

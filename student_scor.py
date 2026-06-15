@@ -51,6 +51,9 @@ from functools import wraps
 
 import logging
 from logging.handlers import RotatingFileHandler
+from openpyxl import Workbook as OpenpyxlWorkbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 try:
     from dotenv import load_dotenv
 except Exception:
@@ -6982,6 +6985,7 @@ def init_db():
                         reason TEXT DEFAULT '',
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )""")
+    safe_exec_ignore("ALTER TABLE class_timetables ADD COLUMN IF NOT EXISTS online_url TEXT DEFAULT ''")
     db_execute(c, """CREATE TABLE IF NOT EXISTS class_timetables (
                         id SERIAL PRIMARY KEY,
                         school_id TEXT NOT NULL,
@@ -6993,6 +6997,7 @@ def init_db():
                         start_time TEXT DEFAULT '',
                         end_time TEXT DEFAULT '',
                         room TEXT DEFAULT '',
+                        online_url TEXT DEFAULT '',
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         UNIQUE(school_id, classname, day_of_week, period_label)
@@ -22190,6 +22195,211 @@ def get_published_students_for_class(school_id, classname, term, academic_year='
         })
     return out
 
+def build_end_of_term_class_result_export(school_id, classname, term, academic_year=''):
+    """Build subject-ordered export rows for one published class result."""
+    school = get_school(school_id) or {}
+    published_students = get_published_students_for_class(school_id, classname, term, academic_year)
+    student_rows = []
+    subject_counts = {}
+
+    for published_student in published_students:
+        student_id = (published_student.get('student_id') or '').strip()
+        if not student_id:
+            continue
+        snapshot = load_published_student_result(school_id, student_id, term, academic_year, classname=classname)
+        if not snapshot:
+            continue
+        scores_map = snapshot.get('scores', {}) if isinstance(snapshot.get('scores', {}), dict) else {}
+        ordered_scores = build_ordered_subject_score_map(scores_map, snapshot.get('subjects', []))
+        row_subjects = list(ordered_scores.keys())
+        for subject_name in row_subjects:
+            subject_counts[subject_name] = subject_counts.get(subject_name, 0) + 1
+        student_rows.append({
+            'student_id': student_id,
+            'firstname': (snapshot.get('firstname') or published_student.get('firstname') or student_id).strip(),
+            'subjects': row_subjects,
+            'scores': ordered_scores,
+            'total_score': round(compute_total_score_from_scores(ordered_scores), 2),
+            'average_marks': round(float(snapshot.get('average_marks', 0) or 0), 2),
+            'grade': (snapshot.get('Grade') or published_student.get('grade') or '').strip(),
+            'status': (snapshot.get('Status') or published_student.get('status') or '').strip(),
+            'published_at': snapshot.get('published_at') or published_student.get('published_at') or '',
+        })
+
+    subject_columns = sorted(
+        subject_counts.keys(),
+        key=lambda subject_name: (-subject_counts.get(subject_name, 0), str(subject_name).lower()),
+    )
+    total_students = len(student_rows)
+    class_average = round(
+        sum(float(row.get('average_marks', 0) or 0) for row in student_rows) / total_students,
+        2,
+    ) if total_students else 0.0
+    highest_total = round(max(float(row.get('total_score', 0) or 0) for row in student_rows), 2) if student_rows else 0.0
+    top_student = max(student_rows, key=lambda row: float(row.get('average_marks', 0) or 0)) if student_rows else None
+    grade_distribution = sorted(
+        Counter((row.get('grade') or 'N/A').strip() or 'N/A' for row in student_rows).items(),
+        key=lambda item: str(item[0]).lower(),
+    )
+    return {
+        'school': school,
+        'rows': student_rows,
+        'subject_columns': subject_columns,
+        'summary': {
+            'total_students': total_students,
+            'total_subjects': len(subject_columns),
+            'class_average': class_average,
+            'highest_total': highest_total,
+            'top_student': (top_student or {}).get('firstname', '') if top_student else '',
+            'grade_distribution': grade_distribution,
+        },
+    }
+
+def build_end_of_term_class_result_workbook(export_data, school, selected_class, export_term, export_year, generated_at=None):
+    generated_at = generated_at or datetime.now()
+    subject_columns = export_data.get('subject_columns', [])
+    student_rows = export_data.get('rows', [])
+    summary = export_data.get('summary', {}) or {}
+    school_name = (school or {}).get('school_name', '') or 'School'
+    total_columns = len(subject_columns) + 4
+    last_column_letter = get_column_letter(max(total_columns, 1))
+
+    workbook = OpenpyxlWorkbook()
+    worksheet = workbook.active
+    worksheet.title = 'Class Result'
+    worksheet.sheet_view.showGridLines = False
+    worksheet.freeze_panes = 'A6'
+
+    title_fill = PatternFill('solid', fgColor='1E3A5F')
+    summary_fill = PatternFill('solid', fgColor='F8FBFF')
+    label_fill = PatternFill('solid', fgColor='EAF2FF')
+    header_fill = PatternFill('solid', fgColor='EEF4FF')
+    total_fill = PatternFill('solid', fgColor='F1F5F9')
+    border_side = Side(style='thin', color='D7E0EB')
+    border = Border(left=border_side, right=border_side, top=border_side, bottom=border_side)
+    title_font = Font(color='FFFFFF', bold=True, size=14)
+    header_font = Font(color='1E3A5F', bold=True)
+    bold_font = Font(bold=True, color='0F172A')
+    center = Alignment(horizontal='center', vertical='center')
+    left = Alignment(horizontal='left', vertical='center')
+    right = Alignment(horizontal='right', vertical='center')
+
+    worksheet.merge_cells(f'A1:{last_column_letter}1')
+    title_cell = worksheet['A1']
+    title_cell.value = 'End-of-Term Class Result'
+    title_cell.fill = title_fill
+    title_cell.font = title_font
+    title_cell.alignment = center
+
+    summary_labels = ['School', 'Class', 'Term', 'Academic Year', 'Students', 'Subjects', 'Class Average', 'Highest Total', 'Top Student']
+    summary_values = [
+        school_name,
+        selected_class,
+        export_term,
+        export_year or '-',
+        summary.get('total_students', 0),
+        summary.get('total_subjects', 0),
+        summary.get('class_average', 0.0),
+        summary.get('highest_total', 0.0),
+        summary.get('top_student', '') or '-',
+    ]
+
+    for column_index, label in enumerate(summary_labels, start=1):
+        label_cell = worksheet.cell(row=2, column=column_index, value=label)
+        label_cell.fill = label_fill
+        label_cell.font = header_font
+        label_cell.alignment = center
+        label_cell.border = border
+        value_cell = worksheet.cell(row=3, column=column_index, value=summary_values[column_index - 1])
+        value_cell.fill = summary_fill
+        value_cell.border = border
+        value_cell.alignment = center if column_index != 9 else left
+        if column_index in {7, 8}:
+            value_cell.number_format = '0.00'
+
+    worksheet.merge_cells(f'A4:{last_column_letter}4')
+    note_cell = worksheet['A4']
+    note_cell.value = 'Subjects are ordered by how many students offer them, from highest to lowest.'
+    note_cell.fill = summary_fill
+    note_cell.font = bold_font
+    note_cell.alignment = left
+    note_cell.border = border
+
+    header_row = 5
+    worksheet.cell(row=header_row, column=1, value='Student Name')
+    worksheet.cell(row=header_row, column=1).fill = header_fill
+    worksheet.cell(row=header_row, column=1).font = header_font
+    worksheet.cell(row=header_row, column=1).alignment = center
+    worksheet.cell(row=header_row, column=1).border = border
+
+    for column_index, subject_name in enumerate(subject_columns, start=2):
+        cell = worksheet.cell(row=header_row, column=column_index, value=subject_name)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center
+        cell.border = border
+
+    total_col = len(subject_columns) + 2
+    average_col = len(subject_columns) + 3
+    grade_col = len(subject_columns) + 4
+    for column_index, label in ((total_col, 'Total'), (average_col, 'Average'), (grade_col, 'Grade')):
+        cell = worksheet.cell(row=header_row, column=column_index, value=label)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center
+        cell.border = border
+
+    row_number = header_row + 1
+    for student_row in student_rows:
+        worksheet.cell(row=row_number, column=1, value=student_row.get('firstname', '')).alignment = left
+        worksheet.cell(row=row_number, column=1).font = bold_font
+        worksheet.cell(row=row_number, column=1).border = border
+        score_map = student_row.get('scores', {}) if isinstance(student_row.get('scores', {}), dict) else {}
+        for column_index, subject_name in enumerate(subject_columns, start=2):
+            block = score_map.get(subject_name)
+            value = round(float(subject_overall_mark(block) or 0), 2) if isinstance(block, dict) else None
+            cell = worksheet.cell(row=row_number, column=column_index, value=value)
+            cell.number_format = '0.00'
+            cell.alignment = right
+            cell.border = border
+        total_cell = worksheet.cell(row=row_number, column=total_col, value=round(float(student_row.get('total_score', 0) or 0), 2))
+        total_cell.number_format = '0.00'
+        total_cell.fill = total_fill
+        total_cell.font = bold_font
+        total_cell.alignment = right
+        total_cell.border = border
+
+        average_cell = worksheet.cell(row=row_number, column=average_col, value=round(float(student_row.get('average_marks', 0) or 0), 2))
+        average_cell.number_format = '0.00'
+        average_cell.fill = total_fill
+        average_cell.font = bold_font
+        average_cell.alignment = right
+        average_cell.border = border
+
+        grade_cell = worksheet.cell(row=row_number, column=grade_col, value=student_row.get('grade', '') or '')
+        grade_cell.fill = total_fill
+        grade_cell.font = bold_font
+        grade_cell.alignment = center
+        grade_cell.border = border
+        row_number += 1
+
+    worksheet.auto_filter.ref = f'A{header_row}:{last_column_letter}{max(row_number - 1, header_row)}'
+
+    worksheet.column_dimensions['A'].width = min(max(18, max((len(str(row.get('firstname', ''))) for row in student_rows), default=12) + 2), 28)
+    for column_index, subject_name in enumerate(subject_columns, start=2):
+        column_letter = get_column_letter(column_index)
+        worksheet.column_dimensions[column_letter].width = min(max(12, len(str(subject_name)) + 2), 18)
+    worksheet.column_dimensions[get_column_letter(total_col)].width = 12
+    worksheet.column_dimensions[get_column_letter(average_col)].width = 12
+    worksheet.column_dimensions[get_column_letter(grade_col)].width = 10
+
+    worksheet.row_dimensions[1].height = 24
+    worksheet.row_dimensions[2].height = 22
+    worksheet.row_dimensions[3].height = 22
+    worksheet.row_dimensions[4].height = 22
+    worksheet.row_dimensions[5].height = 22
+    return workbook
+
 def record_result_view(school_id, student_id, term, academic_year=''):
     """Mark a published result as viewed by student."""
     if not school_id or not student_id or not term:
@@ -24985,6 +25195,37 @@ def _time_to_minutes(value):
     return hour * 60 + minute
 
 
+def get_current_online_lessons(rows, current_day=None, current_minutes=None):
+    if current_day is None or current_minutes is None:
+        now_local = datetime.now()
+        current_day = int(now_local.isoweekday())
+        current_minutes = now_local.hour * 60 + now_local.minute
+    current_day = int(current_day or 0)
+    current_minutes = int(current_minutes or 0)
+    active = []
+    for row in rows:
+        if not (row.get('online_url') or '').strip():
+            continue
+        if int(row.get('day_of_week') or 0) != current_day:
+            continue
+        start_min = _time_to_minutes(row.get('start_time', ''))
+        end_min = _time_to_minutes(row.get('end_time', ''))
+        if start_min is None or end_min is None or end_min <= start_min:
+            continue
+        if start_min <= current_minutes < end_min:
+            row['active_now'] = True
+            active.append({
+                **row,
+                'minutes_left': end_min - current_minutes,
+            })
+    active.sort(key=lambda x: (
+        int(x.get('minutes_left', 0) or 0),
+        (x.get('classname') or '').strip().lower(),
+        (x.get('period_label') or '').strip().lower(),
+    ))
+    return active
+
+
 def timetable_time_ranges_overlap(start_a, end_a, start_b, end_b):
     a1 = _time_to_minutes(start_a)
     a2 = _time_to_minutes(end_a)
@@ -25170,7 +25411,7 @@ def get_school_timetable_rows(school_id, classname=''):
             params.append(classname)
         db_execute(
             c,
-            f"""SELECT id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room
+            f"""SELECT id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room, online_url
                 FROM class_timetables
                 {where_sql}
                 ORDER BY LOWER(classname), day_of_week, LOWER(period_label)""",
@@ -25189,6 +25430,7 @@ def get_school_timetable_rows(school_id, classname=''):
                 'start_time': row[6] or '',
                 'end_time': row[7] or '',
                 'room': row[8] or '',
+                'online_url': row[9] or '',
             })
         return rows
 
@@ -28536,6 +28778,15 @@ def school_access_request():
                     # Rotate challenge per successful submission.
                     challenge_text = _issue_school_access_challenge()
                     return redirect(url_for('school_access_request'))
+                except ValueError as exc:
+                    try:
+                        orphan_abs = _resolve_onboarding_proof_file_path(proof_document_path)
+                        if orphan_abs and os.path.isfile(orphan_abs):
+                            os.remove(orphan_abs)
+                    except Exception as exc2:
+                        _log_suppressed_exception('school_access_request', exc2)
+                    logging.warning("School access request validation failed: %s", exc)
+                    flash(str(exc), 'error')
                 except Exception:
                     try:
                         orphan_abs = _resolve_onboarding_proof_file_path(proof_document_path)
@@ -36303,7 +36554,7 @@ def school_admin_timetable():
         def _slot_lookup_row(cursor, cls_name, day_num, period_name):
             db_execute(
                 cursor,
-                """SELECT id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room
+                """SELECT id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room, online_url
                    FROM class_timetables
                    WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND day_of_week = ? AND LOWER(period_label) = LOWER(?)
                    LIMIT 1""",
@@ -36322,6 +36573,7 @@ def school_admin_timetable():
                 'start_time': r[6] or '',
                 'end_time': r[7] or '',
                 'room': r[8] or '',
+                'online_url': r[9] or '',
             }
 
         try:
@@ -36331,7 +36583,7 @@ def school_admin_timetable():
                     row_id = int(request.form.get('row_id', 0) or 0)
                     db_execute(
                         c,
-                        """SELECT id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room
+                        """SELECT id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room, online_url
                            FROM class_timetables
                            WHERE school_id = ? AND id = ?
                            LIMIT 1""",
@@ -36350,6 +36602,7 @@ def school_admin_timetable():
                         'start_time': existing[6] or '',
                         'end_time': existing[7] or '',
                         'room': existing[8] or '',
+                        'online_url': existing[9] or '',
                     }
                     db_execute(c, "DELETE FROM class_timetables WHERE school_id = ? AND id = ?", (school_id, row_id))
                     log_timetable_change_with_cursor(
@@ -36376,6 +36629,7 @@ def school_admin_timetable():
                     start_time = (source_payload.get('start_time') or '').strip()
                     end_time = (source_payload.get('end_time') or '').strip()
                     room = (source_payload.get('room') or '').strip()
+                    online_url = (source_payload.get('online_url') or '').strip()
                     if not classname or not period_label or not subject or day_of_week < 1 or day_of_week > 7:
                         raise ValueError('History entry is incomplete and cannot be restored.')
                     teacher_id = resolve_timetable_teacher_id(classname, subject)
@@ -36396,16 +36650,17 @@ def school_admin_timetable():
                     db_execute(
                         c,
                         """INSERT INTO class_timetables
-                           (school_id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room, updated_at)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                           (school_id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room, online_url, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                            ON CONFLICT (school_id, classname, day_of_week, period_label) DO UPDATE SET
                              subject = EXCLUDED.subject,
                              teacher_id = EXCLUDED.teacher_id,
                              start_time = EXCLUDED.start_time,
                              end_time = EXCLUDED.end_time,
                              room = EXCLUDED.room,
+                             online_url = EXCLUDED.online_url,
                              updated_at = CURRENT_TIMESTAMP""",
-                        (school_id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room),
+                        (school_id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room, online_url),
                     )
                     after_row = {
                         'classname': classname,
@@ -36416,6 +36671,7 @@ def school_admin_timetable():
                         'start_time': start_time,
                         'end_time': end_time,
                         'room': room,
+                        'online_url': online_url,
                     }
                     log_timetable_change_with_cursor(
                         c,
@@ -36461,6 +36717,7 @@ def school_admin_timetable():
                         start_time = (row.get('start_time', '') or row.get('start', '')).strip()
                         end_time = (row.get('end_time', '') or row.get('end', '')).strip()
                         room = (row.get('room', '') or '').strip()
+                        online_url = (row.get('online_url', '') or '').strip()
                         if not classname or not day_raw or not period_label or not subject:
                             row_errors.append(f'Row {idx}: classname/day/period_label/subject are required.')
                             continue
@@ -36497,16 +36754,17 @@ def school_admin_timetable():
                         db_execute(
                             c,
                             """INSERT INTO class_timetables
-                               (school_id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room, updated_at)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                               (school_id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room, online_url, updated_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                                ON CONFLICT (school_id, classname, day_of_week, period_label) DO UPDATE SET
                                  subject = EXCLUDED.subject,
                                  teacher_id = EXCLUDED.teacher_id,
                                  start_time = EXCLUDED.start_time,
                                  end_time = EXCLUDED.end_time,
                                  room = EXCLUDED.room,
+                                 online_url = EXCLUDED.online_url,
                                  updated_at = CURRENT_TIMESTAMP""",
-                            (school_id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room),
+                            (school_id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room, online_url),
                         )
                         after_row = {
                             'classname': classname,
@@ -36517,6 +36775,7 @@ def school_admin_timetable():
                             'start_time': start_time,
                             'end_time': end_time,
                             'room': room,
+                            'online_url': online_url,
                         }
                         log_timetable_change_with_cursor(
                             c,
@@ -36544,6 +36803,7 @@ def school_admin_timetable():
                     start_time = (request.form.get('start_time', '') or '').strip()
                     end_time = (request.form.get('end_time', '') or '').strip()
                     room = (request.form.get('room', '') or '').strip()
+                    online_url = (request.form.get('online_url', '') or '').strip()
                     if not classname or not period_label or not subject:
                         raise ValueError('Class, period label, and subject are required.')
                     if not is_supported_classname(classname):
@@ -36572,16 +36832,17 @@ def school_admin_timetable():
                     db_execute(
                         c,
                         """INSERT INTO class_timetables
-                           (school_id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room, updated_at)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                           (school_id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room, online_url, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                            ON CONFLICT (school_id, classname, day_of_week, period_label) DO UPDATE SET
                              subject = EXCLUDED.subject,
                              teacher_id = EXCLUDED.teacher_id,
                              start_time = EXCLUDED.start_time,
                              end_time = EXCLUDED.end_time,
                              room = EXCLUDED.room,
+                             online_url = EXCLUDED.online_url,
                              updated_at = CURRENT_TIMESTAMP""",
-                        (school_id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room),
+                        (school_id, classname, day_of_week, period_label, subject, teacher_id, start_time, end_time, room, online_url),
                     )
                     after_row = {
                         'classname': classname,
@@ -36592,6 +36853,7 @@ def school_admin_timetable():
                         'start_time': start_time,
                         'end_time': end_time,
                         'room': room,
+                        'online_url': online_url,
                     }
                     log_timetable_change_with_cursor(
                         c,
@@ -36671,9 +36933,9 @@ def school_admin_timetable_template():
         return redirect(url_for('login'))
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(['classname', 'day_of_week', 'period_label', 'subject', 'start_time', 'end_time', 'room'])
-    writer.writerow(['PRIMARY1', '1', 'Period 1', 'Mathematics', '08:00', '08:40', 'Room A1'])
-    writer.writerow(['PRIMARY1', 'Monday', 'Period 2', 'English Language', '08:40', '09:20', 'Room A1'])
+    writer.writerow(['classname', 'day_of_week', 'period_label', 'subject', 'start_time', 'end_time', 'room', 'online_url'])
+    writer.writerow(['PRIMARY1', '1', 'Period 1', 'Mathematics', '08:00', '08:40', 'Room A1', 'https://meet.example.com/abc123'])
+    writer.writerow(['PRIMARY1', 'Monday', 'Period 2', 'English Language', '08:40', '09:20', 'Room A1', 'https://meet.example.com/def456'])
 
     return Response(
         output.getvalue(),
@@ -36742,12 +37004,14 @@ def teacher_timetable():
             grouped_map[day_name] = {'day_name': day_name, 'rows': []}
             grouped_rows.append(grouped_map[day_name])
         grouped_map[day_name]['rows'].append(row)
+    active_online_lessons = get_current_online_lessons(rows)
     return render_template(
         'teacher/teacher_timetable.html',
         school=school,
         rows=rows,
         grouped_rows=grouped_rows,
         day_options=DAY_OF_WEEK_OPTIONS,
+        active_online_lessons=active_online_lessons,
     )
 
 @app.route('/teacher/subject-ranks')
@@ -41649,6 +41913,15 @@ def teacher_dashboard():
         for item in (subject_assignment_summary or [])
         if str(item.get('classname') or '').strip()
     }
+    selected_export_class = (request.args.get('export_classname', '') or '').strip()
+    class_lookup = {str(cls or '').strip().lower(): str(cls or '').strip() for cls in classes if str(cls or '').strip()}
+    if not selected_export_class and classes:
+        selected_export_class = classes[0]
+    selected_export_key = selected_export_class.lower()
+    if selected_export_class and selected_export_key in class_lookup:
+        selected_export_class = class_lookup[selected_export_key]
+    elif classes:
+        selected_export_class = classes[0]
     teacher_period_notifications = []
     teacher_period_notifications_paused_reason = ''
     now_local = datetime.now()
@@ -41745,7 +42018,186 @@ def teacher_dashboard():
                          subject_rank_summary=subject_rank_summary,
                          subject_assignment_form_map=subject_assignment_form_map,
                          teacher_period_notifications=teacher_period_notifications,
-                         teacher_period_notifications_paused_reason=teacher_period_notifications_paused_reason)
+                         teacher_period_notifications_paused_reason=teacher_period_notifications_paused_reason,
+                         selected_export_class=selected_export_class)
+
+@app.route('/teacher/class-results/export')
+def teacher_class_results_export():
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    school_id = session.get('school_id')
+    teacher_id = session.get('user_id')
+    school = get_school(school_id) or {}
+    current_term = get_current_term(school)
+    current_year = (school or {}).get('academic_year', '')
+    class_options = get_teacher_classes(school_id, teacher_id, term=current_term, academic_year=current_year)
+    class_options = [str(c or '').strip() for c in class_options if str(c or '').strip()]
+    class_lookup = {cls.lower(): cls for cls in class_options}
+    selected_class = (request.args.get('classname', '') or '').strip()
+    if not selected_class and len(class_options) == 1:
+        selected_class = class_options[0]
+    selected_class_key = selected_class.lower()
+    if selected_class_key in class_lookup:
+        selected_class = class_lookup[selected_class_key]
+    if not selected_class or selected_class.lower() not in class_lookup:
+        flash('Choose one of your assigned classes before exporting the result sheet.', 'error')
+        return redirect(url_for('teacher_dashboard', tab='overview', export_classname=(selected_class or '')))
+
+    export_term = (request.args.get('term', '') or current_term).strip() or current_term
+    export_year = (request.args.get('academic_year', '') or current_year).strip() or current_year
+    export_data = build_end_of_term_class_result_export(school_id, selected_class, export_term, export_year)
+    subject_columns = export_data.get('subject_columns', [])
+    student_rows = export_data.get('rows', [])
+    if not student_rows:
+        flash('No published end-of-term results are available for that class yet.', 'error')
+        return redirect(url_for('teacher_dashboard', tab='overview', export_classname=selected_class))
+    output_format = (request.args.get('format', '') or 'csv').strip().lower()
+    if output_format in {'xlsx', 'excel'}:
+        workbook = build_end_of_term_class_result_workbook(
+            export_data,
+            school,
+            selected_class,
+            export_term,
+            export_year,
+            generated_at=datetime.now(),
+        )
+        buffer = BytesIO()
+        workbook.save(buffer)
+        buffer.seek(0)
+        filename = (
+            f"end_of_term_results_"
+            f"{canonicalize_classname(selected_class)}_"
+            f"{export_term.replace(' ', '_')}_"
+            f"{(export_year or '').replace('/', '-')}.xlsx"
+        )
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Student Name', *subject_columns, 'Total', 'Average', 'Grade'])
+    for row in student_rows:
+        score_map = row.get('scores', {}) if isinstance(row.get('scores', {}), dict) else {}
+        values = [row.get('firstname', '')]
+        for subject_name in subject_columns:
+            block = score_map.get(subject_name)
+            values.append(round(float(subject_overall_mark(block) or 0), 2) if isinstance(block, dict) else '')
+        values.extend([
+            round(float(row.get('total_score', 0) or 0), 2),
+            round(float(row.get('average_marks', 0) or 0), 2),
+            row.get('grade', '') or '',
+        ])
+        writer.writerow(values)
+
+    filename = (
+        f"end_of_term_results_"
+        f"{canonicalize_classname(selected_class)}_"
+        f"{export_term.replace(' ', '_')}_"
+        f"{(export_year or '').replace('/', '-')}.csv"
+    )
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv; charset=utf-8',
+        headers={'Content-Disposition': f'attachment; filename={filename}'},
+    )
+
+@app.route('/teacher/class-results/preview')
+def teacher_class_results_preview():
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    school_id = session.get('school_id')
+    teacher_id = session.get('user_id')
+    school = get_school(school_id) or {}
+    teacher_profile = get_teachers(school_id).get(teacher_id, {})
+    teacher_name = f"{teacher_profile.get('firstname', '')} {teacher_profile.get('lastname', '')}".strip() or teacher_id
+    teacher_profile_image = (teacher_profile.get('profile_image') or '').strip()
+    current_term = get_current_term(school)
+    current_year = (school or {}).get('academic_year', '')
+    class_options = [str(c or '').strip() for c in get_teacher_classes(school_id, teacher_id, term=current_term, academic_year=current_year) if str(c or '').strip()]
+    class_lookup = {cls.lower(): cls for cls in class_options}
+    selected_class = (request.args.get('classname', '') or '').strip()
+    if not selected_class and len(class_options) == 1:
+        selected_class = class_options[0]
+    if selected_class.lower() in class_lookup:
+        selected_class = class_lookup[selected_class.lower()]
+    if not selected_class or selected_class.lower() not in class_lookup:
+        flash('Choose one of your assigned classes before opening the preview.', 'error')
+        return redirect(url_for('teacher_dashboard', tab='overview'))
+
+    export_term = (request.args.get('term', '') or current_term).strip() or current_term
+    export_year = (request.args.get('academic_year', '') or current_year).strip() or current_year
+    export_data = build_end_of_term_class_result_export(school_id, selected_class, export_term, export_year)
+    subject_columns = export_data.get('subject_columns', [])
+    student_rows = export_data.get('rows', [])
+    summary = export_data.get('summary', {}) or {}
+    if not student_rows:
+        flash('No published end-of-term results are available for that class yet.', 'error')
+        return redirect(url_for('teacher_dashboard', tab='overview'))
+
+    preview_rows = []
+    top_student = max(student_rows, key=lambda row: float(row.get('average_marks', 0) or 0)) if student_rows else None
+    class_average = round(float(summary.get('class_average', 0.0) or 0), 2)
+    highest_total = round(float(summary.get('highest_total', 0.0) or 0), 2)
+    grade_distribution = {}
+    for row in student_rows:
+        score_map = row.get('scores', {}) if isinstance(row.get('scores', {}), dict) else {}
+        subject_marks = []
+        for subject_name in subject_columns:
+            block = score_map.get(subject_name)
+            subject_marks.append(round(float(subject_overall_mark(block) or 0), 2) if isinstance(block, dict) else '')
+        preview_rows.append({
+            'firstname': row.get('firstname', ''),
+            'subject_marks': subject_marks,
+            'total_score': round(float(row.get('total_score', 0) or 0), 2),
+            'average_marks': round(float(row.get('average_marks', 0) or 0), 2),
+            'grade': row.get('grade', '') or '',
+        })
+        grade_value = (row.get('grade') or '').strip() or 'N/A'
+        grade_distribution[grade_value] = grade_distribution.get(grade_value, 0) + 1
+
+    summary_banner = [
+        {'label': 'School', 'value': school.get('school_name', '') or '-'},
+        {'label': 'Class', 'value': selected_class or '-'},
+        {'label': 'Term', 'value': export_term or '-'},
+        {'label': 'Academic Year', 'value': export_year or '-'},
+        {'label': 'Students', 'value': summary.get('total_students', len(student_rows))},
+        {'label': 'Subjects', 'value': summary.get('total_subjects', len(subject_columns))},
+        {'label': 'Class Average', 'value': f'{class_average:.2f}'},
+        {'label': 'Highest Total', 'value': f'{highest_total:.2f}'},
+        {'label': 'Top Student', 'value': summary.get('top_student', '') or '-'},
+    ]
+
+    return render_template(
+        'teacher/teacher_class_results_preview.html',
+        school=school,
+        classes=class_options,
+        teacher_sidebar_display_name=teacher_name,
+        teacher_sidebar_profile_image=teacher_profile_image,
+        teacher_unread_notifications=0,
+        teacher_has_class_assignment_nav=bool(class_options),
+        teacher_score_nav_tree=[],
+        teacher_selected_score_subject='',
+        teacher_selected_score_class='',
+        school_cbt_enabled=bool(school.get('cbt_enabled', 1)),
+        active_page='result_preview',
+        current_term=current_term,
+        current_year=current_year,
+        selected_class=selected_class,
+        export_term=export_term,
+        export_year=export_year,
+        summary_banner=summary_banner,
+        subject_columns=subject_columns,
+        student_rows=preview_rows,
+        top_student=top_student,
+        class_average=class_average,
+        highest_total=highest_total,
+        grade_distribution=sorted(grade_distribution.items(), key=lambda item: str(item[0]).lower()),
+        generated_at=datetime.now(),
+    )
 
 @app.route('/teacher/subject-handover')
 def teacher_subject_handover():
@@ -47178,6 +47630,8 @@ def parent_timetable():
             grouped_rows.append(grouped_map[day])
         grouped_map[day]['rows'].append(row)
 
+    active_online_lessons = get_current_online_lessons(visible_rows)
+
     parent_theme_accent = '#1F7A8C'
     if children:
         first_school_id = (children[0].get('school_id') or '').strip()
@@ -47204,6 +47658,7 @@ def parent_timetable():
         timetable_rows=visible_rows,
         grouped_rows=grouped_rows,
         show_teacher_names=show_teacher_names,
+        active_online_lessons=active_online_lessons,
         print_mode=print_mode,
         unread_parent_messages=unread_parent_messages,
     )

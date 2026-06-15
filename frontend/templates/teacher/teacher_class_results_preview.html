@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Class Result Preview - Teacher</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .page-shell { width: min(1400px, 100%); margin: 0 auto; padding: 24px; }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .page-header h1 { margin: 0; font-size: 1.9rem; }
+        .page-header .sub { margin: 6px 0 0; color: #475569; }
+        .toolbar { display: flex; gap: 10px; flex-wrap: wrap; }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            margin: 16px 0;
+        }
+        .summary-banner {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            padding: 12px;
+            border: 1px solid #dbe5f2;
+            border-radius: 12px;
+            background: #f8fbff;
+            margin: 16px 0 10px;
+        }
+        .summary-banner-cell {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+        .summary-banner-label {
+            color: #64748b;
+            font-size: 0.72rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .summary-banner-value {
+            color: #102a43;
+            font-size: 1rem;
+            font-weight: 800;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+        .summary-card {
+            border: 1px solid #dbe5f2;
+            border-radius: 10px;
+            background: #f8fbff;
+            padding: 12px 14px;
+        }
+        .summary-label {
+            color: #64748b;
+            font-size: 0.76rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .summary-value {
+            color: #102a43;
+            font-size: 1.05rem;
+            font-weight: 800;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+        .table-wrap {
+            overflow-x: auto;
+            border: 1px solid #dbe5f2;
+            border-radius: 12px;
+            background: #fff;
+        }
+        table {
+            width: 100%;
+            min-width: max-content;
+            border-collapse: collapse;
+        }
+        th, td {
+            border-bottom: 1px solid #e7edf7;
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+            white-space: nowrap;
+        }
+        th {
+            background: #f7fbff;
+            color: #1e3a5f;
+            font-weight: 800;
+            position: sticky;
+            top: 0;
+        }
+        td.number, th.number { text-align: right; }
+        .muted { color: #64748b; }
+        .grade-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 44px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #e0f2fe;
+            color: #075985;
+            font-weight: 800;
+        }
+        .student-name { font-weight: 700; color: #0f172a; }
+        .grade-list {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+        .grade-chip {
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #3730a3;
+            font-weight: 700;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            .page-shell { width: 100%; padding: 0; }
+            .table-wrap { overflow: visible; border: none; }
+            th { position: static; }
+            body { margin: 10mm; }
+            @page { size: landscape; margin: 10mm; }
+        }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+<div class="app-shell topbar-layout">
+    {% include 'teacher/_teacher_sidebar.html' %}
+    <div class="main-content">
+        <div class="page-shell">
+            <div class="page-header">
+                <div>
+                    <h1><i class="fas fa-eye"></i> Class Result Preview</h1>
+                    <p class="sub">
+                        {% if school and school.school_name %}{{ school.school_name }}{% else %}School{% endif %}
+                        |
+                        {{ selected_class }}
+                        |
+                        {{ export_term }}
+                        {% if export_year %}({{ export_year }}){% endif %}
+                    </p>
+                    <p class="sub">Generated {{ generated_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                </div>
+                <div class="toolbar no-print">
+                    <a href="{{ url_for('teacher_dashboard', tab='overview', export_classname=selected_class) }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                    <a href="{{ url_for('teacher_class_results_export', classname=selected_class, term=export_term, academic_year=export_year) }}" class="btn btn-secondary">
+                        <i class="fas fa-download"></i> Download CSV
+                    </a>
+                    <a href="{{ url_for('teacher_class_results_export', classname=selected_class, term=export_term, academic_year=export_year, format='xlsx') }}" class="btn btn-secondary">
+                        <i class="fas fa-file-excel"></i> Download Excel
+                    </a>
+                    <button type="button" class="btn btn-primary" onclick="window.print()">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                </div>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="summary-banner">
+                {% for item in summary_banner %}
+                <div class="summary-banner-cell">
+                    <div class="summary-banner-label">{{ item.label }}</div>
+                    <div class="summary-banner-value">{{ item.value }}</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-label">Students</div>
+                    <div class="summary-value">{{ student_rows|length }}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Subjects</div>
+                    <div class="summary-value">{{ subject_columns|length }}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Class Average</div>
+                    <div class="summary-value">{{ '%.2f'|format(class_average or 0) }}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Highest Total</div>
+                    <div class="summary-value">{{ '%.2f'|format(highest_total or 0) }}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Top Student</div>
+                    <div class="summary-value">{{ top_student.firstname if top_student else '-' }}</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-ranking-star"></i> Grade Spread</h2>
+                {% if grade_distribution %}
+                <div class="grade-list">
+                    {% for grade, count in grade_distribution %}
+                    <span class="grade-chip">{{ grade }}: {{ count }}</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="muted">No grade data available.</p>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-table"></i> Result Table</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Student Name</th>
+                                {% for subject_name in subject_columns %}
+                                <th>{{ subject_name }}</th>
+                                {% endfor %}
+                                <th class="number">Total</th>
+                                <th class="number">Average</th>
+                                <th>Grade</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in student_rows %}
+                            <tr>
+                                <td class="student-name">{{ row.firstname }}</td>
+                                {% for mark in row.subject_marks %}
+                                <td class="number">{{ '%.2f'|format(mark) if mark != '' else '-' }}</td>
+                                {% endfor %}
+                                <td class="number">{{ '%.2f'|format(row.total_score or 0) }}</td>
+                                <td class="number">{{ '%.2f'|format(row.average_marks or 0) }}</td>
+                                <td><span class="grade-pill">{{ row.grade or '-' }}</span></td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="{{ subject_columns|length + 4 }}" class="muted">No published rows available for this class.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+{% include "shared/_loading_overlay.html" %}
+</body>
+</html>

@@ -14,6 +14,9 @@
         .table-wrap th, .table-wrap td { white-space: nowrap; }
         .day-block { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: #f8fbff; }
         .day-title { margin: 0 0 8px; color: #1e3a5f; }
+        .active-now { background: rgba(31, 122, 140, 0.08); }
+        .online-join-links { display: grid; gap: 8px; margin-bottom: 12px; }
+        .online-join-links a { text-decoration: none; }
     </style>
 </head>
 <body>
@@ -28,20 +31,38 @@
         <p><a class="btn" href="{{ url_for('teacher_dashboard') }}">Back to Dashboard</a></p>
     </div>
     <div class="card">
+        {% if active_online_lessons %}
+        <div class="online-join-links">
+            {% for row in active_online_lessons %}
+            <div>
+                <strong>{{ row.classname }}</strong> {{ row.period_label }} &bull; {{ row.subject }}
+                ({{ row.start_time or '-' }} - {{ row.end_time or '-' }})
+                <a class="btn btn-primary" href="{{ row.online_url }}" target="_blank" rel="noreferrer noopener">Join lesson</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
         {% for day_group in grouped_rows %}
         <div class="day-block">
             <h3 class="day-title">{{ day_group.day_name }}</h3>
             <div class="table-wrap">
             <table>
-                <thead><tr><th>Class</th><th>Period</th><th>Subject</th><th>Time</th><th>Room</th></tr></thead>
+                <thead><tr><th>Class</th><th>Period</th><th>Subject</th><th>Time</th><th>Room</th><th>Online</th></tr></thead>
                 <tbody>
                 {% for row in day_group.rows %}
-                    <tr>
+                    <tr {% if row.active_now %}class="active-now"{% endif %}>
                         <td>{{ row.classname }}</td>
                         <td>{{ row.period_label }}</td>
                         <td>{{ row.subject }}</td>
                         <td>{{ row.start_time or '-' }} - {{ row.end_time or '-' }}</td>
                         <td>{{ row.room or '-' }}</td>
+                        <td>
+                            {% if row.online_url %}
+                            <a href="{{ row.online_url }}" target="_blank" rel="noreferrer noopener">Link</a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
                     </tr>
                 {% endfor %}
                 </tbody>

@@ -954,6 +954,44 @@ def test_find_timetable_time_conflicts_detects_overlap(app_module, monkeypatch):
     assert rows and rows[0]["id"] == 22
 
 
+def test_get_current_online_lessons_finds_multiple_active_rows(app_module):
+    m = app_module
+    rows = [
+        {
+            "day_of_week": 1,
+            "period_label": "Period 2",
+            "subject": "English",
+            "classname": "JSS1",
+            "start_time": "08:00",
+            "end_time": "09:00",
+            "online_url": "https://meet.example.com/foo",
+        },
+        {
+            "day_of_week": 1,
+            "period_label": "Period 3",
+            "subject": "Mathematics",
+            "classname": "JSS1",
+            "start_time": "08:20",
+            "end_time": "09:10",
+            "online_url": "https://meet.example.com/bar",
+        },
+        {
+            "day_of_week": 1,
+            "period_label": "Period 1",
+            "subject": "Science",
+            "classname": "JSS1",
+            "start_time": "07:00",
+            "end_time": "07:40",
+            "online_url": "https://meet.example.com/baz",
+        },
+    ]
+    active = m.get_current_online_lessons(rows, current_day=1, current_minutes=510)
+    assert len(active) == 2
+    assert active[0]["period_label"] == "Period 2"
+    assert active[0]["minutes_left"] == 30
+    assert active[1]["period_label"] == "Period 3"
+
+
 def test_parent_timetable_filters_to_child_subjects_only(client, app_module, monkeypatch):
     m = app_module
     monkeypatch.setattr(m, "_parent_allowed_student_keys", lambda: {"SCH::STU1"})
