@@ -356,8 +356,8 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=SESSION_TIMEOUT_MIN
 
 LOGIN_MAX_ATTEMPTS = 4
 LOGIN_LOCK_MINUTES = 15
-STARTUP_SCHEMA_VERSION = '2026-03-09.2'
-EXPECTED_ALEMBIC_HEAD = '007_profile_image_audit_reason'
+STARTUP_SCHEMA_VERSION = '2026-06-16.1'
+EXPECTED_ALEMBIC_HEAD = '008_class_timetables_online_url'
 _DB_POOL = None
 _SCHOOL_LOGO_CACHE = {}
 _SCHOOL_LOGO_CACHE_TTL = 600
@@ -16733,6 +16733,7 @@ def ensure_extended_features_schema():
             db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_password_hash_2 TEXT DEFAULT ''")
             db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_gender_2 TEXT DEFAULT ''")
             db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            db_execute(c, "ALTER TABLE class_timetables ADD COLUMN IF NOT EXISTS online_url TEXT DEFAULT ''")
             db_execute(
                 c,
                 """CREATE TABLE IF NOT EXISTS login_audit_logs (
@@ -17031,6 +17032,7 @@ def ensure_extended_features_schema():
                        start_time TEXT DEFAULT '',
                        end_time TEXT DEFAULT '',
                        room TEXT DEFAULT '',
+                       online_url TEXT DEFAULT '',
                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                        UNIQUE(school_id, classname, day_of_week, period_label)
