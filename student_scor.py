@@ -12886,6 +12886,129 @@ def send_plain_email_message(subject, body_text, recipients):
     except Exception:
         smtp_port = 587
 
+    # If an API provider is configured, prefer API delivery path.
+    email_api_provider = (os.environ.get('EMAIL_API_PROVIDER', '') or '').strip().lower()
+    if email_api_provider in ('brevo', 'sendinblue'):
+        try:
+            return _send_via_brevo_api(subject, body_text, clean_recipients, smtp_from)
+        except Exception as exc:
+            # Fall back to SMTP logic below if API helper unexpectedly fails.
+            logging.exception('Email API send failed, falling back to SMTP: %s', exc)
+
+def _send_via_brevo_api(subject, body_text, clean_recipients, smtp_from):
+    """Send email using Brevo (Sendinblue) Transactional Email API v3.
+    Returns same payload shape as send_plain_email_message.
+    """
+    try:
+        import requests
+    except Exception:
+        return {
+            'sent': 0,
+            'errors': ['requests library is not available for API sending.'],
+            'recipients': clean_recipients,
+            'masked_recipients': [_mask_email_address(r) for r in clean_recipients],
+            'accepted_recipients': [],
+            'masked_accepted_recipients': [],
+            'rejected_recipients': clean_recipients,
+            'masked_rejected_recipients': [_mask_email_address(r) for r in clean_recipients],
+            'smtp_accepted': False,
+            'message_ids': [],
+            'delivery_note': 'requests library missing for API delivery.',
+        }
+
+    api_key = (os.environ.get('EMAIL_API_KEY', '') or '').strip()
+    if not api_key:
+        return {
+            'sent': 0,
+            'errors': ['EMAIL_API_KEY is not configured.'],
+            'recipients': clean_recipients,
+            'masked_recipients': [_mask_email_address(r) for r in clean_recipients],
+            'accepted_recipients': [],
+            'masked_accepted_recipients': [],
+            'rejected_recipients': clean_recipients,
+            'masked_rejected_recipients': [_mask_email_address(r) for r in clean_recipients],
+            'smtp_accepted': False,
+            'message_ids': [],
+            'delivery_note': 'API delivery not attempted because EMAIL_API_KEY is missing.',
+        }
+
+    api_from = (os.environ.get('EMAIL_API_FROM', smtp_from) or smtp_from).strip()
+    url = 'https://api.brevo.com/v3/smtp/email'
+    to_list = [{'email': r} for r in clean_recipients]
+    payload = {
+        'sender': {'email': api_from},
+        'to': to_list,
+        'subject': (subject or 'Notification').strip()[:200],
+        'textContent': (body_text or '').strip() or 'No content.',
+    }
+    headers = {
+        'api-key': api_key,
+        'Content-Type': 'application/json',
+    }
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=int(os.environ.get('EMAIL_API_TIMEOUT', '10')))
+    except Exception as exc:
+        return {
+            'sent': 0,
+            'errors': [f'API send failed: {exc}'],
+            'recipients': clean_recipients,
+            'masked_recipients': [_mask_email_address(r) for r in clean_recipients],
+            'accepted_recipients': [],
+            'masked_accepted_recipients': [],
+            'rejected_recipients': clean_recipients,
+            'masked_rejected_recipients': [_mask_email_address(r) for r in clean_recipients],
+            'smtp_accepted': False,
+            'message_ids': [],
+            'delivery_note': 'API request failed before HTTP response.',
+        }
+
+    try:
+        if resp.status_code in (200, 201, 202):
+            # Brevo returns a JSON with 'messageId' on success for transactional send
+            j = resp.json() if resp.content else {}
+            mid = (j.get('messageId') or j.get('message_id') or '').strip()
+            message_ids = [mid] if mid else []
+            return {
+                'sent': len(clean_recipients),
+                'errors': [],
+                'recipients': clean_recipients,
+                'masked_recipients': [_mask_email_address(r) for r in clean_recipients],
+                'accepted_recipients': clean_recipients,
+                'masked_accepted_recipients': [_mask_email_address(r) for r in clean_recipients],
+                'rejected_recipients': [],
+                'masked_rejected_recipients': [],
+                'smtp_accepted': True,
+                'message_ids': message_ids,
+                'delivery_note': 'Message handed to Brevo API for delivery.',
+            }
+        else:
+            return {
+                'sent': 0,
+                'errors': [f'Brevo API error {resp.status_code}: {resp.text}'],
+                'recipients': clean_recipients,
+                'masked_recipients': [_mask_email_address(r) for r in clean_recipients],
+                'accepted_recipients': [],
+                'masked_accepted_recipients': [],
+                'rejected_recipients': clean_recipients,
+                'masked_rejected_recipients': [_mask_email_address(r) for r in clean_recipients],
+                'smtp_accepted': False,
+                'message_ids': [],
+                'delivery_note': 'Brevo API returned non-success status.',
+            }
+    except Exception as exc:
+        return {
+            'sent': 0,
+            'errors': [f'Error parsing Brevo response: {exc}'],
+            'recipients': clean_recipients,
+            'masked_recipients': [_mask_email_address(r) for r in clean_recipients],
+            'accepted_recipients': [],
+            'masked_accepted_recipients': [],
+            'rejected_recipients': clean_recipients,
+            'masked_rejected_recipients': [_mask_email_address(r) for r in clean_recipients],
+            'smtp_accepted': False,
+            'message_ids': [],
+            'delivery_note': 'Failed to parse API response.',
+        }
     if not smtp_host:
         return {
             'sent': 0,
