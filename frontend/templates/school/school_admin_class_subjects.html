@@ -54,6 +54,26 @@
             background: linear-gradient(135deg, #b42318, #d92d20);
             color: white;
         }
+        .btn-outline {
+            border: 1px solid #b9cbe0;
+            background: #fff;
+            color: #12355b;
+        }
+        .edit-banner {
+            margin: 14px 0 16px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid #cbdcf1;
+            background: linear-gradient(135deg, #eef6ff, #f8fbff);
+            color: #12355b;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .edit-banner strong { display: block; margin-bottom: 4px; }
+        .edit-banner .meta { color: #506680; font-size: 0.92rem; }
         @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -78,16 +98,27 @@
         {% endwith %}
         {% include 'shared/_school_setup_banner.html' %}
 
+        {% if editing_config %}
+        <div class="edit-banner" role="status" aria-live="polite">
+            <div>
+                <strong>Editing {{ editing_config.classname }}</strong>
+                <div class="meta">Make your changes below, then save to update this class configuration.</div>
+            </div>
+            <a class="btn btn-outline" href="{{ url_for('school_admin_class_subjects') }}">Cancel edit</a>
+        </div>
+        {% endif %}
+
         <div class="card">
-            <h2>Configure a Class</h2>
+            <h2>{% if editing_config %}Update Class Configuration{% else %}Configure a Class{% endif %}</h2>
             <p class="hint">Tick subjects with the mark box. Nursery, Primary, JSS, and SS1 (when combined) use only Subjects Offered.</p>
             <form method="post">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="editing_classname" value="{{ editing_config.classname if editing_config else '' }}">
                 <div class="grid">
                     <div>
                         <div class="form-group">
                             <label for="classname">Class Name</label>
-                            <input type="text" id="classname" name="classname" list="classSuggestions" placeholder="e.g. Primary1, Primary2A, JSS1, SS1" required>
+                            <input type="text" id="classname" name="classname" list="classSuggestions" placeholder="e.g. Primary1, Primary2A, JSS1, SS1" value="{{ editing_config.classname if editing_config else '' }}" required>
                             <datalist id="classSuggestions">
                                 {% for class_name in class_options %}
                                 <option value="{{ class_name }}"></option>
@@ -128,7 +159,7 @@
                         </div>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary">Save Configuration</button>
+                <button type="submit" class="btn btn-primary">{% if editing_config %}Update Configuration{% else %}Save Configuration{% endif %}</button>
             </form>
         </div>
 
@@ -157,6 +188,7 @@
                         <td>{{ cfg.commercial_subjects|join(', ') }}</td>
                         <td>{{ cfg.optional_subjects|join(', ') }}</td>
                         <td>
+                            <a href="{{ url_for('school_admin_class_subjects', edit=class_name) }}" class="btn btn-secondary" style="margin-right:8px; text-decoration:none;">Edit</a>
                             <form method="post" action="{{ url_for('school_admin_delete_class_subject_config') }}" onsubmit="return confirm('Delete subject configuration for {{ class_name }}?');">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <input type="hidden" name="classname" value="{{ class_name }}"/>
@@ -184,6 +216,8 @@
         const coreLabel = document.getElementById('coreLabel');
         const ss1StreamMode = "{{ (school.ss1_stream_mode if school else 'separate')|lower }}";
         const catalogMap = {{ (subject_catalog_map or {})|tojson }};
+        const editingClassname = {{ (editing_config.classname if editing_config else '')|tojson }};
+        const editingConfig = {{ (editing_config or {})|tojson }};
 
         function uncheckGroup(groupId) {
             const group = document.getElementById(groupId);
@@ -193,10 +227,11 @@
             });
         }
 
-        function renderSubjectGroup(groupId, inputName, values) {
+        function renderSubjectGroup(groupId, inputName, values, selectedValues) {
             const group = document.getElementById(groupId);
             if (!group) return;
             group.innerHTML = '';
+            const selected = new Set((selectedValues || []).map((value) => String(value || '').trim().toLowerCase()).filter(Boolean));
             (values || []).forEach((subject) => {
                 const label = document.createElement('label');
                 label.className = 'subject-item';
@@ -204,6 +239,7 @@
                 input.type = 'checkbox';
                 input.name = inputName;
                 input.value = subject;
+                input.checked = selected.has(String(subject || '').trim().toLowerCase());
                 const span = document.createElement('span');
                 span.textContent = subject;
                 label.appendChild(input);
@@ -256,6 +292,12 @@
             const parsed = classParts(classVal);
             const classCatalog = catalogMap[parsed.key] || catalogMap[parsed.key + parsed.arm] || {core: [], science: [], art: [], commercial: [], optional: []};
             const ss1Combined = isSs1(classVal) && ss1StreamMode === 'combined';
+            const editingActive = normalizeClassName(editingClassname) && normalizeClassName(editingClassname) === normalizeClassName(classVal);
+            const selectedCore = editingActive ? (editingConfig.core_subjects || []) : [];
+            const selectedScience = editingActive ? (editingConfig.science_subjects || []) : [];
+            const selectedArt = editingActive ? (editingConfig.art_subjects || []) : [];
+            const selectedCommercial = editingActive ? (editingConfig.commercial_subjects || []) : [];
+            const selectedOptional = editingActive ? (editingConfig.optional_subjects || []) : [];
             const mergedOffered = Array.from(new Set([]
                 .concat(classCatalog.core || [])
                 .concat(classCatalog.science || [])
@@ -263,11 +305,11 @@
                 .concat(classCatalog.commercial || [])
                 .concat(classCatalog.optional || [])
             ));
-            renderSubjectGroup('core_subjects_group', 'core_subjects', ss1Combined ? mergedOffered : (classCatalog.core || []));
-            renderSubjectGroup('science_subjects_group', 'science_subjects', classCatalog.science || []);
-            renderSubjectGroup('art_subjects_group', 'art_subjects', classCatalog.art || []);
-            renderSubjectGroup('commercial_subjects_group', 'commercial_subjects', classCatalog.commercial || []);
-            renderSubjectGroup('optional_subjects_group', 'optional_subjects', classCatalog.optional || []);
+            renderSubjectGroup('core_subjects_group', 'core_subjects', ss1Combined ? mergedOffered : (classCatalog.core || []), ss1Combined ? mergedOffered : selectedCore);
+            renderSubjectGroup('science_subjects_group', 'science_subjects', classCatalog.science || [], selectedScience);
+            renderSubjectGroup('art_subjects_group', 'art_subjects', classCatalog.art || [], selectedArt);
+            renderSubjectGroup('commercial_subjects_group', 'commercial_subjects', classCatalog.commercial || [], selectedCommercial);
+            renderSubjectGroup('optional_subjects_group', 'optional_subjects', classCatalog.optional || [], selectedOptional);
 
             let useSs = classUsesStream(classVal);
             if (useSs && isSs1(classVal) && ss1StreamMode === 'combined') {
@@ -281,6 +323,9 @@
                 uncheckGroup('art_subjects_group');
                 uncheckGroup('commercial_subjects_group');
                 uncheckGroup('optional_subjects_group');
+                if (!editingActive) {
+                    uncheckGroup('core_subjects_group');
+                }
             }
         }
 
@@ -289,5 +334,3 @@
     </script>
 </body>
 </html>
-
-

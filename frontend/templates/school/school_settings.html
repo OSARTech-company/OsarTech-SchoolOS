@@ -427,6 +427,14 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label for="pass_mark">Promotion Pass Mark</label>
+                    <input type="number" id="pass_mark" name="pass_mark" min="0" max="100" value="{{ settings_form.pass_mark if settings_form else 50 }}" required>
+                    <small style="color:#5a6c7d; display:block; margin-top:6px;">
+                        Students with an average score at or above this mark are treated as pass for auto-promotion.
+                        Scores below this mark are treated as repeat/fail.
+                    </small>
+                </div>
+                <div class="form-group">
                     <label for="combine_third_term_results">Third Term Result Behaviour</label>
                     <select id="combine_third_term_results" name="combine_third_term_results">
                         <option value="0" {% if not settings_form or not settings_form.combine_third_term_results %}selected{% endif %}>

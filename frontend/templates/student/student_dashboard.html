@@ -532,6 +532,11 @@
                                     {% else %}
                                     Awaiting published status
                                     {% endif %}
+                                    {% if (student.term or '')|string|lower == 'third term' and student.promotion_status %}
+                                    <div style="margin-top:8px;">
+                                        <span class="status-pill {{ 'is-pass' if student.promotion_status == 'Promoted' else 'is-fail' }}">{{ student.promotion_status }}</span>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -560,6 +565,15 @@
                         </div>
                         <div class="sub">Result decision from published snapshot</div>
                     </div>
+                    {% if (student.term or '')|string|lower == 'third term' and student.promotion_status %}
+                    <div class="metric-card">
+                        <span class="label">Promotion</span>
+                        <div class="value">
+                            <span class="status-pill {{ 'is-pass' if student.promotion_status == 'Promoted' else 'is-fail' }}">{{ student.promotion_status }}</span>
+                        </div>
+                        <div class="sub">Shown only on the Third Term result</div>
+                    </div>
+                    {% endif %}
                     <div class="metric-card">
                         <span class="label">Messages</span>
                         <div class="value">{{ unread_student_messages or 0 }}</div>

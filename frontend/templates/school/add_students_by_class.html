@@ -116,6 +116,7 @@
                                 <td>{{ s.stream }}</td>
                                 <td>{{ 'Archived' if s.is_archived else 'Active' }}</td>
                                 <td>
+                                    <a href="{{ url_for('school_admin_edit_student', student_id=s.student_id, return_endpoint='school_admin_add_students_by_class', return_class=selected_class, return_term=selected_term) }}" class="btn btn-secondary btn-sm">Edit</a>
                                     {% if s.is_archived %}
                                     <form method="POST" action="{{ url_for('school_admin_restore_student') }}" style="display:inline;">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>

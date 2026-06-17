@@ -6025,6 +6025,20 @@ def normalize_promoted_db_value(value):
         return bool(value)
     return 1 if bool(value) else 0
 
+def get_result_promotion_status(student_row=None, term=''):
+    """Return a human-readable promotion label for third-term result pages."""
+    if (term or '').strip().lower() != 'third term':
+        return ''
+    row = student_row or {}
+    promoted_value = row.get('promoted', None)
+    if isinstance(promoted_value, str):
+        raw = promoted_value.strip().lower()
+        if raw in {'1', 'true', 'yes', 'promoted'}:
+            return 'Promoted'
+        if raw in {'0', 'false', 'no', 'repeat', 'repeated', ''}:
+            return 'Not Promoted'
+    return 'Promoted' if bool(promoted_value) else 'Not Promoted'
+
 # Set up logging
 _LOG_DIR = os.path.join(os.path.dirname(__file__), 'logs')
 try:
@@ -15934,8 +15948,10 @@ def build_school_backup_drill_summary(school_id, school=None):
         **counts,
         'missing_sections': list(missing_sections),
     }
+    # The school record can contain datetime objects in some environments.
+    # Serialize with a fallback so the drill never fails just because of timestamps.
     summary_payload['backup_size_bytes'] = len(
-        json.dumps(summary_payload, sort_keys=True, ensure_ascii=True).encode('utf-8')
+        json.dumps(summary_payload, sort_keys=True, ensure_ascii=True, default=str).encode('utf-8')
     )
     return summary_payload
 
@@ -33975,15 +33991,26 @@ def school_admin_class_subjects():
         flash('School session is missing. Please log in again.', 'error')
         return redirect(url_for('login'))
     subject_catalog_map = get_school_subject_catalog_map(school_id)
+    editing_classname = canonicalize_classname((request.args.get('edit', '') or '').strip())
+    editing_config = None
+    if editing_classname:
+        editing_config = get_class_subject_config(school_id, editing_classname)
+        if not editing_config:
+            flash(f'No existing subject configuration found for {editing_classname}.', 'error')
+            editing_classname = ''
 
     if request.method == 'POST':
         classname = canonicalize_classname(request.form.get('classname', '').strip())
+        posted_editing_classname = canonicalize_classname(request.form.get('editing_classname', '').strip())
+        if posted_editing_classname and not editing_classname:
+            editing_classname = posted_editing_classname
+            editing_config = get_class_subject_config(school_id, editing_classname)
         if not classname:
             flash('Class name is required.', 'error')
-            return redirect(url_for('school_admin_class_subjects'))
+            return redirect(url_for('school_admin_class_subjects', edit=editing_classname) if editing_classname else url_for('school_admin_class_subjects'))
         if not is_supported_classname(classname):
             flash('Only Nursery, Primary, JSS, and SS classes are supported.', 'error')
-            return redirect(url_for('school_admin_class_subjects'))
+            return redirect(url_for('school_admin_class_subjects', edit=editing_classname) if editing_classname else url_for('school_admin_class_subjects'))
         school = get_school(school_id) or {}
 
         core_subjects = _dedupe_keep_order([
@@ -34041,11 +34068,11 @@ def school_admin_class_subjects():
 
         if not core_subjects:
             flash('Subjects offered are required.', 'error')
-            return redirect(url_for('school_admin_class_subjects'))
+            return redirect(url_for('school_admin_class_subjects', edit=editing_classname) if editing_classname else url_for('school_admin_class_subjects'))
 
         if uses_stream and not (science_subjects or art_subjects or commercial_subjects):
             flash('For SS classes, add subjects for at least one stream (Science/Art/Commercial).', 'error')
-            return redirect(url_for('school_admin_class_subjects'))
+            return redirect(url_for('school_admin_class_subjects', edit=editing_classname) if editing_classname else url_for('school_admin_class_subjects'))
 
         try:
             save_class_subject_config(
@@ -34058,11 +34085,12 @@ def school_admin_class_subjects():
                 optional_subjects=optional_subjects,
             )
             flash(f'Subject configuration saved for {classname}.', 'success')
+            return redirect(url_for('school_admin_class_subjects', edit=classname))
         except Exception:
             logging.exception("Error saving class subjects.")
             flash('Error saving class subjects. Please retry.', 'error')
 
-        return redirect(url_for('school_admin_class_subjects'))
+        return redirect(url_for('school_admin_class_subjects', edit=editing_classname) if editing_classname else url_for('school_admin_class_subjects'))
 
     configs = get_all_class_subject_configs(school_id)
     school = get_school(school_id) or {}
@@ -34073,6 +34101,8 @@ def school_admin_class_subjects():
         school=school,
         subject_catalog_map=subject_catalog_map,
         class_options=class_options,
+        editing_classname=editing_classname,
+        editing_config=editing_config,
     )
 
 @app.route('/school-admin/delete-class-subject-config', methods=['POST'])
@@ -36488,6 +36518,8 @@ def school_admin_promote():
     school_id = session.get('school_id')
     school = get_school(school_id) or {}
     current_term = get_current_term(school)
+    pass_mark = max(0, min(100, safe_int(school.get('pass_mark', 50), 50)))
+    auto_decide = (request.args.get('auto', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
     
     if request.method == 'POST':
         from_class = canonicalize_classname(request.form.get('from_class', '').strip())
@@ -36495,6 +36527,7 @@ def school_admin_promote():
         from_level = get_class_level(from_class)
         from_no = _extract_class_number(from_class)
         auto_ss3 = from_level == 'ss' and from_no == 3
+        auto_decide_post = (request.form.get('auto_decide', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
         action_by_student = {}
         for key, value in request.form.items():
             if key.startswith('action_'):
@@ -36518,6 +36551,17 @@ def school_admin_promote():
                 return redirect(url_for('school_admin_promote', from_class=from_class))
             if auto_ss3:
                 flash('SS3 promote actions are auto-mapped to Graduated.', 'info')
+            if auto_decide_post:
+                class_students = load_students(school_id, class_filter=from_class, term_filter=current_term)
+                auto_actions = {}
+                for sid, student in class_students.items():
+                    average_marks = compute_average_marks_from_scores(
+                        student.get('scores', {}) if isinstance(student.get('scores', {}), dict) else {},
+                        subjects=student.get('subjects', []),
+                    )
+                    auto_actions[sid] = 'promote' if safe_float(average_marks, 0) >= pass_mark else 'repeat'
+                action_by_student = auto_actions
+                flash(f'Auto promotion applied using pass mark {pass_mark}. Review before final save.', 'info')
             promote_students(
                 school_id,
                 from_class,
@@ -36550,9 +36594,24 @@ def school_admin_promote():
         selected_class
     )
     class_students = {
-        sid: data for sid, data in students.items()
+        sid: {
+            **data,
+            'average_marks': compute_average_marks_from_scores(
+                data.get('scores', {}) if isinstance(data.get('scores', {}), dict) else {},
+                subjects=data.get('subjects', []),
+            ),
+        }
+        for sid, data in students.items()
         if not selected_class or canonicalize_classname(data.get('classname', '')) == selected_class_key
     }
+    for sid, student in class_students.items():
+        average_marks = safe_float(student.get('average_marks', 0), 0)
+        student['result_status'] = status_from_score(average_marks, school)
+        student['recommended_action'] = 'promote' if average_marks >= pass_mark else 'repeat'
+        if auto_decide and not student.get('is_archived'):
+            student['default_action'] = student['recommended_action']
+        else:
+            student['default_action'] = 'repeat'
     base_to_classes = list(SUPPORTED_CLASS_SEQUENCE) + ['GRADUATED']
     suggested_next_class = next_class_in_sequence(selected_class_display or selected_class) if selected_class else ''
     to_class_options = _dedupe_keep_order(
@@ -36565,7 +36624,9 @@ def school_admin_promote():
         suggested_next_class=suggested_next_class,
         students=class_students,
         selected_class=selected_class_display,
-        current_term=current_term
+        current_term=current_term,
+        pass_mark=pass_mark,
+        auto_decide=auto_decide,
     )
 
 @app.route('/school-admin/promotion-audit')
@@ -40624,6 +40685,109 @@ def school_admin_add_students_by_class():
         class_students=class_students,
         current_term=current_term,
         selected_term=selected_term,
+    )
+
+@app.route('/school-admin/student/edit/<path:student_id>', methods=['GET', 'POST'])
+def school_admin_edit_student(student_id):
+    """Edit a single student's basic identity details."""
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+
+    student = load_student(school_id, student_id, include_archived=True)
+    if not student:
+        flash('Student record not found.', 'error')
+        return redirect(url_for('school_admin_view_students'))
+
+    return_endpoint = (request.values.get('return_endpoint') or 'school_admin_view_students').strip()
+    if return_endpoint not in {'school_admin_view_students', 'school_admin_add_students_by_class'}:
+        return_endpoint = 'school_admin_view_students'
+
+    def _edit_redirect():
+        if return_endpoint == 'school_admin_add_students_by_class':
+            return redirect(
+                url_for(
+                    'school_admin_add_students_by_class',
+                    **{
+                        'class': (request.values.get('return_class') or student.get('classname', '') or '').strip(),
+                        'term': (request.values.get('return_term') or student.get('term', '') or '').strip(),
+                    },
+                )
+            )
+        return redirect(
+            url_for(
+                'school_admin_view_students',
+                **{
+                    'class': (request.values.get('return_class') or student.get('classname', '') or '').strip(),
+                    'term': (request.values.get('return_term') or student.get('term', '') or '').strip(),
+                    'page': (request.values.get('return_page') or '1').strip() or '1',
+                    'per_page': (request.values.get('return_per_page') or '50').strip() or '50',
+                },
+            )
+        )
+
+    if request.method == 'POST':
+        firstname = normalize_person_name(request.form.get('firstname', ''))
+        email = (request.form.get('email', '') or '').strip().lower()
+        date_of_birth = (request.form.get('date_of_birth', '') or '').strip()
+        gender = normalize_student_gender(request.form.get('gender', ''))
+
+        if not firstname:
+            flash('Student name is required.', 'error')
+            return _edit_redirect()
+        if email and not is_valid_email(email):
+            flash('Please enter a valid email address.', 'error')
+            return _edit_redirect()
+
+        updated_student = dict(student or {})
+        updated_student.update({
+            'firstname': firstname,
+            'email': email,
+            'date_of_birth': date_of_birth,
+            'gender': gender,
+        })
+
+        try:
+            with db_connection(commit=True) as conn:
+                c = conn.cursor()
+                save_student_with_cursor(c, school_id, student_id, updated_student)
+            flash(f'Student {student_id} updated successfully.', 'success')
+        except Exception as exc:
+            logging.exception("Failed to update student %s", student_id)
+            flash(f'Could not update student: {exc}', 'error')
+        return _edit_redirect()
+
+    return render_template(
+        'school/school_admin_edit_student.html',
+        student=student,
+        return_endpoint=return_endpoint,
+        return_class=(request.args.get('return_class') or student.get('classname', '') or '').strip(),
+        return_term=(request.args.get('return_term') or student.get('term', '') or '').strip(),
+        return_page=(request.args.get('return_page') or '1').strip() or '1',
+        return_per_page=(request.args.get('return_per_page') or '50').strip() or '50',
+        back_url=(
+            url_for(
+                'school_admin_add_students_by_class',
+                **{
+                    'class': (request.args.get('return_class') or student.get('classname', '') or '').strip(),
+                    'term': (request.args.get('return_term') or student.get('term', '') or '').strip(),
+                },
+            )
+            if return_endpoint == 'school_admin_add_students_by_class'
+            else url_for(
+                'school_admin_view_students',
+                **{
+                    'class': (request.args.get('return_class') or student.get('classname', '') or '').strip(),
+                    'term': (request.args.get('return_term') or student.get('term', '') or '').strip(),
+                    'page': (request.args.get('return_page') or '1').strip() or '1',
+                    'per_page': (request.args.get('return_per_page') or '50').strip() or '50',
+                },
+            )
+        ),
     )
 
 @app.route('/school-admin/assign-teacher', methods=['POST'])
@@ -45690,6 +45854,7 @@ def student_dashboard():
         'average_marks': 0,
         'Grade': '',
         'Status': '',
+        'promotion_status': '',
         'profile_image_url': get_student_profile_image_url(student),
     }
 
@@ -45719,6 +45884,7 @@ def student_dashboard():
                     'Status': snapshot.get('Status', ''),
                     'profile_image_url': get_student_profile_image_url(student, snapshot),
                 })
+                my_data['promotion_status'] = get_result_promotion_status(student, my_data.get('term', ''))
             else:
                 dashboard_notice = 'No published result available yet.'
     else:
@@ -46494,6 +46660,7 @@ def student_view_result():
         'total_score': compute_total_score_from_scores(snapshot.get('scores', {})),
         'Grade': snapshot.get('Grade', 'F'),
         'Status': snapshot.get('Status', 'Fail'),
+        'promotion_status': get_result_promotion_status(student, target_term),
     }
     student_view.update(
         build_result_term_attendance_data(
@@ -47877,6 +48044,7 @@ def parent_view_result():
         'total_score': compute_total_score_from_scores(snapshot.get('scores', {})),
         'Grade': snapshot.get('Grade', 'F'),
         'Status': snapshot.get('Status', 'Fail'),
+        'promotion_status': get_result_promotion_status(student, target_term),
     }
     result_student.update(
         build_result_term_attendance_data(
@@ -48258,6 +48426,7 @@ def teacher_student_result():
         'total_score': compute_total_score_from_scores(snapshot.get('scores', {})),
         'Grade': snapshot.get('Grade', 'F'),
         'Status': snapshot.get('Status', 'Fail'),
+        'promotion_status': get_result_promotion_status(student, target_term),
     }
     result_student.update(
         build_result_term_attendance_data(
@@ -49250,7 +49419,8 @@ def check_result():
         'average_marks': snapshot.get('average_marks', 0),
         'total_score': compute_total_score_from_scores(snapshot.get('scores', {})),
         'Grade': snapshot.get('Grade', 'F'),
-        'Status': snapshot.get('Status', 'Fail')
+        'Status': snapshot.get('Status', 'Fail'),
+        'promotion_status': get_result_promotion_status(student, target_term)
     }
     student.update(
         build_result_term_attendance_data(

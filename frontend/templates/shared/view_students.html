@@ -782,6 +782,9 @@
                                     <a href="{{ url_for('school_admin_student_result', student_id=student.student_id, term=student.result_term_token) if student.result_term_token else url_for('school_admin_student_result', student_id=student.student_id) }}" class="action-btn view" title="View Published Result">
                                         <i class="fas fa-file-alt"></i> Result
                                     </a>
+                                    <a href="{{ url_for('school_admin_edit_student', student_id=student.student_id, return_endpoint='school_admin_view_students', return_class=selected_class, return_term=selected_term, return_page=page, return_per_page=per_page) }}" class="action-btn edit" title="Edit Student" style="background: #2563eb;">
+                                        <i class="fas fa-user-pen"></i> Edit
+                                    </a>
                                     {% if student.can_edit_full and not student.is_published_snapshot %}
                                     <a href="{{ url_for('teacher_enter_scores', student_id=student.student_id) }}" class="action-btn edit" title="Enter Scores" style="background: #9b59b6;">
                                         <i class="fas fa-chart-bar"></i> Scores

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Student - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(920px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; }
+        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+        .readonly-box {
+            padding: 12px 14px;
+            border: 1px solid #dbe4ef;
+            border-radius: 10px;
+            background: #f8fbff;
+            color: #334155;
+        }
+        .edit-banner {
+            margin: 14px 0 16px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid #cbdcf1;
+            background: linear-gradient(135deg, #eef6ff, #f8fbff);
+            color: #12355b;
+        }
+        .edit-banner strong { display: block; margin-bottom: 4px; }
+        .edit-banner .meta { color: #506680; font-size: 0.92rem; }
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+        @media (max-width: 720px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'view_students' %}
+        {% include 'school/_school_admin_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-user-pen"></i> Edit Student</h1>
+                    <a href="{{ back_url }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="edit-banner">
+                    <strong>{{ student.firstname }} ({{ student.student_id }})</strong>
+                    <div class="meta">This screen updates the student's core identity details. Use the class/student intake pages to change class placement or term setup.</div>
+                </div>
+
+                <div class="card">
+                    <form method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="return_endpoint" value="{{ return_endpoint }}">
+                        <input type="hidden" name="return_class" value="{{ return_class }}">
+                        <input type="hidden" name="return_term" value="{{ return_term }}">
+                        <input type="hidden" name="return_page" value="{{ return_page }}">
+                        <input type="hidden" name="return_per_page" value="{{ return_per_page }}">
+                        <div class="grid">
+                            <div class="form-group">
+                                <label>Student ID</label>
+                                <div class="readonly-box">{{ student.student_id }}</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <div class="readonly-box">{{ student.classname or '-' }}</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Term</label>
+                                <div class="readonly-box">{{ student.term or '-' }}</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Stream</label>
+                                <div class="readonly-box">{{ student.stream or '-' }}</div>
+                            </div>
+                            <div class="form-group">
+                                <label for="firstname">Student Name</label>
+                                <input type="text" id="firstname" name="firstname" value="{{ student.firstname or '' }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="email">Email</label>
+                                <input type="email" id="email" name="email" value="{{ student.email or '' }}" placeholder="e.g. student@example.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="date_of_birth">Date of Birth</label>
+                                <input type="date" id="date_of_birth" name="date_of_birth" value="{{ student.date_of_birth or '' }}">
+                            </div>
+                            <div class="form-group">
+                                <label for="gender">Gender</label>
+                                <select id="gender" name="gender" required>
+                                    <option value="">Select</option>
+                                    <option value="Male" {% if (student.gender or '') == 'Male' %}selected{% endif %}>Male</option>
+                                    <option value="Female" {% if (student.gender or '') == 'Female' %}selected{% endif %}>Female</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+                            <a href="{{ back_url }}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

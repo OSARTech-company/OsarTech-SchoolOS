@@ -15,11 +15,17 @@
         .header h1 { margin: 0; font-size: 1.8rem; }
         .header .back { color: white; text-decoration: none; font-weight: 700; }
         .student-list { max-height: 420px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
-        .student-item { padding: 12px 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; }
+        .student-item { padding: 12px 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .student-item:last-child { border-bottom: none; }
         .student-item:hover { background: #f8f9fa; }
-        .student-item label { flex: 1; cursor: pointer; }
+        .student-meta { flex: 1; min-width: 220px; cursor: pointer; }
+        .student-name { font-weight: 800; display: block; }
+        .student-note { color: #5a6c7d; font-size: 0.92rem; margin-top: 3px; }
         .student-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .student-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 0.82rem; font-weight: 700; margin-top: 6px; }
+        .student-chip.pass { background: #dcfce7; color: #166534; }
+        .student-chip.fail { background: #fee2e2; color: #991b1b; }
+        .student-chip.auto { background: #e0f2fe; color: #075985; }
         .info-box { background: #fff8dd; border: 1px solid #f1d98b; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 10px; }
     </style>
 </head>
@@ -50,6 +56,12 @@
                 <p>2. Choose action per student: <strong>Promote</strong>, <strong>Repeat</strong>, or <strong>Remove (Left School)</strong>.</p>
                 <p>3. Students set to Repeat stay in the same class.</p>
                 <p>4. Normal flow is Nursery to Primary, Primary 6 to JSS1, and SS3 to <strong>Graduated</strong>.</p>
+                <p>5. Use <strong>Auto-select actions</strong> to prefill Promote/Repeat from the school's pass mark, then review before saving.</p>
+            </div>
+
+            <div class="note" style="margin-bottom:16px;">
+                Promotion pass mark: <strong>{{ pass_mark }}</strong>.
+                Anything below this score is treated as a repeat in auto-promotion.
             </div>
 
             <form method="GET" style="margin-bottom: 20px;">
@@ -61,6 +73,16 @@
                         <option value="{{ cls }}" {% if selected_class == cls %}selected{% endif %}>{{ cls }}</option>
                         {% endfor %}
                     </select>
+                </div>
+                <div class="student-actions" style="margin-bottom: 6px;">
+                    {% if selected_class %}
+                    <a href="{{ url_for('school_admin_promote', from_class=selected_class, auto=1) }}" class="btn btn-secondary">
+                        <i class="fas fa-wand-magic-sparkles"></i> Auto-select Actions
+                    </a>
+                    {% endif %}
+                    {% if auto_decide %}
+                    <span class="student-chip auto">Auto-select mode active</span>
+                    {% endif %}
                 </div>
             </form>
 
@@ -96,12 +118,22 @@
                     <div class="student-list">
                         {% for student_id, student in students.items() %}
                         <div class="student-item">
-                            <label for="promote_{{ student_id }}">
-                                <strong>{{ student.firstname }}</strong> - {{ student.classname }}
+                            <label class="student-meta" for="promote_{{ student_id }}">
+                                <span class="student-name">{{ student.firstname }}</span>
+                                <div class="student-note">
+                                    {{ student.classname }}
+                                    {% if student.average_marks is not none %}
+                                    | Avg: {{ '%.2f'|format(student.average_marks or 0) }}
+                                    {% endif %}
+                                    | Status: {{ student.result_status or 'N/A' }}
+                                </div>
+                                <span class="student-chip {{ 'pass' if student.recommended_action == 'promote' else 'fail' }}">
+                                    Recommended: {{ 'Promote' if student.recommended_action == 'promote' else 'Repeat' }}
+                                </span>
                             </label>
                             <div class="student-actions">
-                                <label><input type="radio" name="action_{{ student_id }}" value="promote"> Promote</label>
-                                <label><input type="radio" name="action_{{ student_id }}" value="repeat" checked> Repeat</label>
+                                <label><input type="radio" name="action_{{ student_id }}" value="promote" {% if student.default_action == 'promote' %}checked{% endif %}> Promote</label>
+                                <label><input type="radio" name="action_{{ student_id }}" value="repeat" {% if student.default_action != 'promote' %}checked{% endif %}> Repeat</label>
                                 <label><input type="radio" name="action_{{ student_id }}" value="remove"> Remove</label>
                             </div>
                         </div>
@@ -112,6 +144,9 @@
                 </div>
                 
                 <button type="submit" class="btn btn-success"><i class="fas fa-arrow-up"></i> Apply Actions</button>
+                <button type="submit" name="auto_decide" value="1" class="btn btn-primary" style="margin-left: 10px;">
+                    <i class="fas fa-wand-magic-sparkles"></i> Auto Promote & Save
+                </button>
                 <a href="{{ url_for('school_admin_dashboard') }}" class="btn btn-secondary" style="margin-left: 10px;">Cancel</a>
             </form>
         </div>
@@ -121,5 +156,3 @@
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 </body>
 </html>
-
-

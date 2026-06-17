@@ -1679,6 +1679,14 @@
                         {{ student.Status }}
                     </div>
                 </div>
+                {% if (student.term or '')|string|lower == 'third term' and student.promotion_status %}
+                <div class="info-row">
+                    <div class="info-label">Promotion Status</div>
+                    <div class="info-value {{ 'status-pass' if student.promotion_status == 'Promoted' else 'status-fail' }}" style="font-weight: bold;">
+                        {{ student.promotion_status }}
+                    </div>
+                </div>
+                {% endif %}
                 <div class="info-row">
                     <div class="info-label">Days Open</div>
                     <div class="info-value">{{ student.days_open if student.days_open is not none else 0 }}</div>
