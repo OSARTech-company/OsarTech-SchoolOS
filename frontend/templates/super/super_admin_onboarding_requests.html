@@ -74,6 +74,7 @@
                                 <strong class="{% if item.status == 'approved' %}op-on{% elif item.status in ['pending', 'pending_verification'] %}chip-warning{% else %}op-off{% endif %}">
                                     {{ item.status|replace('_', ' ')|title }}
                                 </strong>
+                                | Type: {{ (item.school_type or 'mixed')|replace('_', ' ')|title }}
                                 | Created: {{ item.created_at }}
                                 {% if item.reviewed_at %}| Reviewed: {{ item.reviewed_at }}{% endif %}
                             </div>
@@ -210,4 +211,3 @@
 <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 </body>
 </html>
-

@@ -32,6 +32,42 @@
         .super-admin-inline-form-compact .super-admin-inline-field {
             min-width: 220px;
         }
+        .school-type-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .school-type-mixed {
+            background: rgba(15, 118, 110, 0.12);
+            color: #0f766e;
+        }
+        .school-type-primary {
+            background: rgba(37, 99, 235, 0.12);
+            color: #1d4ed8;
+        }
+        .school-type-secondary {
+            background: rgba(249, 115, 22, 0.14);
+            color: #c2410c;
+        }
+        .school-type-nursery {
+            background: rgba(168, 85, 247, 0.12);
+            color: #7e22ce;
+        }
+        .school-type-chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 8px 0 0;
+        }
+        .school-type-chip-list a {
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
@@ -99,8 +135,35 @@
                     <h1><i class="fas fa-school"></i> Osartech</h1>
                     <p class="meta-line">
                         <strong>Last Login:</strong> {{ last_login_at }} |
-                        <strong>Total Schools:</strong> {{ overview.total_schools }}
+                        <strong>Total Schools:</strong> {{ overview.total_schools }} |
+                        <strong>Showing:</strong> {{ overview.visible_schools if overview.visible_schools is defined else schools|length }}
                     </p>
+                </div>
+
+                <div class="card">
+                    <form method="GET" class="toolbar">
+                        <div>
+                            <label for="school_type_filter">School Type</label>
+                            <select id="school_type_filter" name="school_type">
+                                <option value="" {% if not school_type_filter %}selected{% endif %}>All Types</option>
+                                <option value="mixed" {% if school_type_filter == 'mixed' %}selected{% endif %}>Mixed School</option>
+                                <option value="primary" {% if school_type_filter == 'primary' %}selected{% endif %}>Primary School</option>
+                                <option value="secondary" {% if school_type_filter == 'secondary' %}selected{% endif %}>Secondary School</option>
+                                <option value="nursery" {% if school_type_filter == 'nursery' %}selected{% endif %}>Nursery School</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-secondary">Filter</button>
+                        {% if school_type_filter %}
+                        <a href="{{ url_for('super_admin_view_schools') }}" class="btn">Clear</a>
+                        {% endif %}
+                    </form>
+                    <div class="school-type-chip-list">
+                        <a href="{{ url_for('super_admin_view_schools') }}" class="school-type-badge {% if not school_type_filter %}school-type-mixed{% endif %}" style="{% if school_type_filter %}opacity:.8;{% endif %}">All {{ overview.total_schools }}</a>
+                        <a href="{{ url_for('super_admin_view_schools', school_type='primary') }}" class="school-type-badge school-type-primary">Primary {{ overview.school_type_counts.primary if overview.school_type_counts else 0 }}</a>
+                        <a href="{{ url_for('super_admin_view_schools', school_type='secondary') }}" class="school-type-badge school-type-secondary">Secondary {{ overview.school_type_counts.secondary if overview.school_type_counts else 0 }}</a>
+                        <a href="{{ url_for('super_admin_view_schools', school_type='nursery') }}" class="school-type-badge school-type-nursery">Nursery {{ overview.school_type_counts.nursery if overview.school_type_counts else 0 }}</a>
+                        <a href="{{ url_for('super_admin_view_schools', school_type='mixed') }}" class="school-type-badge school-type-mixed">Mixed {{ overview.school_type_counts.mixed if overview.school_type_counts else 0 }}</a>
+                    </div>
                 </div>
 
                 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -117,7 +180,11 @@
                             <div class="school-card-main">
                                 <div class="school-name">{{ school.school_name }}</div>
                                 <div class="school-id">ID: {{ school.school_id }}</div>
+                                <div class="school-type-badge school-type-{{ school.school_type or 'mixed' }}">
+                                    {{ school.school_type_label or (school.school_type|replace('_', ' ')|title) }}
+                                </div>
                                 <div class="school-meta">
+                                    Type: <strong>{{ school.school_type_label or (school.school_type|replace('_', ' ')|title) }}</strong> |
                                     Location: {{ school.location or 'Not set' }} |
                                     Phone: {{ school.phone or 'Not set' }} |
                                     Email: {{ school.email or 'Not set' }} |
@@ -188,6 +255,15 @@
                                     <div class="super-admin-inline-field">
                                         <label>School Name</label>
                                         <input type="text" name="school_name" value="{{ school.school_name }}" placeholder="School name" required>
+                                    </div>
+                                    <div class="super-admin-inline-field">
+                                        <label>School Type</label>
+                                        <select name="school_type" title="School type">
+                                            <option value="mixed" {% if school.school_type == 'mixed' %}selected{% endif %}>Mixed School</option>
+                                            <option value="primary" {% if school.school_type == 'primary' %}selected{% endif %}>Primary School</option>
+                                            <option value="secondary" {% if school.school_type == 'secondary' %}selected{% endif %}>Secondary School</option>
+                                            <option value="nursery" {% if school.school_type == 'nursery' %}selected{% endif %}>Nursery School</option>
+                                        </select>
                                     </div>
                                     <div class="super-admin-inline-field">
                                         <label>Location</label>
@@ -394,6 +470,4 @@
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 </body>
 </html>
-
-
 

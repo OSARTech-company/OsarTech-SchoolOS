@@ -38,6 +38,23 @@
       .archived-count-badge.is-hidden { display: none; }
       .archived-section { display: none; }
       .archived-section.is-open { display: block; }
+      .entry-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      .entry-table th, .entry-table td { border: 1px solid #e1e1e1; padding: 10px; text-align: left; vertical-align: top; }
+      .entry-table th { background: #f8f9fa; font-weight: 600; }
+      .entry-table input, .entry-table select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      .row-controls { display: flex; gap: 10px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
+      .row-controls input { width: 120px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+      .small-btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; }
+      .add-row-btn { background: #3498db; color: white; }
+      .remove-row-btn { background: #e74c3c; color: white; }
+      .table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+      .table-wrap table { min-width: 980px; margin-top: 0; }
     </style>
   </head>
   <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
@@ -100,6 +117,83 @@
               </div>
               <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add Teacher</button>
             </form>
+          </div>
+
+          <div class="card">
+            <h2><i class="fas fa-layer-group"></i> Add Many Teachers</h2>
+            <p class="meta-muted">
+              This uses the same multi-row format as student entry: add several rows, fill them in, and save once.
+            </p>
+            <form action="{{ url_for('school_admin_add_teachers_by_table') }}" method="POST">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <div class="row-controls">
+                <label for="rowsToAdd" style="margin:0;">How many rows to add:</label>
+                <input type="number" id="rowsToAdd" min="1" max="100" value="2">
+                <button type="button" class="small-btn add-row-btn" onclick="setExactRows()">Set Rows</button>
+              </div>
+              <div class="table-wrap">
+                <table class="entry-table" id="teachersTable">
+                  <thead>
+                    <tr>
+                      <th style="width: 24%;">Username (Email)</th>
+                      <th style="width: 18%;">First Name</th>
+                      <th style="width: 18%;">Last Name</th>
+                      <th style="width: 16%;">Phone</th>
+                      <th style="width: 10%;">Gender</th>
+                      <th style="width: 10%;">Password</th>
+                      <th style="width: 4%;">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="teachersBody">
+                    <tr>
+                      <td><input type="email" name="username[]" placeholder="teacher@school.com" required></td>
+                      <td><input type="text" name="firstname[]" placeholder="First name" required></td>
+                      <td><input type="text" name="lastname[]" placeholder="Last name"></td>
+                      <td><input type="text" name="phone[]" placeholder="+234..."></td>
+                      <td>
+                        <select name="gender[]" required>
+                          <option value="">Select</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </td>
+                      <td><input type="text" name="password[]" placeholder="Leave blank to auto-generate"></td>
+                      <td><button type="button" class="small-btn remove-row-btn" onclick="removeRow(this)">X</button></td>
+                    </tr>
+                    <tr>
+                      <td><input type="email" name="username[]" placeholder="teacher@school.com"></td>
+                      <td><input type="text" name="firstname[]" placeholder="First name"></td>
+                      <td><input type="text" name="lastname[]" placeholder="Last name"></td>
+                      <td><input type="text" name="phone[]" placeholder="+234..."></td>
+                      <td>
+                        <select name="gender[]">
+                          <option value="">Select</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </td>
+                      <td><input type="text" name="password[]" placeholder="Leave blank to auto-generate"></td>
+                      <td><button type="button" class="small-btn remove-row-btn" onclick="removeRow(this)">X</button></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style="margin-top:10px;">
+                <button type="button" class="small-btn add-row-btn" onclick="addRow()">+ Add Row</button>
+              </div>
+              <div class="form-group" style="margin-top: 12px;">
+                <label class="checkbox-row">
+                  <input type="checkbox" name="send_credentials" value="1" checked />
+                  Email/SMS login details to each teacher
+                </label>
+              </div>
+              <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Add All Teachers</button>
+            </form>
+            <p class="meta-muted" style="margin-top: 10px;">
+              You can leave Password blank to auto-generate one. If you want the credentials sent out, keep the checkbox on.
+            </p>
           </div>
 
           <div class="card">
@@ -230,8 +324,55 @@
           if (isOpen) archived.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
       })();
+
+      function buildRowHtml() {
+        return `
+          <td><input type="email" name="username[]" placeholder="teacher@school.com"></td>
+          <td><input type="text" name="firstname[]" placeholder="First name"></td>
+          <td><input type="text" name="lastname[]" placeholder="Last name"></td>
+          <td><input type="text" name="phone[]" placeholder="+234..."></td>
+          <td>
+            <select name="gender[]">
+              <option value="">Select</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </td>
+          <td><input type="text" name="password[]" placeholder="Leave blank to auto-generate"></td>
+          <td><button type="button" class="small-btn remove-row-btn" onclick="removeRow(this)">X</button></td>
+        `;
+      }
+
+      function addRow() {
+        const tbody = document.getElementById('teachersBody');
+        if (!tbody) return;
+        const tr = document.createElement('tr');
+        tr.innerHTML = buildRowHtml();
+        tbody.appendChild(tr);
+      }
+
+      function removeRow(button) {
+        const row = button && button.closest ? button.closest('tr') : null;
+        const tbody = document.getElementById('teachersBody');
+        if (!row || !tbody) return;
+        if (tbody.rows.length <= 1) return;
+        row.remove();
+      }
+
+      function setExactRows() {
+        const input = document.getElementById('rowsToAdd');
+        const tbody = document.getElementById('teachersBody');
+        if (!input || !tbody) return;
+        const desired = Math.max(1, Math.min(100, parseInt(input.value || '0', 10) || 0));
+        while (tbody.rows.length < desired) {
+          addRow();
+        }
+        while (tbody.rows.length > desired) {
+          tbody.deleteRow(tbody.rows.length - 1);
+        }
+      }
     </script>
       {% include "shared/_loading_overlay.html" %}
 </body>
 </html>
-

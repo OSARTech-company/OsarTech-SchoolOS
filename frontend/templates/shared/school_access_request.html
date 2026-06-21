@@ -158,6 +158,10 @@
                     <span>Admin Email</span>
                     <strong>{{ recent_request.admin_email or '-' }}</strong>
                 </div>
+                <div class="fact-box">
+                    <span>School Type</span>
+                    <strong>{{ (recent_request.school_type or 'mixed')|replace('_', ' ')|title }}</strong>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -199,6 +203,17 @@
                     <div class="form-group">
                         <label for="school_name">School Name *</label>
                         <input id="school_name" name="school_name" type="text" required placeholder="e.g., Saint Mark College">
+                    </div>
+                    <div class="form-group">
+                        <label for="school_type">School Type *</label>
+                        <select id="school_type" name="school_type" required>
+                            <option value="" selected disabled>Select school type</option>
+                            <option value="mixed">Mixed School</option>
+                            <option value="primary">Primary School</option>
+                            <option value="secondary">Secondary School</option>
+                            <option value="nursery">Nursery School</option>
+                        </select>
+                        <small class="note">Choose the school type so SchoolOS can separate primary, nursery, secondary, and mixed schools correctly.</small>
                     </div>
                     <div class="form-group">
                         <label for="location">Location</label>
@@ -428,6 +443,10 @@
                     <div class="fact-box">
                         <span>Admin Email</span>
                         <strong>{{ tracked_request.admin_email or '-' }}</strong>
+                    </div>
+                    <div class="fact-box">
+                        <span>School Type</span>
+                        <strong>{{ (tracked_request.school_type or 'mixed')|replace('_', ' ')|title }}</strong>
                     </div>
                     <div class="fact-box">
                         <span>Website / Social</span>

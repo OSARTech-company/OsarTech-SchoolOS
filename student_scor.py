@@ -6174,6 +6174,7 @@ def init_db():
                         id SERIAL PRIMARY KEY,
                         school_id TEXT UNIQUE NOT NULL,
                         school_name TEXT NOT NULL,
+                        school_type TEXT DEFAULT 'mixed',
                         location TEXT,
                         school_logo TEXT,
                         academic_year TEXT,
@@ -6322,6 +6323,7 @@ def init_db():
     safe_exec_ignore('ALTER TABLE class_assignments DROP CONSTRAINT IF EXISTS class_assignments_school_id_teacher_id_fkey')
     drop_school_id_foreign_keys()
     safe_exec_ignore('ALTER TABLE users ALTER COLUMN school_id TYPE TEXT USING school_id::text')
+    safe_exec_ignore("ALTER TABLE schools ADD COLUMN IF NOT EXISTS school_type TEXT DEFAULT 'mixed'")
     safe_exec_ignore(
         """ALTER TABLE users
            ADD CONSTRAINT chk_users_school_id_required
@@ -6840,6 +6842,7 @@ def init_db():
                         id SERIAL PRIMARY KEY,
                         request_id TEXT UNIQUE NOT NULL,
                         school_name TEXT NOT NULL,
+                        school_type TEXT DEFAULT 'mixed',
                         location TEXT DEFAULT '',
                         phone TEXT DEFAULT '',
                         school_email TEXT DEFAULT '',
@@ -6869,6 +6872,7 @@ def init_db():
     db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_school_onboarding_status_created ON school_onboarding_requests(status, created_at DESC)')
     db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_school_onboarding_admin_email ON school_onboarding_requests(LOWER(admin_email))')
     safe_exec_ignore("ALTER TABLE school_onboarding_requests ADD COLUMN school_email TEXT DEFAULT ''")
+    safe_exec_ignore("ALTER TABLE school_onboarding_requests ADD COLUMN IF NOT EXISTS school_type TEXT DEFAULT 'mixed'")
     safe_exec_ignore("ALTER TABLE school_onboarding_requests ADD COLUMN principal_name TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE school_onboarding_requests ADD COLUMN admin_name TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE school_onboarding_requests ADD COLUMN website_url TEXT DEFAULT ''")
@@ -12037,11 +12041,12 @@ def create_school(school_id, school_name, location='', phone='', email='', princ
         c = conn.cursor()
         db_execute(
             c,
-            """INSERT INTO schools (school_id, school_name, location, phone, email, principal_name, motto, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO schools (school_id, school_name, school_type, location, phone, email, principal_name, motto, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 school_id,
                 school_name,
+                normalize_school_type('mixed'),
                 (location or '').strip(),
                 (phone or '').strip(),
                 (email or '').strip().lower(),
@@ -12051,17 +12056,18 @@ def create_school(school_id, school_name, location='', phone='', email='', princ
             )
         )
 
-def create_school_with_index_id_with_cursor(c, school_name, location='', phone='', email='', principal_name='', motto=''):
+def create_school_with_index_id_with_cursor(c, school_name, location='', phone='', email='', principal_name='', motto='', school_type='mixed'):
     """Create one school using an existing transaction and return normalized school_id."""
     temp_school_id = f"tmp_{secrets.token_hex(8)}"
     db_execute(
         c,
-        """INSERT INTO schools (school_id, school_name, location, phone, email, principal_name, motto, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """INSERT INTO schools (school_id, school_name, school_type, location, phone, email, principal_name, motto, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            RETURNING id""",
         (
             temp_school_id,
             school_name,
+            normalize_school_type(school_type),
             (location or '').strip(),
             (phone or '').strip(),
             (email or '').strip().lower(),
@@ -12090,6 +12096,7 @@ def create_school_with_index_id(school_name, location='', phone='', email='', pr
             email=email,
             principal_name=principal_name,
             motto=motto,
+            school_type='mixed',
         )
 
 SCHOOL_ONBOARDING_STATUSES = {'pending_verification', 'pending', 'approved', 'rejected', 'cancelled'}
@@ -12292,6 +12299,7 @@ def _next_school_onboarding_request_id_with_cursor(c):
 
 def create_school_onboarding_request(
     school_name,
+    school_type='mixed',
     location='',
     phone='',
     school_email='',
@@ -12310,6 +12318,7 @@ def create_school_onboarding_request(
         raise ValueError('Onboarding service is unavailable. Please try again.')
 
     clean_school_name = (school_name or '').strip()
+    clean_school_type = normalize_school_type(school_type)
     clean_location = (location or '').strip()
     clean_phone = (phone or '').strip()
     clean_school_email = (school_email or '').strip().lower()
@@ -12384,21 +12393,22 @@ def create_school_onboarding_request(
             raise ValueError('A pending request already exists for this school contact. Wait for review.')
 
         request_id = _next_school_onboarding_request_id_with_cursor(c)
-        db_execute(
-            c,
-            """INSERT INTO school_onboarding_requests
-               (request_id, school_name, location, phone, school_email, principal_name,
-                admin_name, admin_email, website_url, proof_document_path,
-                expected_students, note, status, school_email_verified,
-                school_email_verify_code_hash, school_email_verify_expires_at, phone_verified, document_verified,
-                verification_meta, payment_proof_path, payment_reference, payment_amount,
-                source_ip, user_agent, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_verification', 0, '', NULL, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                request_id,
-                clean_school_name[:200],
-                clean_location[:200],
-                clean_phone[:60],
+    db_execute(
+        c,
+        """INSERT INTO school_onboarding_requests
+           (request_id, school_name, school_type, location, phone, school_email, principal_name,
+            admin_name, admin_email, website_url, proof_document_path,
+            expected_students, note, status, school_email_verified,
+            school_email_verify_code_hash, school_email_verify_expires_at, phone_verified, document_verified,
+            verification_meta, payment_proof_path, payment_reference, payment_amount,
+            source_ip, user_agent, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_verification', 0, '', NULL, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            request_id,
+            clean_school_name[:200],
+            clean_school_type,
+            clean_location[:200],
+            clean_phone[:60],
                 clean_school_email[:200],
                 clean_principal_name[:160],
                 clean_admin_name[:160],
@@ -12652,14 +12662,14 @@ def list_school_onboarding_requests(status_filter='', text_filter='', page=1, pe
         where_parts.append(
             "(LOWER(request_id) LIKE ? OR LOWER(school_name) LIKE ? OR LOWER(admin_email) LIKE ? "
             "OR LOWER(COALESCE(school_email, '')) LIKE ? OR LOWER(COALESCE(note, '')) LIKE ? "
-            "OR LOWER(COALESCE(website_url, '')) LIKE ?)"
+            "OR LOWER(COALESCE(website_url, '')) LIKE ? OR LOWER(COALESCE(school_type, '')) LIKE ?)"
         )
         like_q = f'%{q}%'
-        params.extend([like_q, like_q, like_q, like_q, like_q, like_q])
+        params.extend([like_q, like_q, like_q, like_q, like_q, like_q, like_q])
 
     where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ''
     query = (
-        "SELECT id, request_id, school_name, location, phone, school_email, principal_name, "
+        "SELECT id, request_id, school_name, school_type, location, phone, school_email, principal_name, "
         "admin_name, admin_email, website_url, proof_document_path, expected_students, note, status, "
         "school_email_verified, school_email_verify_code_hash, school_email_verify_expires_at, "
         "phone_verified, document_verified, verification_meta, payment_proof_path, payment_reference, payment_amount, "
@@ -12704,6 +12714,7 @@ def list_school_onboarding_requests(status_filter='', text_filter='', page=1, pe
                 'id': row['id'],
                 'request_id': (row['request_id'] or '').strip(),
                 'school_name': (row['school_name'] or '').strip(),
+                'school_type': normalize_school_type(row['school_type'] if 'school_type' in row.keys() else 'mixed'),
                 'location': (row['location'] or '').strip(),
                 'phone': (row['phone'] or '').strip(),
                 'school_email': (row['school_email'] or '').strip(),
@@ -12753,7 +12764,7 @@ def get_school_onboarding_request(request_id):
             c = conn.cursor()
             db_execute(
                 c,
-                """SELECT id, request_id, school_name, location, phone, school_email, principal_name,
+                """SELECT id, request_id, school_name, school_type, location, phone, school_email, principal_name,
                           admin_name, admin_email, website_url, proof_document_path,
                           expected_students, note, status, school_email_verified,
                           school_email_verify_code_hash, school_email_verify_expires_at,
@@ -12787,6 +12798,7 @@ def get_school_onboarding_request(request_id):
         'id': row['id'],
         'request_id': (row['request_id'] or '').strip(),
         'school_name': (row['school_name'] or '').strip(),
+        'school_type': normalize_school_type(row['school_type'] if 'school_type' in row.keys() else 'mixed'),
         'location': (row['location'] or '').strip(),
         'phone': (row['phone'] or '').strip(),
         'school_email': (row['school_email'] or '').strip(),
@@ -13293,6 +13305,7 @@ def send_onboarding_event_notifications(event_name, request_payload, actor_user=
     payload = request_payload or {}
     request_id = (payload.get('request_id') or '').strip()
     school_name = (payload.get('school_name') or 'School').strip()
+    school_type = school_type_label(payload.get('school_type', 'mixed'))
     admin_email = (admin_username or payload.get('admin_email') or '').strip().lower()
     school_email = (payload.get('school_email') or '').strip().lower()
     actor = (actor_user or '').strip() or 'system'
@@ -13326,6 +13339,7 @@ def send_onboarding_event_notifications(event_name, request_payload, actor_user=
             f"We received your school onboarding request.\n\n"
             f"Reference: {request_id}\n"
             f"School: {school_name}\n"
+            f"School Type: {school_type}\n"
             f"Submitted At: {created_at or datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
             f"Next Step: verify your school email with the code sent separately.\n"
             f"After verification, super admin will review and contact you.\n"
@@ -13336,6 +13350,7 @@ def send_onboarding_event_notifications(event_name, request_payload, actor_user=
             f"A new school onboarding request has been submitted.\n\n"
             f"Reference: {request_id}\n"
             f"School: {school_name}\n"
+            f"School Type: {school_type}\n"
             f"Admin Email: {admin_email or '-'}\n"
             f"School Email: {school_email or '-'}\n"
             f"Phone: {(payload.get('phone') or '').strip() or '-'}\n"
@@ -13362,6 +13377,7 @@ def send_onboarding_event_notifications(event_name, request_payload, actor_user=
             f"Your school onboarding request has been approved.\n\n"
             f"Reference: {request_id}\n"
             f"School: {school_name}\n"
+            f"School Type: {school_type}\n"
             f"School ID: {linked_school_id or '-'}\n"
             f"Admin Username: {admin_email or '-'}\n"
             f"Reviewed By: {actor}\n"
@@ -13375,6 +13391,7 @@ def send_onboarding_event_notifications(event_name, request_payload, actor_user=
             f"Onboarding request approved.\n\n"
             f"Reference: {request_id}\n"
             f"School: {school_name}\n"
+            f"School Type: {school_type}\n"
             f"School ID: {linked_school_id or '-'}\n"
             f"Admin Username: {admin_email or '-'}\n"
             f"Approved By: {actor}\n"
@@ -13396,6 +13413,7 @@ def send_onboarding_event_notifications(event_name, request_payload, actor_user=
             f"Your school onboarding request was not approved at this time.\n\n"
             f"Reference: {request_id}\n"
             f"School: {school_name}\n"
+            f"School Type: {school_type}\n"
             f"Reviewed By: {actor}\n"
             f"Reason: {review_note or 'Not provided'}\n\n"
             f"You may submit a corrected request with accurate details."
@@ -14400,6 +14418,34 @@ def normalize_school_access_status(value, default='trial_free'):
         fallback = 'trial_free'
     return raw if raw in SCHOOL_ACCESS_STATUSES else fallback
 
+SCHOOL_TYPES = {'nursery', 'primary', 'secondary', 'mixed'}
+SCHOOL_TYPE_LABELS = {
+    'nursery': 'Nursery School',
+    'primary': 'Primary School',
+    'secondary': 'Secondary School',
+    'mixed': 'Mixed School',
+}
+
+def normalize_school_type(value, default='mixed'):
+    """Normalize school type for onboarding/registration flows."""
+    raw = (value or '').strip().lower()
+    if raw in SCHOOL_TYPES:
+        return raw
+    aliases = {
+        'nursery school': 'nursery',
+        'primary school': 'primary',
+        'secondary school': 'secondary',
+        'mixed school': 'mixed',
+        'combined school': 'mixed',
+        'coed': 'mixed',
+        'co-educational': 'mixed',
+    }
+    return aliases.get(raw, default if default in SCHOOL_TYPES else 'mixed')
+
+def school_type_label(value):
+    """Return a display label for a normalized school type."""
+    return SCHOOL_TYPE_LABELS.get(normalize_school_type(value), 'Mixed School')
+
 
 def normalize_school_cbt_enabled(value, default=1):
     raw = '' if value is None else str(value).strip().lower()
@@ -15177,6 +15223,7 @@ def _school_row_to_dict(row):
     data = {
         'school_id': row['school_id'],
         'school_name': row['school_name'],
+        'school_type': normalize_school_type(row['school_type'] if 'school_type' in row.keys() else 'mixed'),
         'location': row['location'] if 'location' in row.keys() else '',
         'phone': row['phone'] if 'phone' in row.keys() else '',
         'email': row['email'] if 'email' in row.keys() else '',
@@ -15248,6 +15295,7 @@ def _school_row_to_dict(row):
         'pre_soft_delete_status': (row['pre_soft_delete_status'] if 'pre_soft_delete_status' in row.keys() else '') or '',
     }
     data['leadership_label'] = get_school_leadership_label(data.get('leadership_title'))
+    data['school_type_label'] = school_type_label(data.get('school_type'))
     data['access_state'] = build_school_access_state(data)
     return data
 
@@ -28495,17 +28543,20 @@ def _validate_school_access_challenge(user_answer):
     return (str(user_answer or '').strip() == expected)
 
 
-def _remember_recent_school_onboarding_request(request_id='', school_email='', admin_email=''):
+def _remember_recent_school_onboarding_request(request_id='', school_email='', admin_email='', school_type=''):
     payload = {}
     rid = (request_id or '').strip().upper()
     school_email_text = (school_email or '').strip().lower()
     admin_email_text = (admin_email or '').strip().lower()
+    school_type_text = normalize_school_type(school_type) if (school_type or '').strip() else ''
     if rid:
         payload['request_id'] = rid
     if school_email_text:
         payload['school_email'] = school_email_text
     if admin_email_text:
         payload['admin_email'] = admin_email_text
+    if school_type_text:
+        payload['school_type'] = school_type_text
     if payload:
         session['recent_school_onboarding_request'] = payload
     else:
@@ -28521,12 +28572,15 @@ def _get_recent_school_onboarding_request_context():
     rid = (raw.get('request_id') or '').strip().upper()
     school_email = (raw.get('school_email') or '').strip().lower()
     admin_email = (raw.get('admin_email') or '').strip().lower()
+    school_type = normalize_school_type(raw.get('school_type', '')) if (raw.get('school_type') or '').strip() else ''
     if rid:
         payload['request_id'] = rid
     if school_email:
         payload['school_email'] = school_email
     if admin_email:
         payload['admin_email'] = admin_email
+    if school_type:
+        payload['school_type'] = school_type
     return payload
 
 
@@ -28672,6 +28726,7 @@ def school_access_request():
                     request_id=request_id,
                     school_email=tracked_request.get('school_email', ''),
                     admin_email=tracked_request.get('admin_email', ''),
+                    school_type=tracked_request.get('school_type', ''),
                 )
                 flash(f'Request {request_id} found.', 'success')
         elif action == 'verify_email':
@@ -28689,6 +28744,7 @@ def school_access_request():
                     request_id=request_id,
                     school_email=(tracked_request or {}).get('school_email') or school_email,
                     admin_email=(tracked_request or {}).get('admin_email', ''),
+                    school_type=(tracked_request or {}).get('school_type', ''),
                 )
                 if result.get('already_verified'):
                     flash(f'{request_id} is already email-verified and pending review.', 'success')
@@ -28710,6 +28766,7 @@ def school_access_request():
                     request_id=request_id,
                     school_email=tracked_request.get('school_email', ''),
                     admin_email=tracked_request.get('admin_email', ''),
+                    school_type=tracked_request.get('school_type', ''),
                 )
                 try:
                     send_result = issue_school_onboarding_email_verification_code(
@@ -28753,6 +28810,7 @@ def school_access_request():
                     request_id=request_id,
                     school_email=tracked_request.get('school_email', ''),
                     admin_email=tracked_request.get('admin_email', ''),
+                    school_type=tracked_request.get('school_type', ''),
                 )
                 try:
                     test_result = send_school_onboarding_smtp_test(
@@ -28801,6 +28859,7 @@ def school_access_request():
                     request_id=request_id,
                     school_email=tracked_request.get('school_email', ''),
                     admin_email=tracked_request.get('admin_email', ''),
+                    school_type=tracked_request.get('school_type', ''),
                 )
                 try:
                     proof_path = save_school_onboarding_payment_proof(request.files.get('payment_proof'))
@@ -28830,6 +28889,7 @@ def school_access_request():
                 flash('Wrong challenge answer. Please retry.', 'error')
             else:
                 school_name = (request.form.get('school_name') or '').strip()
+                school_type = normalize_school_type(request.form.get('school_type', 'mixed'))
                 location = (request.form.get('location') or '').strip()
                 phone = (request.form.get('phone') or '').strip()
                 school_email = (request.form.get('school_email') or '').strip().lower()
@@ -28844,6 +28904,7 @@ def school_access_request():
                     proof_document_path = save_school_onboarding_proof_document(request.files.get('proof_document'))
                     submission = create_school_onboarding_request(
                         school_name=school_name,
+                        school_type=school_type,
                         location=location,
                         phone=phone,
                         school_email=school_email,
@@ -28862,6 +28923,7 @@ def school_access_request():
                         request_id=request_id,
                         school_email=school_email,
                         admin_email=admin_email,
+                        school_type=(submission or {}).get('school_type', school_type),
                     )
                     verify_send = (submission or {}).get('verification_send_result') or {}
                     masked_target = verify_send.get('masked_email') or _mask_email_address(school_email)
@@ -28891,6 +28953,7 @@ def school_access_request():
                         notify_payload = {
                             'request_id': request_id,
                             'school_name': school_name,
+                            'school_type': school_type,
                             'location': location,
                             'phone': phone,
                             'school_email': school_email,
@@ -29066,6 +29129,82 @@ def internal_server_error(error):
         back_url=back_url,
         role=role,
     ), 500
+
+@app.errorhandler(404)
+def not_found_error(error):
+    """Friendly 404 page with a safe return path."""
+    role = (session.get('role') or '').strip().lower()
+    if role == 'super_admin':
+        back_url = url_for('super_admin_dashboard')
+    elif role == 'school_admin':
+        back_url = url_for('school_admin_dashboard')
+    elif role == 'teacher':
+        back_url = url_for('teacher_dashboard')
+    elif role == 'student':
+        back_url = url_for('student_dashboard')
+    elif role == 'parent':
+        back_url = url_for('parent_dashboard')
+    else:
+        back_url = url_for('home')
+    back_url = safe_referrer_or(back_url)
+    wants_json = (
+        request.path.startswith('/assistant/')
+        or (request.headers.get('X-Requested-With', '') or '').lower() == 'xmlhttprequest'
+        or 'application/json' in (request.headers.get('Accept', '') or '').lower()
+    )
+    if wants_json:
+        body = {
+            'ok': False,
+            'error': 'The requested resource was not found.',
+            'requested_path': request.path,
+            'method': (request.method or 'GET').upper(),
+        }
+        return Response(json.dumps(body), status=404, mimetype='application/json')
+    return render_template(
+        'shared/error_404.html',
+        role=role,
+        back_url=back_url,
+        requested_path=request.path,
+        method=(request.method or 'GET').upper(),
+    ), 404
+
+@app.errorhandler(403)
+def forbidden_error(error):
+    """Friendly 403 page with a safe return path."""
+    role = (session.get('role') or '').strip().lower()
+    if role == 'super_admin':
+        back_url = url_for('super_admin_dashboard')
+    elif role == 'school_admin':
+        back_url = url_for('school_admin_dashboard')
+    elif role == 'teacher':
+        back_url = url_for('teacher_dashboard')
+    elif role == 'student':
+        back_url = url_for('student_dashboard')
+    elif role == 'parent':
+        back_url = url_for('parent_dashboard')
+    else:
+        back_url = url_for('home')
+    back_url = safe_referrer_or(back_url)
+    wants_json = (
+        request.path.startswith('/assistant/')
+        or (request.headers.get('X-Requested-With', '') or '').lower() == 'xmlhttprequest'
+        or 'application/json' in (request.headers.get('Accept', '') or '').lower()
+    )
+    if wants_json:
+        body = {
+            'ok': False,
+            'error': 'You do not have permission to access this resource.',
+            'requested_path': request.path,
+            'method': (request.method or 'GET').upper(),
+        }
+        return Response(json.dumps(body), status=403, mimetype='application/json')
+    return render_template(
+        'shared/error_403.html',
+        role=role,
+        back_url=back_url,
+        requested_path=request.path,
+        method=(request.method or 'GET').upper(),
+    ), 403
 
 def _auth_error_render_context(template_name):
     """Build fallback template context for auth routes after an exception."""
@@ -30800,9 +30939,26 @@ def super_admin_add_school_page():
 def super_admin_view_schools():
     if session.get('role') != 'super_admin':
         return redirect(url_for('login'))
-    schools, overview = _build_super_admin_school_overview()
+    all_schools, overview = _build_super_admin_school_overview()
+    school_type_filter = normalize_school_type((request.args.get('school_type') or request.args.get('type') or '').strip(), default='')
+    if school_type_filter not in SCHOOL_TYPES:
+        school_type_filter = ''
+    schools = list(all_schools)
+    if school_type_filter:
+        schools = [school for school in schools if normalize_school_type(school.get('school_type'), default='') == school_type_filter]
+    school_type_counts = Counter()
+    for school in all_schools:
+        school_type_counts[normalize_school_type(school.get('school_type'))] += 1
+    overview['visible_schools'] = len(schools)
+    overview['school_type_counts'] = dict(school_type_counts)
     last_login_at = format_timestamp(get_last_login_at(session.get('user_id')))
-    return render_template('super/super_admin_schools.html', schools=schools, overview=overview, last_login_at=last_login_at)
+    return render_template(
+        'super/super_admin_schools.html',
+        schools=schools,
+        overview=overview,
+        last_login_at=last_login_at,
+        school_type_filter=school_type_filter,
+    )
 
 
 @app.route('/super-admin/onboarding-requests')
@@ -30864,6 +31020,7 @@ def super_admin_onboarding_approve():
         class_arm_ranking_mode = 'separate'
     if access_status not in SCHOOL_ACCESS_STATUSES:
         access_status = 'trial_free'
+    school_type = normalize_school_type(onboarding.get('school_type', 'mixed'))
 
     onboarding = get_school_onboarding_request(request_id)
     if not onboarding:
@@ -30912,11 +31069,17 @@ def super_admin_onboarding_approve():
             school_id = create_school_with_index_id_with_cursor(
                 c,
                 school_name=onboarding.get('school_name', ''),
+                school_type=school_type,
                 location=onboarding.get('location', ''),
                 phone=onboarding.get('phone', ''),
                 email=onboarding.get('school_email', '') or admin_username,
                 principal_name=onboarding.get('principal_name', ''),
                 motto='',
+            )
+            db_execute(
+                c,
+                'UPDATE schools SET school_type = ? WHERE school_id = ?',
+                (school_type, school_id),
             )
             db_execute(
                 c,
@@ -31408,6 +31571,7 @@ def super_admin_add_school():
     school_email = _first_form_value('school_email', 'email', 'school_contact_email').lower()
     principal_name = _first_form_value('principal_name', 'principal')
     motto = _first_form_value('motto', 'school_motto')
+    school_type = normalize_school_type(_first_form_value('school_type', 'type'))
     academic_year = _first_form_value('academic_year')
     current_term = _first_form_value('current_term')
     class_arm_ranking_mode = (_first_form_value('class_arm_ranking_mode') or 'separate').lower()
@@ -31495,11 +31659,17 @@ def super_admin_add_school():
                 email=school_email,
                 principal_name=principal_name,
                 motto=motto,
+                school_type=school_type,
             )
             db_execute(
                 c,
                 'UPDATE schools SET class_arm_ranking_mode = ? WHERE school_id = ?',
                 (class_arm_ranking_mode, school_id),
+            )
+            db_execute(
+                c,
+                'UPDATE schools SET school_type = ? WHERE school_id = ?',
+                (school_type, school_id),
             )
             if academic_year or current_term:
                 update_school_term_year_with_cursor(
@@ -31757,6 +31927,7 @@ def super_admin_update_school():
         return redirect(url_for('login'))
     school_id = _normalize_school_id_text(request.form.get('school_id'))
     school_name = request.form.get('school_name', '').strip()
+    school_type = normalize_school_type(request.form.get('school_type', 'mixed'))
     location = request.form.get('location', '').strip()
     phone = request.form.get('phone', '').strip()
     school_email = request.form.get('school_email', '').strip().lower()
@@ -31775,13 +31946,14 @@ def super_admin_update_school():
         with db_connection(commit=True) as conn:
             c = conn.cursor()
             db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS class_arm_ranking_mode TEXT DEFAULT 'separate'")
+            db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS school_type TEXT DEFAULT 'mixed'")
             db_execute(
                 c,
                 """UPDATE schools
                    SET school_name = ?, location = ?, phone = ?, email = ?,
-                       principal_name = ?, motto = ?, class_arm_ranking_mode = ?, updated_at = ?
+                       principal_name = ?, motto = ?, school_type = ?, class_arm_ranking_mode = ?, updated_at = ?
                    WHERE school_id = ?""",
-                (school_name, location, phone, school_email, principal_name, motto, class_arm_ranking_mode, datetime.now(), school_id),
+                (school_name, location, phone, school_email, principal_name, motto, school_type, class_arm_ranking_mode, datetime.now(), school_id),
             )
         invalidate_school_cache(school_id)
         flash(f'School profile updated for {school_id}.', 'success')
@@ -36404,7 +36576,7 @@ def school_admin_add_teacher():
         return redirect(url_for('login'))
     
     school_id = _normalize_school_id_text(session.get('school_id'))
-    fallback_redirect = request.referrer or url_for('school_admin_dashboard')
+    fallback_redirect = safe_referrer_or(url_for('school_admin_dashboard'))
     if not school_id:
         flash('School session is missing. Please log in again.', 'error')
         return redirect(url_for('login'))
@@ -36508,6 +36680,274 @@ def school_admin_add_teacher():
         except Exception as e:
             flash(f'Error adding teacher: {str(e)}', 'error')
     
+    return redirect(fallback_redirect)
+
+@app.route('/school-admin/add-teachers-by-table', methods=['POST'])
+def school_admin_add_teachers_by_table():
+    """School admin can add multiple teachers in one table-style form."""
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    fallback_redirect = safe_referrer_or(url_for('school_admin_teachers'))
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+
+    send_credentials = (request.form.get('send_credentials', '') or '').strip() in {'1', 'true', 'yes', 'on'}
+    usernames = [(value or '').strip().lower() for value in request.form.getlist('username[]')]
+    firstnames = [normalize_person_name((value or '').strip()) for value in request.form.getlist('firstname[]')]
+    lastnames = [normalize_person_name((value or '').strip()) for value in request.form.getlist('lastname[]')]
+    phones = [(value or '').strip() for value in request.form.getlist('phone[]')]
+    genders = [normalize_teacher_gender((value or '').strip()) for value in request.form.getlist('gender[]')]
+    passwords = [(value or '').strip() for value in request.form.getlist('password[]')]
+
+    teachers_map = get_teachers(school_id, include_archived=True) or {}
+    teachers_map_by_lower = {str(tid or '').strip().lower(): teacher for tid, teacher in teachers_map.items()}
+    seen_usernames = set()
+    teacher_rows = []
+
+    row_count = max(len(usernames), len(firstnames), len(lastnames), len(phones), len(genders), len(passwords))
+    for idx in range(row_count):
+        username = usernames[idx] if idx < len(usernames) else ''
+        firstname = firstnames[idx] if idx < len(firstnames) else ''
+        lastname = lastnames[idx] if idx < len(lastnames) else ''
+        phone = phones[idx] if idx < len(phones) else ''
+        gender = genders[idx] if idx < len(genders) else ''
+        password = passwords[idx] if idx < len(passwords) else ''
+
+        if not any((username, firstname, lastname, phone, gender, password)):
+            continue
+        if not username:
+            flash(f'Username/email is required on row {idx + 1}.', 'error')
+            continue
+        if not is_valid_email(username):
+            flash(f'Row {idx + 1}: teacher username must be a valid email address.', 'error')
+            continue
+        if not firstname:
+            flash(f'Row {idx + 1}: first name is required.', 'error')
+            continue
+        if gender not in {'male', 'female', 'other'}:
+            flash(f'Row {idx + 1}: select a valid gender.', 'error')
+            continue
+        if username in seen_usernames:
+            flash(f'Row {idx + 1}: duplicate username "{username}" was skipped.', 'error')
+            continue
+        seen_usernames.add(username)
+        teacher_rows.append({
+            'username': username,
+            'firstname': firstname,
+            'lastname': lastname,
+            'phone': phone,
+            'gender': gender,
+            'password': password,
+        })
+
+    if not teacher_rows:
+        flash('Add at least one teacher row.', 'error')
+        return redirect(fallback_redirect)
+
+    new_teacher_count = sum(1 for row in teacher_rows if row['username'] not in teachers_map_by_lower)
+    try:
+        ensure_school_plan_capacity(school_id, add_students=0, add_teachers=new_teacher_count)
+    except Exception as exc:
+        flash(str(exc), 'error')
+        return redirect(fallback_redirect)
+
+    added_count = 0
+    updated_count = 0
+    skipped_count = 0
+    credential_notes = []
+
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        for idx, row in enumerate(teacher_rows, start=1):
+            username = row['username']
+            firstname = row['firstname']
+            lastname = row['lastname']
+            phone = row['phone']
+            gender = row['gender']
+            existing_teacher = teachers_map_by_lower.get(username, {}) or {}
+            existing_user = None
+
+            db_execute(
+                c,
+                """SELECT username, role, school_id
+                   FROM users
+                   WHERE LOWER(username) = LOWER(?)
+                   LIMIT 1""",
+                (username,),
+            )
+            existing_user = c.fetchone()
+            if existing_user:
+                existing_role = (existing_user[1] or '').strip().lower()
+                existing_school = (existing_user[2] or '').strip()
+                if not (existing_role == 'teacher' and existing_school == school_id):
+                    flash(
+                        f'Row {idx}: username "{username}" already belongs to another account/school. Skipped.',
+                        'error',
+                    )
+                    skipped_count += 1
+                    continue
+
+            assigned_classes = existing_teacher.get('assigned_classes', []) or []
+            subjects_taught = existing_teacher.get('subjects_taught', []) or []
+            password = row['password']
+            password_changed = False
+            if existing_user:
+                if password:
+                    password_hash = hash_password(password)
+                    upsert_user_with_cursor(c, username, password_hash, 'teacher', school_id)
+                    password_changed = True
+            else:
+                if not password:
+                    password = generate_temp_password()
+                password_hash = hash_password(password)
+                upsert_user_with_cursor(c, username, password_hash, 'teacher', school_id)
+                password_changed = True
+
+            db_execute(
+                c,
+                """SELECT 1
+                   FROM teachers
+                   WHERE school_id = ? AND user_id = ?
+                   LIMIT 1""",
+                (school_id, username),
+            )
+            teacher_exists = bool(c.fetchone())
+            if teacher_exists:
+                db_execute(
+                    c,
+                    """UPDATE teachers
+                       SET firstname = ?, lastname = ?, phone = ?, gender = ?, assigned_classes = ?, subjects_taught = ?
+                       WHERE school_id = ? AND user_id = ?""",
+                    (
+                        firstname,
+                        lastname,
+                        phone,
+                        gender,
+                        json.dumps(assigned_classes),
+                        json.dumps(normalize_subjects_list(subjects_taught)),
+                        school_id,
+                        username,
+                    ),
+                )
+                if teachers_has_archive_columns() and int(existing_teacher.get('is_archived', 0) or 0):
+                    db_execute(
+                        c,
+                        """UPDATE teachers
+                           SET is_archived = 0,
+                               archived_at = NULL
+                           WHERE school_id = ? AND user_id = ?""",
+                        (school_id, username),
+                    )
+                updated_count += 1
+            else:
+                try:
+                    db_execute(
+                        c,
+                        """INSERT INTO teachers
+                           (school_id, user_id, firstname, lastname, phone, gender, signature_image, profile_image, assigned_classes, subjects_taught)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            school_id,
+                            username,
+                            firstname,
+                            lastname,
+                            phone,
+                            gender,
+                            '',
+                            '',
+                            json.dumps([]),
+                            json.dumps([]),
+                        ),
+                    )
+                except Exception:
+                    db_execute(
+                        c,
+                        """INSERT INTO teachers
+                           (school_id, user_id, firstname, lastname, phone, gender, signature_image, assigned_classes, subjects_taught)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            school_id,
+                            username,
+                            firstname,
+                            lastname,
+                            phone,
+                            gender,
+                            '',
+                            json.dumps([]),
+                            json.dumps([]),
+                        ),
+                    )
+                added_count += 1
+
+            if send_credentials and password_changed:
+                school_name = (get_school(school_id) or {}).get('school_name', 'your school')
+                login_url = url_for('login', _external=True)
+                subject = f"Teacher Account Created - {school_name}"
+                body = (
+                    f"Hello {firstname or 'Teacher'},\n\n"
+                    f"Your teacher account has been created for {school_name}.\n"
+                    f"Username: {username}\n"
+                    f"Password: {password}\n\n"
+                    f"Login here: {login_url}\n"
+                    "Please log in and change your password immediately.\n\n"
+                    "If you did not expect this, contact your school admin."
+                )
+                email_result = send_plain_email_message(subject, body, [username])
+                sms_result = {'sent_sms': 0, 'errors': []}
+                if phone:
+                    sms_body = (
+                        f"{school_name} teacher account created.\n"
+                        f"Username: {username}\n"
+                        f"Password: {password}\n"
+                        f"Login: {login_url}\n"
+                        "Please change your password after login."
+                    )
+                    sms_result = send_bulk_sms_messages(
+                        [phone],
+                        sms_body,
+                        school_name=school_name,
+                        context='teacher_temp_password',
+                        school_id=school_id,
+                        audience_role='teacher',
+                    )
+                    if sms_result.get('errors'):
+                        flash(f'Row {idx}: SMS issue: {sms_result.get("errors")[0]}', 'warning')
+                email_sent = bool(email_result.get('sent'))
+                sms_sent = bool(sms_result.get('sent_sms'))
+                if email_sent:
+                    flash(f'Row {idx}: credentials emailed to {username}.', 'success')
+                if sms_sent:
+                    flash(f'Row {idx}: credentials sent by SMS.', 'success')
+                if not email_sent and not sms_sent:
+                    err = (email_result.get('errors') or ['Email send failed.'])[0]
+                    flash(f'Row {idx}: credentials were not delivered ({err}).', 'warning')
+            elif not send_credentials and password_changed:
+                credential_notes.append((idx, username, password))
+            elif send_credentials and not password_changed:
+                flash(
+                    f'Row {idx}: credentials were not resent because the existing teacher password was left unchanged.',
+                    'info',
+                )
+
+    if credential_notes and len(credential_notes) <= 5:
+        for idx, username, password in credential_notes:
+            flash(f'Row {idx}: credentials not sent. Share this password with {username}: {password}', 'warning')
+    elif credential_notes:
+        flash(
+            f'{len(credential_notes)} teacher account(s) were created without sending credentials. Share passwords manually.',
+            'warning',
+        )
+
+    if added_count or updated_count:
+        flash(
+            f'Teacher batch saved successfully: {added_count} added, {updated_count} updated, {skipped_count} skipped.',
+            'success',
+        )
+    else:
+        flash(f'No teacher rows were saved. {skipped_count} row(s) were skipped.', 'error')
     return redirect(fallback_redirect)
 
 @app.route('/school-admin/promote-students', methods=['GET', 'POST'])
@@ -46660,7 +47100,7 @@ def student_view_result():
         'total_score': compute_total_score_from_scores(snapshot.get('scores', {})),
         'Grade': snapshot.get('Grade', 'F'),
         'Status': snapshot.get('Status', 'Fail'),
-        'promotion_status': get_result_promotion_status(student, target_term),
+        'promotion_status': get_result_promotion_status(live_student, target_term),
     }
     student_view.update(
         build_result_term_attendance_data(
@@ -49420,7 +49860,7 @@ def check_result():
         'total_score': compute_total_score_from_scores(snapshot.get('scores', {})),
         'Grade': snapshot.get('Grade', 'F'),
         'Status': snapshot.get('Status', 'Fail'),
-        'promotion_status': get_result_promotion_status(student, target_term)
+        'promotion_status': get_result_promotion_status(live_student, target_term)
     }
     student.update(
         build_result_term_attendance_data(

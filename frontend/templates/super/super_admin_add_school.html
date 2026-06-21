@@ -97,6 +97,16 @@
                                 <input type="text" id="school_name" name="school_name" placeholder="e.g., King College" required>
                             </div>
                             <div class="form-group">
+                                <label for="school_type">School Type:</label>
+                                <select id="school_type" name="school_type" required>
+                                    <option value="" selected disabled>Select school type</option>
+                                    <option value="mixed">Mixed School</option>
+                                    <option value="primary">Primary School</option>
+                                    <option value="secondary">Secondary School</option>
+                                    <option value="nursery">Nursery School</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
                                 <label for="location">School Location:</label>
                                 <input type="text" id="location" name="location" placeholder="e.g., Lagos, Nigeria">
                             </div>
@@ -225,6 +235,4 @@
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 </body>
 </html>
-
-
 
