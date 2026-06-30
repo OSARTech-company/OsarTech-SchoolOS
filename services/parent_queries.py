@@ -6,6 +6,7 @@ def load_students_for_student_ids(
     db_connection,
     db_execute,
     students_has_parent_access_columns,
+    students_has_lastname_column,
     school_id,
     student_ids,
 ):
@@ -14,18 +15,20 @@ def load_students_for_student_ids(
     if not ids:
         return {}
     has_parent_cols = students_has_parent_access_columns()
+    has_lastname_col = students_has_lastname_column()
+    lastname_col = 'lastname' if has_lastname_col else "'' AS lastname"
     placeholders = ','.join(['?'] * len(ids))
     with db_connection() as conn:
         c = conn.cursor()
         if has_parent_cols:
             query = (
-                'SELECT student_id, firstname, date_of_birth, gender, classname, first_year_class, term, stream, '
+                f'SELECT student_id, firstname, {lastname_col}, date_of_birth, gender, classname, first_year_class, term, stream, '
                 'number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash '
                 f'FROM students WHERE school_id = ? AND student_id IN ({placeholders})'
             )
         else:
             query = (
-                'SELECT student_id, firstname, date_of_birth, gender, classname, first_year_class, term, stream, '
+                f'SELECT student_id, firstname, {lastname_col}, date_of_birth, gender, classname, first_year_class, term, stream, '
                 'number_of_subject, subjects, scores, promoted '
                 f'FROM students WHERE school_id = ? AND student_id IN ({placeholders})'
             )
@@ -35,13 +38,14 @@ def load_students_for_student_ids(
     out = {}
     for row in rows:
         if has_parent_cols:
-            student_id, firstname, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash = row
+            student_id, firstname, lastname, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash = row
         else:
-            student_id, firstname, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted = row
+            student_id, firstname, lastname, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted = row
             parent_phone, parent_password_hash = '', ''
         out[str(student_id or '').strip()] = {
             'student_id': student_id,
             'firstname': firstname,
+            'lastname': lastname,
             'date_of_birth': (date_of_birth or '').strip(),
             'gender': (gender or '').strip(),
             'classname': classname,
@@ -130,4 +134,3 @@ def get_published_overview_for_students(
         'terms_by_student': terms_by_student,
         'snapshot_by_student_token': snapshot_by_student_token,
     }
-

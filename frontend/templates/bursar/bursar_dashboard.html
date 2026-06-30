@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bursar Dashboard - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308d') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .container { max-width: 1180px; }
+        .bursar-shell { display: grid; gap: 18px; }
+        .bursar-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            padding: 28px;
+            color: #fff;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.15), transparent 32%),
+                linear-gradient(135deg, #12395f 0%, #14507a 52%, #1d7c8b 100%);
+            box-shadow: 0 20px 40px rgba(15, 76, 129, 0.22);
+        }
+        .bursar-hero::after {
+            content: "";
+            position: absolute;
+            inset: auto -60px -70px auto;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+        }
+        .hero-topline {
+            position: relative;
+            z-index: 1;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            font-size: 0.8rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-weight: 800;
+        }
+        .hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(240px, 0.9fr);
+            gap: 18px;
+            margin-top: 18px;
+        }
+        .hero-title {
+            margin: 0;
+            font-size: clamp(2rem, 4vw, 3rem);
+            line-height: 1.05;
+        }
+        .hero-subtitle {
+            margin: 12px 0 0;
+            max-width: 720px;
+            color: rgba(255,255,255,0.88);
+            line-height: 1.6;
+        }
+        .hero-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+        .hero-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            color: #fff;
+            font-weight: 700;
+        }
+        .hero-summary { display: grid; gap: 12px; }
+        .hero-summary-card {
+            border-radius: 18px;
+            padding: 16px;
+            background: rgba(255,255,255,0.13);
+            border: 1px solid rgba(255,255,255,0.16);
+            backdrop-filter: blur(6px);
+        }
+        .hero-summary-card .label {
+            display: block;
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.72);
+            margin-bottom: 6px;
+            font-weight: 800;
+        }
+        .hero-summary-card .value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+        .hero-summary-card .meta {
+            margin-top: 6px;
+            color: rgba(255,255,255,0.85);
+            font-size: 0.92rem;
+        }
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 14px;
+        }
+        .metric-card {
+            border-radius: 18px;
+            padding: 18px;
+            background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+            border: 1px solid #dbe7f3;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+        }
+        .metric-card .label {
+            display: block;
+            color: #64748b;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 8px;
+            font-weight: 800;
+        }
+        .metric-card .value {
+            font-size: 1.65rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.1;
+        }
+        .metric-card .sub {
+            margin-top: 6px;
+            color: #5b6475;
+            font-size: 0.92rem;
+        }
+        .bursar-layout {
+            grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.92fr);
+            gap: 18px;
+            align-items: start;
+        }
+        .bursar-layout .card {
+            margin-bottom: 0;
+        }
+        .bursar-primary,
+        .bursar-side {
+            display: grid;
+            gap: 18px;
+            min-width: 0;
+        }
+        .bursar-layout .layout-primary {
+            order: 1;
+        }
+        .bursar-layout .layout-side {
+            order: 2;
+        }
+        .panel-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .panel-title h2 { margin: 0; font-size: 1.12rem; color: #17365f; }
+        .panel-title p { margin: 0; color: #5b6475; font-size: 0.9rem; }
+        .card .panel-title h2 {
+            padding-bottom: 0;
+            border-bottom: 0;
+        }
+        .lookup-grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .lookup-grid--wide {
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        }
+        .lookup-grid .form-group {
+            margin-bottom: 0;
+        }
+        .lookup-grid .form-group label {
+            font-size: 0.82rem;
+        }
+        .action-grid {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        }
+        .action-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 11px 12px;
+            border-radius: 12px;
+            border: 1px solid #d9e3ef;
+            background: #f7fbff;
+            color: #1e3b5f;
+            text-decoration: none;
+            font-weight: 800;
+        }
+        .action-link:hover { background: #edf5ff; }
+        .action-form { margin: 0; }
+        .action-form button.action-link {
+            width: 100%;
+            cursor: pointer;
+        }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 82px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: 0.82rem;
+        }
+        .status-pill.is-paid { background: #dcfce7; color: #166534; }
+        .status-pill.is-resolved { background: #dcfce7; color: #166534; }
+        .status-pill.is-overdue { background: #fee2e2; color: #b91c1c; }
+        .status-pill.is-part_paid { background: #fef3c7; color: #b45309; }
+        .status-pill.is-pending { background: #e2e8f0; color: #334155; }
+        .table-scroll { overflow-x: auto; }
+        .table-scroll table { min-width: 780px; }
+        .empty-state {
+            padding: 16px;
+            border-radius: 14px;
+            background: #f8fbff;
+            border: 1px dashed #d6e2ef;
+            color: #52627a;
+        }
+        @media (max-width: 980px) {
+            .hero-grid,
+            .bursar-layout { grid-template-columns: 1fr; }
+            .lookup-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#12395f' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1d7c8b' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1d7c8b' }};">
+    <div class="app-shell topbar-layout">
+        {% include 'bursar/_bursar_sidebar.html' %}
+
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-wallet"></i> Bursar Dashboard</h1>
+                    <p class="meta-line">
+                        <strong>School:</strong> {{ school.school_name if school and school.school_name else '-' }} |
+                        <strong>Term:</strong> {{ current_term or '-' }} |
+                        <strong>Year:</strong> {{ current_year or '-' }}
+                    </p>
+                    {% set school_initial = ((school.school_name if school and school.school_name else 'S')[:1] or 'S')|upper %}
+                    {% if school and school.school_logo %}
+                    <img
+                        src="{{ url_for('school_logo_proxy', school_id=school.school_id, v=(school.updated_at|string if school and school.updated_at else '1')) }}"
+                        alt="School Logo"
+                        class="school-logo"
+                        onload="var fb=this.nextElementSibling;if(fb){fb.classList.add('is-hidden');fb.style.display='none';}"
+                        onerror="this.onerror=null;this.style.display='none';var fb=this.nextElementSibling;if(fb){fb.classList.remove('is-hidden');fb.style.display='flex';}"
+                    />
+                    <div class="school-logo-fallback is-hidden"><i class="fas fa-school" aria-hidden="true"></i><span>{{ school_initial }}</span></div>
+                    {% else %}
+                    <div class="school-logo-fallback"><i class="fas fa-school" aria-hidden="true"></i><span>{{ school_initial }}</span></div>
+                    {% endif %}
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="bursar-shell">
+                    <section class="bursar-hero">
+                        <span class="hero-topline"><i class="fas fa-file-invoice-dollar"></i> Fee Management Desk</span>
+                        <div class="hero-grid">
+                            <div>
+                                <h2 class="hero-title">Keep fee collection, balances, and receipts under control.</h2>
+                                <p class="hero-subtitle">
+                                    Track assessed fees, spot overdue accounts, and review recent collections for
+                                    {{ school.school_name if school and school.school_name else 'the school' }} without leaving the bursar workspace.
+                                </p>
+                                <div class="hero-chips">
+                                    <span class="hero-chip"><i class="fas fa-calendar-check"></i> {{ current_term or 'Current Term' }}</span>
+                                    <span class="hero-chip"><i class="fas fa-graduation-cap"></i> {{ current_year or 'Academic Year' }}</span>
+                                    <a href="{{ url_for('bursar_student_fees') }}" class="hero-chip" style="text-decoration:none;">
+                                        <i class="fas fa-arrow-right"></i> Open Fee Desk
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="hero-summary">
+                                <div class="hero-summary-card">
+                                    <span class="label">Outstanding Balance</span>
+                                    <div class="value">{{ '{:,.2f}'.format(fee_summary.outstanding or 0) }}</div>
+                                    <div class="meta">Across {{ fee_summary.students or 0 }} fee account(s)</div>
+                                </div>
+                                <div class="hero-summary-card">
+                                    <span class="label">Collected So Far</span>
+                                    <div class="value">{{ '{:,.2f}'.format(fee_summary.total_paid or 0) }}</div>
+                                    <div class="meta">Payments recorded for this term</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="dashboard-stats">
+                        <div class="metric-card">
+                            <span class="label">Tracked Students</span>
+                            <div class="value">{{ fee_summary.tracked_students or 0 }}</div>
+                            <div class="sub">Students with fee accounts</div>
+                        </div>
+                        <div class="metric-card">
+                            <span class="label">Total Due</span>
+                            <div class="value">{{ '{:,.2f}'.format(fee_summary.total_due or 0) }}</div>
+                            <div class="sub">Planned billing for the selected term</div>
+                        </div>
+                        <div class="metric-card">
+                            <span class="label">Outstanding</span>
+                            <div class="value">{{ '{:,.2f}'.format(fee_summary.outstanding or 0) }}</div>
+                            <div class="sub">Unpaid balances to follow up</div>
+                        </div>
+                        <div class="metric-card">
+                            <span class="label">Overdue Accounts</span>
+                            <div class="value">{{ fee_summary.overdue_rows or 0 }}</div>
+                            <div class="sub">{{ fee_summary.part_paid_rows or 0 }} partially paid, {{ fee_summary.pending_rows or 0 }} pending</div>
+                        </div>
+                    </section>
+
+                    <div class="layout-main bursar-layout">
+                        <div class="layout-primary bursar-primary">
+                            <section class="card" id="student-search">
+                                <div class="panel-title">
+                                    <div>
+                                        <h2><i class="fas fa-users"></i> Search Students</h2>
+                                        <p>Find a student by ID, name, or class.</p>
+                                    </div>
+                                </div>
+                                <form method="get" action="{{ url_for('bursar_dashboard') }}" class="form-group">
+                                    <div class="lookup-grid">
+                                        <div class="form-group">
+                                            <label for="student_query">Student / Class Search</label>
+                                            <input type="text" id="student_query" name="student_query" value="{{ student_query or '' }}" placeholder="Enter student ID, name, or class">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="class_filter">Class Filter</label>
+                                            <input type="text" id="class_filter" name="class_filter" value="{{ class_filter or '' }}" placeholder="e.g. Primary 3A">
+                                        </div>
+                                    </div>
+                                    <div class="action-grid" style="margin-top: 12px;">
+                                        <button type="submit" class="action-link"><i class="fas fa-search"></i> Search</button>
+                                        <a href="{{ url_for('bursar_dashboard') }}" class="action-link"><i class="fas fa-rotate-left"></i> Clear</a>
+                                    </div>
+                                </form>
+                                {% if student_search_results %}
+                                <div class="table-scroll" style="margin-top: 16px;">
+                                    <table class="assignment-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Student</th>
+                                                <th>Class</th>
+                                                <th>Term</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in student_search_results %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ row.student_name or row.student_id }}</strong><br>
+                                                    <span class="meta-muted">{{ row.student_id }}</span>
+                                                </td>
+                                                <td>{{ row.classname or 'Not set' }}</td>
+                                                <td>{{ row.term or current_term or '-' }}</td>
+                                                <td>
+                                                    <a class="action-link" href="{{ url_for('bursar_fee_receipt', student_id=row.student_id, term=(row.term or current_term or ''), academic_year=(current_year or ''), fee_label='School Fee') }}">
+                                                        <i class="fas fa-receipt"></i> Open Receipt
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% elif student_query or class_filter %}
+                                <div class="empty-state" style="margin-top: 16px;">No students matched that search. Try a different name, ID, or class.</div>
+                                {% endif %}
+                            </section>
+
+                            <section class="card">
+                                <div class="panel-title">
+                                    <div>
+                                        <h2><i class="fas fa-bell"></i> Fee Follow-up</h2>
+                                        <p>Accounts that still need attention.</p>
+                                    </div>
+                                </div>
+                                {% if follow_up_rows %}
+                                <div class="table-scroll">
+                                    <table class="assignment-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Student</th>
+                                                <th>Class</th>
+                                                <th>Balance</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in follow_up_rows %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ row.student_name or row.student_id }}</strong><br>
+                                                    <span class="meta-muted">{{ row.student_id }}</span>
+                                                </td>
+                                                <td>{{ row.classname or 'Not set' }}</td>
+                                                <td>{{ row.currency or 'NGN' }} {{ '{:,.2f}'.format(row.balance_amount or 0) }}</td>
+                                                <td><span class="status-pill is-{{ (row.status or 'pending')|lower|replace(' ', '_') }}">{{ (row.status or 'pending')|replace('_', ' ')|title }}</span></td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="empty-state">No fee follow-up items yet. Everything is up to date.</div>
+                                {% endif %}
+                            </section>
+
+                            <section class="card" id="review-queue">
+                                <div class="panel-title">
+                                    <div>
+                                        <h2><i class="fas fa-clipboard-list"></i> Payment Review Queue</h2>
+                                        <p>Unmatched fee transfers waiting for bursar review.</p>
+                                    </div>
+                                    <form method="get" action="{{ url_for('bursar_dashboard') }}" class="action-form">
+                                        <input type="hidden" name="student_query" value="{{ student_query or '' }}">
+                                        <input type="hidden" name="class_filter" value="{{ class_filter or '' }}">
+                                        <label for="queue_status" style="display:block; font-size: 0.8rem; font-weight: 800; color: #52627a; margin-bottom: 6px;">Queue Status</label>
+                                        <select id="queue_status" name="queue_status" style="min-width: 180px; padding: 10px 12px; border-radius: 12px; border: 1px solid #d9e3ef; background: #fff; font-weight: 700;">
+                                            <option value="pending" {% if queue_status == 'pending' %}selected{% endif %}>Pending</option>
+                                            <option value="resolved" {% if queue_status == 'resolved' %}selected{% endif %}>Resolved</option>
+                                            <option value="all" {% if queue_status == 'all' %}selected{% endif %}>All</option>
+                                        </select>
+                                        <div style="margin-top: 10px;">
+                                            <button type="submit" class="action-link"><i class="fas fa-filter"></i> Filter</button>
+                                        </div>
+                                    </form>
+                                </div>
+                                {% if review_queue_rows %}
+                                <div class="table-scroll">
+                                    <table class="assignment-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Student</th>
+                                                <th>Amount</th>
+                                                <th>Details</th>
+                                                <th>Resolve</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in review_queue_rows %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ row.student_name or row.student_id or 'Unknown student' }}</strong><br>
+                                                    <span class="meta-muted">{{ row.student_id or '-' }}</span>
+                                                </td>
+                                                <td>{{ row.currency or 'NGN' }} {{ '{:,.2f}'.format(row.amount_paid or 0) }}</td>
+                                                <td>
+                                                    {{ row.fee_label or 'School Fee' }}<br>
+                                                    <span class="meta-muted">Ref: {{ row.invoice_ref or row.payment_reference or '-' }}</span><br>
+                                                    <span class="status-pill is-{{ (row.status or 'pending')|lower|replace(' ', '_') }}">{{ (row.status or 'pending')|replace('_', ' ')|title }}</span><br>
+                                                    <span class="meta-muted">{{ row.reason or 'Awaiting manual review' }}</span>
+                                                </td>
+                                                <td>
+                                                    {% if (row.status or '')|lower == 'resolved' %}
+                                                    <span class="status-pill is-paid">Resolved</span>
+                                                    {% else %}
+                                                    <form method="post" action="{{ url_for('bursar_resolve_payment_review') }}" class="form-group" style="margin: 0; min-width: 250px;">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <input type="hidden" name="review_id" value="{{ row.id }}">
+                                                        <input type="hidden" name="student_id" value="{{ row.student_id }}">
+                                                        <input type="hidden" name="fee_label" value="{{ row.fee_label }}">
+                                                        <input type="hidden" name="term" value="{{ row.term }}">
+                                                        <input type="hidden" name="academic_year" value="{{ row.academic_year }}">
+                                                        <input type="hidden" name="invoice_ref" value="{{ row.invoice_ref }}">
+                                                        <input type="hidden" name="payment_reference" value="{{ row.payment_reference }}">
+                                                        <input type="hidden" name="payment_method" value="transfer">
+                                                        <input type="hidden" name="note" value="{{ row.reason }}">
+                                                        <input type="hidden" name="student_query" value="{{ student_query or '' }}">
+                                                        <input type="hidden" name="class_filter" value="{{ class_filter or '' }}">
+                                                        <input type="hidden" name="queue_status" value="{{ queue_status or 'pending' }}">
+                                                        <label for="amount_paid_{{ row.id }}">Amount</label>
+                                                        <input type="number" step="0.01" min="0" id="amount_paid_{{ row.id }}" name="amount_paid" value="{{ '%.2f'|format(row.amount_paid or 0) }}" style="margin-bottom: 10px;">
+                                                        <button type="submit" class="action-link"><i class="fas fa-check"></i> Mark Resolved</button>
+                                                    </form>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="empty-state">No payment review items are waiting right now.</div>
+                                {% endif %}
+                            </section>
+
+                            <section class="card">
+                                <div class="panel-title">
+                                    <div>
+                                        <h2><i class="fas fa-receipt"></i> Recent Payments</h2>
+                                        <p>Latest payments recorded in the system.</p>
+                                    </div>
+                                </div>
+                                {% if recent_payment_rows %}
+                                <div class="table-scroll">
+                                    <table class="assignment-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Student</th>
+                                                <th>Class</th>
+                                                <th>Amount</th>
+                                                <th>Method</th>
+                                                <th>Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in recent_payment_rows %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ row.student_name or row.student_id }}</strong><br>
+                                                    <span class="meta-muted">{{ row.student_id }}</span>
+                                                </td>
+                                                <td>{{ row.classname or 'Not set' }}</td>
+                                                <td>{{ row.fee_label or 'School Fee' }}<br>{{ '{:,.2f}'.format(row.amount_paid or 0) }}</td>
+                                                <td>{{ (row.payment_method or 'cash')|title }}</td>
+                                                <td>{{ row.created_at or '-' }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="empty-state">No payments have been recorded yet.</div>
+                                {% endif %}
+                            </section>
+                        </div>
+
+                        <div class="layout-side bursar-side">
+                            <section class="card" id="quick-actions">
+                                <div class="panel-title">
+                                    <div>
+                                        <h2><i class="fas fa-bolt"></i> Quick Actions</h2>
+                                        <p>Open the most common bursar tasks.</p>
+                                    </div>
+                                </div>
+                                <div class="action-grid">
+                                    <a href="{{ url_for('bursar_student_fees') }}" class="action-link"><i class="fas fa-money-bill-wave"></i> Fee Desk</a>
+                                    <a href="#student-search" class="action-link"><i class="fas fa-users"></i> Student Search</a>
+                                    <a href="{{ url_for('change_password') }}" class="action-link"><i class="fas fa-key"></i> Change Password</a>
+                                    <a href="{{ url_for('help', role='bursar') }}" class="action-link"><i class="fas fa-circle-question"></i> Help</a>
+                                    <form method="post" action="{{ url_for('logout') }}" class="action-form">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="action-link"><i class="fas fa-right-from-bracket"></i> Logout</button>
+                                    </form>
+                                </div>
+                            </section>
+
+                            <section class="card">
+                                <div class="panel-title">
+                                    <div>
+                                        <h2><i class="fas fa-search"></i> Find Student Receipt</h2>
+                                        <p>Jump straight to a printable fee receipt.</p>
+                                    </div>
+                                </div>
+                                <form method="get" action="{{ url_for('bursar_fee_receipt') }}" class="form-group">
+                                    <div class="lookup-grid lookup-grid--wide">
+                                        <div class="form-group">
+                                            <label for="receipt_student_id">Student ID</label>
+                                            <input type="text" id="receipt_student_id" name="student_id" placeholder="Enter student ID" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="receipt_term">Term</label>
+                                            <input type="text" id="receipt_term" name="term" value="{{ current_term or '' }}" placeholder="Current term">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="receipt_year">Academic Year</label>
+                                            <input type="text" id="receipt_year" name="academic_year" value="{{ current_year or '' }}" placeholder="Current year">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="receipt_fee_label">Fee Label</label>
+                                            <input type="text" id="receipt_fee_label" name="fee_label" value="School Fee">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="receipt_invoice_ref">Invoice Ref</label>
+                                            <input type="text" id="receipt_invoice_ref" name="invoice_ref" placeholder="Optional invoice ref">
+                                        </div>
+                                    </div>
+                                    <div class="action-grid" style="margin-top: 12px;">
+                                        <button type="submit" class="action-link"><i class="fas fa-receipt"></i> Open Receipt</button>
+                                    </div>
+                                </form>
+                            </section>
+
+                            <section class="card">
+                                <div class="panel-title">
+                                    <div>
+                                        <h2><i class="fas fa-circle-info"></i> Role Snapshot</h2>
+                                        <p>What this page is for.</p>
+                                    </div>
+                                </div>
+                                <div class="empty-state">
+                                    <p style="margin-top:0;">The bursar workspace is focused on fee assessment, payment capture, and balance follow-up.</p>
+                                    <p class="note" style="margin-bottom:0;">School admin still manages bursar accounts, while the bursar handles day-to-day fee operations.</p>
+                                    <p class="note" style="margin-bottom:0;">Generated: {{ generated_at or '-' }}</p>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Fees</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308d') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" integrity="sha384-3B6NwesSXE7YJlcLI9RpRqGf2p/EgVH8BgoKTaUrmKNDkHPStTQ3EyoYjCGXaOTS" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <style>
+        .container { max-width: 1200px; }
+        .fees-shell { display: grid; gap: 18px; }
+        .fees-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            padding: 26px;
+            color: #fff;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.18), transparent 30%),
+                linear-gradient(135deg, #12395f 0%, #15607d 55%, #1f7a8c 100%);
+            box-shadow: 0 20px 40px rgba(15, 76, 129, 0.22);
+        }
+        .fees-hero::after {
+            content: "";
+            position: absolute;
+            right: -60px;
+            bottom: -70px;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+        }
+        .fees-hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.85fr);
+            gap: 18px;
+            align-items: end;
+        }
+        .fees-topline {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            font-size: 0.82rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .fees-title { margin: 14px 0 0; font-size: clamp(1.8rem, 3.8vw, 2.8rem); line-height: 1.06; }
+        .fees-text { margin: 12px 0 0; color: rgba(255,255,255,0.88); line-height: 1.6; max-width: 760px; }
+        .fees-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+        .fees-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            color: #fff;
+            font-weight: 600;
+        }
+        .snapshot-card {
+            border-radius: 18px;
+            padding: 16px;
+            border: 1px solid rgba(255,255,255,0.16);
+            background: rgba(255,255,255,0.12);
+            backdrop-filter: blur(6px);
+        }
+        .snapshot-card .label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255,255,255,0.72);
+            margin-bottom: 6px;
+        }
+        .snapshot-card .value { font-size: 1.9rem; font-weight: 800; line-height: 1.1; }
+        .snapshot-card .meta { margin-top: 6px; color: rgba(255,255,255,0.84); }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .summary-card {
+            border-radius: 18px;
+            border: 1px solid #dbe7f3;
+            background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+            padding: 16px;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+        }
+        .summary-card .label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.76rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+        .summary-card .value {
+            font-size: 1.65rem;
+            font-weight: 800;
+            color: #14365e;
+            line-height: 1.1;
+        }
+        .summary-card .meta {
+            margin-top: 6px;
+            color: #5d6d82;
+            font-size: 0.92rem;
+        }
+        .fees-list {
+            display: grid;
+            gap: 16px;
+        }
+        .fee-card {
+            border-radius: 22px;
+            border: 1px solid #dbe7f3;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+            overflow: hidden;
+        }
+        .fee-card-head {
+            padding: 18px 18px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 14px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #e3ebf4;
+            background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        }
+        .fee-card-title { margin: 0; color: #12395f; }
+        .fee-card-subtitle { margin-top: 6px; color: #64748b; }
+        .fee-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: 0.84rem;
+        }
+        .status-paid { background: #dcfce7; color: #166534; }
+        .status-part_paid { background: #fef3c7; color: #b45309; }
+        .status-overdue { background: #fee2e2; color: #b91c1c; }
+        .status-pending { background: #e2e8f0; color: #334155; }
+        .fee-card-body { padding: 18px; }
+        .fee-info-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .fee-info {
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #eef6ff;
+            border: 1px solid #dbe7f3;
+        }
+        .fee-info .label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #66758a;
+        }
+        .fee-info .value {
+            color: #12395f;
+            font-weight: 700;
+        }
+        .fee-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+        .fee-actions .btn {
+            margin: 0;
+        }
+        .account-table-wrap {
+            overflow-x: auto;
+            margin-top: 14px;
+        }
+        .account-table-wrap table { min-width: 760px; }
+        .empty-card {
+            text-align: center;
+            padding: 30px 18px;
+            border: 1px solid #dbe4ef;
+            background: #f8fbff;
+            border-radius: 18px;
+        }
+        .empty-card .empty-icon {
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 10px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            font-size: 1.8rem;
+            color: #0f4c81;
+            background: #e7f2ff;
+        }
+        @media (max-width: 960px) {
+            .fees-hero-grid,
+            .summary-grid,
+            .fee-info-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 640px) {
+            .fees-hero { padding: 22px 18px; border-radius: 18px; }
+            .fees-hero-grid,
+            .summary-grid,
+            .fee-info-grid { grid-template-columns: 1fr; }
+            .fees-chip { width: 100%; justify-content: center; }
+        }
+    </style>
+</head>
+<body style="--accent: {{ parent_theme_accent if parent_theme_accent else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'fees' %}
+        {% include 'parent/_parent_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <div class="stack-head">
+                        <h2 class="no-margin"><i class="fas fa-receipt"></i> Parent Fees</h2>
+                    </div>
+                    <div class="muted mt-10">Phone: {{ parent_phone }}</div>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="fees-shell">
+                    <section class="fees-hero">
+                        <div class="fees-hero-grid">
+                            <div>
+                                <span class="fees-topline"><i class="fas fa-wallet"></i> School fee overview</span>
+                                <h1 class="fees-title">Track every linked child fee account in one place.</h1>
+                                <p class="fees-text">
+                                    See current balances, recent payments, and open a receipt for any linked student without searching through multiple pages.
+                                </p>
+                                <div class="fees-meta">
+                                    <span class="fees-chip"><i class="fas fa-user-graduate"></i> {{ parent_fee_overview.children or 0 }} Linked Student{{ '' if (parent_fee_overview.children or 0) == 1 else 's' }}</span>
+                                    <span class="fees-chip"><i class="fas fa-file-invoice"></i> {{ parent_fee_overview.accounts or 0 }} Fee Accounts</span>
+                                    <span class="fees-chip"><i class="fas fa-exclamation-triangle"></i> {{ parent_fee_overview.overdue or 0 }} Overdue</span>
+                                </div>
+                            </div>
+                            <div class="snapshot-card">
+                                <span class="label">Outstanding Balance</span>
+                                <div class="value">{{ 'NGN' }} {{ '%.2f'|format(parent_fee_overview.outstanding or 0) }}</div>
+                                <div class="meta">Across all linked children and active fee accounts</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="summary-grid">
+                        <div class="summary-card">
+                            <span class="label">Total Due</span>
+                            <div class="value">NGN {{ '%.2f'|format(parent_fee_overview.total_due or 0) }}</div>
+                            <div class="meta">All visible school fee accounts</div>
+                        </div>
+                        <div class="summary-card">
+                            <span class="label">Total Paid</span>
+                            <div class="value">NGN {{ '%.2f'|format(parent_fee_overview.total_paid or 0) }}</div>
+                            <div class="meta">Confirmed payments on record</div>
+                        </div>
+                        <div class="summary-card">
+                            <span class="label">Outstanding</span>
+                            <div class="value">NGN {{ '%.2f'|format(parent_fee_overview.outstanding or 0) }}</div>
+                            <div class="meta">Remaining balance to clear</div>
+                        </div>
+                        <div class="summary-card">
+                            <span class="label">Overdue</span>
+                            <div class="value">{{ parent_fee_overview.overdue or 0 }}</div>
+                            <div class="meta">Fee accounts past due date</div>
+                        </div>
+                    </section>
+
+                    {% if parent_fee_rows %}
+                    <div class="fees-list">
+                        {% for row in parent_fee_rows %}
+                        {% set summary = row.summary or {} %}
+                        <article class="fee-card" id="{{ row.key }}">
+                            <div class="fee-card-head">
+                                <div>
+                                    <h3 class="fee-card-title">{{ row.student_name or row.student_id }}</h3>
+                                    <div class="fee-card-subtitle">
+                                        {{ row.school_name or row.school_id }}
+                                        {% if row.classname %} - {{ row.classname }}{% endif %}
+                                        {% if row.stream %} ({{ row.stream }}){% endif %}
+                                    </div>
+                                </div>
+                                <span class="fee-pill status-{{ (summary.status or 'pending')|replace(' ', '_')|lower }}">{{ (summary.status or 'pending')|replace('_', ' ')|title }}</span>
+                            </div>
+                            <div class="fee-card-body">
+                                <div class="fee-info-grid">
+                                    <div class="fee-info">
+                                        <span class="label">Fee Label</span>
+                                        <span class="value">{{ summary.fee_label or 'School Fee' }}</span>
+                                    </div>
+                                    <div class="fee-info">
+                                        <span class="label">Invoice Ref</span>
+                                        <span class="value">{{ summary.invoice_ref or '-' }}</span>
+                                    </div>
+                                    <div class="fee-info">
+                                        <span class="label">Term / Year</span>
+                                        <span class="value">{{ row.current_term or summary.term or '-' }}{% if row.current_year or summary.academic_year %} / {{ row.current_year or summary.academic_year }}{% endif %}</span>
+                                    </div>
+                                    <div class="fee-info">
+                                        <span class="label">Balance</span>
+                                        <span class="value">{{ summary.currency or 'NGN' }} {{ '%.2f'|format(summary.balance_amount or 0) }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="fee-info-grid">
+                                    <div class="fee-info">
+                                        <span class="label">Amount Due</span>
+                                        <span class="value">{{ summary.currency or 'NGN' }} {{ '%.2f'|format(summary.amount_due or 0) }}</span>
+                                    </div>
+                                    <div class="fee-info">
+                                        <span class="label">Amount Paid</span>
+                                        <span class="value">{{ summary.currency or 'NGN' }} {{ '%.2f'|format(summary.amount_paid or 0) }}</span>
+                                    </div>
+                                    <div class="fee-info">
+                                        <span class="label">Payments</span>
+                                        <span class="value">{{ summary.payment_count or 0 }}</span>
+                                    </div>
+                                    <div class="fee-info">
+                                        <span class="label">Updated</span>
+                                        <span class="value">{{ summary.updated_at or '-' }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="fee-actions">
+                                    <a href="{{ row.receipt_url }}" class="btn btn-primary">
+                                        <i class="fas fa-receipt"></i> Open Receipt
+                                    </a>
+                                    <a href="{{ url_for('parent_view_result', student_key=row.key) }}" class="btn btn-secondary">
+                                        <i class="fas fa-user-graduate"></i> View Results
+                                    </a>
+                                </div>
+
+                                <div class="account-table-wrap">
+                                    {% if row.recent_accounts %}
+                                    <table class="mt-10">
+                                        <thead>
+                                            <tr>
+                                                <th>Fee Label</th>
+                                                <th>Term</th>
+                                                <th>Year</th>
+                                                <th>Due</th>
+                                                <th>Paid</th>
+                                                <th>Balance</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for account in row.recent_accounts %}
+                                            <tr>
+                                                <td>{{ account.fee_label or 'School Fee' }}</td>
+                                                <td>{{ account.term or '-' }}</td>
+                                                <td>{{ account.academic_year or '-' }}</td>
+                                                <td>{{ account.currency or 'NGN' }} {{ '%.2f'|format(account.amount_due or 0) }}</td>
+                                                <td>{{ account.currency or 'NGN' }} {{ '%.2f'|format(account.amount_paid or 0) }}</td>
+                                                <td>{{ account.currency or 'NGN' }} {{ '%.2f'|format(account.balance_amount or 0) }}</td>
+                                                <td>{{ (account.status or 'pending')|replace('_', ' ')|title }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    {% else %}
+                                    <p class="muted mt-10">No fee history found for this child yet.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </article>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-card">
+                        <div class="empty-icon"><i class="fas fa-file-invoice"></i></div>
+                        <h3 class="no-margin">No Fee Accounts Yet</h3>
+                        <p class="muted mt-10">
+                            There are no linked fee records for the students attached to this parent account yet.
+                        </p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

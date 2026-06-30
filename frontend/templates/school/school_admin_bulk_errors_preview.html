@@ -7,6 +7,19 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .bulk-error-pagination {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            align-items: center;
+            margin-top: 12px;
+        }
+        .btn.is-disabled {
+            pointer-events: none;
+            opacity: 0.5;
+        }
+    </style>
 </head>
 <body>
     {% include "shared/_loading_overlay.html" %}
@@ -51,12 +64,12 @@
         <p class="muted">No error rows to display.</p>
         {% endif %}
         {% if total_pages and total_pages > 1 %}
-        <div class="pagination" style="display:flex; justify-content:flex-end; gap:8px; align-items:center; margin-top:12px;">
-            <a class="btn btn-secondary btn-xs {% if page <= 1 %}is-disabled{% endif %}" href="{{ url_for('school_admin_import_csv_error_preview', token=error_token, page=page-1, per_page=per_page) }}" style="{% if page <= 1 %}pointer-events:none;opacity:0.5;{% endif %}">
+        <div class="pagination bulk-error-pagination">
+            <a class="btn btn-secondary btn-xs {% if page <= 1 %}is-disabled{% endif %}" href="{{ url_for('school_admin_import_csv_error_preview', token=error_token, page=page-1, per_page=per_page) }}" {% if page <= 1 %}aria-disabled="true"{% endif %}>
                 <i class="fas fa-chevron-left"></i> Prev
             </a>
             <span class="muted">Page {{ page }} of {{ total_pages }}</span>
-            <a class="btn btn-secondary btn-xs {% if page >= total_pages %}is-disabled{% endif %}" href="{{ url_for('school_admin_import_csv_error_preview', token=error_token, page=page+1, per_page=per_page) }}" style="{% if page >= total_pages %}pointer-events:none;opacity:0.5;{% endif %}">
+            <a class="btn btn-secondary btn-xs {% if page >= total_pages %}is-disabled{% endif %}" href="{{ url_for('school_admin_import_csv_error_preview', token=error_token, page=page+1, per_page=per_page) }}" {% if page >= total_pages %}aria-disabled="true"{% endif %}>
                 Next <i class="fas fa-chevron-right"></i>
             </a>
         </div>
@@ -68,4 +81,3 @@
 <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 </body>
 </html>
-

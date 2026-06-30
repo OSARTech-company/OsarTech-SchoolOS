@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ receipt_title or 'Fee Receipt' }}</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308d') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: #eef4fb; }
+        .receipt-shell {
+            width: min(980px, 100%);
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .receipt-card {
+            background: #fff;
+            border: 1px solid #dbe4ef;
+            border-radius: 20px;
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
+            overflow: hidden;
+        }
+        .receipt-header {
+            padding: 22px 24px;
+            background: linear-gradient(135deg, #12395f 0%, #14507a 52%, #1d7c8b 100%);
+            color: #fff;
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+        .receipt-header h1 { margin: 0; font-size: 1.7rem; }
+        .receipt-header .meta { margin-top: 6px; color: rgba(255,255,255,0.86); line-height: 1.5; }
+        .receipt-body { padding: 24px; }
+        .top-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+        .info-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            margin-bottom: 18px;
+        }
+        .info-box {
+            border-radius: 14px;
+            border: 1px solid #dbe4ef;
+            background: #f8fbff;
+            padding: 14px;
+        }
+        .info-box .label {
+            display: block;
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #64748b;
+            margin-bottom: 6px;
+            font-weight: 800;
+        }
+        .info-box .value {
+            color: #0f172a;
+            font-weight: 800;
+            line-height: 1.35;
+        }
+        .summary-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            margin-bottom: 18px;
+        }
+        .summary-card {
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid #dbe4ef;
+            background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        }
+        .summary-card .label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #64748b;
+            margin-bottom: 8px;
+            font-weight: 800;
+        }
+        .summary-card .value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 82px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: 0.84rem;
+        }
+        .status-paid { background: #dcfce7; color: #166534; }
+        .status-part_paid { background: #fef3c7; color: #b45309; }
+        .status-overdue { background: #fee2e2; color: #b91c1c; }
+        .status-pending { background: #e2e8f0; color: #334155; }
+        .table-scroll { overflow-x: auto; }
+        .table-scroll table { min-width: 720px; }
+        .print-note { color: #64748b; font-size: 0.9rem; }
+        @media print {
+            body { background: #fff; }
+            .top-actions, .no-print { display: none !important; }
+            .receipt-shell { padding: 0; }
+            .receipt-card { border: 0; border-radius: 0; box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-shell">
+        <div class="top-actions no-print">
+            <a href="{{ back_url or url_for('bursar_dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> {{ back_label or 'Back' }}</a>
+            <button type="button" class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
+        </div>
+
+        <div class="receipt-card">
+            <div class="receipt-header">
+                <div>
+                    <h1><i class="fas fa-receipt"></i> {{ receipt_title or 'Fee Receipt' }}</h1>
+                    <div class="meta">
+                        <strong>{{ school.school_name if school and school.school_name else 'School' }}</strong><br>
+                        {{ school.location if school and school.location else '' }}
+                    </div>
+                </div>
+                <div class="print-note">
+                    Term: {{ selected_term or '-' }}<br>
+                    Year: {{ selected_academic_year or '-' }}<br>
+                    Generated: {{ generated_at or '-' }}
+                </div>
+            </div>
+
+            <div class="receipt-body">
+                <div class="top-actions no-print">
+                    <a href="{{ open_fee_url or url_for('bursar_student_fees', student_id=fee_summary.student_id, term=selected_term, fee_label=selected_fee_label) }}" class="btn btn-secondary">
+                        <i class="fas fa-money-bill-wave"></i> {{ open_fee_label or 'Open Fee Desk' }}
+                    </a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="info-grid">
+                    <div class="info-box">
+                        <span class="label">Student</span>
+                        <div class="value">{{ student.firstname or fee_summary.student_name or fee_summary.student_id or 'Unknown Student' }}</div>
+                        <div class="muted">{{ fee_summary.student_id or '-' }}</div>
+                    </div>
+                    <div class="info-box">
+                        <span class="label">Class / Stream</span>
+                        <div class="value">{{ fee_summary.classname or student.classname or '-' }}</div>
+                        <div class="muted">{{ fee_summary.stream or student.stream or '-' }}</div>
+                    </div>
+                    <div class="info-box">
+                        <span class="label">Fee Label</span>
+                        <div class="value">{{ fee_summary.fee_label or selected_fee_label or 'School Fee' }}</div>
+                        <div class="muted">Status: {{ (fee_summary.status or 'pending')|replace('_', ' ')|title }}</div>
+                    </div>
+                    <div class="info-box">
+                        <span class="label">Invoice Ref</span>
+                        <div class="value">{{ fee_summary.invoice_ref or '-' }}</div>
+                        <div class="muted">Quote this reference when transferring to the school account.</div>
+                    </div>
+                    <div class="info-box">
+                        <span class="label">Updated</span>
+                        <div class="value">{{ fee_summary.updated_at or '-' }}</div>
+                        <div class="muted">Last payment: {{ fee_summary.latest_payment_at or '-' }}</div>
+                    </div>
+                </div>
+
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <span class="label">Amount Due</span>
+                        <div class="value">{{ fee_summary.currency or 'NGN' }} {{ '%.2f'|format(fee_summary.amount_due or 0) }}</div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="label">Amount Paid</span>
+                        <div class="value">{{ fee_summary.currency or 'NGN' }} {{ '%.2f'|format(fee_summary.amount_paid or 0) }}</div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="label">Balance</span>
+                        <div class="value">{{ fee_summary.currency or 'NGN' }} {{ '%.2f'|format(fee_summary.balance_amount or 0) }}</div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="label">Payments</span>
+                        <div class="value">{{ fee_summary.payment_count or 0 }}</div>
+                    </div>
+                </div>
+
+                <section class="card">
+                    <h2><i class="fas fa-credit-card"></i> Payment History</h2>
+                    {% if payment_rows %}
+                    <div class="table-scroll">
+                        <table class="assignment-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Reference</th>
+                                    <th>Note</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in payment_rows %}
+                                <tr>
+                                    <td>{{ row.created_at or '-' }}</td>
+                                    <td>{{ fee_summary.currency or 'NGN' }} {{ '%.2f'|format(row.amount_paid or 0) }}</td>
+                                    <td>{{ (row.payment_method or 'cash')|title }}</td>
+                                    <td>{{ row.payment_reference or '-' }}</td>
+                                    <td>{{ row.note or '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="print-note">No payment records found for this fee account.</p>
+                    {% endif %}
+                </section>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

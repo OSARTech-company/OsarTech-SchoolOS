@@ -81,11 +81,12 @@
     {% include "shared/_loading_overlay.html" %}
     <div class="app-shell topbar-layout">
     {% set active_page = 'class_subjects' %}
+    {% set is_primary_school = school and school.school_type == 'primary' %}
     {% include 'school/_school_admin_sidebar.html' %}
     <div class="main-content">
     <div class="container">
         <div class="header">
-            <h1>Class Subject Configuration</h1>
+            <h1>{% if is_primary_school %}Primary Class Subject Configuration{% else %}Class Subject Configuration{% endif %}</h1>
             <a href="{{ url_for('school_admin_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
         </div>
 
@@ -110,7 +111,13 @@
 
         <div class="card">
             <h2>{% if editing_config %}Update Class Configuration{% else %}Configure a Class{% endif %}</h2>
-            <p class="hint">Tick subjects with the mark box. Nursery, Primary, JSS, and SS1 (when combined) use only Subjects Offered.</p>
+            <p class="hint">
+                {% if is_primary_school %}
+                Primary schools use Subjects Offered only, and SS-only subject groups stay hidden.
+                {% else %}
+                Tick subjects with the mark box. Nursery, Primary, JSS, and SS1 (when combined) use only Subjects Offered.
+                {% endif %}
+            </p>
             <form method="post">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="editing_classname" value="{{ editing_config.classname if editing_config else '' }}">
@@ -138,6 +145,7 @@
                             <input class="mini-input" type="text" id="new_optional_subjects" name="new_optional_subjects" placeholder="e.g. Music, Animal Husbandry">
                         </div>
                     </div>
+                    {% if not is_primary_school %}
                     <div id="ssStreamSection">
                         <div class="form-group ss-only">
                             <label>Science Subjects (SS only)</label>
@@ -158,6 +166,7 @@
                             <input class="mini-input" type="text" id="new_commercial_subjects" name="new_commercial_subjects" placeholder="e.g. Office Practice">
                         </div>
                     </div>
+                    {% endif %}
                 </div>
                 <button type="submit" class="btn btn-primary">{% if editing_config %}Update Configuration{% else %}Save Configuration{% endif %}</button>
             </form>
@@ -315,7 +324,9 @@
             if (useSs && isSs1(classVal) && ss1StreamMode === 'combined') {
                 useSs = false;
             }
-            ssSection.style.display = useSs ? 'block' : 'none';
+            if (ssSection) {
+                ssSection.style.display = useSs ? 'block' : 'none';
+            }
             optionalSection.style.display = useSs ? 'block' : 'none';
             coreLabel.textContent = useSs ? 'Core Subjects (all students)' : (ss1Combined ? 'Subjects Offered (SS1 Combined)' : 'Subjects Offered');
             if (!useSs) {

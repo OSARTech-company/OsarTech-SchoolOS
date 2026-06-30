@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Documents</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308d') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .container { max-width: 1160px; }
+        .doc-shell { display: grid; gap: 18px; }
+        .doc-hero {
+            border-radius: 22px;
+            padding: 24px;
+            color: #fff;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.16), transparent 30%),
+                linear-gradient(135deg, #12395f 0%, #15607d 55%, #1f7a8c 100%);
+            box-shadow: 0 18px 34px rgba(15, 76, 129, 0.2);
+        }
+        .doc-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+        .doc-summary-card {
+            border-radius: 16px;
+            padding: 14px 16px;
+            border: 1px solid rgba(255,255,255,0.16);
+            background: rgba(255,255,255,0.12);
+            backdrop-filter: blur(6px);
+        }
+        .doc-summary-card .label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255,255,255,0.74);
+        }
+        .doc-summary-card .value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1.1;
+        }
+        .doc-list {
+            display: grid;
+            gap: 14px;
+        }
+        .doc-item {
+            border: 1px solid #dbe7f3;
+            border-radius: 18px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            overflow: hidden;
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+        }
+        .doc-item-head {
+            padding: 16px 16px 12px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #e4ecf5;
+        }
+        .doc-item-title { margin: 0; color: #12395f; }
+        .doc-item-subtitle { margin-top: 6px; color: #64748b; }
+        .doc-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: 0.84rem;
+            background: #e2e8f0;
+            color: #334155;
+        }
+        .doc-item-body { padding: 16px; }
+        .doc-info-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .doc-info {
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #eef6ff;
+            border: 1px solid #dbe7f3;
+        }
+        .doc-info .label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #66758a;
+        }
+        .doc-info .value {
+            color: #12395f;
+            font-weight: 700;
+            word-break: break-word;
+        }
+        .doc-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .doc-empty {
+            text-align: center;
+            padding: 30px 18px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 18px;
+            background: #fbfdff;
+        }
+        .doc-empty .icon {
+            width: 68px;
+            height: 68px;
+            margin: 0 auto 10px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            font-size: 1.7rem;
+            color: #0f4c81;
+            background: #e7f2ff;
+        }
+        @media (max-width: 960px) {
+            .doc-summary-grid,
+            .doc-info-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 640px) {
+            .doc-hero { padding: 20px 18px; border-radius: 18px; }
+            .doc-summary-grid,
+            .doc-info-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body style="--accent: {{ parent_theme_accent if parent_theme_accent else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'documents' %}
+        {% include 'parent/_parent_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-folder-open"></i> Documents</h1>
+                    <p class="meta-line">School handouts, circulars, and forms linked to your children.</p>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="doc-shell">
+                    <section class="doc-hero">
+                        <h2 class="no-margin">Keep school notices and forms in one family folder.</h2>
+                        <p class="mt-10">
+                            This page shows documents shared for parents and matched to your linked children.
+                        </p>
+                        <div class="doc-summary-grid">
+                            <div class="doc-summary-card">
+                                <span class="label">Visible Documents</span>
+                                <div class="value">{{ parent_documents|length if parent_documents else 0 }}</div>
+                            </div>
+                            <div class="doc-summary-card">
+                                <span class="label">Linked Children</span>
+                                <div class="value">{{ children|length if children else 0 }}</div>
+                            </div>
+                            <div class="doc-summary-card">
+                                <span class="label">Schools</span>
+                                <div class="value">{{ parent_document_counts|length if parent_document_counts else 0 }}</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {% if parent_document_counts %}
+                    <section class="card">
+                        <h3 class="no-margin"><i class="fas fa-school"></i> Document Count by School</h3>
+                        <div class="summary-grid mt-10" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+                            {% for school_name, count in parent_document_counts.items() %}
+                            <div class="card" style="margin:0;">
+                                <strong>{{ school_name }}</strong>
+                                <div class="muted mt-10">{{ count }} document{{ '' if count == 1 else 's' }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endif %}
+
+                    {% if parent_documents %}
+                    <div class="doc-list">
+                        {% for doc in parent_documents %}
+                        <article class="doc-item">
+                            <div class="doc-item-head">
+                                <div>
+                                    <h4 class="doc-item-title">{{ doc.title }}</h4>
+                                    <div class="doc-item-subtitle">
+                                        {{ doc.school_name }}
+                                        {% if doc.document_category %} · {{ doc.document_category }}{% endif %}
+                                        {% if doc.target_classname %} · {{ doc.target_classname }}{% endif %}
+                                        {% if doc.target_stream %} · {{ doc.target_stream }}{% endif %}
+                                    </div>
+                                </div>
+                                <span class="doc-pill">{{ doc.audience|title }}</span>
+                            </div>
+                            <div class="doc-item-body">
+                                <div class="doc-info-grid">
+                                    <div class="doc-info">
+                                        <span class="label">File</span>
+                                        <span class="value">{{ doc.attachment_name or (doc.external_url and 'External Link') or 'No file' }}</span>
+                                    </div>
+                                    <div class="doc-info">
+                                        <span class="label">Subject</span>
+                                        <span class="value">{{ doc.target_subject or '-' }}</span>
+                                    </div>
+                                    <div class="doc-info">
+                                        <span class="label">Created</span>
+                                        <span class="value">{{ doc.created_at or '-' }}</span>
+                                    </div>
+                                    <div class="doc-info">
+                                        <span class="label">Uploaded By</span>
+                                        <span class="value">{{ doc.created_by or '-' }}</span>
+                                    </div>
+                                </div>
+                                {% if doc.description %}
+                                <p class="muted">{{ doc.description }}</p>
+                                {% endif %}
+                                <div class="doc-actions mt-10">
+                                    {% if doc.external_url %}
+                                    <a href="{{ doc.external_url }}" class="btn btn-secondary" target="_blank" rel="noopener">
+                                        <i class="fas fa-external-link-alt"></i> Open Link
+                                    </a>
+                                    {% endif %}
+                                    {% if doc.attachment_url %}
+                                    <a href="{{ doc.attachment_url }}" class="btn btn-primary" target="_blank" rel="noopener">
+                                        <i class="fas fa-download"></i> Open File
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </article>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="doc-empty">
+                        <div class="icon"><i class="fas fa-folder-open"></i></div>
+                        <h3 class="no-margin">No documents yet</h3>
+                        <p class="muted mt-10">When your school shares documents for parents, they will appear here.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

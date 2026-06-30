@@ -88,14 +88,24 @@
                     <i class="fas fa-user-plus"></i>
                     <span>Add Students</span>
                 </a>
+                <a href="{{ url_for('school_admin_student_fees') }}" class="side-link{% if active_page == 'student_fees' %} active{% endif %}">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <span>Student Fees</span>
+                </a>
+                <a href="{{ url_for('school_admin_documents') }}" class="side-link{% if active_page == 'documents' %} active{% endif %}">
+                    <i class="fas fa-folder-open"></i>
+                    <span>Documents</span>
+                </a>
                 <a href="{{ url_for('school_admin_student_reset_requests') }}" class="side-link{% if active_page == 'student_reset_requests' %} active{% endif %}">
                     <i class="fas fa-unlock-alt"></i>
                     <span>Reset Requests</span>
                 </a>
+                {% if not school or school.school_type != 'primary' %}
                 <a href="{{ url_for('school_admin_subject_requests') }}" class="side-link{% if active_page == 'subject_requests' %} active{% endif %}">
                     <i class="fas fa-book"></i>
                     <span>Subject Requests</span>
                 </a>
+                {% endif %}
                 <a href="{{ url_for('school_admin_view_parents') }}" class="side-link{% if active_page == 'parents' %} active{% endif %}">
                     <i class="fas fa-user-friends"></i>
                     <span>View Parents</span>
@@ -124,7 +134,7 @@
                     {% if school and school.score_entry_mode == 'dean_led' %}hidden{% endif %}
                 >
                     <i class="fas fa-diagram-project"></i>
-                    <span>Assign Teacher</span>
+                    <span>{% if school and school.school_type == 'primary' %}Assign Class Teachers{% else %}Assign Teacher{% endif %}</span>
                 </a>
                 <a href="{{ url_for('school_admin_teacher_workload') }}" class="side-link{% if active_page == 'teacher_workload' %} active{% endif %}">
                     <i class="fas fa-user-gear"></i>

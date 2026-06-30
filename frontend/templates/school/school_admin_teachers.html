@@ -120,6 +120,50 @@
           </div>
 
           <div class="card">
+            <h2><i class="fas fa-wallet"></i> Add Bursar</h2>
+            <p class="meta-muted">Create a finance staff account for fee assessment and payment tracking.</p>
+            <form action="{{ url_for('school_admin_add_bursar') }}" method="POST">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <div class="form-group">
+                <label for="bursar_username">Username (Email)</label>
+                <input type="email" id="bursar_username" name="username" placeholder="e.g., bursar@school.com" required />
+              </div>
+              <div class="form-group">
+                <label for="bursar_firstname">First Name</label>
+                <input type="text" id="bursar_firstname" name="firstname" required />
+              </div>
+              <div class="form-group">
+                <label for="bursar_lastname">Last Name</label>
+                <input type="text" id="bursar_lastname" name="lastname" />
+              </div>
+              <div class="form-group">
+                <label for="bursar_phone">Phone (optional, for SMS)</label>
+                <input type="text" id="bursar_phone" name="phone" placeholder="+234..." />
+              </div>
+              <div class="form-group">
+                <label for="bursar_gender">Gender</label>
+                <select id="bursar_gender" name="gender" required>
+                  <option value="">-- Select Gender --</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="bursar_password">Password (optional, auto-generated if empty)</label>
+                <input type="password" id="bursar_password" name="password" autocomplete="new-password" />
+              </div>
+              <div class="form-group">
+                <label class="checkbox-row">
+                  <input type="checkbox" name="send_credentials" value="1" checked />
+                  Email/SMS login details to the bursar
+                </label>
+              </div>
+              <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add Bursar</button>
+            </form>
+          </div>
+
+          <div class="card">
             <h2><i class="fas fa-layer-group"></i> Add Many Teachers</h2>
             <p class="meta-muted">
               This uses the same multi-row format as student entry: add several rows, fill them in, and save once.
@@ -266,6 +310,51 @@
             </div>
           </div>
 
+          <div class="card">
+            <h2><i class="fas fa-wallet"></i> Active Bursars ({{ current_term }} {{ current_year }})</h2>
+            {% if bursar_rows %}
+            <div class="table-scroll">
+              <table class="assignment-table">
+                <thead>
+                  <tr>
+                    <th>Bursar</th>
+                    <th>Username</th>
+                    <th>Gender</th>
+                    <th>Phone</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in bursar_rows %}
+                  <tr>
+                    <td><strong>{{ row.name }}</strong></td>
+                    <td class="meta-muted">{{ row.teacher_id }}</td>
+                    <td>{{ (row.gender or 'Not set')|title }}</td>
+                    <td>{{ row.phone or 'Not set' }}</td>
+                    <td>
+                      <form action="{{ url_for('school_admin_archive_bursar') }}" method="POST" onsubmit="return confirm('Archive this bursar?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <input type="hidden" name="bursar_id" value="{{ row.teacher_id }}" />
+                        <button type="submit" class="btn btn-danger">Archive</button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <p>No active bursars yet.</p>
+            {% endif %}
+            <div class="archived-toggle-row">
+              <button type="button" id="toggle-archived-bursars" class="btn btn-secondary btn-sm">
+                <i class="fas fa-box-archive"></i> View Archived Bursars
+                {% set archived_bursar_count = archived_bursar_rows|length %}
+                <span class="archived-count-badge {% if archived_bursar_count == 0 %}is-hidden{% endif %}">{{ archived_bursar_count }}</span>
+              </button>
+            </div>
+          </div>
+
           <div class="card archived-section" id="archived-teachers-section">
             <h2><i class="fas fa-box-archive"></i> Archived Teachers</h2>
             {% if archived_teacher_rows %}
@@ -304,6 +393,44 @@
             <p>No archived teachers.</p>
             {% endif %}
           </div>
+
+          <div class="card archived-section" id="archived-bursars-section">
+            <h2><i class="fas fa-box-archive"></i> Archived Bursars</h2>
+            {% if archived_bursar_rows %}
+            <div class="table-scroll">
+              <table class="assignment-table">
+                <thead>
+                  <tr>
+                    <th>Bursar</th>
+                    <th>Username</th>
+                    <th>Gender</th>
+                    <th>Phone</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in archived_bursar_rows %}
+                  <tr>
+                    <td><strong>{{ row.name }}</strong></td>
+                    <td class="meta-muted">{{ row.teacher_id }}</td>
+                    <td>{{ (row.gender or 'Not set')|title }}</td>
+                    <td>{{ row.phone or 'Not set' }}</td>
+                    <td>
+                      <form action="{{ url_for('school_admin_restore_bursar') }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <input type="hidden" name="bursar_id" value="{{ row.teacher_id }}" />
+                        <button type="submit" class="btn btn-primary">Restore</button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <p>No archived bursars.</p>
+            {% endif %}
+          </div>
         </div>
       </div>
     </div>
@@ -312,17 +439,30 @@
     <script>
       (function () {
         if (window.innerWidth > 600) document.body.classList.add('rail-expanded');
-        const toggle = document.getElementById('toggle-archived-teachers');
-        const archived = document.getElementById('archived-teachers-section');
-        if (!toggle || !archived) return;
-        toggle.addEventListener('click', function () {
-          archived.classList.toggle('is-open');
-          const isOpen = archived.classList.contains('is-open');
-          toggle.innerHTML = isOpen
-            ? '<i class="fas fa-eye-slash"></i> Hide Archived Teachers'
-            : '<i class="fas fa-box-archive"></i> View Archived Teachers';
-          if (isOpen) archived.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
+        const teacherToggle = document.getElementById('toggle-archived-teachers');
+        const teacherArchived = document.getElementById('archived-teachers-section');
+        if (teacherToggle && teacherArchived) {
+          teacherToggle.addEventListener('click', function () {
+            teacherArchived.classList.toggle('is-open');
+            const isOpen = teacherArchived.classList.contains('is-open');
+            teacherToggle.innerHTML = isOpen
+              ? '<i class="fas fa-eye-slash"></i> Hide Archived Teachers'
+              : '<i class="fas fa-box-archive"></i> View Archived Teachers';
+            if (isOpen) teacherArchived.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        }
+        const bursarToggle = document.getElementById('toggle-archived-bursars');
+        const bursarArchived = document.getElementById('archived-bursars-section');
+        if (bursarToggle && bursarArchived) {
+          bursarToggle.addEventListener('click', function () {
+            bursarArchived.classList.toggle('is-open');
+            const isOpen = bursarArchived.classList.contains('is-open');
+            bursarToggle.innerHTML = isOpen
+              ? '<i class="fas fa-eye-slash"></i> Hide Archived Bursars'
+              : '<i class="fas fa-box-archive"></i> View Archived Bursars';
+            if (isOpen) bursarArchived.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        }
       })();
 
       function buildRowHtml() {

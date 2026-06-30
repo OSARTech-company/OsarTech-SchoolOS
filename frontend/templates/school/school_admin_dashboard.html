@@ -187,6 +187,47 @@
 
           <div class="card">
             <div class="section-title-bar">
+              <h2><i class="fas fa-layer-group"></i> School Type Overview</h2>
+              <p>{{ school.school_type_label or (school.school_type|replace('_', ' ')|title) }}</p>
+            </div>
+            <p class="note">
+              {% if school and school.school_type == 'primary' %}
+              This school is set up as a primary school. Use class-teacher assignments, primary class subjects, and pupil-by-class management for the smoothest workflow.
+              {% elif school and school.school_type == 'nursery' %}
+              This school is set up as a nursery school. Keep the setup simple with class-teacher ownership and early years class structure.
+              {% elif school and school.school_type == 'secondary' %}
+              This school is set up as a secondary school. Subject-teacher assignments, class arms, and stream-based configuration will be more important.
+              {% else %}
+              This school is set up as a mixed school. You can combine primary and secondary workflows as needed.
+              {% endif %}
+            </p>
+            <div class="quick-actions">
+              <a href="{{ url_for('school_admin_settings_profile') }}" class="quick-link"><i class="fas fa-cogs"></i> Change School Type</a>
+              <a href="{{ url_for('school_admin_add_students_by_class') }}" class="quick-link"><i class="fas fa-user-plus"></i> Add Students by Class</a>
+              <a href="{{ url_for('school_admin_teacher_assignments') }}" class="quick-link"><i class="fas fa-chalkboard-user"></i> Assign Class Teachers</a>
+              <a href="{{ url_for('school_admin_class_subjects') }}" class="quick-link"><i class="fas fa-book-open"></i> Set Class Subjects</a>
+            </div>
+          </div>
+
+          {% if school and school.school_type == 'primary' %}
+          <div class="card">
+            <div class="section-title-bar">
+              <h2><i class="fas fa-apple-whole"></i> Primary School Focus</h2>
+              <p>Class-teacher workflow first.</p>
+            </div>
+            <p class="note">
+              In primary mode, the school runs with class teachers handling all subjects for their classes. Keep subject setup light and use class-based student management.
+            </p>
+            <div class="quick-actions">
+              <a href="{{ url_for('school_admin_teacher_assignments') }}" class="quick-link"><i class="fas fa-chalkboard-user"></i> Manage Class Teachers</a>
+              <a href="{{ url_for('school_admin_add_students_by_class') }}" class="quick-link"><i class="fas fa-user-plus"></i> Add Pupils by Class</a>
+              <a href="{{ url_for('school_admin_setup_wizard') }}" class="quick-link"><i class="fas fa-wand-magic-sparkles"></i> Open Primary Setup</a>
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="card">
+            <div class="section-title-bar">
               <h2><i class="fas fa-list-check"></i> Setup & Plan Checklist</h2>
               <p>Complete core setup before full rollout.</p>
             </div>
@@ -239,6 +280,7 @@
               <a href="{{ url_for('school_admin_add_students_by_class') }}" class="quick-link"><i class="fas fa-user-plus"></i> Add Students</a>
               <a href="{{ url_for('school_admin_class_subjects') }}" class="quick-link"><i class="fas fa-book-open"></i> Class Subjects</a>
               <a href="{{ url_for('school_admin_term_programs') }}" class="quick-link"><i class="fas fa-calendar-alt"></i> Term Programs</a>
+              <a href="{{ url_for('school_admin_documents') }}" class="quick-link"><i class="fas fa-folder-open"></i> Documents</a>
               <a href="{{ url_for('school_admin_settings_profile') }}" class="quick-link"><i class="fas fa-cogs"></i> School Settings</a>
               <a href="{{ url_for('school_admin_analytics') }}" class="quick-link"><i class="fas fa-chart-line"></i> Analytics</a>
               <a href="{{ url_for('school_admin_security') }}" class="quick-link"><i class="fas fa-shield-alt"></i> Security Logs</a>

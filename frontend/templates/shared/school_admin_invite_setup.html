@@ -14,7 +14,12 @@
     <div class="container" style="max-width: 760px;">
         <div class="header">
             <h1><i class="fas fa-key"></i> Set School Admin Password</h1>
-            <p class="meta-line">Account: {{ invite.username }} | School: {{ invite.school_id }} | Expires: {{ expires_at }}</p>
+            <p class="meta-line">
+                Account: {{ invite.username }} |
+                School: {{ invite.school_id }} |
+                Type: {{ invite_school_type or 'Mixed School' }} |
+                Expires: {{ expires_at }}
+            </p>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -26,6 +31,7 @@
         {% endwith %}
 
         <div class="card">
+            <p class="note">This invite is tied to a {{ invite_school_type or 'Mixed School' }}. The school type is chosen during school creation or onboarding request.</p>
             <form method="POST" action="">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group">
@@ -45,4 +51,3 @@
     </div>
 </body>
 </html>
-

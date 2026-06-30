@@ -1,0 +1,73 @@
+<div class="side-taskbar bursar-sidebar">
+    <style>
+      .app-shell.topbar-layout .side-taskbar.bursar-sidebar {
+        background: linear-gradient(180deg, #132b4d 0%, #0e1d37 100%) !important;
+        border-right: 1px solid #27415f !important;
+        box-shadow: 2px 0 16px rgba(4, 10, 26, 0.4) !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.bursar-sidebar .side-brand {
+        background: #17365f !important;
+        border-bottom: 1px solid #2d4f73 !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.bursar-sidebar .side-brand .school-brand-meta {
+        display: none;
+      }
+      .app-shell.topbar-layout .side-taskbar.bursar-sidebar .side-link span,
+      .app-shell.topbar-layout .side-taskbar.bursar-sidebar .side-link i,
+      .app-shell.topbar-layout .side-taskbar.bursar-sidebar .side-group-toggle {
+        color: #eef4ff !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.bursar-sidebar .side-link {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: rgba(148, 163, 184, 0.28) !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.bursar-sidebar .side-link:hover {
+        background: rgba(255, 255, 255, 0.14) !important;
+        border-color: rgba(148, 163, 184, 0.45) !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.bursar-sidebar .side-link.active {
+        background: rgba(99, 102, 241, 0.34) !important;
+        border-color: rgba(129, 140, 248, 0.62) !important;
+      }
+    </style>
+    <div class="side-brand">
+        <img src="{{ url_for('static', filename='img/osartech-logo.png', v='20260411b') }}" alt="Osartech Logo" class="brand-logo">
+        <div class="school-brand-meta">
+            <div class="school-brand-title">Bursar</div>
+            <div class="school-brand-org">OSARTECH</div>
+        </div>
+    </div>
+    {% if school_access_state %}
+    {% set access_status = (school_access_state.effective_status or school_access_state.status or '') %}
+    {% set access_class = 'is-active' if access_status in ['trial_free', 'active_paid'] else ('is-warning' if access_status == 'pending_payment' else 'is-blocked') %}
+    <div class="side-access-status">
+        <span class="label">Access</span>
+        <span class="status {{ access_class }}">{{ access_status|replace('_', ' ')|title }}</span>
+    </div>
+    {% endif %}
+    <div class="side-links">
+        <a href="{{ url_for('bursar_dashboard') }}" class="side-link{% if active_page == 'dashboard' %} active{% endif %}">
+            <i class="fas fa-home"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('bursar_student_fees') }}" class="side-link{% if active_page == 'student_fees' %} active{% endif %}">
+            <i class="fas fa-money-bill-wave"></i>
+            <span>Student Fees</span>
+        </a>
+        <a href="{{ url_for('change_password') }}" class="side-link{% if active_page == 'settings' %} active{% endif %}">
+            <i class="fas fa-key"></i>
+            <span>Change Password</span>
+        </a>
+        <a href="{{ url_for('help', role='bursar') }}" class="side-link">
+            <i class="fas fa-question-circle"></i>
+            <span>Help</span>
+        </a>
+        <form method="post" action="{{ url_for('logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="side-link side-link-logout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </form>
+    </div>
+</div>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Center - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308d') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .container { max-width: 1180px; }
+        .doc-shell { display: grid; gap: 18px; }
+        .doc-hero {
+            border-radius: 22px;
+            padding: 24px;
+            color: #fff;
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.16), transparent 30%),
+                linear-gradient(135deg, #12395f 0%, #14507a 54%, #1f7a8c 100%);
+            box-shadow: 0 18px 34px rgba(15, 76, 129, 0.2);
+        }
+        .doc-grid { display: grid; gap: 18px; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); }
+        .doc-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+        .doc-summary-card, .doc-form-card, .doc-list-card {
+            border-radius: 18px;
+            border: 1px solid #dbe7f3;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+        }
+        .doc-summary-card { padding: 16px; }
+        .doc-summary-card .label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #64748b;
+        }
+        .doc-summary-card .value {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #12395f;
+            line-height: 1.1;
+        }
+        .doc-form-card, .doc-list-card { padding: 18px; }
+        .doc-form-grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .doc-form-grid .full { grid-column: 1 / -1; }
+        .doc-form-card input, .doc-form-card select, .doc-form-card textarea {
+            width: 100%;
+        }
+        .doc-list {
+            display: grid;
+            gap: 14px;
+        }
+        .doc-item {
+            border: 1px solid #dbe7f3;
+            border-radius: 16px;
+            background: #fff;
+            overflow: hidden;
+        }
+        .doc-item-head {
+            padding: 16px 16px 12px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #e4ecf5;
+        }
+        .doc-item-title { margin: 0; color: #12395f; }
+        .doc-item-subtitle { margin-top: 6px; color: #64748b; }
+        .doc-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: 0.84rem;
+            background: #e2e8f0;
+            color: #334155;
+        }
+        .doc-item-body { padding: 16px; }
+        .doc-info-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .doc-info {
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #eef6ff;
+            border: 1px solid #dbe7f3;
+        }
+        .doc-info .label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #66758a;
+        }
+        .doc-info .value {
+            color: #12395f;
+            font-weight: 700;
+            word-break: break-word;
+        }
+        .doc-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .doc-empty {
+            text-align: center;
+            padding: 28px 18px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 18px;
+            background: #fbfdff;
+        }
+        .doc-empty .icon {
+            width: 68px;
+            height: 68px;
+            margin: 0 auto 10px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            font-size: 1.7rem;
+            color: #0f4c81;
+            background: #e7f2ff;
+        }
+        @media (max-width: 960px) {
+            .doc-grid,
+            .doc-form-grid,
+            .doc-info-grid,
+            .doc-summary-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 640px) {
+            .doc-hero { padding: 20px 18px; border-radius: 18px; }
+            .doc-grid,
+            .doc-form-grid,
+            .doc-info-grid,
+            .doc-summary-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'documents' %}
+        {% include 'school/_school_admin_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-folder-open"></i> Document Center</h1>
+                    <p class="meta-line">Manage school documents, handouts, and parent-facing files in one place.</p>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="doc-shell">
+                    <section class="doc-hero">
+                        <h2 class="no-margin">Publish class notes, forms, policies, and parent documents.</h2>
+                        <p class="mt-10">
+                            Upload a file or share an external link, then choose who should see it.
+                        </p>
+                        <div class="doc-summary-grid">
+                            <div class="doc-summary-card">
+                                <span class="label">Total Documents</span>
+                                <div class="value">{{ school_document_total or 0 }}</div>
+                            </div>
+                            <div class="doc-summary-card">
+                                <span class="label">Active</span>
+                                <div class="value">{{ active_document_count or 0 }}</div>
+                            </div>
+                            <div class="doc-summary-card">
+                                <span class="label">Archived</span>
+                                <div class="value">{{ inactive_document_count or 0 }}</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="doc-grid">
+                        <section class="doc-form-card">
+                            <h3 class="no-margin"><i class="fas fa-cloud-upload-alt"></i> Upload Document</h3>
+                            <form method="post" enctype="multipart/form-data" class="mt-12">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <div class="doc-form-grid">
+                                    <div class="full">
+                                        <label>Title</label>
+                                        <input type="text" name="title" maxlength="160" required placeholder="e.g. First Term Circular">
+                                    </div>
+                                    <div class="full">
+                                        <label>Description</label>
+                                        <textarea name="description" rows="4" maxlength="1200" placeholder="Short note about the file"></textarea>
+                                    </div>
+                                    <div>
+                                        <label>Audience</label>
+                                        <select name="audience">
+                                            <option value="parents">Parents</option>
+                                            <option value="teachers">Teachers</option>
+                                            <option value="students">Students</option>
+                                            <option value="staff">Staff</option>
+                                            <option value="all">Everyone</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label>Category</label>
+                                        <input type="text" name="document_category" maxlength="80" placeholder="Policy, Form, Circular">
+                                    </div>
+                                    <div>
+                                        <label>Class Target</label>
+                                        <input type="text" name="target_classname" maxlength="40" placeholder="Optional class">
+                                    </div>
+                                    <div>
+                                        <label>Stream Target</label>
+                                        <select name="target_stream">
+                                            <option value="">Any stream</option>
+                                            <option value="Science">Science</option>
+                                            <option value="Art">Art</option>
+                                            <option value="Commercial">Commercial</option>
+                                        </select>
+                                    </div>
+                                    <div class="full">
+                                        <label>Subject Target</label>
+                                        <input type="text" name="target_subject" maxlength="120" placeholder="Optional subject">
+                                    </div>
+                                    <div class="full">
+                                        <label>External Link</label>
+                                        <input type="url" name="external_url" maxlength="500" placeholder="Optional document URL">
+                                    </div>
+                                    <div class="full">
+                                        <label>Upload File</label>
+                                        <input type="file" name="document_file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp">
+                                        <small class="muted">PDF and image files only for now.</small>
+                                    </div>
+                                </div>
+                                <div class="mt-12">
+                                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Publish Document</button>
+                                </div>
+                            </form>
+                        </section>
+
+                        <section class="doc-list-card">
+                            <h3 class="no-margin"><i class="fas fa-list"></i> Published Documents</h3>
+                            {% if document_rows %}
+                            <div class="doc-list mt-12">
+                                {% for doc in document_rows %}
+                                <article class="doc-item">
+                                    <div class="doc-item-head">
+                                        <div>
+                                            <h4 class="doc-item-title">{{ doc.title }}</h4>
+                                            <div class="doc-item-subtitle">
+                                                {% if doc.document_category %}{{ doc.document_category }} · {% endif %}
+                                                {{ doc.audience|title }}
+                                                {% if doc.target_classname %} · {{ doc.target_classname }}{% endif %}
+                                                {% if doc.target_stream %} · {{ doc.target_stream }}{% endif %}
+                                            </div>
+                                        </div>
+                                        <span class="doc-pill {% if doc.is_active %}chip-success{% else %}chip-warning{% endif %}">
+                                            {% if doc.is_active %}Active{% else %}Archived{% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="doc-item-body">
+                                        <div class="doc-info-grid">
+                                            <div class="doc-info">
+                                                <span class="label">File</span>
+                                                <span class="value">{{ doc.attachment_name or (doc.external_url and 'External Link') or 'No file' }}</span>
+                                            </div>
+                                            <div class="doc-info">
+                                                <span class="label">Subject</span>
+                                                <span class="value">{{ doc.target_subject or '-' }}</span>
+                                            </div>
+                                            <div class="doc-info">
+                                                <span class="label">Created</span>
+                                                <span class="value">{{ doc.created_at or '-' }}</span>
+                                            </div>
+                                            <div class="doc-info">
+                                                <span class="label">Uploaded By</span>
+                                                <span class="value">{{ doc.created_by or '-' }}</span>
+                                            </div>
+                                        </div>
+                                        {% if doc.description %}
+                                        <p class="muted">{{ doc.description }}</p>
+                                        {% endif %}
+                                        <div class="doc-actions mt-10">
+                                            {% if doc.external_url %}
+                                            <a href="{{ doc.external_url }}" class="btn btn-secondary" target="_blank" rel="noopener">
+                                                <i class="fas fa-external-link-alt"></i> Open Link
+                                            </a>
+                                            {% endif %}
+                                            {% if doc.attachment_url %}
+                                            <a href="{{ doc.attachment_url }}" class="btn btn-primary" target="_blank" rel="noopener">
+                                                <i class="fas fa-download"></i> Open File
+                                            </a>
+                                            {% endif %}
+                                            {% if doc.is_active %}
+                                            <form method="post" action="{{ url_for('school_admin_archive_document') }}">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="document_id" value="{{ doc.id }}">
+                                                <button type="submit" class="btn btn-secondary" onclick="return confirm('Archive this document?')">
+                                                    <i class="fas fa-archive"></i> Archive
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </article>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="doc-empty mt-12">
+                                <div class="icon"><i class="fas fa-folder-open"></i></div>
+                                <h4 class="no-margin">No documents yet</h4>
+                                <p class="muted mt-10">Upload the first document to start your document center.</p>
+                            </div>
+                            {% endif %}
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

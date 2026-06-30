@@ -46,9 +46,14 @@
             <div class="container">
                 <div class="header">
                     <h1><i class="fas fa-user-pen"></i> Edit Student</h1>
-                    <a href="{{ back_url }}" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Back
-                    </a>
+                    <div class="actions">
+                        <a href="{{ url_for('school_admin_student_fees', student_id=student.student_id, term=student.term or '', fee_label='School Fee') }}" class="btn btn-primary">
+                            <i class="fas fa-money-bill-wave"></i> Manage Fees
+                        </a>
+                        <a href="{{ back_url }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                    </div>
                 </div>
 
                 {% with messages = get_flashed_messages(with_categories=true) %}

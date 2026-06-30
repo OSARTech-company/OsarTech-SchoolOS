@@ -70,7 +70,7 @@ Use this page to review student subject add/drop requests.
 
 Use this page to review linked parent records for students.
 
-#### Parent Directory
+#### Parent Contacts
 
 Use this page to browse parent contact information and links.
 
@@ -251,4 +251,3 @@ For a new school setup, use this order:
 - Some actions are blocked when school operations are restricted.
 - Results, timetable, and message workflows should be checked carefully before saving.
 - Keep backups before major bulk changes.
-

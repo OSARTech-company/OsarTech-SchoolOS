@@ -146,7 +146,7 @@
                                     <span class="label" title="{{ row.question }}">{{ row.question }}</span>
                                     <strong>{{ row.count }}</strong>
                                 </div>
-                                <div class="bar-track"><div class="bar-fill" style="width: {{ pct }}%;"></div></div>
+                                <div class="bar-track"><div class="bar-fill" data-bar-width="{{ pct }}"></div></div>
                             </div>
                             {% else %}
                             <p class="muted">No chart data yet.</p>
@@ -165,7 +165,7 @@
                                     <span class="label">{{ row.version }}</span>
                                     <strong>{{ row.count }}</strong>
                                 </div>
-                                <div class="bar-track"><div class="bar-fill" style="width: {{ pct }}%;"></div></div>
+                                <div class="bar-track"><div class="bar-fill" data-bar-width="{{ pct }}"></div></div>
                             </div>
                             {% else %}
                             <p class="muted">No chart data yet.</p>
@@ -184,7 +184,7 @@
                                     <span class="label">{{ row.mode|title }}</span>
                                     <strong>{{ row.count }}</strong>
                                 </div>
-                                <div class="bar-track"><div class="bar-fill" style="width: {{ pct }}%;"></div></div>
+                                <div class="bar-track"><div class="bar-fill" data-bar-width="{{ pct }}"></div></div>
                             </div>
                             {% else %}
                             <p class="muted">No chart data yet.</p>
@@ -203,7 +203,7 @@
                                     <span class="label" title="{{ row.question }}">{{ row.question }}</span>
                                     <strong>{{ row.count }}</strong>
                                 </div>
-                                <div class="bar-track"><div class="bar-fill warn" style="width: {{ pct }}%;"></div></div>
+                                <div class="bar-track"><div class="bar-fill warn" data-bar-width="{{ pct }}"></div></div>
                             </div>
                             {% else %}
                             <p class="muted">No unresolved chart data yet.</p>
@@ -224,6 +224,13 @@
         </div>
     </div>
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+        document.querySelectorAll('.bar-fill[data-bar-width]').forEach((el) => {
+            const width = String(el.dataset.barWidth || '').trim();
+            if (width) {
+                el.style.width = `${width}%`;
+            }
+        });
+    </script>
 </body>
 </html>
-

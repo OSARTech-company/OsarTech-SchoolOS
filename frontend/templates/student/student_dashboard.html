@@ -596,6 +596,38 @@
                 </div>
 
                 <div class="card">
+                    <h2><i class="fas fa-money-bill-wave"></i> School Fees</h2>
+                    {% if fee_summary and fee_summary.id %}
+                        {% set fee_status_text = (fee_summary.status or 'pending')|replace('_', ' ')|title %}
+                        {% if fee_summary.status == 'paid' %}
+                            {% set fee_status_class = 'chip-success' %}
+                        {% elif fee_summary.status == 'overdue' %}
+                            {% set fee_status_class = 'chip-danger' %}
+                        {% elif fee_summary.status == 'part_paid' %}
+                            {% set fee_status_class = 'chip-warning' %}
+                        {% else %}
+                            {% set fee_status_class = 'chip' %}
+                        {% endif %}
+                        <p class="chip {{ fee_status_class }}">
+                            <strong>{{ fee_summary.fee_label or 'School Fee' }}</strong>
+                            - {{ fee_status_text }}
+                        </p>
+                        <p class="note">Term: <strong>{{ fee_summary.term or student.term or '-' }}</strong></p>
+                        <p class="note">Amount Due: <strong>{{ fee_summary.currency or 'NGN' }} {{ '%.2f'|format(fee_summary.amount_due or 0) }}</strong></p>
+                        <p class="note">Amount Paid: <strong>{{ fee_summary.currency or 'NGN' }} {{ '%.2f'|format(fee_summary.amount_paid or 0) }}</strong></p>
+                        <p class="note">Balance: <strong>{{ fee_summary.currency or 'NGN' }} {{ '%.2f'|format(fee_summary.balance_amount or 0) }}</strong></p>
+                        {% if fee_summary.due_date %}
+                        <p class="note">Due Date: <strong>{{ fee_summary.due_date }}</strong></p>
+                        {% endif %}
+                        {% if fee_summary.latest_payment_at %}
+                        <p class="note">Latest Payment: <strong>{{ fee_summary.latest_payment_at }}</strong></p>
+                        {% endif %}
+                    {% else %}
+                        <p class="note">No fee assessment has been added for your record yet.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
                     <h2><i class="fas fa-user-plus"></i> Parent 1 Access</h2>
                     {% if parent_phone %}
                     <p class="chip chip-success">

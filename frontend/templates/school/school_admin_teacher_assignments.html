@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Assign Teachers - School Admin</title>
+    {% set is_primary_school = school and school.school_type == 'primary' %}
+    <title>{% if school and school.school_type == 'primary' %}Assign Class Teachers{% else %}Assign Teachers{% endif %} - School Admin</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
@@ -115,7 +116,7 @@
       <div class="main-content">
         <div class="container">
           <div class="header">
-            <h1><i class="fas fa-diagram-project"></i> Assign Teachers</h1>
+            <h1><i class="fas fa-diagram-project"></i> {% if is_primary_school %}Assign Class Teachers{% else %}Assign Teachers{% endif %}</h1>
             <a href="{{ url_for('school_admin_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
           </div>
 
@@ -127,11 +128,24 @@
             {% endif %}
           {% endwith %}
 
+          {% if is_primary_school %}
+          <div class="card" style="margin-bottom: 16px; border-left: 4px solid var(--brand, #0f4c81);">
+            <h2><i class="fas fa-apple-whole"></i> Primary School Mode</h2>
+            <p class="note-line" style="margin-bottom: 0;">
+              This school uses class-teacher flow. One teacher can handle all subjects for a class, so the subject-teacher section stays hidden.
+            </p>
+          </div>
+          {% endif %}
+
           <div class="grid-two">
             <div class="card">
-              <h2><i class="fas fa-user-check"></i> Assign Teacher to Class</h2>
+              <h2><i class="fas fa-user-check"></i> {% if is_primary_school %}Assign Class Teacher{% else %}Assign Teacher to Class{% endif %}</h2>
               <p class="note-line">
+                {% if is_primary_school %}
+                This assigns the class teacher for each primary class in {{ current_term }} {{ current_year }}.
+                {% else %}
                 This assigns class owner for {{ current_term }} {{ current_year }}.
+                {% endif %}
                 {% if school and school.score_entry_mode == 'dean_led' %}
                 Subject assignment is disabled for this school mode.
                 {% endif %}
@@ -168,7 +182,7 @@
               </form>
             </div>
 
-            {% if not school or school.score_entry_mode != 'dean_led' %}
+            {% if not is_primary_school and (not school or school.score_entry_mode != 'dean_led') %}
             <div class="card">
               <h2><i class="fas fa-list-check"></i> Assign Subject Teacher</h2>
               <p class="note-line">Secondary classes only. Nursery and Primary use their class teacher for all subjects.</p>
@@ -276,7 +290,7 @@
             {% endfor %}
           </datalist>
 
-          {% if not school or school.score_entry_mode != 'dean_led' %}
+          {% if not is_primary_school and (not school or school.score_entry_mode != 'dean_led') %}
           <div class="card">
             <h2><i class="fas fa-table-list"></i> Current Subject Assigned</h2>
             {% if subject_assignments %}

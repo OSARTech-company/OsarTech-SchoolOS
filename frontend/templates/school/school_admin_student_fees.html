@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Fees - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; }
+        .container { width: min(1240px, 100%); margin: 0 auto; padding: 24px; }
+        .page-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+        .page-head h1 { margin: 0; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        .stat-card {
+            border-radius: 16px;
+            padding: 16px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            border: 1px solid #dbe4ef;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
+        }
+        .stat-card .label {
+            display: block;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #64748b;
+            margin-bottom: 8px;
+        }
+        .stat-card .value {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.1;
+        }
+        .filters-card, .bulk-card, .table-card {
+            border-radius: 18px;
+            background: #fff;
+            border: 1px solid #dbe4ef;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+            padding: 18px;
+            margin-bottom: 18px;
+        }
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            align-items: end;
+        }
+        .filters-grid .form-group { margin-bottom: 0; }
+        .inline-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+        .fee-table-wrap { overflow-x: auto; }
+        .fee-table {
+            width: 100%;
+            min-width: 980px;
+            border-collapse: collapse;
+        }
+        .fee-table th, .fee-table td {
+            border-bottom: 1px solid #e5edf6;
+            padding: 12px 10px;
+            vertical-align: top;
+        }
+        .fee-table thead th {
+            background: #eff6ff;
+            color: #1e3a5f;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 76px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 800;
+        }
+        .status-paid { background: #dcfce7; color: #166534; }
+        .status-part_paid { background: #fef3c7; color: #b45309; }
+        .status-overdue { background: #fee2e2; color: #b91c1c; }
+        .status-pending { background: #e2e8f0; color: #334155; }
+        .student-name {
+            font-weight: 800;
+            color: #16324f;
+            margin-bottom: 4px;
+        }
+        .student-meta {
+            color: #64748b;
+            font-size: 0.86rem;
+            line-height: 1.45;
+        }
+        .payment-form {
+            display: grid;
+            grid-template-columns: minmax(90px, 120px) minmax(110px, 130px) minmax(120px, 150px) minmax(130px, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+        }
+        .payment-form input,
+        .payment-form select {
+            width: 100%;
+            margin: 0;
+        }
+        .muted { color: #64748b; }
+        @media (max-width: 960px) {
+            .payment-form { grid-template-columns: 1fr 1fr; }
+            .payment-form .btn { grid-column: 1 / -1; }
+        }
+        @media (max-width: 720px) {
+            .container { padding: 18px; }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'student_fees' %}
+        {% if bursar_mode %}
+        {% include 'bursar/_bursar_sidebar.html' %}
+        {% else %}
+        {% include 'school/_school_admin_sidebar.html' %}
+        {% endif %}
+        <div class="main-content">
+            <div class="container">
+                <div class="page-head">
+                    <div>
+                        <h1><i class="fas fa-money-bill-wave"></i> {% if bursar_mode %}Bursar Fee Desk{% else %}Student Fees{% endif %}</h1>
+                        <p class="note">{% if bursar_mode %}Assess fees and record payments from the bursar workspace.{% else %}Assess fees by class and term, then record student payments in one place.{% endif %}</p>
+                    </div>
+                    <a href="{{ url_for('bursar_dashboard') if bursar_mode else url_for('school_admin_dashboard') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <section class="stats-grid">
+                    <div class="stat-card">
+                        <span class="label">Students</span>
+                        <div class="value">{{ fee_summary.students or 0 }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">Total Due</span>
+                        <div class="value">{{ currency }} {{ '%.2f'|format(fee_summary.total_due or 0) }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">Total Paid</span>
+                        <div class="value">{{ currency }} {{ '%.2f'|format(fee_summary.total_paid or 0) }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">Outstanding</span>
+                        <div class="value">{{ currency }} {{ '%.2f'|format(fee_summary.outstanding or 0) }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">Overdue</span>
+                        <div class="value">{{ fee_summary.overdue_rows or 0 }}</div>
+                    </div>
+                </section>
+
+                <section class="filters-card">
+                    <h2><i class="fas fa-filter"></i> Filters</h2>
+                    <form method="get">
+                        <div class="filters-grid">
+                            <div class="form-group">
+                                <label for="class">Class</label>
+                                <select id="class" name="class">
+                                    <option value="">All Classes</option>
+                                    {% for class_name in available_classes %}
+                                    <option value="{{ class_name }}" {% if selected_class == class_name %}selected{% endif %}>{{ class_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="term">Term</label>
+                                <select id="term" name="term">
+                                    {% for term_name in available_terms %}
+                                    <option value="{{ term_name }}" {% if selected_term == term_name %}selected{% endif %}>{{ term_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="student_id">Student ID</label>
+                                <input type="text" id="student_id" name="student_id" value="{{ selected_student_id or '' }}" placeholder="Optional search">
+                            </div>
+                            <div class="form-group">
+                                <label for="fee_label">Fee Label</label>
+                                <input type="text" id="fee_label" name="fee_label" value="{{ fee_label or 'School Fee' }}">
+                            </div>
+                            <div class="form-group">
+                                <label for="currency">Currency</label>
+                                <input type="text" id="currency" name="currency" value="{{ currency or 'NGN' }}" maxlength="10">
+                            </div>
+                        </div>
+                        <div class="inline-actions">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Apply Filters</button>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="bulk-card">
+                    <h2><i class="fas fa-layer-group"></i> Bulk Fee Assessment</h2>
+                    <p class="note">This creates or updates the fee record for the filtered students. Leave the student ID empty to apply to everyone in the filter.</p>
+                    <form method="post">
+                        <input type="hidden" name="action" value="bulk_assess">
+                        <input type="hidden" name="class" value="{{ selected_class }}">
+                        <input type="hidden" name="term" value="{{ selected_term }}">
+                        <input type="hidden" name="student_id" value="{{ selected_student_id }}">
+                        <input type="hidden" name="fee_label" value="{{ fee_label }}">
+                        <input type="hidden" name="currency" value="{{ currency }}">
+                        <div class="filters-grid">
+                            <div class="form-group">
+                                <label for="amount_due">Amount Due</label>
+                                <input type="number" step="0.01" min="0" id="amount_due" name="amount_due" placeholder="0.00" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="due_date">Due Date</label>
+                                <input type="date" id="due_date" name="due_date">
+                            </div>
+                            <div class="form-group" style="grid-column: 1 / -1;">
+                                <label for="note">Note</label>
+                                <input type="text" id="note" name="note" placeholder="Optional note about this fee assessment">
+                            </div>
+                        </div>
+                        <div class="inline-actions">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Fee Assessment</button>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="table-card">
+                    <h2><i class="fas fa-table"></i> Student Fee Accounts</h2>
+                    <div class="fee-table-wrap">
+                        <table class="fee-table">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Class</th>
+                                    <th>Fee</th>
+                                    <th>Due</th>
+                                    <th>Paid</th>
+                                    <th>Balance</th>
+                                    <th>Status</th>
+                                    <th>Payment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if fee_accounts %}
+                                    {% for row in fee_accounts %}
+                                    <tr>
+                                        <td>
+                                            <div class="student-name">{{ row.student_name or row.student_id }}</div>
+                                            <div class="student-meta">
+                                                ID: {{ row.student_id }}<br>
+                                                {% if row.invoice_ref %}Ref: {{ row.invoice_ref }}<br>{% endif %}
+                                                {% if row.stream %}Stream: {{ row.stream }}<br>{% endif %}
+                                                {% if row.due_date %}Due: {{ row.due_date }}<br>{% endif %}
+                                                {% if row.updated_at %}Updated: {{ row.updated_at }}{% endif %}
+                                            </div>
+                                        </td>
+                                        <td>{{ row.classname or '-' }}<br><span class="muted">{{ row.term or '-' }}</span></td>
+                                        <td>{{ row.fee_label or 'School Fee' }}</td>
+                                        <td>{{ row.currency or currency }} {{ '%.2f'|format(row.amount_due or 0) }}</td>
+                                        <td>{{ row.currency or currency }} {{ '%.2f'|format(row.amount_paid or 0) }}</td>
+                                        <td>{{ row.currency or currency }} {{ '%.2f'|format(row.balance_amount or 0) }}</td>
+                                        <td>
+                                            {% set status_value = (row.status or 'pending') %}
+                                            <span class="status-pill status-{{ status_value }}">{{ status_value|replace('_', ' ')|title }}</span>
+                                        </td>
+                                        <td>
+                                            <form method="post" class="payment-form">
+                                                <input type="hidden" name="action" value="record_payment">
+                                                <input type="hidden" name="class" value="{{ selected_class }}">
+                                                <input type="hidden" name="term" value="{{ selected_term }}">
+                                                <input type="hidden" name="student_id" value="{{ row.student_id }}">
+                                                <input type="hidden" name="fee_label" value="{{ row.fee_label }}">
+                                                <input type="hidden" name="currency" value="{{ row.currency or currency }}">
+                                                <input type="number" step="0.01" min="0" name="amount_paid" placeholder="Amount" required>
+                                                <select name="payment_method">
+                                                    <option value="cash">Cash</option>
+                                                    <option value="transfer">Transfer</option>
+                                                    <option value="card">Card</option>
+                                                    <option value="mobile_money">Mobile Money</option>
+                                                </select>
+                                                <input type="text" name="payment_reference" placeholder="Ref">
+                                                <input type="text" name="payment_note" placeholder="Optional note">
+                                                <button type="submit" class="btn btn-secondary"><i class="fas fa-check"></i> Save</button>
+                                            </form>
+                                            <div class="inline-actions" style="margin-top:10px;">
+                                                <a href="{{ url_for('bursar_fee_receipt', student_id=row.student_id, invoice_ref=row.invoice_ref, term=selected_term, academic_year=current_year, fee_label=row.fee_label) }}" class="btn btn-secondary btn-sm">
+                                                    <i class="fas fa-receipt"></i> Receipt
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="8">No fee accounts found for the selected filter.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

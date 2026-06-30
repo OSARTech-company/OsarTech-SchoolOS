@@ -70,6 +70,11 @@
             <div class="wizard-title">
               <h1><i class="fas fa-wand-magic-sparkles"></i> School Setup Wizard</h1>
               <p>First-time setup for your school, presented one step at a time.</p>
+              {% if setup_summary and setup_summary.is_primary_school %}
+              <p style="margin-top:8px; color:#1d4ed8; font-weight:700;">
+                Primary school mode is active. The wizard will focus on class teachers and a simpler class structure.
+              </p>
+              {% endif %}
             </div>
             <a href="{{ url_for('school_admin_dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
           </div>
@@ -128,11 +133,19 @@
               <section class="wizard-hero">
                 <h2>Welcome to School Setup</h2>
                 <div class="hero-sub">This will take less than 5 minutes.</div>
+                {% if setup_summary and setup_summary.is_primary_school %}
+                <div class="hero-sub" style="font-size:0.95rem; margin-top: 8px;">
+                  Primary school mode is on, so we will keep the workflow centered on class teachers, pupils, and simple class groups.
+                </div>
+                {% endif %}
                 <p>We’ll guide you through the essential setup steps in a simple order so your school is ready to use.</p>
                 <ul class="wizard-bullets">
                   <li>Clear setup order with simple next-step navigation</li>
                   <li>Quick access to the right page for each task</li>
                   <li>Designed for first-time school admins</li>
+                  {% if setup_summary and setup_summary.is_primary_school %}
+                  <li>Primary school mode keeps the setup centered on class teachers</li>
+                  {% endif %}
                 </ul>
                 <div class="hero-actions">
                   <form method="post" action="{{ url_for('school_admin_setup_wizard') }}">
@@ -235,5 +248,4 @@
     {% include "shared/_loading_overlay.html" %}
   </body>
 </html>
-
 

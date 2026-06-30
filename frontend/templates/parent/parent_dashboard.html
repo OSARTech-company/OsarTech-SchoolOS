@@ -329,7 +329,7 @@
                 <div class="layout-side">
                 <div class="card feature-card" id="parent-messages-card">
                     <h3 class="no-margin"><i class="fas fa-bell"></i> School Notifications</h3>
-                    <p class="muted mt-10">Open your dedicated messages page to keep this dashboard light.</p>
+                    <p class="muted mt-10">Open your dedicated messages page to keep this dashboard light. Attendance alerts also appear there automatically.</p>
                     <p class="muted">Unread notifications: <strong>{{ unread_parent_messages or 0 }}</strong></p>
                     <div class="parent-notif-actions">
                         <button type="button" class="btn btn-secondary btn-xs" id="enableParentBrowserNotif">
@@ -346,9 +346,26 @@
                 <div class="card feature-card" id="parent-tools-card">
                     <h3 class="no-margin"><i class="fas fa-compass"></i> Parent Tools</h3>
                     <p class="muted mt-10">Quick links to the most used parent pages.</p>
+                    {% if parent_fee_overview %}
+                    <div class="child-meta-grid mt-10">
+                        <div class="child-meta-item">
+                            <span class="label">Outstanding Fees</span>
+                            <span class="value">NGN {{ '%.2f'|format(parent_fee_overview.outstanding or 0) }}</span>
+                        </div>
+                        <div class="child-meta-item">
+                            <span class="label">Overdue Accounts</span>
+                            <span class="value">{{ parent_fee_overview.overdue or 0 }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <a href="{{ url_for('parent_fees') }}" class="btn btn-secondary mt-10">
+                        <i class="fas fa-receipt"></i> Open Fees
+                    </a>
                     <div class="parent-quick-actions mt-10">
                         <a href="{{ url_for('parent_notification_preferences') }}" class="parent-quick-link"><i class="fas fa-sliders-h"></i> Notification Preferences</a>
                         <a href="{{ url_for('parent_disputes') }}" class="parent-quick-link"><i class="fas fa-comment-dots"></i> Dispute Updates</a>
+                        <a href="{{ url_for('parent_fees') }}" class="parent-quick-link"><i class="fas fa-receipt"></i> Fees</a>
+                        <a href="{{ url_for('parent_documents') }}" class="parent-quick-link"><i class="fas fa-folder-open"></i> Documents</a>
                         <a href="{{ url_for('parent_subject_comments', student_key=first_child_key) if first_child_key else url_for('parent_subject_comments') }}" class="parent-quick-link"><i class="fas fa-clipboard-list"></i> Subject Comments</a>
                         <a href="{{ url_for('parent_timetable', student_key=first_child_key) if first_child_key else url_for('parent_timetable') }}" class="parent-quick-link"><i class="fas fa-calendar-week"></i> Timetable</a>
                     </div>
@@ -411,6 +428,7 @@
                 {% if children %}
                 <div class="grid">
                     {% for child in children %}
+                    {% set fee_row = (parent_fee_rows_by_key or {}).get(child.key) %}
                     <div class="card child-card">
                         <div class="child-head">
                             <div>
@@ -450,12 +468,27 @@
                         {% else %}
                         <div class="muted mt-10">No published result yet.</div>
                         {% endif %}
+                        {% if fee_row %}
+                        <div class="child-meta-grid">
+                            <div class="child-meta-item">
+                                <span class="label">Fee Status</span>
+                                <span class="value">{{ (fee_row.summary.status or 'pending')|replace('_', ' ')|title }}</span>
+                            </div>
+                            <div class="child-meta-item">
+                                <span class="label">Outstanding</span>
+                                <span class="value">{{ fee_row.summary.currency or 'NGN' }} {{ '%.2f'|format(fee_row.summary.balance_amount or 0) }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
                         <div class="child-action-grid">
                             <a class="btn" href="{{ url_for('parent_view_result', student_key=child.key) }}">View Results</a>
                             <a class="btn" href="{{ url_for('parent_compare_results', student_key=child.key) }}">Compare Terms</a>
                             <a class="btn" href="{{ url_for('parent_period_attendance', student_key=child.key) }}">Attendance</a>
                             <a class="btn" href="{{ url_for('parent_timetable', student_key=child.key) }}">Timetable</a>
                             <a class="btn" href="{{ url_for('parent_submit_dispute', student_key=child.key) }}">Report Dispute</a>
+                            {% if fee_row %}
+                            <a class="btn" href="{{ fee_row.receipt_url }}"><i class="fas fa-receipt"></i> Open Fee Receipt</a>
+                            {% endif %}
                         </div>
                     </div>
                     {% endfor %}
@@ -607,7 +640,3 @@
     {% include "shared/_loading_overlay.html" %}
 </body>
 </html>
-
-
-
-

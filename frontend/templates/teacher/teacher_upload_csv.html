@@ -113,7 +113,7 @@
                 <ul>
                     <li><code>Student ID</code> - Existing student ID</li>
                     <li><code>Subject</code> - One subject per row</li>
-                    <li><code>CA1</code> ... <code>CA{{ max_tests }}</code> (each CA slot is {{ ca_slot_max_score(max_tests, school.test_score_max if school else 30) }} max; combined CA total must stay within school CA maximum)</li>
+                     <li><code>CA1</code> ... <code>CA{{ max_tests }}</code> (each CA slot is {{ ca_slot_max_score(max_tests, school.get('test_score_max', 30) if school else 30) }} max; combined CA total must stay within school CA maximum)</li>
                     {% if exam_mode_view == 'combined' %}
                     <li><code>Exam Score</code> (your class/classes use combined exam mode)</li>
                     {% elif exam_mode_view == 'separate' %}

@@ -23,6 +23,14 @@
             <span class="notif-badge">{{ unread_parent_messages }}</span>
             {% endif %}
         </a>
+        <a href="{{ url_for('parent_fees') }}" class="side-link{% if active_page == 'fees' %} active{% endif %}">
+            <i class="fas fa-receipt"></i>
+            <span>Fees</span>
+        </a>
+        <a href="{{ url_for('parent_documents') }}" class="side-link{% if active_page == 'documents' %} active{% endif %}">
+            <i class="fas fa-folder-open"></i>
+            <span>Documents</span>
+        </a>
         <a href="{{ url_for('parent_notification_preferences') }}" class="side-link{% if active_page == 'notification_prefs' %} active{% endif %}">
             <i class="fas fa-sliders-h"></i>
             <span>Notification Prefs</span>
@@ -134,4 +142,3 @@
         });
     })();
 </script>
-

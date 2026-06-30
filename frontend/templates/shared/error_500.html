@@ -226,12 +226,12 @@
                     <p>Please try again in a moment. If this keeps happening, share the error reference with support.</p>
                     <div class="meta-grid">
                         <div class="meta-box">
-                            <span>Requested Path</span>
-                            <strong>{{ request.path if request else 'Unknown' }}</strong>
-                        </div>
-                        <div class="meta-box">
                             <span>Role</span>
                             <strong>{{ role|replace('_', ' ')|title if role else 'Guest' }}</strong>
+                        </div>
+                        <div class="meta-box">
+                            <span>Support</span>
+                            <strong>Use the reference below when reporting this issue.</strong>
                         </div>
                     </div>
                     <div class="error-ref">

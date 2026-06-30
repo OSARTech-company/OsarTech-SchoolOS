@@ -12,6 +12,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask import got_request_exception
 from flask_wtf.csrf import CSRFProtect, CSRFError
 import argparse
+import html as html_lib
 import json
 import csv
 import re
@@ -3715,7 +3716,32 @@ def _assistant_build_response(role, question, teacher_scope=None, source_page=''
             else:
                 q_norm = 'add students manual and csv import steps'
 
-    if len(q_norm.split()) <= 5 and user_history:
+    def _assistant_should_merge_recent_history(text_norm):
+        text = _assistant_normalize_text(text_norm or '')
+        if not text:
+            return False
+        if text in {'yes', 'y', 'ok', 'okay', 'sure', 'yeah', 'yep', 'alright', 'continue', 'go on', 'proceed'}:
+            return True
+        follow_up_starts = (
+            'and ',
+            'also ',
+            'then ',
+            'what about',
+            'how about',
+            'same ',
+            'again ',
+            'now ',
+            'here ',
+            'there ',
+            'it ',
+            'this ',
+            'that ',
+            'those ',
+            'these ',
+        )
+        return text.startswith(follow_up_starts)
+
+    if user_history and _assistant_should_merge_recent_history(q_norm):
         last_context = _assistant_normalize_text(' '.join(user_history[-2:]))
         if last_context:
             q_norm = (q_norm + ' ' + last_context).strip()
@@ -4820,7 +4846,7 @@ ROLE_ROUTE_NAMESPACE_EXCEPTIONS = {
     '/teacher/allocate-stream': {'teacher', 'school_admin'},
 }
 
-ROLE_SESSION_BINDING_ROLES = {'super_admin', 'school_admin', 'teacher', 'student'}
+ROLE_SESSION_BINDING_ROLES = {'super_admin', 'school_admin', 'teacher', 'student', 'bursar'}
 
 def _role_home_endpoint(role):
     role_name = (role or '').strip().lower()
@@ -4832,6 +4858,8 @@ def _role_home_endpoint(role):
         return 'teacher_dashboard'
     if role_name == 'student':
         return 'student_dashboard'
+    if role_name == 'bursar':
+        return 'bursar_dashboard'
     if role_name == 'parent':
         return 'parent_dashboard'
     return 'login'
@@ -5567,6 +5595,7 @@ _STUDENTS_PROMOTED_IS_BOOL = None
 _STUDENTS_HAS_USER_ID = None
 _STUDENTS_HAS_PARENT_ACCESS_COLS = None
 _STUDENTS_HAS_PARENT_MULTI_COLS = None
+_STUDENTS_HAS_LASTNAME_COL = None
 _STUDENTS_HAS_EMAIL_COL = None
 _STUDENTS_HAS_ARCHIVE_COLS = None
 _STUDENTS_HAS_PHONE_COL = None
@@ -5623,6 +5652,40 @@ def students_has_parent_access_columns():
     except Exception:
         _STUDENTS_HAS_PARENT_ACCESS_COLS = False
     return _STUDENTS_HAS_PARENT_ACCESS_COLS
+
+def students_has_lastname_column():
+    """Detect whether students.lastname exists."""
+    global _STUDENTS_HAS_LASTNAME_COL
+    if _STUDENTS_HAS_LASTNAME_COL is not None:
+        return _STUDENTS_HAS_LASTNAME_COL
+    try:
+        with db_connection() as conn:
+            c = conn.cursor()
+            db_execute(
+                c,
+                """SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'students'
+                     AND column_name = 'lastname'
+                   LIMIT 1""",
+                None,
+            )
+            _STUDENTS_HAS_LASTNAME_COL = bool(c.fetchone())
+            if not _STUDENTS_HAS_LASTNAME_COL:
+                try:
+                    with db_connection(commit=True) as heal_conn:
+                        heal_cursor = heal_conn.cursor()
+                        db_execute(
+                            heal_cursor,
+                            "ALTER TABLE students ADD COLUMN IF NOT EXISTS lastname TEXT DEFAULT ''",
+                        )
+                    _STUDENTS_HAS_LASTNAME_COL = True
+                except Exception:
+                    _STUDENTS_HAS_LASTNAME_COL = False
+    except Exception:
+        _STUDENTS_HAS_LASTNAME_COL = False
+    return _STUDENTS_HAS_LASTNAME_COL
 
 def students_has_parent_multi_access_columns():
     """Detect whether students has secondary parent + parent gender columns."""
@@ -6591,6 +6654,7 @@ def init_db():
                         school_id TEXT NOT NULL,
                         student_id TEXT NOT NULL,
                         firstname TEXT NOT NULL,
+                        lastname TEXT DEFAULT '',
                         email TEXT DEFAULT '',
                         student_phone TEXT DEFAULT '',
                         profile_image TEXT DEFAULT '',
@@ -6615,6 +6679,7 @@ def init_db():
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         UNIQUE(school_id, student_id)
                     )""")
+    safe_exec_ignore("ALTER TABLE students ADD COLUMN IF NOT EXISTS lastname TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE students ADD COLUMN email TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE students ADD COLUMN student_phone TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE students ADD COLUMN profile_image TEXT DEFAULT ''")
@@ -14660,6 +14725,8 @@ def build_school_setup_wizard_summary(school_id):
     """Return wizard progress and actionable school-admin setup steps."""
     sid = (school_id or '').strip()
     school = get_school(sid) or {}
+    school_type = normalize_school_type(school.get('school_type', 'mixed'))
+    is_primary_school = school_type == 'primary'
     current_term = get_current_term(school)
     current_year = (school.get('academic_year', '') or '').strip()
     profile = build_school_profile_completeness(sid)
@@ -14766,24 +14833,28 @@ def build_school_setup_wizard_summary(school_id):
         'class_count': len(class_names or []),
         'timetable_count': len(timetable_rows or []),
         'term_event_count': len(term_events or []),
+        'school_type': school_type,
+        'is_primary_school': is_primary_school,
     }
 
 
 def build_school_setup_wizard_flow(school_id):
     """Build the ordered first-login wizard flow for school admins."""
     summary = build_school_setup_wizard_summary(school_id)
+    school_type = summary.get('school_type', 'mixed')
+    is_primary_school = bool(summary.get('is_primary_school'))
     summary_steps = {str(step.get('key') or '').strip().lower(): step for step in (summary.get('steps') or [])}
     flow_steps = [
         {
             'key': 'welcome',
             'title': 'Welcome to School Setup',
-            'subtitle': 'This will take less than 5 minutes.',
-            'description': 'We will guide you through the essential school setup steps in a simple order.',
+            'subtitle': 'This will take less than 5 minutes.' if not is_primary_school else 'This primary school setup is streamlined around class teachers.',
+            'description': 'We will guide you through the essential school setup steps in a simple order.' if not is_primary_school else 'We will guide you through the essential school setup steps for a primary school, with a simpler class-teacher workflow.',
             'bullets': [
                 'Complete your school profile',
                 'Set school identity, colors, and signature',
                 'Configure classes, subjects, teachers, and students',
-                'Finish with timetable and term programs',
+                'Finish with timetable and term programs' if not is_primary_school else 'Finish with term programs and a simple timetable',
             ],
             'primary_label': 'Start Setup',
             'primary_step': 'profile',
@@ -14827,12 +14898,12 @@ def build_school_setup_wizard_flow(school_id):
         {
             'key': 'classes',
             'title': 'Step 3: Classes and Subjects',
-            'subtitle': 'Set the subjects each class will offer.',
-            'description': 'Create or review class subject configurations before you assign teachers.',
+            'subtitle': 'Set the subjects each class will offer.' if not is_primary_school else 'Set up the primary class groups and keep subjects simple.',
+            'description': 'Create or review class subject configurations before you assign teachers.' if not is_primary_school else 'Create or review primary class groups before you assign class teachers.',
             'bullets': [
                 'Add Nursery, Primary, JSS, and SS classes',
                 'Configure subjects offered for each class',
-                'Use SS streams only where the school needs Science, Art, or Commercial tracks',
+                'Use SS streams only where the school needs Science, Art, or Commercial tracks' if not is_primary_school else 'Keep class names simple and easy to manage',
             ],
             'primary_label': 'Open Class Subjects',
             'primary_endpoint': 'school_admin_class_subjects',
@@ -14844,8 +14915,8 @@ def build_school_setup_wizard_flow(school_id):
         {
             'key': 'teachers',
             'title': 'Step 4: Teachers',
-            'subtitle': 'Make sure your staff list is ready.',
-            'description': 'Add teachers before assigning class or subject responsibilities.',
+            'subtitle': 'Make sure your staff list is ready.' if not is_primary_school else 'Make sure your class teachers are ready.',
+            'description': 'Add teachers before assigning class or subject responsibilities.' if not is_primary_school else 'Add teachers before assigning class-teacher responsibilities.',
             'bullets': [
                 'Register active teachers',
                 'Review teacher names and contacts',
@@ -14861,8 +14932,8 @@ def build_school_setup_wizard_flow(school_id):
         {
             'key': 'students',
             'title': 'Step 5: Students',
-            'subtitle': 'Add the learners who will use the system.',
-            'description': 'Create student records for each class so results and attendance can work.',
+            'subtitle': 'Add the learners who will use the system.' if not is_primary_school else 'Add pupils for each primary class.',
+            'description': 'Create student records for each class so results and attendance can work.' if not is_primary_school else 'Create pupil records for each class so attendance and results can work smoothly.',
             'bullets': [
                 'Add students class by class',
                 'Use CSV import if you have many records',
@@ -14878,12 +14949,12 @@ def build_school_setup_wizard_flow(school_id):
         {
             'key': 'assignments',
             'title': 'Step 6: Assign Teachers',
-            'subtitle': 'Match teachers to classes first, then secondary subjects where needed.',
-            'description': 'Assign class teachers for all classes and subject teachers for secondary classes.',
+            'subtitle': 'Match teachers to classes first, then secondary subjects where needed.' if not is_primary_school else 'Match teachers to primary classes only.',
+            'description': 'Assign class teachers for all classes and subject teachers for secondary classes.' if not is_primary_school else 'Assign class teachers for primary classes only. Subject-teacher assignment is not needed in primary mode.',
             'bullets': [
-                'Assign class teachers for Nursery, Primary, JSS, and SS',
-                'Assign subject teachers only for JSS/SS classes',
-                'Check both assignment lists for the current term',
+                'Assign class teachers for Nursery, Primary, JSS, and SS' if not is_primary_school else 'Assign class teachers for each primary class',
+                'Assign subject teachers only for JSS/SS classes' if not is_primary_school else 'Skip subject-teacher assignment',
+                'Check both assignment lists for the current term' if not is_primary_school else 'Check the class-teacher list for the current term',
             ],
             'primary_label': 'Assign Teachers',
             'primary_endpoint': 'school_admin_teacher_assignments',
@@ -14895,8 +14966,8 @@ def build_school_setup_wizard_flow(school_id):
         {
             'key': 'schedule',
             'title': 'Step 7: Term Programs and Timetable',
-            'subtitle': 'Finish the calendar and class schedule.',
-            'description': 'Add term events, timetable rows, and school dates so the year is ready to run.',
+            'subtitle': 'Finish the calendar and class schedule.' if not is_primary_school else 'Finish the calendar and keep the timetable simple.',
+            'description': 'Add term events, timetable rows, and school dates so the year is ready to run.' if not is_primary_school else 'Add term events and simple schedule rows so the primary school year is ready to run.',
             'bullets': [
                 'Set term programs and dates',
                 'Fill the timetable coverage',
@@ -16467,8 +16538,13 @@ def get_effective_status_scale(cfg_or_school=None):
 
 
 def get_grade_label_map(cfg_or_school=None):
-    scale = get_effective_grade_scale(cfg_or_school)
-    if len(scale) >= 5:
+    source = cfg_or_school or {}
+    has_custom_scale = bool((source.get('grade_scale_json', '') or '').strip()) or isinstance(source.get('grade_scale'), list)
+    if has_custom_scale:
+        scale = get_effective_grade_scale(cfg_or_school)
+    else:
+        scale = []
+    if scale and len(scale) >= 5:
         return {
             'A': scale[0].get('label', DEFAULT_GRADE_LABELS['A']),
             'B': scale[1].get('label', DEFAULT_GRADE_LABELS['B']),
@@ -16476,7 +16552,6 @@ def get_grade_label_map(cfg_or_school=None):
             'D': scale[3].get('label', DEFAULT_GRADE_LABELS['D']),
             'F': scale[-1].get('label', DEFAULT_GRADE_LABELS['F']),
         }
-    source = cfg_or_school or {}
     return {
         'A': (source.get('grade_label_a', DEFAULT_GRADE_LABELS['A']) or DEFAULT_GRADE_LABELS['A']).strip() or DEFAULT_GRADE_LABELS['A'],
         'B': (source.get('grade_label_b', DEFAULT_GRADE_LABELS['B']) or DEFAULT_GRADE_LABELS['B']).strip() or DEFAULT_GRADE_LABELS['B'],
@@ -16486,26 +16561,57 @@ def get_grade_label_map(cfg_or_school=None):
     }
 
 
+def _grade_band_from_scale_index(index, scale_length):
+    """Map a custom grade-scale row index to the legacy A/B/C/D/F bands."""
+    if index >= max(0, scale_length - 1):
+        return 'F'
+    if index <= 0:
+        return 'A'
+    if index == 1:
+        return 'B'
+    if index == 2:
+        return 'C'
+    return 'D'
+
+
+def _display_session_user_id(value):
+    """Keep short IDs readable while preserving emails and usernames as entered."""
+    text = (value or '').strip()
+    if not text:
+        return ''
+    if '@' in text:
+        return text
+    return text.upper()
+
+
+def _lookup_case_insensitive_mapping_key(mapping, lookup_value):
+    """Find the original dict key for a case-insensitive lookup."""
+    needle = (lookup_value or '').strip().lower()
+    if not needle:
+        return ''
+    for key in (mapping or {}).keys():
+        if str(key).strip().lower() == needle:
+            return key
+    return ''
+
+
 def normalize_grade_band(grade_value, cfg_or_school=None):
     raw = (grade_value or '').strip()
     if not raw:
         return ''
+    reverse_label_map = {
+        (label or '').strip().casefold(): band
+        for band, label in get_grade_label_map(cfg_or_school).items()
+        if (label or '').strip()
+    }
+    mapped_band = reverse_label_map.get(raw.casefold())
+    if mapped_band:
+        return mapped_band
     scale = get_effective_grade_scale(cfg_or_school)
     for index, row in enumerate(scale):
         label = (row.get('label', '') or '').strip()
         if label and raw.casefold() == label.casefold():
-            if index == len(scale) - 1:
-                return 'F'
-            if len(scale) <= 2:
-                return 'A'
-            ratio = (index / max(1, len(scale) - 2)) if len(scale) > 2 else 0
-            if ratio <= 0.25:
-                return 'A'
-            if ratio <= 0.5:
-                return 'B'
-            if ratio <= 0.75:
-                return 'C'
-            return 'D'
+            return _grade_band_from_scale_index(index, len(scale))
     upper_raw = raw.upper()
     return upper_raw if upper_raw in DEFAULT_GRADE_LABELS else raw
 
@@ -16514,44 +16620,48 @@ def display_grade_label(grade_value, cfg_or_school=None):
     raw = (grade_value or '').strip()
     if not raw:
         return ''
+    source = cfg_or_school or {}
+    has_custom_scale = bool((source.get('grade_scale_json', '') or '').strip()) or isinstance(source.get('grade_scale'), list)
+    if not has_custom_scale and raw.upper() in DEFAULT_GRADE_LABELS:
+        return get_grade_label_map(cfg_or_school).get(raw.upper(), raw)
     scale = get_effective_grade_scale(cfg_or_school)
     for row in scale:
         label = (row.get('label', '') or '').strip()
         if label and raw.casefold() == label.casefold():
             return label
+    if raw.upper() in DEFAULT_GRADE_LABELS:
+        return get_grade_label_map(cfg_or_school).get(raw.upper(), raw)
     band = normalize_grade_band(raw, cfg_or_school)
     return get_grade_label_map(cfg_or_school).get(band, raw)
 
 
 def grade_css_class_from_grade(grade_value, cfg_or_school=None):
-    scale = get_effective_grade_scale(cfg_or_school)
     raw = (grade_value or '').strip()
-    index = None
+    band = normalize_grade_band(raw, cfg_or_school)
+    if band == 'A':
+        return 'grade-a'
+    if band == 'B':
+        return 'grade-b'
+    if band == 'C':
+        return 'grade-c'
+    if band == 'D':
+        return 'grade-d'
+    if band == 'F':
+        return 'grade-f'
+    scale = get_effective_grade_scale(cfg_or_school)
     for idx, row in enumerate(scale):
         if raw.casefold() == str(row.get('label', '') or '').strip().casefold():
-            index = idx
-            break
-    if index is None:
-        band = normalize_grade_band(grade_value, cfg_or_school)
-        if band == 'A':
-            return 'grade-a'
-        if band == 'B':
-            return 'grade-b'
-        if band == 'C':
-            return 'grade-c'
-        if band == 'D':
-            return 'grade-d'
-        return 'grade-f'
-    if index == len(scale) - 1:
-        return 'grade-f'
-    ratio = (index / max(1, len(scale) - 2)) if len(scale) > 2 else 0
-    if ratio <= 0.25:
-        return 'grade-a'
-    if ratio <= 0.5:
-        return 'grade-b'
-    if ratio <= 0.75:
-        return 'grade-c'
-    return 'grade-d'
+            band = _grade_band_from_scale_index(idx, len(scale))
+            if band == 'A':
+                return 'grade-a'
+            if band == 'B':
+                return 'grade-b'
+            if band == 'C':
+                return 'grade-c'
+            if band == 'D':
+                return 'grade-d'
+            return 'grade-f'
+    return 'grade-f'
 
 def grade_from_score(score, cfg):
     """Get configured grade label from score."""
@@ -16786,6 +16896,7 @@ def ensure_extended_features_schema():
             db_execute(c, "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
             db_execute(c, "UPDATE users SET password_changed_at = COALESCE(password_changed_at, CURRENT_TIMESTAMP)")
             db_execute(c, "ALTER TABLE users ADD COLUMN IF NOT EXISTS tutorial_seen_at TIMESTAMP")
+            db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS lastname TEXT DEFAULT ''")
             db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''")
             db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS student_phone TEXT DEFAULT ''")
             db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_phone TEXT")
@@ -16797,6 +16908,9 @@ def ensure_extended_features_schema():
             db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_password_hash_2 TEXT DEFAULT ''")
             db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_gender_2 TEXT DEFAULT ''")
             db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            db_execute(c, "ALTER TABLE bursars ADD COLUMN IF NOT EXISTS profile_image TEXT DEFAULT ''")
+            db_execute(c, "ALTER TABLE bursars ADD COLUMN IF NOT EXISTS is_archived INTEGER DEFAULT 0")
+            db_execute(c, "ALTER TABLE bursars ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP")
             db_execute(c, "ALTER TABLE class_timetables ADD COLUMN IF NOT EXISTS online_url TEXT DEFAULT ''")
             db_execute(
                 c,
@@ -17379,6 +17493,125 @@ def ensure_extended_features_schema():
                    )""",
             )
             db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_school_auto_backups_school_created ON school_auto_backups(school_id, created_at DESC)')
+            db_execute(
+                c,
+                """CREATE TABLE IF NOT EXISTS student_fee_accounts (
+                       id SERIAL PRIMARY KEY,
+                       school_id TEXT NOT NULL,
+                       student_id TEXT NOT NULL,
+                       student_name TEXT DEFAULT '',
+                       classname TEXT DEFAULT '',
+                       stream TEXT DEFAULT '',
+                       term TEXT DEFAULT '',
+                       academic_year TEXT DEFAULT '',
+                       fee_label TEXT DEFAULT 'School Fee',
+                       currency TEXT DEFAULT 'NGN',
+                       amount_due REAL NOT NULL DEFAULT 0,
+                       amount_paid REAL NOT NULL DEFAULT 0,
+                       balance_amount REAL NOT NULL DEFAULT 0,
+                       status TEXT NOT NULL DEFAULT 'pending',
+                       due_date TEXT DEFAULT '',
+                       note TEXT DEFAULT '',
+                       invoice_ref TEXT DEFAULT '',
+                       assessed_by TEXT DEFAULT '',
+                       assessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       UNIQUE(school_id, student_id, academic_year, term, fee_label)
+                   )""",
+            )
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_student_fee_accounts_school_class_term ON student_fee_accounts(school_id, classname, term, academic_year, updated_at DESC)')
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_student_fee_accounts_school_invoice_ref ON student_fee_accounts(school_id, invoice_ref)')
+            db_execute(
+                c,
+                """CREATE TABLE IF NOT EXISTS student_fee_payments (
+                       id SERIAL PRIMARY KEY,
+                       account_id INTEGER NOT NULL,
+                       school_id TEXT NOT NULL,
+                       student_id TEXT NOT NULL,
+                       term TEXT DEFAULT '',
+                       academic_year TEXT DEFAULT '',
+                       fee_label TEXT DEFAULT '',
+                       amount_paid REAL NOT NULL DEFAULT 0,
+                       payment_method TEXT DEFAULT '',
+                       payment_reference TEXT DEFAULT '',
+                       note TEXT DEFAULT '',
+                       recorded_by TEXT DEFAULT '',
+                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                   )""",
+            )
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_student_fee_payments_account_created ON student_fee_payments(account_id, created_at DESC)')
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_student_fee_payments_school_created ON student_fee_payments(school_id, created_at DESC)')
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_student_fee_payments_school_reference ON student_fee_payments(school_id, payment_reference)')
+            db_execute(
+                c,
+                """CREATE TABLE IF NOT EXISTS student_fee_review_queue (
+                       id SERIAL PRIMARY KEY,
+                       school_id TEXT NOT NULL,
+                       source TEXT DEFAULT '',
+                       student_id TEXT DEFAULT '',
+                       student_name TEXT DEFAULT '',
+                       invoice_ref TEXT DEFAULT '',
+                       payment_reference TEXT DEFAULT '',
+                       term TEXT DEFAULT '',
+                       academic_year TEXT DEFAULT '',
+                       fee_label TEXT DEFAULT 'School Fee',
+                       currency TEXT DEFAULT 'NGN',
+                       amount_paid REAL NOT NULL DEFAULT 0,
+                       reason TEXT DEFAULT '',
+                       payload_json TEXT DEFAULT '{}',
+                       status TEXT NOT NULL DEFAULT 'pending',
+                       reviewed_by TEXT DEFAULT '',
+                       reviewed_at TIMESTAMP,
+                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                   )""",
+            )
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_student_fee_review_queue_school_status_created ON student_fee_review_queue(school_id, status, created_at DESC)')
+            db_execute(
+                c,
+                """CREATE TABLE IF NOT EXISTS bursars (
+                       id SERIAL PRIMARY KEY,
+                       school_id TEXT NOT NULL,
+                       user_id TEXT NOT NULL,
+                       firstname TEXT NOT NULL,
+                       lastname TEXT NOT NULL,
+                       phone TEXT DEFAULT '',
+                       gender TEXT DEFAULT '',
+                       profile_image TEXT DEFAULT '',
+                       is_archived INTEGER DEFAULT 0,
+                       archived_at TIMESTAMP,
+                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                   )""",
+            )
+            db_execute(c, 'CREATE UNIQUE INDEX IF NOT EXISTS idx_bursars_school_user ON bursars(school_id, user_id)')
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_bursars_school_archived ON bursars(school_id, is_archived)')
+            db_execute(
+                c,
+                """CREATE TABLE IF NOT EXISTS school_documents (
+                       id SERIAL PRIMARY KEY,
+                       school_id TEXT NOT NULL,
+                       title TEXT NOT NULL,
+                       description TEXT DEFAULT '',
+                       audience TEXT DEFAULT 'parents',
+                       document_category TEXT DEFAULT '',
+                       target_classname TEXT DEFAULT '',
+                       target_stream TEXT DEFAULT '',
+                       target_subject TEXT DEFAULT '',
+                       external_url TEXT DEFAULT '',
+                       attachment_path TEXT DEFAULT '',
+                       attachment_name TEXT DEFAULT '',
+                       attachment_mime TEXT DEFAULT '',
+                       attachment_size INTEGER DEFAULT 0,
+                       is_active INTEGER NOT NULL DEFAULT 1,
+                       archived_at TIMESTAMP,
+                       created_by TEXT DEFAULT '',
+                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                   )""",
+            )
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_school_documents_school_active_created ON school_documents(school_id, is_active, created_at DESC)')
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_school_documents_school_audience ON school_documents(school_id, audience)')
         _EXTENDED_FEATURES_SCHEMA_READY = True
         return True
     except Exception as exc:
@@ -17417,6 +17650,1108 @@ def ensure_error_logs_schema():
     except Exception as exc:
         logging.warning("Failed to ensure error logs schema: %s", exc)
         return False
+
+SCHOOL_DOCUMENT_ALLOWED_EXTS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp'}
+SCHOOL_DOCUMENT_MAX_BYTES = 5 * 1024 * 1024
+
+def _normalize_fee_label(value):
+    text = (value or '').strip()
+    return text or 'School Fee'
+
+def _normalize_fee_currency(value):
+    text = (value or '').strip().upper()
+    return text[:10] or 'NGN'
+
+def _build_fee_invoice_ref(student_id, term, academic_year, fee_label='', school_id=''):
+    clean_student = re.sub(r'[^A-Za-z0-9]+', '', (student_id or '').strip()).upper() or 'STUDENT'
+    clean_term = re.sub(r'[^A-Za-z0-9]+', '', (term or '').strip()).upper() or 'TERM'
+    clean_year = re.sub(r'[^A-Za-z0-9]+', '', (academic_year or '').strip()).upper() or 'YEAR'
+    clean_school = re.sub(r'[^A-Za-z0-9]+', '', (school_id or '').strip()).upper()[:6]
+    suffix = secrets.token_hex(2).upper()
+    parts = ['SF']
+    if clean_school:
+        parts.append(clean_school)
+    parts.extend([clean_student[:12], clean_term[:8], clean_year[:8], suffix])
+    return '-'.join(parts)[:120]
+
+def _fee_status_from_values(amount_due, amount_paid, due_date=''):
+    due_val = max(0.0, float(amount_due or 0))
+    paid_val = max(0.0, float(amount_paid or 0))
+    balance = max(0.0, due_val - paid_val)
+    if due_val <= 0:
+        return 'pending', balance
+    if balance <= 0:
+        return 'paid', 0.0
+    status = 'part_paid' if paid_val > 0 else 'pending'
+    if due_date:
+        try:
+            if date.fromisoformat(str(due_date).strip()) < date.today():
+                status = 'overdue'
+        except Exception:
+            pass
+    return status, balance
+
+def _normalize_payment_reference(value):
+    return re.sub(r'[^A-Za-z0-9]+', '', (value or '').strip()).upper()
+
+def _find_student_fee_account_by_reference(school_id, payment_reference='', invoice_ref='', student_id='', term='', academic_year='', fee_label=''):
+    sid = (school_id or '').strip()
+    if not sid or not ensure_extended_features_schema():
+        return None
+    payment_ref_norm = _normalize_payment_reference(payment_reference)
+    invoice_ref_norm = _normalize_payment_reference(invoice_ref)
+    student_key = (student_id or '').strip()
+    term_key = (term or '').strip()
+    year_key = (academic_year or '').strip()
+    fee_key = _normalize_fee_label(fee_label)
+    with db_connection() as conn:
+        c = conn.cursor()
+        clauses = ['school_id = ?']
+        params = [sid]
+        if student_key:
+            clauses.append('student_id = ?')
+            params.append(student_key)
+        if term_key:
+            clauses.append('LOWER(TRIM(term)) = LOWER(TRIM(?))')
+            params.append(term_key)
+        if year_key:
+            clauses.append('LOWER(TRIM(academic_year)) = LOWER(TRIM(?))')
+            params.append(year_key)
+        if fee_key:
+            clauses.append('LOWER(TRIM(fee_label)) = LOWER(TRIM(?))')
+            params.append(fee_key)
+        db_execute(
+            c,
+            f"""SELECT id, school_id, student_id, student_name, classname, stream, term, academic_year, fee_label, currency,
+                      amount_due, amount_paid, balance_amount, status, due_date, note, invoice_ref, assessed_by, assessed_at,
+                      created_at, updated_at
+               FROM student_fee_accounts
+               WHERE {' AND '.join(clauses)}
+               ORDER BY updated_at DESC, id DESC""",
+            tuple(params),
+        )
+        rows = c.fetchall() or []
+    if not rows:
+        return None
+
+    def _row_to_account(row):
+        return {
+            'id': int(row[0] or 0),
+            'school_id': row[1] or '',
+            'student_id': row[2] or '',
+            'student_name': row[3] or '',
+            'classname': row[4] or '',
+            'stream': row[5] or '',
+            'term': row[6] or '',
+            'academic_year': row[7] or '',
+            'fee_label': row[8] or '',
+            'currency': row[9] or 'NGN',
+            'amount_due': float(row[10] or 0),
+            'amount_paid': float(row[11] or 0),
+            'balance_amount': float(row[12] or 0),
+            'status': row[13] or 'pending',
+            'due_date': row[14] or '',
+            'note': row[15] or '',
+            'invoice_ref': row[16] or '',
+            'assessed_by': row[17] or '',
+            'assessed_at': format_timestamp(row[18]) if row[18] else '',
+            'created_at': format_timestamp(row[19]),
+            'updated_at': format_timestamp(row[20]),
+        }
+
+    scored = []
+    for row in rows:
+        invoice_ref_row = (row[16] or '').strip()
+        invoice_norm = _normalize_payment_reference(invoice_ref_row)
+        student_ref = (row[2] or '').strip()
+        row_term = (row[6] or '').strip()
+        row_year = (row[7] or '').strip()
+        row_fee = _normalize_fee_label(row[8] or '')
+        score = 0
+        if invoice_ref_norm and invoice_norm and invoice_ref_norm == invoice_norm:
+            score += 100
+        if payment_ref_norm and invoice_norm and payment_ref_norm == invoice_norm:
+            score += 100
+        if payment_ref_norm and invoice_norm and (payment_ref_norm in invoice_norm or invoice_norm in payment_ref_norm):
+            score += 70
+        if payment_ref_norm and student_ref and _normalize_payment_reference(student_ref) and _normalize_payment_reference(student_ref) in payment_ref_norm:
+            score += 20
+        if term_key and row_term and term_key.lower() == row_term.lower():
+            score += 8
+        if year_key and row_year and year_key.lower() == row_year.lower():
+            score += 8
+        if fee_key and row_fee and fee_key.lower() == row_fee.lower():
+            score += 8
+        if student_key and student_ref and student_key.lower() == student_ref.lower():
+            score += 12
+        if score > 0:
+            scored.append((score, row))
+    if not scored:
+        return _row_to_account(rows[0]) if len(rows) == 1 else None
+    scored.sort(key=lambda item: (item[0], item[1][19] or ''), reverse=True)
+    best_score, best_row = scored[0]
+    if best_score < 20:
+        return None
+    return _row_to_account(best_row)
+
+def enqueue_student_fee_review(
+    school_id,
+    source='manual',
+    student_id='',
+    student_name='',
+    invoice_ref='',
+    payment_reference='',
+    term='',
+    academic_year='',
+    fee_label='School Fee',
+    currency='NGN',
+    amount_paid=0,
+    reason='',
+    payload=None,
+    status='pending',
+):
+    sid = (school_id or '').strip()
+    if not sid or not ensure_extended_features_schema():
+        return 0
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """INSERT INTO student_fee_review_queue
+               (school_id, source, student_id, student_name, invoice_ref, payment_reference, term, academic_year, fee_label, currency,
+                amount_paid, reason, payload_json, status, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
+            (
+                sid,
+                (source or 'manual').strip()[:40],
+                (student_id or '').strip()[:80],
+                (student_name or '').strip()[:120],
+                (invoice_ref or '').strip()[:120],
+                (payment_reference or '').strip()[:120],
+                (term or '').strip()[:40],
+                (academic_year or '').strip()[:40],
+                _normalize_fee_label(fee_label)[:80],
+                _normalize_fee_currency(currency),
+                max(0.0, float(amount_paid or 0)),
+                (reason or '').strip()[:300],
+                json.dumps(payload or {}, default=str),
+                (status or 'pending').strip()[:20],
+            ),
+        )
+        return int(getattr(c, 'lastrowid', 0) or 0)
+
+def save_school_document_attachment(file_storage):
+    if not file_storage or not (file_storage.filename or '').strip():
+        return ''
+    original_name = (file_storage.filename or '').strip()
+    ext = original_name.rsplit('.', 1)[-1].strip().lower() if '.' in original_name else ''
+    if not ext or ext not in SCHOOL_DOCUMENT_ALLOWED_EXTS:
+        raise ValueError('Document must be a PDF or image file (pdf, png, jpg, jpeg, gif, webp).')
+    raw = file_storage.read() or b''
+    if not raw:
+        raise ValueError('Document file is empty.')
+    if len(raw) > SCHOOL_DOCUMENT_MAX_BYTES:
+        raise ValueError('Document is too large. Maximum size is 5MB.')
+    date_seg = datetime.now().strftime('%Y%m')
+    rel_dir = os.path.join('uploads', 'school_documents', date_seg)
+    abs_dir = os.path.join(app.static_folder or 'static', rel_dir)
+    os.makedirs(abs_dir, exist_ok=True)
+    filename = f"doc_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{secrets.token_hex(6)}.{ext}"
+    abs_path = os.path.join(abs_dir, filename)
+    with open(abs_path, 'wb') as fh:
+        fh.write(raw)
+    return os.path.join(rel_dir, filename).replace('\\', '/')
+
+def get_school_documents(school_id, active_only=True):
+    sid = (school_id or '').strip()
+    if not sid or not ensure_extended_features_schema():
+        return []
+    with db_connection() as conn:
+        c = conn.cursor()
+        if active_only:
+            db_execute(
+                c,
+                """SELECT id, school_id, title, description, audience, document_category, target_classname, target_stream, target_subject,
+                          external_url, attachment_path, attachment_name, attachment_mime, attachment_size, is_active, archived_at,
+                          created_by, created_at, updated_at
+                   FROM school_documents
+                   WHERE school_id = ? AND is_active = 1
+                   ORDER BY created_at DESC, id DESC""",
+                (sid,),
+            )
+        else:
+            db_execute(
+                c,
+                """SELECT id, school_id, title, description, audience, document_category, target_classname, target_stream, target_subject,
+                          external_url, attachment_path, attachment_name, attachment_mime, attachment_size, is_active, archived_at,
+                          created_by, created_at, updated_at
+                   FROM school_documents
+                   WHERE school_id = ?
+                   ORDER BY created_at DESC, id DESC""",
+                (sid,),
+            )
+        rows = c.fetchall() or []
+    out = []
+    for row in rows:
+        attachment_path = row[10] or ''
+        out.append({
+            'id': int(row[0] or 0),
+            'school_id': row[1] or '',
+            'title': row[2] or '',
+            'description': row[3] or '',
+            'audience': (row[4] or 'parents').strip().lower() or 'parents',
+            'document_category': row[5] or '',
+            'target_classname': row[6] or '',
+            'target_stream': row[7] or '',
+            'target_subject': row[8] or '',
+            'external_url': row[9] or '',
+            'attachment_path': attachment_path,
+            'attachment_name': row[11] or '',
+            'attachment_mime': row[12] or '',
+            'attachment_size': int(row[13] or 0),
+            'is_active': bool(int(row[14] or 0)),
+            'archived_at': format_timestamp(row[15]) if row[15] else '',
+            'created_by': row[16] or '',
+            'created_at': format_timestamp(row[17]),
+            'updated_at': format_timestamp(row[18]),
+            'attachment_url': url_for('static', filename=attachment_path) if attachment_path else '',
+        })
+    return out
+
+def create_school_document(
+    school_id,
+    title,
+    description='',
+    audience='parents',
+    document_category='',
+    target_classname='',
+    target_stream='',
+    target_subject='',
+    external_url='',
+    attachment_path='',
+    attachment_name='',
+    attachment_mime='',
+    attachment_size=0,
+    created_by='',
+):
+    sid = (school_id or '').strip()
+    doc_title = (title or '').strip()
+    if not sid or not doc_title:
+        raise ValueError('School and document title are required.')
+    if not ensure_extended_features_schema():
+        raise ValueError('Document storage is unavailable.')
+    clean_audience = (audience or 'parents').strip().lower()
+    if clean_audience not in {'parents', 'teachers', 'students', 'staff', 'all'}:
+        clean_audience = 'parents'
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """INSERT INTO school_documents
+               (school_id, title, description, audience, document_category, target_classname, target_stream, target_subject,
+                external_url, attachment_path, attachment_name, attachment_mime, attachment_size, is_active, created_by, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
+            (
+                sid,
+                doc_title[:160],
+                (description or '').strip()[:1200],
+                clean_audience,
+                (document_category or '').strip()[:80],
+                (target_classname or '').strip()[:40],
+                (target_stream or '').strip()[:40],
+                normalize_subject_name(target_subject)[:120],
+                (external_url or '').strip()[:500],
+                (attachment_path or '').strip()[:260],
+                (attachment_name or '').strip()[:160],
+                (attachment_mime or '').strip()[:120],
+                max(0, int(attachment_size or 0)),
+                (created_by or '').strip()[:120],
+            ),
+        )
+    return True
+
+def archive_school_document(school_id, document_id):
+    sid = (school_id or '').strip()
+    if not sid or not ensure_extended_features_schema():
+        return 0
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """UPDATE school_documents
+               SET is_active = 0, archived_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+               WHERE school_id = ? AND id = ?""",
+            (sid, int(document_id or 0)),
+        )
+        return int(c.rowcount or 0)
+
+def get_student_fee_account(school_id, student_id, term, academic_year, fee_label):
+    sid = (school_id or '').strip()
+    student_key = (student_id or '').strip()
+    term_name = (term or '').strip()
+    year_name = (academic_year or '').strip()
+    fee_name = _normalize_fee_label(fee_label)
+    if not sid or not student_key or not ensure_extended_features_schema():
+        return None
+    with db_connection() as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """SELECT id, school_id, student_id, student_name, classname, stream, term, academic_year, fee_label, currency,
+                      amount_due, amount_paid, balance_amount, status, due_date, note, invoice_ref, assessed_by, assessed_at,
+                      created_at, updated_at
+               FROM student_fee_accounts
+               WHERE school_id = ? AND student_id = ? AND term = ? AND academic_year = ? AND fee_label = ?
+               LIMIT 1""",
+            (sid, student_key, term_name, year_name, fee_name),
+        )
+        row = c.fetchone()
+    if not row:
+        return None
+    return {
+        'id': int(row[0] or 0),
+        'school_id': row[1] or '',
+        'student_id': row[2] or '',
+        'student_name': row[3] or '',
+        'classname': row[4] or '',
+        'stream': row[5] or '',
+        'term': row[6] or '',
+        'academic_year': row[7] or '',
+        'fee_label': row[8] or '',
+        'currency': row[9] or 'NGN',
+        'amount_due': float(row[10] or 0),
+        'amount_paid': float(row[11] or 0),
+        'balance_amount': float(row[12] or 0),
+        'status': row[13] or 'pending',
+        'due_date': row[14] or '',
+        'note': row[15] or '',
+        'invoice_ref': row[16] or '',
+        'assessed_by': row[17] or '',
+        'assessed_at': format_timestamp(row[18]) if row[18] else '',
+        'created_at': format_timestamp(row[19]),
+        'updated_at': format_timestamp(row[20]),
+    }
+
+def _refresh_fee_account_totals_with_cursor(c, account_id):
+    db_execute(
+        c,
+        """SELECT amount_due, due_date, currency, school_id, student_id, term, academic_year, fee_label, invoice_ref
+           FROM student_fee_accounts
+           WHERE id = ?
+           LIMIT 1""",
+        (int(account_id or 0),),
+    )
+    account = c.fetchone()
+    if not account:
+        return None
+    db_execute(
+        c,
+        """SELECT COALESCE(SUM(amount_paid), 0), COUNT(*), MAX(created_at)
+           FROM student_fee_payments
+           WHERE account_id = ?""",
+        (int(account_id or 0),),
+    )
+    pay_row = c.fetchone() or [0, 0, None]
+    amount_due = float(account[0] or 0)
+    due_date = account[1] or ''
+    amount_paid = float(pay_row[0] or 0)
+    status, balance = _fee_status_from_values(amount_due, amount_paid, due_date=due_date)
+    db_execute(
+        c,
+        """UPDATE student_fee_accounts
+           SET amount_paid = ?, balance_amount = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?""",
+        (amount_paid, balance, status, int(account_id or 0)),
+    )
+    return {
+        'school_id': account[3] or '',
+        'student_id': account[4] or '',
+        'term': account[5] or '',
+        'academic_year': account[6] or '',
+        'fee_label': account[7] or '',
+        'invoice_ref': account[8] or '',
+        'amount_due': amount_due,
+        'amount_paid': amount_paid,
+        'balance_amount': balance,
+        'status': status,
+        'payment_count': int(pay_row[1] or 0),
+        'latest_payment_at': format_timestamp(pay_row[2]) if pay_row[2] else '',
+    }
+
+def upsert_student_fee_account(school_id, student_data, fee_label, amount_due, term, academic_year, currency='NGN', due_date='', note='', assessed_by=''):
+    sid = (school_id or '').strip()
+    student_id = (student_data.get('student_id') or '').strip()
+    if not sid or not student_id:
+        raise ValueError('Student fee account requires a school and student.')
+    if not ensure_extended_features_schema():
+        raise ValueError('Fee tables are unavailable.')
+    account = get_student_fee_account(sid, student_id, term, academic_year, fee_label) or {}
+    invoice_ref = (account.get('invoice_ref') or '').strip() or _build_fee_invoice_ref(student_id, term, academic_year, fee_label, sid)
+    student_name = (student_data.get('firstname') or student_data.get('student_name') or '').strip()
+    classname = (student_data.get('classname') or '').strip()
+    stream = (student_data.get('stream') or '').strip()
+    fee_name = _normalize_fee_label(fee_label)
+    currency_code = _normalize_fee_currency(currency)
+    due_value = max(0.0, float(amount_due or 0))
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """INSERT INTO student_fee_accounts
+               (school_id, student_id, student_name, classname, stream, term, academic_year, fee_label, currency,
+                amount_due, amount_paid, balance_amount, status, due_date, note, invoice_ref, assessed_by, assessed_at, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+               ON CONFLICT(school_id, student_id, academic_year, term, fee_label) DO UPDATE SET
+                 student_name = excluded.student_name,
+                 classname = excluded.classname,
+                 stream = excluded.stream,
+                 currency = excluded.currency,
+                 amount_due = excluded.amount_due,
+                 due_date = excluded.due_date,
+                 note = excluded.note,
+                 invoice_ref = CASE WHEN COALESCE(student_fee_accounts.invoice_ref, '') <> '' THEN student_fee_accounts.invoice_ref ELSE excluded.invoice_ref END,
+                 assessed_by = excluded.assessed_by,
+                 assessed_at = CURRENT_TIMESTAMP,
+                 updated_at = CURRENT_TIMESTAMP""",
+            (
+                sid,
+                student_id,
+                student_name,
+                classname,
+                stream,
+                (term or '').strip(),
+                (academic_year or '').strip(),
+                fee_name,
+                currency_code,
+                due_value,
+                due_date or '',
+                note or '',
+                invoice_ref,
+                (assessed_by or '').strip()[:120],
+            ),
+        )
+        db_execute(
+            c,
+            """SELECT id FROM student_fee_accounts
+               WHERE school_id = ? AND student_id = ? AND term = ? AND academic_year = ? AND fee_label = ?
+               LIMIT 1""",
+            (sid, student_id, (term or '').strip(), (academic_year or '').strip(), fee_name),
+        )
+        row = c.fetchone()
+        if row:
+            _refresh_fee_account_totals_with_cursor(c, row[0])
+    return get_student_fee_account(sid, student_id, term, academic_year, fee_name)
+
+def record_student_fee_payment(school_id, student_id, term, academic_year, fee_label, amount_paid, payment_method='cash', payment_reference='', note='', recorded_by=''):
+    sid = (school_id or '').strip()
+    student_key = (student_id or '').strip()
+    fee_name = _normalize_fee_label(fee_label)
+    if not sid or not student_key:
+        raise ValueError('Student and school are required.')
+    if not ensure_extended_features_schema():
+        raise ValueError('Fee tables are unavailable.')
+    payment_method_key = (payment_method or 'cash').strip().lower()
+    account = get_student_fee_account(sid, student_key, term, academic_year, fee_name)
+    if not account:
+        account = _find_student_fee_account_by_reference(
+            sid,
+            payment_reference=payment_reference,
+            invoice_ref=payment_reference,
+            student_id=student_key,
+            term=term,
+            academic_year=academic_year,
+            fee_label=fee_name,
+        )
+        if account:
+            student_key = (account.get('student_id') or student_key).strip() or student_key
+            term = (account.get('term') or term).strip() or term
+            academic_year = (account.get('academic_year') or academic_year).strip() or academic_year
+            fee_name = _normalize_fee_label(account.get('fee_label') or fee_name)
+    if not account:
+        if payment_method_key in {'transfer', 'bank transfer', 'wire', 'card', 'mobile_money', 'mobile money', 'pos', 'online'} or payment_reference:
+            student = load_student(sid, student_key) or {'student_id': student_key}
+            enqueue_student_fee_review(
+                sid,
+                source='payment_entry',
+                student_id=student_key,
+                student_name=student.get('firstname', '') or student.get('student_name', '') or student_key,
+                invoice_ref='',
+                payment_reference=payment_reference,
+                term=term,
+                academic_year=academic_year,
+                fee_label=fee_name,
+                currency='NGN',
+                amount_paid=amount_paid,
+                reason='Unmatched payment reference. Awaiting bursar review.',
+                payload={
+                    'payment_method': payment_method_key,
+                    'recorded_by': recorded_by,
+                    'note': note,
+                    'student_id': student_key,
+                },
+            )
+            return None
+        student = load_student(sid, student_key) or {'student_id': student_key}
+        account = upsert_student_fee_account(
+            sid,
+            student,
+            fee_name,
+            0,
+            term,
+            academic_year,
+            note='Auto-created fee account from payment entry.',
+            assessed_by=recorded_by,
+        ) or {}
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """INSERT INTO student_fee_payments
+               (account_id, school_id, student_id, term, academic_year, fee_label, amount_paid, payment_method, payment_reference, note, recorded_by, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+            (
+                int(account.get('id') or 0),
+                sid,
+                student_key,
+                (term or '').strip(),
+                (academic_year or '').strip(),
+                fee_name,
+                max(0.0, float(amount_paid or 0)),
+                (payment_method or 'cash').strip(),
+                (payment_reference or '').strip()[:120],
+                (note or '').strip()[:500],
+                (recorded_by or '').strip()[:120],
+            ),
+        )
+        _refresh_fee_account_totals_with_cursor(c, int(account.get('id') or 0))
+    return get_student_fee_account(sid, student_key, term, academic_year, fee_name)
+
+def get_student_fee_payments(school_id, student_id, term, academic_year, fee_label):
+    sid = (school_id or '').strip()
+    student_key = (student_id or '').strip()
+    fee_name = _normalize_fee_label(fee_label)
+    account = get_student_fee_account(sid, student_key, term, academic_year, fee_name)
+    if not account:
+        return []
+    with db_connection() as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """SELECT amount_paid, payment_method, payment_reference, note, recorded_by, created_at
+               FROM student_fee_payments
+               WHERE account_id = ?
+               ORDER BY created_at DESC, id DESC""",
+            (int(account.get('id') or 0),),
+        )
+        rows = c.fetchall() or []
+    return [{
+        'amount_paid': float(row[0] or 0),
+        'payment_method': row[1] or 'cash',
+        'payment_reference': row[2] or '',
+        'note': row[3] or '',
+        'recorded_by': row[4] or '',
+        'created_at': format_timestamp(row[5]),
+    } for row in rows]
+
+def get_school_fee_accounts(school_id, class_filter='', term_filter='', student_filter='', fee_label=''):
+    sid = (school_id or '').strip()
+    if not sid or not ensure_extended_features_schema():
+        return []
+    class_name = (class_filter or '').strip()
+    term_name = (term_filter or '').strip()
+    student_search = (student_filter or '').strip().lower()
+    fee_name = _normalize_fee_label(fee_label)
+    with db_connection() as conn:
+        c = conn.cursor()
+        clauses = ["school_id = ?"]
+        params = [sid]
+        if class_name:
+            clauses.append("LOWER(classname) = LOWER(?)")
+            params.append(class_name)
+        if term_name:
+            clauses.append("term = ?")
+            params.append(term_name)
+        if fee_name:
+            clauses.append("fee_label = ?")
+            params.append(fee_name)
+        db_execute(
+            c,
+            f"""SELECT id, school_id, student_id, student_name, classname, stream, term, academic_year, fee_label, currency,
+                       amount_due, amount_paid, balance_amount, status, due_date, note, invoice_ref, assessed_by, assessed_at,
+                       created_at, updated_at
+                FROM student_fee_accounts
+                WHERE {' AND '.join(clauses)}
+                ORDER BY LOWER(COALESCE(classname, '')), LOWER(COALESCE(student_name, student_id)), updated_at DESC""",
+            tuple(params),
+        )
+        rows = c.fetchall() or []
+    out = []
+    for row in rows:
+        student_name = row[3] or ''
+        student_id = row[2] or ''
+        if student_search:
+            haystack = ' '.join([student_name, student_id, row[4] or '', row[16] or '']).lower()
+            if student_search not in haystack:
+                continue
+        out.append({
+            'id': int(row[0] or 0),
+            'school_id': row[1] or '',
+            'student_id': student_id,
+            'student_name': student_name,
+            'classname': row[4] or '',
+            'stream': row[5] or '',
+            'term': row[6] or '',
+            'academic_year': row[7] or '',
+            'fee_label': row[8] or '',
+            'currency': row[9] or 'NGN',
+            'amount_due': float(row[10] or 0),
+            'amount_paid': float(row[11] or 0),
+            'balance_amount': float(row[12] or 0),
+            'status': row[13] or 'pending',
+            'due_date': row[14] or '',
+            'note': row[15] or '',
+            'invoice_ref': row[16] or '',
+            'assessed_by': row[17] or '',
+            'assessed_at': format_timestamp(row[18]) if row[18] else '',
+            'created_at': format_timestamp(row[19]),
+            'updated_at': format_timestamp(row[20]),
+            'payment_count': 0,
+        })
+    return out
+
+def get_school_fee_summary(school_id, class_filter='', term_filter='', student_filter='', fee_label=''):
+    rows = get_school_fee_accounts(school_id, class_filter=class_filter, term_filter=term_filter, student_filter=student_filter, fee_label=fee_label)
+    summary = {
+        'students': len(rows),
+        'tracked_students': len({row['student_id'] for row in rows if row.get('student_id')}),
+        'total_due': sum(float(row.get('amount_due', 0) or 0) for row in rows),
+        'total_paid': sum(float(row.get('amount_paid', 0) or 0) for row in rows),
+        'outstanding': sum(float(row.get('balance_amount', 0) or 0) for row in rows),
+        'overdue_rows': sum(1 for row in rows if (row.get('status') or '').strip().lower() == 'overdue'),
+        'part_paid_rows': sum(1 for row in rows if (row.get('status') or '').strip().lower() == 'part_paid'),
+        'pending_rows': sum(1 for row in rows if (row.get('status') or '').strip().lower() == 'pending'),
+    }
+    return summary
+
+def _document_matches_student(document_row, student_row):
+    audience = (document_row.get('audience') or 'parents').strip().lower()
+    if audience not in {'parents', 'all', 'students'}:
+        return False
+    doc_class = canonicalize_classname(document_row.get('target_classname', ''))
+    doc_stream = (document_row.get('target_stream') or '').strip().lower()
+    doc_subject = normalize_subject_name(document_row.get('target_subject', ''))
+    student_class = canonicalize_classname(student_row.get('classname', ''))
+    student_stream = (student_row.get('stream') or '').strip().lower()
+    student_subjects = {normalize_subject_name(item).lower() for item in (student_row.get('subjects') or [])}
+    if doc_class and student_class.lower() != doc_class.lower():
+        return False
+    if doc_stream and student_stream != doc_stream:
+        return False
+    if doc_subject and doc_subject.lower() not in student_subjects:
+        return False
+    return True
+
+def get_parent_documents_for_children(parent_phone, children):
+    phone = normalize_parent_phone(parent_phone)
+    if not phone:
+        return [], {}
+    child_rows = list(children or [])
+    by_school = {}
+    for row in child_rows:
+        school_id = (row.get('school_id') or '').strip()
+        if not school_id:
+            continue
+        by_school.setdefault(school_id, {'school_name': row.get('school_name', school_id), 'students': []})
+        by_school[school_id]['students'].append(row)
+    documents = []
+    counts = {}
+    for school_id, payload in by_school.items():
+        school_docs = get_school_documents(school_id, active_only=True)
+        visible_docs = []
+        for doc in school_docs:
+            if (doc.get('audience') or 'parents').strip().lower() not in {'parents', 'all'}:
+                continue
+            matched = False
+            for child in payload.get('students', []):
+                if _document_matches_student(doc, child):
+                    matched = True
+                    break
+            if not matched:
+                continue
+            visible_docs.append(doc)
+        counts[payload.get('school_name', school_id)] = len(visible_docs)
+        for doc in visible_docs:
+            item = dict(doc)
+            item['school_name'] = payload.get('school_name', school_id)
+            documents.append(item)
+    documents.sort(key=lambda row: ((row.get('created_at') or ''), row.get('title', '')), reverse=True)
+    return documents, counts
+
+def build_parent_fee_rows(parent_phone, children):
+    phone = normalize_parent_phone(parent_phone)
+    rows = []
+    overview = {
+        'children': 0,
+        'accounts': 0,
+        'overdue': 0,
+        'total_due': 0.0,
+        'total_paid': 0.0,
+        'outstanding': 0.0,
+    }
+    if not phone:
+        return rows, overview
+    for child in list(children or []):
+        school_id = (child.get('school_id') or '').strip()
+        student_id = (child.get('student_id') or '').strip()
+        if not school_id or not student_id:
+            continue
+        overview['children'] += 1
+        student_accounts = get_school_fee_accounts(
+            school_id,
+            class_filter=child.get('classname', ''),
+            term_filter='',
+            student_filter=student_id,
+            fee_label='',
+        )
+        recent_accounts = sorted(student_accounts, key=lambda row: (row.get('updated_at') or '', row.get('created_at') or ''), reverse=True)
+        if not recent_accounts:
+            continue
+        summary = recent_accounts[0]
+        current_school = get_school(school_id) or {}
+        current_term = get_current_term(current_school)
+        current_year = (current_school or {}).get('academic_year', '')
+        receipt_url = url_for(
+            'bursar_fee_receipt',
+            student_id=student_id,
+            term=summary.get('term') or current_term or '',
+            academic_year=summary.get('academic_year') or current_year or '',
+            fee_label=summary.get('fee_label') or 'School Fee',
+            invoice_ref=summary.get('invoice_ref') or '',
+        )
+        rows.append({
+            'key': f"{school_id}::{student_id}",
+            'school_id': school_id,
+            'school_name': current_school.get('school_name', school_id),
+            'student_id': student_id,
+            'student_name': child.get('firstname', '') or summary.get('student_name', '') or student_id,
+            'classname': child.get('classname', '') or summary.get('classname', ''),
+            'stream': child.get('stream', '') or summary.get('stream', ''),
+            'current_term': current_term,
+            'current_year': current_year,
+            'summary': summary,
+            'recent_accounts': recent_accounts[:5],
+            'receipt_url': receipt_url,
+        })
+        overview['children'] += 1
+        overview['accounts'] += len(recent_accounts)
+        overview['overdue'] += sum(1 for account in recent_accounts if (account.get('status') or '').strip().lower() == 'overdue')
+        overview['total_due'] += sum(float(account.get('amount_due', 0) or 0) for account in recent_accounts)
+        overview['total_paid'] += sum(float(account.get('amount_paid', 0) or 0) for account in recent_accounts)
+        overview['outstanding'] += sum(float(account.get('balance_amount', 0) or 0) for account in recent_accounts)
+    return rows, overview
+
+def _load_parent_portal_children():
+    allowed_keys = _parent_allowed_student_keys()
+    if not allowed_keys:
+        return [], {}
+    key_pairs = []
+    student_ids_by_school = {}
+    for key in sorted(allowed_keys):
+        if '::' not in key:
+            continue
+        school_id, student_id = key.split('::', 1)
+        school_id = (school_id or '').strip()
+        student_id = (student_id or '').strip()
+        if not school_id or not student_id:
+            continue
+        key_pairs.append((key, school_id, student_id))
+        student_ids_by_school.setdefault(school_id, []).append(student_id)
+    schools_by_id = {sid: (get_school(sid) or {}) for sid in student_ids_by_school.keys()}
+    students_by_key = {}
+    for sid, student_ids in student_ids_by_school.items():
+        rows = load_students_for_student_ids(sid, student_ids)
+        for student_id, student in rows.items():
+            students_by_key[f'{sid}::{student_id}'] = student
+    children = []
+    for key, school_id, student_id in key_pairs:
+        student = students_by_key.get(key)
+        if not student:
+            continue
+        school = schools_by_id.get(school_id, {})
+        children.append({
+            'key': key,
+            'school_id': school_id,
+            'school_name': (school or {}).get('school_name', school_id),
+            'student_id': student_id,
+            'firstname': student.get('firstname', ''),
+            'classname': student.get('classname', ''),
+            'stream': student.get('stream', ''),
+            'subjects': student.get('subjects', []),
+        })
+    children.sort(key=lambda row: ((row.get('firstname') or '').lower(), (row.get('student_id') or '').lower()))
+    return children, schools_by_id
+
+def _load_fee_workspace_context(school_id, request_args=None):
+    school = get_school(school_id) or {}
+    current_term = get_current_term(school)
+    current_year = (school.get('academic_year') or '').strip()
+    current_role = (session.get('role') or '').strip().lower()
+    request_args = request_args or {}
+    selected_class = canonicalize_classname((request_args.get('class', '') or '').strip())
+    selected_term = (request_args.get('term', '') or '').strip()
+    selected_student_id = (request_args.get('student_id', '') or '').strip()
+    fee_label = _normalize_fee_label(request_args.get('fee_label', '') or 'School Fee')
+    currency = _normalize_fee_currency(request_args.get('currency', '') or 'NGN')
+    if not selected_term:
+        selected_term = current_term
+    if not selected_term:
+        selected_term = 'First Term'
+    available_classes, available_terms = get_student_filter_options(school_id)
+    if current_term and current_term not in set(available_terms or []):
+        available_terms = list(available_terms or []) + [current_term]
+    if selected_term and selected_term not in set(available_terms or []):
+        available_terms = list(available_terms or []) + [selected_term]
+    available_terms = sorted(set([term for term in available_terms if term]), key=lambda t: (term_sort_value(t), t))
+    if current_role == 'teacher':
+        available_classes = filter_supported_classnames(available_classes or [])
+    if selected_class and selected_class not in set(available_classes or []):
+        selected_class = ''
+    students_data = load_students(
+        school_id,
+        class_filter=selected_class,
+        term_filter=selected_term,
+        include_archived=False,
+    )
+    if selected_student_id:
+        students_data = {
+            sid: row for sid, row in students_data.items()
+            if sid == selected_student_id or (row.get('student_id') or '').strip() == selected_student_id
+        }
+    student_rows = []
+    for student_id, student in students_data.items():
+        student_rows.append({
+            'student_id': student_id,
+            'firstname': student.get('firstname', ''),
+            'classname': student.get('classname', ''),
+            'stream': student.get('stream', ''),
+            'subjects': student.get('subjects', []),
+            'term': student.get('term', ''),
+        })
+    if selected_class:
+        student_rows = [row for row in student_rows if (row.get('classname') or '').strip() == selected_class]
+    if selected_student_id:
+        student_rows = [row for row in student_rows if (row.get('student_id') or '').strip() == selected_student_id]
+    fee_accounts = get_school_fee_accounts(
+        school_id,
+        class_filter=selected_class,
+        term_filter=selected_term,
+        student_filter=selected_student_id,
+        fee_label=fee_label,
+    )
+    fee_summary = get_school_fee_summary(
+        school_id,
+        class_filter=selected_class,
+        term_filter=selected_term,
+        student_filter=selected_student_id,
+        fee_label=fee_label,
+    )
+    return {
+        'school': school,
+        'school_id': school_id,
+        'current_term': current_term,
+        'current_year': current_year,
+        'selected_class': selected_class,
+        'selected_term': selected_term,
+        'selected_student_id': selected_student_id,
+        'fee_label': fee_label,
+        'currency': currency,
+        'available_classes': available_classes,
+        'available_terms': available_terms,
+        'student_rows': student_rows,
+        'fee_accounts': fee_accounts,
+        'fee_summary': fee_summary,
+        'role': current_role,
+    }
+
+def _render_fee_workspace(bursar_mode=False):
+    role = (session.get('role') or '').strip().lower()
+    allowed_roles = {'school_admin', 'bursar'}
+    if role not in allowed_roles:
+        return redirect(url_for('login'))
+    school_id = (session.get('school_id') or '').strip()
+    if not school_id:
+        flash('School session expired. Please login again.', 'error')
+        return redirect(url_for('login'))
+    context = _load_fee_workspace_context(school_id, request.args)
+    school = context['school']
+    current_year = context['current_year']
+    current_term = context['current_term']
+    selected_class = context['selected_class']
+    selected_term = context['selected_term']
+    selected_student_id = context['selected_student_id']
+    fee_label = context['fee_label']
+    currency = context['currency']
+    student_rows = context['student_rows']
+    fee_accounts = context['fee_accounts']
+    fee_summary = context['fee_summary']
+
+    if request.method == 'POST':
+        action = (request.form.get('action', '') or '').strip().lower()
+        post_class = canonicalize_classname((request.form.get('class', '') or '').strip()) or selected_class
+        post_term = (request.form.get('term', '') or '').strip() or selected_term
+        post_student_id = (request.form.get('student_id', '') or '').strip() or selected_student_id
+        post_fee_label = _normalize_fee_label(request.form.get('fee_label', '') or fee_label)
+        post_currency = _normalize_fee_currency(request.form.get('currency', '') or currency)
+        post_note = (request.form.get('note', '') or request.form.get('payment_note', '') or '').strip()
+        if action == 'bulk_assess':
+            try:
+                amount_due = safe_float(request.form.get('amount_due', 0), 0.0)
+            except Exception:
+                amount_due = 0.0
+            due_date = (request.form.get('due_date', '') or '').strip()
+            targets = student_rows or []
+            if post_student_id:
+                targets = [row for row in targets if (row.get('student_id') or '').strip() == post_student_id]
+            if not targets and not post_student_id and not post_class:
+                targets = []
+                live_students = load_students(school_id, class_filter='', term_filter=post_term or current_term, include_archived=False)
+                for student_id, student in live_students.items():
+                    targets.append({
+                        'student_id': student_id,
+                        'firstname': student.get('firstname', ''),
+                        'classname': student.get('classname', ''),
+                        'stream': student.get('stream', ''),
+                    })
+            if not targets:
+                flash('No students matched the selected filter.', 'warning')
+            else:
+                saved_count = 0
+                for student in targets:
+                    try:
+                        upsert_student_fee_account(
+                            school_id,
+                            student,
+                            post_fee_label,
+                            amount_due,
+                            post_term or current_term or '',
+                            current_year,
+                            currency=post_currency,
+                            due_date=due_date,
+                            note=post_note,
+                            assessed_by=session.get('user_id', ''),
+                        )
+                        saved_count += 1
+                    except Exception as exc:
+                        logging.exception("Could not save fee assessment for %s", student.get('student_id', ''))
+                        flash(f'Fee assessment failed for {student.get("student_id", "")}: {exc}', 'error')
+                if saved_count:
+                    flash(f'Fee assessment saved for {saved_count} student(s).', 'success')
+                return redirect(url_for(
+                    request.endpoint or 'school_admin_student_fees',
+                    **{
+                        'class': post_class,
+                        'term': post_term,
+                        'student_id': post_student_id,
+                        'fee_label': post_fee_label,
+                        'currency': post_currency,
+                    },
+                ))
+        elif action == 'record_payment':
+            student_id = (request.form.get('student_id', '') or '').strip()
+            term_name = (request.form.get('term', '') or '').strip() or current_term
+            year_name = current_year
+            fee_name = _normalize_fee_label(request.form.get('fee_label', '') or fee_label)
+            try:
+                amount_paid = safe_float(request.form.get('amount_paid', 0), 0.0)
+            except Exception:
+                amount_paid = 0.0
+            payment_method = (request.form.get('payment_method', '') or 'cash').strip() or 'cash'
+            payment_reference = (request.form.get('payment_reference', '') or '').strip()
+            if not student_id:
+                flash('Student ID is required to record a payment.', 'error')
+            else:
+                try:
+                    payment_result = record_student_fee_payment(
+                        school_id,
+                        student_id,
+                        term_name,
+                        year_name,
+                        fee_name,
+                        amount_paid,
+                        payment_method=payment_method,
+                        payment_reference=payment_reference,
+                        note=post_note,
+                        recorded_by=session.get('user_id', ''),
+                    )
+                    if payment_result is None:
+                        flash('Payment could not be matched automatically and was queued for review.', 'warning')
+                        return redirect(url_for(
+                            request.endpoint or 'school_admin_student_fees',
+                            **{
+                                'class': post_class,
+                                'term': term_name,
+                                'student_id': student_id,
+                                'fee_label': fee_name,
+                                'currency': post_currency,
+                            },
+                        ))
+                    flash('Payment recorded successfully.', 'success')
+                    return redirect(url_for(
+                        request.endpoint or 'school_admin_student_fees',
+                        **{
+                            'class': post_class,
+                            'term': term_name,
+                            'student_id': student_id,
+                            'fee_label': fee_name,
+                            'currency': post_currency,
+                        },
+                    ))
+                except Exception as exc:
+                    logging.exception("Could not record fee payment.")
+                    flash(f'Could not record payment: {exc}', 'error')
+        else:
+            if request.form:
+                flash('Unsupported fee action.', 'warning')
+
+        context = _load_fee_workspace_context(
+            school_id,
+            {
+                'class': post_class,
+                'term': post_term,
+                'student_id': post_student_id,
+                'fee_label': post_fee_label,
+                'currency': post_currency,
+            },
+        )
+        school = context['school']
+        current_year = context['current_year']
+        current_term = context['current_term']
+        selected_class = context['selected_class']
+        selected_term = context['selected_term']
+        selected_student_id = context['selected_student_id']
+        fee_label = context['fee_label']
+        currency = context['currency']
+        student_rows = context['student_rows']
+        fee_accounts = context['fee_accounts']
+        fee_summary = context['fee_summary']
+
+    return render_template(
+        'school/school_admin_student_fees.html',
+        school=school,
+        current_year=current_year,
+        current_term=current_term,
+        selected_class=selected_class,
+        selected_term=selected_term,
+        selected_student_id=selected_student_id,
+        fee_label=fee_label,
+        currency=currency,
+        available_classes=context['available_classes'],
+        available_terms=context['available_terms'],
+        fee_accounts=fee_accounts,
+        fee_summary=fee_summary,
+        student_rows=student_rows,
+        bursar_mode=bursar_mode,
+    )
 
 def ensure_login_security_schema():
     """Best-effort schema guard for login tracking tables/columns."""
@@ -19656,6 +20991,8 @@ def _complete_authenticated_login(user, user_school_id):
                 exc,
             )
         return redirect(url_for('school_admin_dashboard'))
+    if role == 'bursar':
+        return redirect(url_for('bursar_dashboard'))
     if role == 'teacher':
         return redirect(url_for('teacher_dashboard'))
     if role == 'student':
@@ -20327,24 +21664,30 @@ def _combine_student_snapshots(snapshots, school_id):
     if not snapshots:
         return None
     # Preserve the natural subject order from the contributing snapshots.
-    all_subjects = _dedupe_keep_order([
-        normalize_subject_name(subj)
-        for s in snapshots
-        for subj in (s.get('subjects', []) or [])
-        if str(subj).strip()
-    ])
+    all_subjects = []
+    seen_subject_keys = set()
+    for s in snapshots:
+        for subj in (s.get('subjects', []) or []):
+            display_subject = ' '.join(str(subj or '').strip().split())
+            if not display_subject:
+                continue
+            normalized_key = normalize_subject_name(display_subject).casefold()
+            if normalized_key in seen_subject_keys:
+                continue
+            seen_subject_keys.add(normalized_key)
+            all_subjects.append(display_subject)
     combined_scores = {}
-    for subj in all_subjects:
+    for display_subject in all_subjects:
         marks = []
         latest_subject_comment = ''
         for s in snapshots:
             scores = s.get('scores', {}) or {}
-            ss = scores.get(subj)
+            ss = get_subject_score_block(scores, display_subject)
             if isinstance(ss, dict):
                 marks.append(subject_overall_mark(ss))
         for s in reversed(snapshots):
             scores = s.get('scores', {}) or {}
-            ss = scores.get(subj)
+            ss = get_subject_score_block(scores, display_subject)
             if isinstance(ss, dict):
                 c = (ss.get('subject_teacher_comment', '') or '').strip()
                 if c:
@@ -20354,7 +21697,7 @@ def _combine_student_snapshots(snapshots, school_id):
         block = {'overall_mark': avg_mark}
         if latest_subject_comment:
             block['subject_teacher_comment'] = latest_subject_comment
-        combined_scores[subj] = block
+        combined_scores[display_subject] = block
     # Combined-third-term policy: overall average is the mean of each term average.
     term_averages = []
     for s in snapshots:
@@ -21186,6 +22529,23 @@ def get_subject_score_block(scores_map, subject_name):
     return {}
 
 
+def _find_subject_score_key(scores_map, subject_name):
+    """Return the original score-map key that matches a subject name."""
+    if not isinstance(scores_map, dict):
+        return ''
+    raw_target = (subject_name or '').strip().lower()
+    norm_target = normalize_subject_name(subject_name or '').lower()
+    if not raw_target and not norm_target:
+        return ''
+    for key in scores_map.keys():
+        if str(key).strip().lower() == raw_target:
+            return key
+    for key in scores_map.keys():
+        if normalize_subject_name(str(key)).lower() == norm_target:
+            return key
+    return ''
+
+
 def build_ordered_subject_score_map(scores_map, subjects=None):
     """Align score blocks to an explicit subject order, then append extras safely."""
     if not isinstance(scores_map, dict):
@@ -21195,13 +22555,14 @@ def build_ordered_subject_score_map(scores_map, subjects=None):
     ordered_subjects = _dedupe_keep_order(normalize_subjects_list(subjects or []))
 
     for subject in ordered_subjects:
-        block = get_subject_score_block(scores_map, subject)
-        normalized_subject = normalize_subject_name(subject)
+        source_key = _find_subject_score_key(scores_map, subject)
+        block = scores_map.get(source_key, {}) if source_key else get_subject_score_block(scores_map, subject)
+        normalized_subject = normalize_subject_name(source_key or subject)
         normalized_key = normalized_subject.lower()
         if not normalized_subject or normalized_key in seen_subjects:
             continue
         if isinstance(block, dict):
-            ordered_scores[normalized_subject] = block
+            ordered_scores[source_key or normalized_subject] = block
             seen_subjects.add(normalized_key)
 
     for raw_subject, block in scores_map.items():
@@ -21755,7 +23116,9 @@ def submit_result_approval_request(school_id, classname, term, academic_year, te
     ensure_result_publication_approval_columns()
     school = get_school(school_id) or {}
     resolved_principal_name = (school.get('principal_name', '') or '').strip()
-    teacher_profile = get_teachers(school_id).get(teacher_id, {})
+    teachers = get_teachers(school_id) or {}
+    teacher_key = _lookup_case_insensitive_mapping_key(teachers, teacher_id) or teacher_id
+    teacher_profile = teachers.get(teacher_key, {})
     resolved_teacher_name = f"{teacher_profile.get('firstname', '')} {teacher_profile.get('lastname', '')}".strip() or str(teacher_id)
     submitted_at = datetime.now().isoformat()
     has_approval_cols = result_publication_has_approval_columns()
@@ -21817,7 +23180,9 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
     publish_year = (academic_year or school.get('academic_year', '') or '').strip()
     grade_cfg = get_grade_config(school_id)
     principal_name = (school.get('principal_name', '') or '').strip()
-    teacher_profile = get_teachers(school_id).get(teacher_id, {})
+    teachers = get_teachers(school_id) or {}
+    teacher_key = _lookup_case_insensitive_mapping_key(teachers, teacher_id) or teacher_id
+    teacher_profile = teachers.get(teacher_key, {})
     teacher_name = f"{teacher_profile.get('firstname', '')} {teacher_profile.get('lastname', '')}".strip() or str(teacher_id)
     class_students = load_students(school_id, class_filter=classname, term_filter=term)
     attendance_gate = attendance_gate if isinstance(attendance_gate, dict) else get_class_attendance_publish_readiness(
@@ -21845,13 +23210,23 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
 
     with db_connection(commit=True) as conn:
         c = conn.cursor()
-        behaviour_by_student = get_class_behaviour_assessments(
-            school_id,
-            classname,
-            term,
-            publish_year,
-            school_or_mode=school,
-        )
+        try:
+            behaviour_by_student = get_class_behaviour_assessments(
+                school_id,
+                classname,
+                term,
+                publish_year,
+                school_or_mode=school,
+            )
+        except TypeError as exc:
+            if 'school_or_mode' not in str(exc):
+                raise
+            behaviour_by_student = get_class_behaviour_assessments(
+                school_id,
+                classname,
+                term,
+                publish_year,
+            )
         for sid, student in class_students.items():
             scores = student.get('scores', {}) if isinstance(student.get('scores', {}), dict) else {}
             behaviour_payload = behaviour_by_student.get(sid, _default_behaviour_assessment())
@@ -23015,9 +24390,11 @@ def load_students(school_id, class_filter='', term_filter='', include_archived=F
     """Load students for a school."""
     has_parent_cols = students_has_parent_access_columns()
     has_parent_multi_cols = students_has_parent_multi_access_columns()
+    has_lastname_col = students_has_lastname_column()
     has_email_col = students_has_email_column()
     has_archive_cols = students_has_archive_columns()
     has_phone_col = students_has_phone_column()
+    lastname_col = 'lastname' if has_lastname_col else "'' AS lastname"
     email_col = 'email' if has_email_col else "'' AS email"
     with db_connection() as conn:
         c = conn.cursor()
@@ -23025,16 +24402,16 @@ def load_students(school_id, class_filter='', term_filter='', include_archived=F
             archive_col = ', COALESCE(is_archived, 0)' if has_archive_cols else ''
             phone_col = ', student_phone' if has_phone_col else ''
             if has_parent_multi_cols:
-                query = f"""SELECT student_id, firstname, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream,
+                query = f"""SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream,
                             number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash, parent_name, parent_gender,
                             parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2{archive_col}{phone_col}
                             FROM students WHERE school_id = ?"""
             else:
-                query = f'SELECT student_id, firstname, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash{archive_col}{phone_col} FROM students WHERE school_id = ?'
+                query = f'SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash{archive_col}{phone_col} FROM students WHERE school_id = ?'
         else:
             archive_col = ', COALESCE(is_archived, 0)' if has_archive_cols else ''
             phone_col = ', student_phone' if has_phone_col else ''
-            query = f'SELECT student_id, firstname, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects, scores, promoted{archive_col}{phone_col} FROM students WHERE school_id = ?'
+            query = f'SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects, scores, promoted{archive_col}{phone_col} FROM students WHERE school_id = ?'
         params = [school_id]
         
         if class_filter:
@@ -23058,39 +24435,39 @@ def load_students(school_id, class_filter='', term_filter='', include_archived=F
                 if has_parent_multi_cols:
                     if has_archive_cols:
                         if has_phone_col:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, is_archived, student_phone = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, is_archived, student_phone = row
                         else:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, is_archived = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, is_archived = row
                     else:
                         if has_phone_col:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, student_phone = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, student_phone = row
                         else:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2 = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2 = row
                         is_archived = 0
                 else:
                     if has_archive_cols:
                         if has_phone_col:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, is_archived, student_phone = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, is_archived, student_phone = row
                         else:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, is_archived = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, is_archived = row
                     else:
                         if has_phone_col:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, student_phone = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, student_phone = row
                         else:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash = row
                         is_archived = 0
                     parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2 = '', '', '', '', '', ''
             else:
                 if has_archive_cols:
                     if has_phone_col:
-                        student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, is_archived, student_phone = row
+                        student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, is_archived, student_phone = row
                     else:
-                        student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, is_archived = row
+                        student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, is_archived = row
                 else:
                     if has_phone_col:
-                        student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, student_phone = row
+                        student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, student_phone = row
                     else:
-                        student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted = row
+                        student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted = row
                     is_archived = 0
                 parent_phone, parent_password_hash, parent_name, parent_gender = '', '', '', ''
                 parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2 = '', '', '', ''
@@ -23099,6 +24476,7 @@ def load_students(school_id, class_filter='', term_filter='', include_archived=F
             scores = _safe_json_object(scores_str)
             students_data[student_id] = {
                 'firstname': firstname,
+                'lastname': lastname,
                 'email': (email or '').strip(),
                 'student_phone': student_phone,
                 'date_of_birth': (date_of_birth or '').strip(),
@@ -23134,9 +24512,11 @@ def load_students_for_classes(school_id, classnames, term_filter='', include_arc
         return {}
     has_parent_cols = students_has_parent_access_columns()
     has_parent_multi_cols = students_has_parent_multi_access_columns()
+    has_lastname_col = students_has_lastname_column()
     has_email_col = students_has_email_column()
     has_archive_cols = students_has_archive_columns()
     has_phone_col = students_has_phone_column()
+    lastname_col = 'lastname' if has_lastname_col else "'' AS lastname"
     email_col = 'email' if has_email_col else "'' AS email"
     with db_connection() as conn:
         c = conn.cursor()
@@ -23146,13 +24526,13 @@ def load_students_for_classes(school_id, classnames, term_filter='', include_arc
             phone_col = ', student_phone' if has_phone_col else ''
             if has_parent_multi_cols:
                 query = (
-                    f'SELECT student_id, firstname, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, '
+                    f'SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, '
                     f'number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2{archive_col}{phone_col} '
                     f"FROM students WHERE school_id = ? AND REGEXP_REPLACE(UPPER(COALESCE(classname, '')), '[^A-Z0-9]+', '', 'g') IN ({placeholders})"
                 )
             else:
                 query = (
-                    f'SELECT student_id, firstname, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, '
+                    f'SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, '
                     f'number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash{archive_col}{phone_col} '
                     f"FROM students WHERE school_id = ? AND REGEXP_REPLACE(UPPER(COALESCE(classname, '')), '[^A-Z0-9]+', '', 'g') IN ({placeholders})"
                 )
@@ -23160,7 +24540,7 @@ def load_students_for_classes(school_id, classnames, term_filter='', include_arc
             archive_col = ', COALESCE(is_archived, 0)' if has_archive_cols else ''
             phone_col = ', student_phone' if has_phone_col else ''
             query = (
-                f'SELECT student_id, firstname, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, '
+                f'SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, '
                 f'number_of_subject, subjects, scores, promoted{archive_col}{phone_col} '
                 f"FROM students WHERE school_id = ? AND REGEXP_REPLACE(UPPER(COALESCE(classname, '')), '[^A-Z0-9]+', '', 'g') IN ({placeholders})"
             )
@@ -23179,45 +24559,46 @@ def load_students_for_classes(school_id, classnames, term_filter='', include_arc
                 if has_parent_multi_cols:
                     if has_archive_cols:
                         if has_phone_col:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, is_archived, student_phone = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, is_archived, student_phone = row
                         else:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, is_archived = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, is_archived = row
                     else:
                         if has_phone_col:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, student_phone = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, student_phone = row
                         else:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2 = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2 = row
                         is_archived = 0
                 else:
                     if has_archive_cols:
                         if has_phone_col:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, is_archived, student_phone = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, is_archived, student_phone = row
                         else:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, is_archived = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, is_archived = row
                     else:
                         if has_phone_col:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, student_phone = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, student_phone = row
                         else:
-                            student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash = row
+                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash = row
                         is_archived = 0
                     parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2 = '', '', '', '', '', ''
             else:
                 if has_archive_cols:
                     if has_phone_col:
-                        student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, is_archived, student_phone = row
+                        student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, is_archived, student_phone = row
                     else:
-                        student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, is_archived = row
+                        student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, is_archived = row
                 else:
                     if has_phone_col:
-                        student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, student_phone = row
+                        student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, student_phone = row
                     else:
-                        student_id, firstname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted = row
+                        student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted = row
                     is_archived = 0
                 parent_phone, parent_password_hash, parent_name, parent_gender = '', '', '', ''
                 parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2 = '', '', '', ''
             student_phone = (student_phone or '').strip() if has_phone_col else ''
             students_data[student_id] = {
                 'firstname': firstname,
+                'lastname': lastname,
                 'email': (email or '').strip(),
                 'student_phone': student_phone,
                 'date_of_birth': (date_of_birth or '').strip(),
@@ -23247,6 +24628,7 @@ def load_students_for_student_ids(school_id, student_ids):
         db_connection=db_connection,
         db_execute=db_execute,
         students_has_parent_access_columns=students_has_parent_access_columns,
+        students_has_lastname_column=students_has_lastname_column,
         school_id=school_id,
         student_ids=student_ids,
     )
@@ -23412,10 +24794,12 @@ def load_student(school_id, student_id, include_archived=False):
     """Load a single student."""
     has_parent_cols = students_has_parent_access_columns()
     has_parent_multi_cols = students_has_parent_multi_access_columns()
+    has_lastname_col = students_has_lastname_column()
     has_email_col = students_has_email_column()
     has_archive_cols = students_has_archive_columns()
     has_phone_col = students_has_phone_column()
     has_profile_image_col = students_has_profile_image_column()
+    lastname_col = ', lastname' if has_lastname_col else ", '' AS lastname"
     email_col = 'email' if has_email_col else "'' AS email"
     profile_col = ', profile_image' if has_profile_image_col else ''
     with db_connection() as conn:
@@ -23425,13 +24809,13 @@ def load_student(school_id, student_id, include_archived=False):
             archive_col = ', COALESCE(is_archived, 0)' if has_archive_cols else ''
             phone_col = ', student_phone' if has_phone_col else ''
             if has_parent_multi_cols:
-                db_execute(c, f"""SELECT student_id, firstname, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream,
+                db_execute(c, f"""SELECT student_id, firstname{lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream,
                                number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash, parent_name, parent_gender,
                                parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2{archive_col}{phone_col}{profile_col} FROM students
                                WHERE school_id = ? AND student_id = ?{archived_sql}""",
                            (school_id, student_id))
             else:
-                db_execute(c, f"""SELECT student_id, firstname, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream,
+                db_execute(c, f"""SELECT student_id, firstname{lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream,
                                number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash{archive_col}{phone_col}{profile_col} FROM students
                                WHERE school_id = ? AND student_id = ?{archived_sql}""",
                            (school_id, student_id))
@@ -23439,7 +24823,7 @@ def load_student(school_id, student_id, include_archived=False):
             archived_sql = '' if (include_archived or not has_archive_cols) else ' AND COALESCE(is_archived, 0) = 0'
             archive_col = ', COALESCE(is_archived, 0)' if has_archive_cols else ''
             phone_col = ', student_phone' if has_phone_col else ''
-            db_execute(c, f"""SELECT student_id, firstname, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, 
+            db_execute(c, f"""SELECT student_id, firstname{lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, 
                            number_of_subject, subjects, scores, promoted{archive_col}{phone_col}{profile_col} FROM students 
                            WHERE school_id = ? AND student_id = ?{archived_sql}""",
                        (school_id, student_id))
@@ -23447,17 +24831,17 @@ def load_student(school_id, student_id, include_archived=False):
         if not row:
             return None
         if has_parent_cols:
-            parent_phone = (row[13] or '').strip()
-            parent_password_hash = (row[14] or '').strip()
+            parent_phone = (row[14] or '').strip()
+            parent_password_hash = (row[15] or '').strip()
             if has_parent_multi_cols:
-                parent_name = (row[15] or '').strip()
-                parent_gender = (row[16] or '').strip()
-                parent_name_2 = (row[17] or '').strip()
-                parent_phone_2 = (row[18] or '').strip()
-                parent_password_hash_2 = (row[19] or '').strip()
-                parent_gender_2 = (row[20] or '').strip()
-                archived_idx = 21 if has_archive_cols else None
-                phone_idx = (22 if has_archive_cols else 21) if has_phone_col else None
+                parent_name = (row[16] or '').strip()
+                parent_gender = (row[17] or '').strip()
+                parent_name_2 = (row[18] or '').strip()
+                parent_phone_2 = (row[19] or '').strip()
+                parent_password_hash_2 = (row[20] or '').strip()
+                parent_gender_2 = (row[21] or '').strip()
+                archived_idx = 22 if has_archive_cols else None
+                phone_idx = (23 if has_archive_cols else 22) if has_phone_col else None
             else:
                 parent_name = ''
                 parent_gender = ''
@@ -23465,8 +24849,8 @@ def load_student(school_id, student_id, include_archived=False):
                 parent_phone_2 = ''
                 parent_password_hash_2 = ''
                 parent_gender_2 = ''
-                archived_idx = 15 if has_archive_cols else None
-                phone_idx = (16 if has_archive_cols else 15) if has_phone_col else None
+                archived_idx = 16 if has_archive_cols else None
+                phone_idx = (17 if has_archive_cols else 16) if has_phone_col else None
         else:
             parent_phone = ''
             parent_password_hash = ''
@@ -23476,26 +24860,27 @@ def load_student(school_id, student_id, include_archived=False):
             parent_phone_2 = ''
             parent_password_hash_2 = ''
             parent_gender_2 = ''
-            archived_idx = 13 if has_archive_cols else None
-            phone_idx = (14 if has_archive_cols else 13) if has_phone_col else None
+            archived_idx = 14 if has_archive_cols else None
+            phone_idx = (15 if has_archive_cols else 14) if has_phone_col else None
         student_phone = (row[phone_idx] or '').strip() if phone_idx is not None else ''
         profile_image = normalize_optional_image_src(row[-1] if has_profile_image_col else '')
         return {
             'student_id': row[0],
             'firstname': row[1],
-            'email': (row[2] or '').strip(),
+            'lastname': (row[2] or '').strip(),
+            'email': (row[3] or '').strip(),
             'student_phone': student_phone,
             'profile_image': profile_image,
-            'date_of_birth': (row[3] or '').strip(),
-            'gender': (row[4] or '').strip(),
-            'classname': row[5],
-            'first_year_class': row[6],
-            'term': row[7],
-            'stream': row[8],
-            'number_of_subject': row[9],
-            'subjects': _safe_json_rows(row[10]),
-            'scores': _safe_json_object(row[11]),
-            'promoted': row[12],
+            'date_of_birth': (row[4] or '').strip(),
+            'gender': (row[5] or '').strip(),
+            'classname': row[6],
+            'first_year_class': row[7],
+            'term': row[8],
+            'stream': row[9],
+            'number_of_subject': row[10],
+            'subjects': _safe_json_rows(row[11]),
+            'scores': _safe_json_object(row[12]),
+            'promoted': row[13],
             'parent_phone': parent_phone,
             'parent_password_hash': parent_password_hash,
             'parent_name': parent_name,
@@ -26973,6 +28358,51 @@ def get_teachers(school_id, include_archived=False):
             }
         return teachers
 
+def get_bursars(school_id, include_archived=False):
+    """Get all bursars for a school."""
+    sid = (school_id or '').strip()
+    if not sid:
+        return {}
+    with db_connection() as conn:
+        c = conn.cursor()
+        archived_where = ' AND COALESCE(is_archived, 0) = 0' if not include_archived else ''
+        rows = []
+        try:
+            db_execute(
+                c,
+                f"""SELECT user_id, firstname, lastname, phone, gender, profile_image, COALESCE(is_archived, 0)
+                   FROM bursars
+                   WHERE school_id = ?{archived_where}""",
+                (sid,),
+            )
+            rows = c.fetchall() or []
+            has_profile_image_col = True
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception as exc:
+                _log_suppressed_exception('get_bursars', exc)
+            db_execute(
+                c,
+                f"""SELECT user_id, firstname, lastname, phone, gender, COALESCE(is_archived, 0)
+                   FROM bursars
+                   WHERE school_id = ?{archived_where}""",
+                (sid,),
+            )
+            rows = c.fetchall() or []
+            has_profile_image_col = False
+    bursars = {}
+    for row in rows:
+        bursars[row[0]] = {
+            'firstname': row[1],
+            'lastname': row[2],
+            'phone': (row[3] or '').strip() if len(row) > 3 else '',
+            'gender': normalize_teacher_gender(row[4] if len(row) > 4 else ''),
+            'profile_image': (row[5] or '').strip() if has_profile_image_col and len(row) > 5 else '',
+            'is_archived': int(row[6] or 0) if has_profile_image_col and len(row) > 6 else int(row[5] or 0),
+        }
+    return bursars
+
 def save_teacher(school_id, user_id, firstname, lastname, assigned_classes, subjects_taught=None, phone='', gender=''):
     """Save a teacher."""
     school_key = _normalize_school_id_text(school_id)
@@ -27005,6 +28435,67 @@ def save_teacher(school_id, user_id, firstname, lastname, assigned_classes, subj
                     _log_suppressed_exception('save_teacher', exc)
                 db_execute(c, 'INSERT INTO teachers (school_id, user_id, firstname, lastname, phone, gender, signature_image, assigned_classes, subjects_taught) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                            (school_key, user_id, firstname, lastname, phone, gender, '', classes_str, subjects_str))
+
+def save_bursar(school_id, user_id, firstname, lastname, phone='', gender=''):
+    """Save a bursar profile."""
+    school_key = _normalize_school_id_text(school_id)
+    if not school_key:
+        raise ValueError('School ID is required.')
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        firstname = normalize_person_name(firstname)
+        lastname = normalize_person_name(lastname)
+        phone = (phone or '').strip()
+        gender = normalize_teacher_gender(gender)
+        db_execute(c, 'SELECT user_id FROM bursars WHERE school_id = ? AND user_id = ?', (school_key, user_id))
+        if c.fetchone():
+            db_execute(
+                c,
+                'UPDATE bursars SET firstname = ?, lastname = ?, phone = ?, gender = ? WHERE school_id = ? AND user_id = ?',
+                (firstname, lastname, phone, gender, school_key, user_id),
+            )
+        else:
+            db_execute(
+                c,
+                'INSERT INTO bursars (school_id, user_id, firstname, lastname, phone, gender, profile_image) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                (school_key, user_id, firstname, lastname, phone, gender, ''),
+            )
+
+def archive_bursar_account(school_id, bursar_id, archived_by=''):
+    """Soft archive one bursar."""
+    school_key = _normalize_school_id_text(school_id)
+    if not school_key:
+        raise ValueError('School ID is required.')
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """UPDATE bursars
+               SET is_archived = 1,
+                   archived_at = CURRENT_TIMESTAMP
+               WHERE school_id = ? AND user_id = ?""",
+            (school_key, bursar_id),
+        )
+    if archived_by:
+        logging.info("Bursar archived by=%s school_id=%s bursar_id=%s", archived_by, school_key, bursar_id)
+
+def restore_bursar_account(school_id, bursar_id, restored_by=''):
+    """Restore one archived bursar."""
+    school_key = _normalize_school_id_text(school_id)
+    if not school_key:
+        raise ValueError('School ID is required.')
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """UPDATE bursars
+               SET is_archived = 0,
+                   archived_at = NULL
+               WHERE school_id = ? AND user_id = ?""",
+            (school_key, bursar_id),
+        )
+    if restored_by:
+        logging.info("Bursar restored by=%s school_id=%s bursar_id=%s", restored_by, school_key, bursar_id)
 
 def archive_teacher_account(school_id, teacher_id, archived_by=''):
     """Soft archive one teacher and clear active assignments."""
@@ -27310,7 +28801,9 @@ def teacher_has_class_access(school_id, teacher_id, classname, term='', academic
 
 def get_teacher_subjects(school_id, teacher_id):
     """Return normalized subject list configured for a teacher."""
-    profile = get_teachers(school_id).get(teacher_id, {})
+    teachers = get_teachers(school_id) or {}
+    teacher_key = _lookup_case_insensitive_mapping_key(teachers, teacher_id) or teacher_id
+    profile = teachers.get(teacher_key, {})
     return normalize_subjects_list(profile.get('subjects_taught', []))
 
 def get_teacher_subjects_for_class_term(school_id, teacher_id, classname, term='', academic_year=''):
@@ -29653,9 +31146,11 @@ def enforce_role_namespace_and_session_binding():
             session['_auth_binding_checked_at'] = now_ts
             logging.warning("Skipping session binding enforcement due user lookup DB error for %s", user_id)
             return None
-        session.clear()
-        flash('Account not found. Please login again.', 'error')
-        return redirect(url_for('login'))
+        # If the backing user row is not available, keep the role-based session
+        # intact so valid route guards can still evaluate the request.
+        session['_auth_binding_checked_at'] = now_ts
+        logging.warning("Skipping session binding enforcement because user row was not found for %s", user_id)
+        return None
 
     user_role = ((user_row.get('role') or '').strip().lower() or 'student')
     if user_role != role:
@@ -29819,6 +31314,39 @@ def enforce_teacher_mutation_scope():
         return redirect(url_for('teacher_dashboard'))
     return None
 
+
+_HTML_INLINE_TAG_NONCE_RE = re.compile(r'<(script|style)\b(?![^>]*\bnonce=)([^>]*)>', re.IGNORECASE)
+_HTML_ON_ATTR_RE = re.compile(r'\s(on[a-z][a-z0-9_-]*)\s*=\s*(?:"([^"]*)"|\'([^\']*)\')', re.IGNORECASE)
+
+
+def _csp_sha256_source(value):
+    digest = hashlib.sha256((value or '').encode('utf-8')).digest()
+    return "'sha256-{}'".format(base64.b64encode(digest).decode('ascii'))
+
+
+def _inject_csp_nonce_into_html(html_text, nonce):
+    if not html_text or not nonce:
+        return html_text
+
+    def _replace_tag(match):
+        tag_name = match.group(1)
+        attrs = match.group(2) or ''
+        return f'<{tag_name} nonce="{nonce}"{attrs}>'
+
+    return _HTML_INLINE_TAG_NONCE_RE.sub(_replace_tag, html_text)
+
+
+def _extract_inline_handler_hashes(html_text):
+    if not html_text:
+        return set()
+    hashes = set()
+    for _, double_quoted, single_quoted in _HTML_ON_ATTR_RE.findall(html_text):
+        handler = double_quoted if double_quoted else single_quoted
+        handler = html_lib.unescape((handler or '').strip())
+        if handler:
+            hashes.add(_csp_sha256_source(handler))
+    return hashes
+
 @app.after_request
 def apply_pwa_and_cache_headers(response):
     """
@@ -29859,6 +31387,45 @@ def apply_pwa_and_cache_headers(response):
     response.headers.setdefault('Cross-Origin-Opener-Policy', 'same-origin')
     if app.config.get('SESSION_COOKIE_SECURE'):
         response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    if 'text/html' in (response.content_type or '').lower():
+        csp_nonce = base64.b64encode(secrets.token_bytes(18)).decode('ascii').rstrip('=')
+        csp_script_hashes = set()
+        try:
+            body = response.get_data(as_text=True)
+            if '</head>' in body and '/manifest.webmanifest' not in body:
+                body = body.replace('</head>', f'{PWA_HEAD_SNIPPET}\n</head>')
+            if '</body>' in body and "register('/sw.js')" not in body:
+                body = body.replace('</body>', f'{PWA_BODY_SNIPPET}\n</body>')
+            csp_script_hashes = _extract_inline_handler_hashes(body)
+            body = _inject_csp_nonce_into_html(body, csp_nonce)
+            response.set_data(body)
+            response.headers['Content-Length'] = str(len(response.get_data()))
+        except Exception:
+            csp_script_hashes = set()
+        script_sources = [
+            "'self'",
+            f"'nonce-{csp_nonce}'",
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com',
+        ]
+        if csp_script_hashes:
+            script_sources.append("'unsafe-hashes'")
+            script_sources.extend(sorted(csp_script_hashes))
+        csp_directives = [
+            "default-src 'self'",
+            "base-uri 'self'",
+            "form-action 'self'",
+            "frame-ancestors 'self'",
+            "object-src 'none'",
+            "script-src " + ' '.join(script_sources),
+            f"style-src 'self' 'nonce-{csp_nonce}' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
+            "style-src-attr 'unsafe-inline'",
+            "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com",
+            "img-src 'self' data: blob: https:",
+            "media-src 'self' data: https:",
+            "connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+        ]
+        response.headers.setdefault('Content-Security-Policy', '; '.join(csp_directives))
     return response
 
 @app.route('/cbt-login', methods=['GET', 'POST'])
@@ -30033,7 +31600,7 @@ def login():
         
         if user and check_password(user['password_hash'], password):
             role = (user.get('role') or '').strip().lower()
-            if role not in {'super_admin', 'school_admin', 'teacher', 'student'}:
+            if role not in {'super_admin', 'school_admin', 'teacher', 'student', 'bursar'}:
                 register_failed_login('login', username, client_ip)
                 record_login_audit(username, role, user.get('school_id'), 'login', False, 'invalid_role')
                 flash('Invalid account role configuration. Contact system administrator.', 'error')
@@ -32651,6 +34218,9 @@ def school_admin_teachers():
     teachers_all = get_teachers(school_id, include_archived=True) or {}
     active_teachers = {tid: t for tid, t in teachers_all.items() if not int(t.get('is_archived', 0) or 0)}
     archived_teachers = {tid: t for tid, t in teachers_all.items() if int(t.get('is_archived', 0) or 0)}
+    bursars_all = get_bursars(school_id, include_archived=True) or {}
+    active_bursars = {bid: b for bid, b in bursars_all.items() if not int(b.get('is_archived', 0) or 0)}
+    archived_bursars = {bid: b for bid, b in bursars_all.items() if int(b.get('is_archived', 0) or 0)}
 
     class_assignments = get_class_assignments(school_id) or []
     subject_assignments = get_teacher_subject_assignments(
@@ -32696,6 +34266,21 @@ def school_admin_teachers():
         rows.sort(key=lambda r: (r.get('name') or '').lower())
         return rows
 
+    def _build_bursar_rows(src):
+        rows = []
+        for bursar_id, bursar in (src or {}).items():
+            first = (bursar.get('firstname') or '').strip()
+            last = (bursar.get('lastname') or '').strip()
+            name = f'{first} {last}'.strip() or bursar_id
+            rows.append({
+                'teacher_id': bursar_id,
+                'name': name,
+                'gender': (bursar.get('gender') or 'Not set'),
+                'phone': (bursar.get('phone') or 'Not set'),
+            })
+        rows.sort(key=lambda r: (r.get('name') or '').lower())
+        return rows
+
     return render_template(
         'school/school_admin_teachers.html',
         school=school,
@@ -32704,6 +34289,8 @@ def school_admin_teachers():
         current_year=current_year,
         teacher_rows=_build_rows(active_teachers),
         archived_teacher_rows=_build_rows(archived_teachers),
+        bursar_rows=_build_bursar_rows(active_bursars),
+        archived_bursar_rows=_build_bursar_rows(archived_bursars),
     )
 
 @app.route('/school-admin/teacher-assignments')
@@ -35563,12 +37150,20 @@ def school_admin_settings():
             )
             if grade_scale_error:
                 return _settings_error(grade_scale_error)
-            custom_status_scale_rows, status_scale_error = _validate_status_scale_rows(
-                request.form,
-                default_rows=get_effective_status_scale(current_school),
-            )
-            if status_scale_error:
-                return _settings_error(status_scale_error)
+            status_scale_inputs_present = any(
+                (request.form.get(f'status_scale_label_{idx}', '') or '').strip()
+                or (request.form.get(f'status_scale_min_{idx}', '') or '').strip()
+                for idx in range(1, DEFAULT_GRADE_SCALE_ROW_COUNT + 1)
+            ) or bool(request.form.getlist('status_scale_label')) or bool(request.form.getlist('status_scale_min'))
+            if status_scale_inputs_present:
+                custom_status_scale_rows, status_scale_error = _validate_status_scale_rows(
+                    request.form,
+                    default_rows=get_effective_status_scale(current_school),
+                )
+                if status_scale_error:
+                    return _settings_error(status_scale_error)
+            else:
+                custom_status_scale_rows = get_effective_status_scale(current_school)
             legacy_grade_fields = _legacy_grade_fields_from_scale_rows(custom_grade_scale_rows, current_school)
             grade_a_min = legacy_grade_fields['grade_a_min']
             grade_b_min = legacy_grade_fields['grade_b_min']
@@ -35861,9 +37456,18 @@ def school_admin_settings():
             for level in ('jss', 'ss'):
                 current_cfg = current_assessment_configs.get(level) or get_default_assessment_config(level)
                 mode = request.form.get(f'exam_mode_{level}', current_cfg.get('exam_mode', 'separate')).strip().lower()
-                objective_max = _to_int(request.form.get(f'objective_max_{level}', current_cfg.get('objective_max', 0)), current_cfg.get('objective_max', 0))
-                theory_max = _to_int(request.form.get(f'theory_max_{level}', current_cfg.get('theory_max', 0)), current_cfg.get('theory_max', 0))
-                exam_score_max = _to_int(request.form.get(f'exam_score_max_{level}', current_cfg.get('exam_score_max', 0)), current_cfg.get('exam_score_max', 0))
+                objective_max = _to_int(
+                    request.form.get(f'objective_max_{level}', current_cfg.get('objective_max', 0)),
+                    current_cfg.get('objective_max', 0),
+                )
+                theory_max = _to_int(
+                    request.form.get(f'theory_max_{level}', current_cfg.get('theory_max', 0)),
+                    current_cfg.get('theory_max', 0),
+                )
+                exam_score_max = _to_int(
+                    request.form.get(f'exam_score_max_{level}', current_cfg.get('exam_score_max', 0)),
+                    current_cfg.get('exam_score_max', 0),
+                )
                 if mode not in {'combined', 'separate'}:
                     mode = 'separate'
                 if objective_max < 0 or objective_max > 100 or theory_max < 0 or theory_max > 100:
@@ -35883,7 +37487,7 @@ def school_admin_settings():
                     if exam_score_max != derived_exam_score_max:
                         return _settings_error(
                             f'{level.upper()} objective + theory must add up to {derived_exam_score_max} '
-                            f'because total CA score is {test_score_max}.',
+                            f'because total test score is {test_score_max}.',
                             calendar_term_override=calendar_target_term,
                             calendar_year_override=calendar_target_year,
                         )
@@ -36542,6 +38146,46 @@ def school_admin_change_password():
     
     return render_template('shared/change_password.html', form_action='school_admin_change_password', back_url='school_admin_dashboard')
 
+@app.route('/bursar/change-password', methods=['GET', 'POST'])
+def bursar_change_password():
+    if session.get('role') != 'bursar':
+        return redirect(url_for('login'))
+
+    username = session.get('user_id')
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    user = get_user(username)
+    if not user or (user.get('role') or '').strip().lower() != 'bursar':
+        flash('Bursar account not found.', 'error')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        if not current_password or not new_password or not confirm_password:
+            flash('All fields are required.', 'error')
+            return redirect(url_for('change_password'))
+        if not check_password(user.get('password_hash', ''), current_password):
+            flash('Current password is incorrect.', 'error')
+            return redirect(url_for('change_password'))
+        if len(new_password) < 8:
+            flash('New password must be at least 8 characters.', 'error')
+            return redirect(url_for('change_password'))
+        if new_password != confirm_password:
+            flash('New passwords do not match.', 'error')
+            return redirect(url_for('change_password'))
+
+        upsert_user(username, hash_password(new_password), 'bursar', school_id, overwrite_identity=True)
+        flash('Password changed successfully.', 'success')
+        return redirect(url_for('bursar_dashboard'))
+
+    return render_template(
+        'shared/change_password.html',
+        form_action='change_password',
+        back_url='bursar_dashboard',
+    )
+
 @app.route('/super-admin/change-password', methods=['GET', 'POST'])
 def super_admin_change_password():
     if session.get('role') != 'super_admin':
@@ -36680,6 +38324,111 @@ def school_admin_add_teacher():
         except Exception as e:
             flash(f'Error adding teacher: {str(e)}', 'error')
     
+    return redirect(fallback_redirect)
+
+@app.route('/school-admin/add-bursar', methods=['POST'])
+def school_admin_add_bursar():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    fallback_redirect = safe_referrer_or(url_for('school_admin_teachers'))
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    username = request.form.get('username', '').strip().lower()
+    firstname = normalize_person_name(request.form.get('firstname', '').strip())
+    lastname = normalize_person_name(request.form.get('lastname', '').strip())
+    gender = normalize_teacher_gender(request.form.get('gender', '').strip())
+    phone = (request.form.get('phone', '') or '').strip()
+    send_credentials = (request.form.get('send_credentials', '') or '').strip() in {'1', 'true', 'yes', 'on'}
+    password = request.form.get('password', '').strip()
+
+    if username and firstname:
+        try:
+            if not is_valid_email(username):
+                flash('Bursar username must be a valid email address.', 'error')
+                return redirect(fallback_redirect)
+            temp_password = ''
+            manual_password = bool(password)
+            if not password:
+                temp_password = generate_temp_password()
+                password = temp_password
+            if gender not in {'male', 'female', 'other'}:
+                flash('Bursar gender is required.', 'error')
+                return redirect(fallback_redirect)
+            existing_user = get_user(username)
+            if existing_user:
+                existing_role = (existing_user.get('role') or '').strip().lower()
+                existing_school = (existing_user.get('school_id') or '').strip()
+                if not (existing_role == 'bursar' and existing_school == school_id):
+                    flash('This username already belongs to another account/school. Choose a different email.', 'error')
+                    return redirect(fallback_redirect)
+            password_hash = hash_password(password)
+            upsert_user(username, password_hash, 'bursar', school_id, overwrite_identity=True)
+            save_bursar(
+                school_id,
+                username,
+                firstname,
+                lastname,
+                phone=phone,
+                gender=gender,
+            )
+            flash(f'Bursar added successfully. Username: {username}', 'success')
+            if send_credentials and (temp_password or manual_password):
+                school_name = (get_school(school_id) or {}).get('school_name', 'your school')
+                login_url = url_for('login', _external=True)
+                password_label = 'Temporary password' if temp_password else 'Password'
+                subject = f'Bursar Account Created - {school_name}'
+                body = (
+                    f"Hello {firstname or 'Bursar'},\n\n"
+                    f"Your bursar account has been created for {school_name}.\n"
+                    f"Username: {username}\n"
+                    f"{password_label}: {password}\n\n"
+                    f"Login here: {login_url}\n"
+                    "Please log in and change your password immediately.\n\n"
+                    "If you did not expect this, contact your school admin."
+                )
+                email_result = send_plain_email_message(subject, body, [username])
+                sms_result = {'sent_sms': 0, 'errors': []}
+                if phone:
+                    sms_body = (
+                        f"{school_name} bursar account created.\n"
+                        f"Username: {username}\n"
+                        f"{password_label}: {password}\n"
+                        f"Login: {login_url}\n"
+                        "Please change your password after login."
+                    )
+                    sms_result = send_bulk_sms_messages(
+                        [phone],
+                        sms_body,
+                        school_name=school_name,
+                        context='bursar_temp_password',
+                        school_id=school_id,
+                        audience_role='bursar',
+                    )
+                    if sms_result.get('errors'):
+                        flash(f"SMS issue: {sms_result.get('errors')[0]}", 'warning')
+                email_sent = bool(email_result.get('sent'))
+                sms_sent = bool(sms_result.get('sent_sms'))
+                if email_sent:
+                    flash(f'{password_label} emailed to {username}.', 'success')
+                if sms_sent:
+                    flash(f'{password_label} sent by SMS.', 'success')
+                if not email_sent and not sms_sent:
+                    err = (email_result.get('errors') or ['Email send failed.'])[0]
+                    if temp_password:
+                        flash(f'Email failed ({err}). Share this temp password with the bursar: {temp_password}', 'warning')
+                    else:
+                        flash(f'Email failed ({err}). Share the password you set with the bursar.', 'warning')
+            elif not send_credentials:
+                if temp_password:
+                    flash(f'Credentials not sent. Share this temp password with the bursar: {temp_password}', 'warning')
+                elif manual_password:
+                    flash('Credentials not sent. Remember to share the password you set with the bursar.', 'warning')
+        except Exception as e:
+            flash(f'Error adding bursar: {str(e)}', 'error')
+
     return redirect(fallback_redirect)
 
 @app.route('/school-admin/add-teachers-by-table', methods=['POST'])
@@ -44117,7 +45866,7 @@ def teacher_publish_results():
         return redirect(url_for('login'))
 
     school_id = _normalize_school_id_text(session.get('school_id'))
-    teacher_id = session.get('user_id')
+    teacher_id = _display_session_user_id(session.get('user_id'))
     if not school_id:
         flash('School session is missing. Please log in again.', 'error')
         return redirect(url_for('login'))
@@ -44132,7 +45881,9 @@ def teacher_publish_results():
     if not teacher_has_class_access(school_id, teacher_id, classname, term=current_term, academic_year=current_year):
         flash('You are not assigned to this class for the current term/year.', 'error')
         return redirect(url_for('teacher_dashboard'))
-    teacher_profile = get_teachers(school_id).get(teacher_id, {})
+    teachers = get_teachers(school_id) or {}
+    teacher_lookup_id = _lookup_case_insensitive_mapping_key(teachers, teacher_id) or teacher_id
+    teacher_profile = teachers.get(teacher_lookup_id, {})
     if not (teacher_profile.get('signature_image') or '').strip():
         flash('Upload your class teacher signature before submitting this class result.', 'error')
         return redirect(url_for('teacher_dashboard'))
@@ -44225,7 +45976,7 @@ def teacher_publish_results():
             return redirect(url_for('teacher_attendance', classname=classname))
         return redirect(url_for('teacher_attendance', classname=classname))
 
-    submit_result_approval_request(school_id, classname, current_term, current_year, teacher_id)
+    submit_result_approval_request(school_id, classname, current_term, current_year, teacher_lookup_id)
     record_admin_action_audit(
         school_id,
         'teacher_submit_results_for_approval',
@@ -44426,7 +46177,7 @@ def school_admin_approve_results():
     if session.get('role') != 'school_admin':
         return redirect(url_for('login'))
     school_id = session.get('school_id')
-    admin_user_id = session.get('user_id')
+    admin_user_id = _display_session_user_id(session.get('user_id'))
     classname = canonicalize_classname(request.form.get('classname', '').strip())
     term = (request.form.get('term', '') or '').strip()
     academic_year = (request.form.get('academic_year', '') or '').strip()
@@ -44628,7 +46379,7 @@ def school_admin_reject_results():
     if session.get('role') != 'school_admin':
         return redirect(url_for('login'))
     school_id = session.get('school_id')
-    admin_user_id = session.get('user_id')
+    admin_user_id = _display_session_user_id(session.get('user_id'))
     classname = canonicalize_classname(request.form.get('classname', '').strip())
     term = (request.form.get('term', '') or '').strip()
     academic_year = (request.form.get('academic_year', '') or '').strip()
@@ -44841,6 +46592,38 @@ def school_admin_restore_teacher():
     flash(f'Teacher {teacher_id} restored.', 'success')
     return redirect(safe_referrer_or(url_for('school_admin_dashboard')))
 
+@app.route('/school-admin/bursar/archive', methods=['POST'])
+def school_admin_archive_bursar():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    bursar_id = (request.form.get('bursar_id', '') or '').strip().lower()
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    if not bursar_id:
+        flash('Bursar ID is required.', 'error')
+        return redirect(safe_referrer_or(url_for('school_admin_teachers')))
+    archive_bursar_account(school_id, bursar_id, archived_by=session.get('user_id', '') or '')
+    flash(f'Bursar {bursar_id} archived.', 'success')
+    return redirect(safe_referrer_or(url_for('school_admin_teachers')))
+
+@app.route('/school-admin/bursar/restore', methods=['POST'])
+def school_admin_restore_bursar():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    bursar_id = (request.form.get('bursar_id', '') or '').strip().lower()
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    if not bursar_id:
+        flash('Bursar ID is required.', 'error')
+        return redirect(safe_referrer_or(url_for('school_admin_teachers')))
+    restore_bursar_account(school_id, bursar_id, restored_by=session.get('user_id', '') or '')
+    flash(f'Bursar {bursar_id} restored.', 'success')
+    return redirect(safe_referrer_or(url_for('school_admin_teachers')))
+
 @app.route('/teacher/allocate-stream', methods=['GET', 'POST'])
 def teacher_allocate_stream():
     route_started_at = time.perf_counter()
@@ -44882,7 +46665,7 @@ def teacher_allocate_stream():
     success_redirect = (
         url_for('school_admin_view_students', **{'class': classname})
         if role == 'school_admin'
-        else url_for('teacher_class_list')
+        else url_for('teacher_dashboard')
     )
     if role == 'teacher' and not teacher_has_class_access(school_id, teacher_id, classname, term=current_term, academic_year=current_year):
         message = 'You are not assigned to this class.'
@@ -44951,44 +46734,43 @@ def teacher_allocate_stream():
 
         # Use a focused update for stream allocation to avoid full-row save
         # overhead and reduce the chance of long-running submit requests.
+        db_connect_ms = 0
+        update_ms = 0
+        commit_ms = 0
         conn = None
         try:
             before_db_connect_at = time.perf_counter()
-            conn = get_db()
-            db_connect_ms = int((time.perf_counter() - before_db_connect_at) * 1000)
-            c = conn.cursor()
-            # Fail fast if the row is locked or the DB is slow.
-            db_execute(c, "SET LOCAL statement_timeout = 8000")
-            db_execute(c, "SET LOCAL lock_timeout = 4000")
-            before_update_at = time.perf_counter()
-            db_execute(
-                c,
-                """UPDATE students
-                   SET stream = ?,
-                       subjects = ?,
-                       number_of_subject = ?,
-                       scores = ?
-                   WHERE school_id = ? AND student_id = ?""",
-                (
-                    final_stream,
-                    json.dumps(subjects),
-                    len(subjects),
-                    json.dumps(student['scores']),
-                    school_id,
-                    student_id,
-                ),
-            )
-            update_ms = int((time.perf_counter() - before_update_at) * 1000)
-            updated_rows = int(c.rowcount or 0)
-            before_commit_at = time.perf_counter()
-            conn.commit()
-            commit_ms = int((time.perf_counter() - before_commit_at) * 1000)
+            with db_connection(commit=True) as conn:
+                db_connect_ms = int((time.perf_counter() - before_db_connect_at) * 1000)
+                c = conn.cursor()
+                # Fail fast if the row is locked or the DB is slow.
+                db_execute(c, "SET LOCAL statement_timeout = 8000")
+                db_execute(c, "SET LOCAL lock_timeout = 4000")
+                before_update_at = time.perf_counter()
+                db_execute(
+                    c,
+                    """UPDATE students
+                       SET stream = ?,
+                           subjects = ?,
+                           number_of_subject = ?,
+                           scores = ?
+                       WHERE school_id = ? AND student_id = ?""",
+                    (
+                        final_stream,
+                        json.dumps(subjects),
+                        len(subjects),
+                        json.dumps(student['scores']),
+                        school_id,
+                        student_id,
+                    ),
+                )
+                update_ms = int((time.perf_counter() - before_update_at) * 1000)
+                updated_rows = int(getattr(c, 'rowcount', 0) or 0)
+                before_commit_at = time.perf_counter()
+                if hasattr(conn, 'commit'):
+                    conn.commit()
+                commit_ms = int((time.perf_counter() - before_commit_at) * 1000)
         except Exception as exc:
-            if conn is not None:
-                try:
-                    conn.rollback()
-                except Exception:
-                    pass
             logging.exception(
                 "teacher_allocate_stream: update failed school_id=%s student_id=%s teacher_id=%s student_load_ms=%s subject_build_ms=%s",
                 school_id,
@@ -45002,12 +46784,6 @@ def teacher_allocate_stream():
                 return jsonify({'ok': False, 'message': message, 'redirect_url': url_for('teacher_allocate_stream', student_id=student_id)}), 500
             flash(message, 'error')
             return redirect(url_for('teacher_allocate_stream', student_id=student_id))
-        finally:
-            if conn is not None:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
         elapsed_ms = int((time.perf_counter() - allocation_started_at) * 1000)
         if updated_rows <= 0:
             logging.warning(
@@ -47487,6 +49263,7 @@ def parent_dashboard():
         limit_per_school=80,
     )
     unread_parent_messages = sum(1 for row in parent_messages if not row.get('is_read'))
+    parent_fee_rows, parent_fee_overview = build_parent_fee_rows(session.get('parent_phone', ''), children)
     return render_template(
         'parent/parent_dashboard.html',
         parent_phone=session.get('parent_phone', ''),
@@ -47495,6 +49272,499 @@ def parent_dashboard():
         parent_term_events=parent_term_events,
         parent_messages=parent_messages,
         unread_parent_messages=unread_parent_messages,
+        parent_fee_rows=parent_fee_rows,
+        parent_fee_overview=parent_fee_overview,
+    )
+
+@app.route('/school-admin/documents', methods=['GET', 'POST'])
+def school_admin_documents():
+    if (session.get('role') or '').strip().lower() != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = (session.get('school_id') or '').strip()
+    if not school_id:
+        flash('School session expired. Please login again.', 'error')
+        return redirect(url_for('login'))
+    school = get_school(school_id) or {}
+    if request.method == 'POST':
+        title = (request.form.get('title', '') or '').strip()
+        description = (request.form.get('description', '') or '').strip()
+        audience = (request.form.get('audience', '') or 'parents').strip().lower()
+        document_category = (request.form.get('document_category', '') or '').strip()
+        target_classname = canonicalize_classname((request.form.get('target_classname', '') or '').strip())
+        target_stream = (request.form.get('target_stream', '') or '').strip()
+        target_subject = (request.form.get('target_subject', '') or '').strip()
+        external_url = (request.form.get('external_url', '') or '').strip()
+        upload = request.files.get('document_file')
+        attachment_path = ''
+        attachment_name = ''
+        attachment_mime = ''
+        attachment_size = 0
+        try:
+            if upload and (upload.filename or '').strip():
+                upload.stream.seek(0)
+                attachment_path = save_school_document_attachment(upload)
+                attachment_name = (upload.filename or '').strip()
+                attachment_mime = (upload.mimetype or '').strip()
+                try:
+                    upload.stream.seek(0, os.SEEK_END)
+                    attachment_size = int(upload.stream.tell() or 0)
+                except Exception:
+                    attachment_size = 0
+            if not title:
+                raise ValueError('Document title is required.')
+            if not attachment_path and not external_url:
+                raise ValueError('Upload a file or add an external link before publishing.')
+            create_school_document(
+                school_id,
+                title,
+                description=description,
+                audience=audience,
+                document_category=document_category,
+                target_classname=target_classname,
+                target_stream=target_stream,
+                target_subject=target_subject,
+                external_url=external_url,
+                attachment_path=attachment_path,
+                attachment_name=attachment_name,
+                attachment_mime=attachment_mime,
+                attachment_size=attachment_size,
+                created_by=session.get('user_id', ''),
+            )
+            flash('Document published successfully.', 'success')
+            return redirect(url_for('school_admin_documents'))
+        except Exception as exc:
+            logging.exception("Could not publish school document.")
+            flash(f'Could not publish document: {exc}', 'error')
+    document_rows = get_school_documents(school_id, active_only=False)
+    school_document_total = len(document_rows)
+    active_document_count = sum(1 for doc in document_rows if doc.get('is_active'))
+    inactive_document_count = school_document_total - active_document_count
+    return render_template(
+        'school/school_admin_documents.html',
+        school=school,
+        school_document_total=school_document_total,
+        active_document_count=active_document_count,
+        inactive_document_count=inactive_document_count,
+        document_rows=document_rows,
+    )
+
+@app.route('/school-admin/documents/archive', methods=['POST'])
+def school_admin_archive_document():
+    if (session.get('role') or '').strip().lower() != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = (session.get('school_id') or '').strip()
+    document_id = request.form.get('document_id', '').strip()
+    try:
+        changed = archive_school_document(school_id, int(document_id or 0))
+        if changed:
+            flash('Document archived.', 'success')
+        else:
+            flash('Document not found.', 'warning')
+    except Exception as exc:
+        logging.exception("Could not archive school document.")
+        flash(f'Could not archive document: {exc}', 'error')
+    return redirect(url_for('school_admin_documents'))
+
+@app.route('/parent/documents')
+def parent_documents():
+    if (session.get('role') or '').strip().lower() != 'parent':
+        return redirect(url_for('login'))
+    context = _build_parent_sidebar_context(limit_per_school=80)
+    children = context.get('children', [])
+    parent_theme_accent = context.get('parent_theme_accent', '#1F7A8C')
+    parent_documents, parent_document_counts = get_parent_documents_for_children(
+        session.get('parent_phone', ''),
+        children,
+    )
+    return render_template(
+        'parent/parent_documents.html',
+        parent_phone=session.get('parent_phone', ''),
+        parent_theme_accent=parent_theme_accent,
+        children=children,
+        parent_documents=parent_documents,
+        parent_document_counts=parent_document_counts,
+    )
+
+@app.route('/parent/fees')
+def parent_fees():
+    if (session.get('role') or '').strip().lower() != 'parent':
+        return redirect(url_for('login'))
+    context = _build_parent_sidebar_context(limit_per_school=80)
+    children = context.get('children', [])
+    parent_theme_accent = context.get('parent_theme_accent', '#1F7A8C')
+    parent_fee_rows, parent_fee_overview = build_parent_fee_rows(session.get('parent_phone', ''), children)
+    return render_template(
+        'parent/parent_fees.html',
+        parent_phone=session.get('parent_phone', ''),
+        parent_theme_accent=parent_theme_accent,
+        children=children,
+        parent_fee_rows=parent_fee_rows,
+        parent_fee_overview=parent_fee_overview,
+    )
+
+@app.route('/school-admin/student-fees', methods=['GET', 'POST'])
+def school_admin_student_fees():
+    role = (session.get('role') or '').strip().lower()
+    if role == 'bursar':
+        return redirect(url_for('bursar_student_fees', **request.args.to_dict(flat=True)))
+    if role != 'school_admin':
+        return redirect(url_for('login'))
+    return _render_fee_workspace(bursar_mode=False)
+
+@app.route('/bursar/dashboard')
+def bursar_dashboard():
+    role = (session.get('role') or '').strip().lower()
+    if role not in {'bursar', 'school_admin'}:
+        return redirect(url_for('login'))
+    school_id = (session.get('school_id') or '').strip()
+    if not school_id:
+        flash('School session expired. Please login again.', 'error')
+        return redirect(url_for('login'))
+    school = get_school(school_id) or {}
+    current_term = get_current_term(school)
+    current_year = (school.get('academic_year') or '').strip()
+    student_query = (request.args.get('student_query', '') or '').strip()
+    class_filter = canonicalize_classname((request.args.get('class_filter', '') or '').strip())
+    queue_status = (request.args.get('queue_status', '') or 'pending').strip().lower() or 'pending'
+    students = load_students(school_id, class_filter=class_filter, term_filter=current_term, include_archived=False)
+    student_search_results = []
+    for student_id, student in students.items():
+        haystack = ' '.join([
+            student_id,
+            student.get('firstname', ''),
+            student.get('classname', ''),
+            student.get('stream', ''),
+            ' '.join(student.get('subjects', []) or []),
+        ]).lower()
+        if student_query and student_query.lower() not in haystack:
+            continue
+        account = get_student_fee_account(school_id, student_id, current_term, current_year, 'School Fee') or {}
+        student_search_results.append({
+            'student_id': student_id,
+            'student_name': student.get('firstname', '') or account.get('student_name', '') or student_id,
+            'classname': student.get('classname', '') or account.get('classname', ''),
+            'stream': student.get('stream', '') or account.get('stream', ''),
+            'term': account.get('term', '') or current_term,
+            'academic_year': account.get('academic_year', '') or current_year,
+            'currency': account.get('currency', 'NGN'),
+            'amount_due': account.get('amount_due', 0),
+            'amount_paid': account.get('amount_paid', 0),
+            'balance_amount': account.get('balance_amount', 0),
+            'status': account.get('status', 'pending'),
+            'invoice_ref': account.get('invoice_ref', ''),
+        })
+    student_search_results.sort(key=lambda row: ((row.get('student_name') or '').lower(), (row.get('student_id') or '').lower()))
+    student_search_results = student_search_results[:120]
+    follow_up_rows = [
+        row for row in get_school_fee_accounts(
+            school_id,
+            class_filter=class_filter,
+            term_filter=current_term,
+            student_filter=student_query,
+            fee_label='',
+        )
+        if float(row.get('balance_amount', 0) or 0) > 0 and (row.get('status') or '').strip().lower() in {'pending', 'part_paid', 'overdue'}
+    ]
+    follow_up_rows.sort(key=lambda row: ((row.get('balance_amount', 0) or 0), row.get('updated_at', '')), reverse=True)
+    follow_up_rows = follow_up_rows[:12]
+    review_queue_rows = []
+    if ensure_extended_features_schema():
+        try:
+            with db_connection() as conn:
+                c = conn.cursor()
+                clauses = ['school_id = ?']
+                params = [school_id]
+                if queue_status != 'all':
+                    clauses.append('status = ?')
+                    params.append(queue_status)
+                db_execute(
+                    c,
+                    f"""SELECT id, school_id, source, student_id, student_name, invoice_ref, payment_reference, term, academic_year,
+                              fee_label, currency, amount_paid, reason, payload_json, status, reviewed_by, reviewed_at, created_at, updated_at
+                       FROM student_fee_review_queue
+                       WHERE {' AND '.join(clauses)}
+                       ORDER BY created_at DESC, id DESC""",
+                    tuple(params),
+                )
+                rows = c.fetchall() or []
+            for row in rows:
+                review_queue_rows.append({
+                    'id': int(row[0] or 0),
+                    'school_id': row[1] or '',
+                    'source': row[2] or '',
+                    'student_id': row[3] or '',
+                    'student_name': row[4] or '',
+                    'invoice_ref': row[5] or '',
+                    'payment_reference': row[6] or '',
+                    'term': row[7] or '',
+                    'academic_year': row[8] or '',
+                    'fee_label': row[9] or 'School Fee',
+                    'currency': row[10] or 'NGN',
+                    'amount_paid': float(row[11] or 0),
+                    'reason': row[12] or '',
+                    'payload_json': row[13] or '{}',
+                    'status': row[14] or 'pending',
+                    'reviewed_by': row[15] or '',
+                    'reviewed_at': format_timestamp(row[16]) if row[16] else '',
+                    'created_at': format_timestamp(row[17]),
+                    'updated_at': format_timestamp(row[18]),
+                })
+        except Exception:
+            logging.exception("Could not load bursar review queue.")
+    fee_summary = get_school_fee_summary(
+        school_id,
+        class_filter=class_filter,
+        term_filter=current_term,
+        student_filter=student_query,
+        fee_label='',
+    )
+    return render_template(
+        'bursar/bursar_dashboard.html',
+        school=school,
+        fee_summary=fee_summary,
+        student_query=student_query,
+        class_filter=class_filter,
+        student_search_results=student_search_results,
+        follow_up_rows=follow_up_rows,
+        review_queue_rows=review_queue_rows,
+        queue_status=queue_status,
+        current_term=current_term,
+        current_year=current_year,
+    )
+
+@app.route('/bursar/fees', methods=['GET', 'POST'])
+def bursar_student_fees():
+    role = (session.get('role') or '').strip().lower()
+    if role not in {'bursar', 'school_admin'}:
+        return redirect(url_for('login'))
+    return _render_fee_workspace(bursar_mode=True)
+
+@app.route('/bursar/review/resolve', methods=['POST'])
+def bursar_resolve_payment_review():
+    role = (session.get('role') or '').strip().lower()
+    if role not in {'bursar', 'school_admin'}:
+        return redirect(url_for('login'))
+    school_id = (session.get('school_id') or '').strip()
+    if not school_id:
+        flash('School session expired. Please login again.', 'error')
+        return redirect(url_for('login'))
+    review_id_raw = (request.form.get('review_id', '') or '').strip()
+    student_id = (request.form.get('student_id', '') or '').strip()
+    fee_label = _normalize_fee_label(request.form.get('fee_label', '') or 'School Fee')
+    term_name = (request.form.get('term', '') or '').strip()
+    academic_year = (request.form.get('academic_year', '') or '').strip()
+    invoice_ref = (request.form.get('invoice_ref', '') or '').strip()
+    payment_reference = (request.form.get('payment_reference', '') or '').strip()
+    payment_method = (request.form.get('payment_method', '') or 'transfer').strip() or 'transfer'
+    note = (request.form.get('note', '') or '').strip()
+    student_query = (request.form.get('student_query', '') or '').strip()
+    class_filter = canonicalize_classname((request.form.get('class_filter', '') or '').strip())
+    queue_status = (request.form.get('queue_status', '') or 'pending').strip().lower() or 'pending'
+    try:
+        amount_paid = safe_float(request.form.get('amount_paid', 0), 0.0)
+    except Exception:
+        amount_paid = 0.0
+    try:
+        review_id = int(review_id_raw or 0)
+    except Exception:
+        review_id = 0
+    if not review_id:
+        flash('Invalid review entry.', 'error')
+        return redirect(url_for('bursar_dashboard', student_query=student_query, class_filter=class_filter, queue_status=queue_status))
+    try:
+        matched_account = _find_student_fee_account_by_reference(
+            school_id,
+            payment_reference=payment_reference,
+            invoice_ref=invoice_ref,
+            student_id=student_id,
+            term=term_name,
+            academic_year=academic_year,
+            fee_label=fee_label,
+        )
+        if matched_account:
+            student_id = matched_account.get('student_id') or student_id
+            term_name = matched_account.get('term') or term_name
+            academic_year = matched_account.get('academic_year') or academic_year
+            fee_label = _normalize_fee_label(matched_account.get('fee_label') or fee_label)
+        payment_result = record_student_fee_payment(
+            school_id,
+            student_id,
+            term_name,
+            academic_year,
+            fee_label,
+            amount_paid,
+            payment_method=payment_method,
+            payment_reference=payment_reference or invoice_ref,
+            note=note,
+            recorded_by=session.get('user_id', ''),
+        ) if student_id else None
+        if payment_result is None:
+            flash('Payment could not be matched automatically and was queued for review.', 'warning')
+            return redirect(url_for('bursar_dashboard', student_query=student_query, class_filter=class_filter, queue_status=queue_status))
+        with db_connection(commit=True) as conn:
+            c = conn.cursor()
+            db_execute(
+                c,
+                """UPDATE student_fee_review_queue
+                   SET status = 'resolved',
+                       reviewed_by = ?,
+                       reviewed_at = CURRENT_TIMESTAMP,
+                       amount_paid = ?,
+                       student_id = COALESCE(NULLIF(?, ''), student_id),
+                       term = COALESCE(NULLIF(?, ''), term),
+                       academic_year = COALESCE(NULLIF(?, ''), academic_year),
+                       fee_label = COALESCE(NULLIF(?, ''), fee_label),
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE school_id = ? AND id = ?""",
+                (session.get('user_id', ''), amount_paid, student_id, term_name, academic_year, fee_label, school_id, review_id),
+            )
+        flash('Payment review marked as resolved.', 'success')
+    except Exception as exc:
+        logging.exception("Could not resolve bursar payment review.")
+        flash(f'Could not resolve review: {exc}', 'error')
+    return redirect(url_for('bursar_dashboard', student_query=student_query, class_filter=class_filter, queue_status=queue_status))
+
+@app.route('/bursar/fee-receipt')
+def bursar_fee_receipt():
+    role = (session.get('role') or '').strip().lower()
+    if role not in {'bursar', 'school_admin', 'parent'}:
+        return redirect(url_for('login'))
+    student_id = (request.args.get('student_id', '') or '').strip()
+    term_name = (request.args.get('term', '') or '').strip()
+    academic_year = (request.args.get('academic_year', '') or '').strip()
+    fee_label = _normalize_fee_label(request.args.get('fee_label', '') or 'School Fee')
+    invoice_ref = (request.args.get('invoice_ref', '') or '').strip()
+    school_id = (session.get('school_id') or '').strip()
+    school = get_school(school_id) or {}
+    account = None
+    if role == 'parent':
+        context = _build_parent_sidebar_context(limit_per_school=120)
+        children = context.get('children', [])
+        schools_by_id = {child.get('school_id'): get_school(child.get('school_id')) or {} for child in children if child.get('school_id')}
+        candidate_school_ids = [child.get('school_id') for child in children if (child.get('student_id') or '').strip() == student_id and child.get('school_id')]
+        for candidate_school_id in candidate_school_ids:
+            if invoice_ref:
+                with db_connection() as conn:
+                    c = conn.cursor()
+                    db_execute(
+                        c,
+                        """SELECT school_id
+                           FROM student_fee_accounts
+                           WHERE school_id = ? AND invoice_ref = ?
+                           LIMIT 1""",
+                        (candidate_school_id, invoice_ref),
+                    )
+                    row = c.fetchone()
+                    if row:
+                        candidate_school_id = (row[0] or '').strip()
+                        break
+            account = get_student_fee_account(candidate_school_id, student_id, term_name, academic_year, fee_label)
+            if account:
+                school_id = candidate_school_id
+                school = schools_by_id.get(candidate_school_id, school) or get_school(candidate_school_id) or {}
+                break
+    else:
+        if invoice_ref and school_id:
+            with db_connection() as conn:
+                c = conn.cursor()
+                db_execute(
+                    c,
+                    """SELECT school_id, student_id, term, academic_year, fee_label
+                       FROM student_fee_accounts
+                       WHERE school_id = ? AND invoice_ref = ?
+                       LIMIT 1""",
+                    (school_id, invoice_ref),
+                )
+                row = c.fetchone()
+                if row:
+                    student_id = student_id or (row[1] or '').strip()
+                    term_name = term_name or (row[2] or '').strip()
+                    academic_year = academic_year or (row[3] or '').strip()
+                    fee_label = fee_label or _normalize_fee_label(row[4] or 'School Fee')
+        account = get_student_fee_account(school_id, student_id, term_name, academic_year, fee_label)
+        if not account and invoice_ref and school_id:
+            account = _find_student_fee_account_by_reference(
+                school_id,
+                payment_reference=invoice_ref,
+                invoice_ref=invoice_ref,
+                student_id=student_id,
+                term=term_name,
+                academic_year=academic_year,
+                fee_label=fee_label,
+            )
+    if not account and invoice_ref and school_id:
+        with db_connection() as conn:
+            c = conn.cursor()
+            db_execute(
+                c,
+                """SELECT id, school_id, student_id, student_name, classname, stream, term, academic_year, fee_label, currency,
+                          amount_due, amount_paid, balance_amount, status, due_date, note, invoice_ref, assessed_by, assessed_at,
+                          created_at, updated_at
+                   FROM student_fee_accounts
+                   WHERE school_id = ? AND invoice_ref = ?
+                   LIMIT 1""",
+                (school_id, invoice_ref),
+            )
+            row = c.fetchone()
+            if row:
+                account = {
+                    'id': int(row[0] or 0),
+                    'school_id': row[1] or '',
+                    'student_id': row[2] or '',
+                    'student_name': row[3] or '',
+                    'classname': row[4] or '',
+                    'stream': row[5] or '',
+                    'term': row[6] or '',
+                    'academic_year': row[7] or '',
+                    'fee_label': row[8] or '',
+                    'currency': row[9] or 'NGN',
+                    'amount_due': float(row[10] or 0),
+                    'amount_paid': float(row[11] or 0),
+                    'balance_amount': float(row[12] or 0),
+                    'status': row[13] or 'pending',
+                    'due_date': row[14] or '',
+                    'note': row[15] or '',
+                    'invoice_ref': row[16] or '',
+                    'assessed_by': row[17] or '',
+                    'assessed_at': format_timestamp(row[18]) if row[18] else '',
+                    'created_at': format_timestamp(row[19]),
+                    'updated_at': format_timestamp(row[20]),
+                }
+    payment_rows = get_student_fee_payments(
+        school_id,
+        student_id,
+        account.get('term', term_name) if account else term_name,
+        account.get('academic_year', academic_year) if account else academic_year,
+        account.get('fee_label', fee_label) if account else fee_label,
+    ) if account else []
+    fee_summary = account or {
+        'student_id': student_id,
+        'term': term_name,
+        'academic_year': academic_year,
+        'fee_label': fee_label,
+        'currency': 'NGN',
+        'amount_due': 0,
+        'amount_paid': 0,
+        'balance_amount': 0,
+        'status': 'pending',
+        'invoice_ref': invoice_ref,
+    }
+    back_url = request.args.get('back_url', '')
+    open_fee_url = request.args.get('open_fee_url', '')
+    return render_template(
+        'bursar/bursar_fee_receipt.html',
+        school=school,
+        fee_summary=fee_summary,
+        student=load_student(school_id, student_id) if school_id and student_id else {},
+        payment_rows=payment_rows,
+        selected_term=fee_summary.get('term', term_name),
+        selected_academic_year=fee_summary.get('academic_year', academic_year),
+        selected_fee_label=fee_summary.get('fee_label', fee_label),
+        generated_at=format_timestamp(datetime.now()),
+        back_url=back_url,
+        back_label=request.args.get('back_label', ''),
+        open_fee_url=open_fee_url,
+        open_fee_label=request.args.get('open_fee_label', ''),
     )
 
 @app.route('/parent/messages/mark-read', methods=['POST'])
@@ -49951,6 +52221,8 @@ def change_password():
     if role == 'school_admin':
         # Reuse the dedicated school-admin handler for both GET and POST.
         return school_admin_change_password()
+    if role == 'bursar':
+        return bursar_change_password()
     if role == 'student':
         return student_change_password()
 
