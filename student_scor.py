@@ -16908,9 +16908,44 @@ def ensure_extended_features_schema():
             db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_password_hash_2 TEXT DEFAULT ''")
             db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS parent_gender_2 TEXT DEFAULT ''")
             db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            db_execute(
+                c,
+                """CREATE TABLE IF NOT EXISTS bursars (
+                       id SERIAL PRIMARY KEY,
+                       school_id TEXT NOT NULL,
+                       user_id TEXT NOT NULL,
+                       firstname TEXT NOT NULL,
+                       lastname TEXT NOT NULL,
+                       phone TEXT DEFAULT '',
+                       gender TEXT DEFAULT '',
+                       profile_image TEXT DEFAULT '',
+                       is_archived INTEGER DEFAULT 0,
+                       archived_at TIMESTAMP,
+                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                   )""",
+            )
             db_execute(c, "ALTER TABLE bursars ADD COLUMN IF NOT EXISTS profile_image TEXT DEFAULT ''")
             db_execute(c, "ALTER TABLE bursars ADD COLUMN IF NOT EXISTS is_archived INTEGER DEFAULT 0")
             db_execute(c, "ALTER TABLE bursars ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP")
+            db_execute(
+                c,
+                """CREATE TABLE IF NOT EXISTS class_timetables (
+                       id SERIAL PRIMARY KEY,
+                       school_id TEXT NOT NULL,
+                       classname TEXT NOT NULL,
+                       day_of_week INTEGER NOT NULL,
+                       period_label TEXT NOT NULL,
+                       subject TEXT NOT NULL,
+                       teacher_id TEXT DEFAULT '',
+                       start_time TEXT DEFAULT '',
+                       end_time TEXT DEFAULT '',
+                       room TEXT DEFAULT '',
+                       online_url TEXT DEFAULT '',
+                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       UNIQUE(school_id, classname, day_of_week, period_label)
+                   )""",
+            )
             db_execute(c, "ALTER TABLE class_timetables ADD COLUMN IF NOT EXISTS online_url TEXT DEFAULT ''")
             db_execute(
                 c,
@@ -28363,6 +28398,8 @@ def get_bursars(school_id, include_archived=False):
     sid = (school_id or '').strip()
     if not sid:
         return {}
+    if not ensure_extended_features_schema():
+        return {}
     with db_connection() as conn:
         c = conn.cursor()
         archived_where = ' AND COALESCE(is_archived, 0) = 0' if not include_archived else ''
@@ -28382,15 +28419,19 @@ def get_bursars(school_id, include_archived=False):
                 conn.rollback()
             except Exception as exc:
                 _log_suppressed_exception('get_bursars', exc)
-            db_execute(
-                c,
-                f"""SELECT user_id, firstname, lastname, phone, gender, COALESCE(is_archived, 0)
-                   FROM bursars
-                   WHERE school_id = ?{archived_where}""",
-                (sid,),
-            )
-            rows = c.fetchall() or []
-            has_profile_image_col = False
+            try:
+                db_execute(
+                    c,
+                    f"""SELECT user_id, firstname, lastname, phone, gender, COALESCE(is_archived, 0)
+                       FROM bursars
+                       WHERE school_id = ?{archived_where}""",
+                    (sid,),
+                )
+                rows = c.fetchall() or []
+                has_profile_image_col = False
+            except Exception as exc:
+                _log_suppressed_exception('get_bursars', exc)
+                return {}
     bursars = {}
     for row in rows:
         bursars[row[0]] = {

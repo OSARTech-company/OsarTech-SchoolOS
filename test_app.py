@@ -91,6 +91,73 @@ def test_db_execute_transaction_resets(monkeypatch):
     assert conn.committed, "db_execute should commit after successful statement"
 
 
+def test_get_bursars_ensures_schema_before_query(app_module, monkeypatch):
+    m = app_module
+    ensure_calls = []
+
+    def fake_ensure_extended_features_schema():
+        ensure_calls.append(True)
+        return True
+
+    class FakeCursor:
+        def execute(self, query, params=None):
+            if 'FROM bursars' in query:
+                raise RuntimeError('simulated missing table')
+        def fetchall(self):
+            return []
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    monkeypatch.setattr(m, "ensure_extended_features_schema", fake_ensure_extended_features_schema)
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+
+    assert m.get_bursars("SCH") == {}
+    assert ensure_calls == [True]
+
+
+def test_ensure_extended_features_schema_creates_bursars_table_before_alter(app_module, monkeypatch):
+    m = app_module
+
+    class FakeCursor:
+        def __init__(self):
+            self.tables = set()
+        def execute(self, query, params=None):
+            if 'CREATE TABLE IF NOT EXISTS bursars' in query:
+                self.tables.add('bursars')
+                return
+            if 'CREATE TABLE IF NOT EXISTS class_timetables' in query:
+                self.tables.add('class_timetables')
+                return
+            if 'ALTER TABLE bursars' in query:
+                if 'bursars' not in self.tables:
+                    raise RuntimeError('simulated missing bursars table')
+                return
+            if 'ALTER TABLE class_timetables' in query:
+                if 'class_timetables' not in self.tables:
+                    raise RuntimeError('simulated missing class_timetables table')
+                return
+        def fetchall(self):
+            return []
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+
+    assert m.ensure_extended_features_schema() is True
+
+
 @pytest.fixture
 def app_module(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "x" * 40)
