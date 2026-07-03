@@ -272,7 +272,7 @@
                         <label for="parent_phone">Parent Phone</label>
                         <input class="input" id="parent_phone" name="parent_phone" type="text" autocomplete="username" required>
                         <label for="password">Password</label>
-                        <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
+                        <input class="input" id="password" name="password" type="password" autocomplete="current-password" data-password-toggle required>
                     </div>
                     <div class="portal-actions">
                         <button class="btn" type="submit"><i class="fas fa-sign-in-alt"></i> Login</button>
@@ -282,8 +282,8 @@
             </section>
         </div>
     </div>
+    <script src="{{ url_for('static', filename='js/password-toggle.js', v='20260703a') }}"></script>
 </body>
 </html>
-
 
 

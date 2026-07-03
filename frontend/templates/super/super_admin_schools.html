@@ -303,7 +303,7 @@
                                     </div>
                                     <div class="super-admin-inline-field">
                                         <label>New Password</label>
-                                        <input type="password" name="admin_password" placeholder="New password (optional)" autocomplete="new-password" minlength="12" title="Use at least 12 characters. Include uppercase, lowercase, number, and symbol.">
+                                        <input type="password" name="admin_password" placeholder="New password (optional)" autocomplete="new-password" minlength="12" data-password-toggle title="Use at least 12 characters. Include uppercase, lowercase, number, and symbol.">
                                     </div>
                                     <button type="submit" class="btn btn-primary"><i class="fas fa-user-edit"></i> Update Admin</button>
                                 </form>
@@ -468,6 +468,6 @@
         </div>
     </div>
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script src="{{ url_for('static', filename='js/password-toggle.js', v='20260703a') }}"></script>
 </body>
 </html>
-

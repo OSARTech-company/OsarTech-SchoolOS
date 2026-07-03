@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Edit Teacher</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      .page-shell {
+        width: min(860px, 100%);
+        margin: 0 auto;
+        padding: 24px;
+      }
+      .header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .header-row h1 {
+        margin: 0;
+        font-size: 1.8rem;
+      }
+      .teacher-edit-grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .teacher-edit-grid .form-group {
+        margin: 0;
+      }
+      .teacher-edit-grid .full-span {
+        grid-column: 1 / -1;
+      }
+      .password-note {
+        margin: 8px 0 0;
+        color: #5b6475;
+        font-size: 0.9rem;
+      }
+      .action-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+      @media (max-width: 720px) {
+        .page-shell {
+          padding: 16px;
+        }
+        .teacher-edit-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+        <div class="page-shell">
+          <div class="header-row">
+            <div>
+              <h1><i class="fas fa-user-pen"></i> Edit Teacher</h1>
+              <p class="meta-line">Current login: {{ teacher_id }}</p>
+            </div>
+            <a href="{{ url_for('school_admin_teachers') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Teachers</a>
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          <div class="card">
+            <h2><i class="fas fa-id-card"></i> Teacher Details</h2>
+            <p class="note">Update the teacher login email like a Gmail address, and reset the password when you save.</p>
+            <form method="post" action="{{ url_for('school_admin_edit_teacher', teacher_id=teacher_id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <div class="teacher-edit-grid">
+                <div class="form-group full-span">
+                  <label for="username">Login Email / Username</label>
+                  <input type="email" id="username" name="username" value="{{ teacher_id }}" placeholder="teacher@school.com" required />
+                </div>
+                <div class="form-group">
+                  <label for="firstname">First Name</label>
+                  <input type="text" id="firstname" name="firstname" value="{{ teacher.firstname or '' }}" required />
+                </div>
+                <div class="form-group">
+                  <label for="lastname">Last Name</label>
+                  <input type="text" id="lastname" name="lastname" value="{{ teacher.lastname or '' }}" />
+                </div>
+                <div class="form-group">
+                  <label for="phone">Phone</label>
+                  <input type="text" id="phone" name="phone" value="{{ teacher.phone or '' }}" placeholder="+234..." />
+                </div>
+                <div class="form-group">
+                  <label for="gender">Gender</label>
+                  <select id="gender" name="gender" required>
+                    <option value="">Select Gender</option>
+                    <option value="male" {% if (teacher.gender or '') == 'male' %}selected{% endif %}>Male</option>
+                    <option value="female" {% if (teacher.gender or '') == 'female' %}selected{% endif %}>Female</option>
+                    <option value="other" {% if (teacher.gender or '') == 'other' %}selected{% endif %}>Other</option>
+                  </select>
+                </div>
+                <div class="form-group full-span">
+                  <label for="new_password">New Password</label>
+                  <input type="password" id="new_password" name="new_password" autocomplete="new-password" data-password-toggle />
+                  <p class="password-note">Leave this blank and we will generate a fresh temporary password when you save.</p>
+                </div>
+                <div class="form-group full-span">
+                  <label class="checkbox-row">
+                    <input type="checkbox" name="send_credentials" value="1" checked />
+                    Email the updated login details to the teacher
+                  </label>
+                </div>
+              </div>
+              <div class="action-row">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Teacher</button>
+                <a href="{{ url_for('school_admin_teachers') }}" class="btn btn-secondary">Cancel</a>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/password-toggle.js', v='20260703a') }}"></script>
+  </body>
+</html>

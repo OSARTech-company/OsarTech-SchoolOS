@@ -115,7 +115,7 @@
             <label for="username">Student ID</label>
             <input type="text" id="username" name="username" autocomplete="username" required>
             <label for="password">Password</label>
-            <input type="password" id="password" name="password" autocomplete="current-password" required>
+            <input type="password" id="password" name="password" autocomplete="current-password" data-password-toggle required>
             <div class="terms">
                 <input type="checkbox" id="agree_terms" name="agree_terms" {% if terms_read %}checked{% endif %}>
                 <label for="agree_terms">
@@ -128,7 +128,7 @@
             </div>
         </form>
     </div>
+    <script src="{{ url_for('static', filename='js/password-toggle.js', v='20260703a') }}"></script>
 </body>
 </html>
-
 

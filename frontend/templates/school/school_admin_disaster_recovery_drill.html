@@ -60,14 +60,14 @@
                 <form method="post" action="{{ url_for('school_admin_backup_encrypted') }}" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="return_to" value="recovery_drill">
-                    <input type="password" name="backup_passphrase" placeholder="Backup passphrase (min 8 chars)" minlength="8" required>
+                    <input type="password" name="backup_passphrase" placeholder="Backup passphrase (min 8 chars)" minlength="8" data-password-toggle required>
                     <button class="btn btn-secondary" type="submit">Download Encrypted Backup</button>
                 </form>
                 <form method="post" action="{{ url_for('school_admin_restore') }}" enctype="multipart/form-data" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="return_to" value="recovery_drill">
                     <input type="file" name="backup_file" accept=".json,application/json" required>
-                    <input type="password" name="backup_passphrase" placeholder="Passphrase (encrypted backup only)">
+                    <input type="password" name="backup_passphrase" placeholder="Passphrase (encrypted backup only)" data-password-toggle>
                     <select name="mode">
                         <option value="merge">Restore Mode: Merge</option>
                         <option value="replace">Restore Mode: Replace</option>
@@ -153,7 +153,7 @@
         </main>
     </div>
     {% include "shared/_loading_overlay.html" %}
+    <script src="{{ url_for('static', filename='js/password-toggle.js', v='20260703a') }}"></script>
 </body>
 </html>
-
 

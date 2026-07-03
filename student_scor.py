@@ -46519,6 +46519,111 @@ def school_admin_restore_student():
     flash(f'Student {student_id} restored.', 'success')
     return redirect(safe_referrer_or(url_for('school_admin_add_students_by_class')))
 
+@app.route('/school-admin/teacher/edit/<path:teacher_id>', methods=['GET', 'POST'])
+def school_admin_edit_teacher(teacher_id):
+    """Edit a teacher's login email and profile, with optional password reset."""
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+
+    teacher = get_teacher(school_id, teacher_id)
+    if not teacher:
+        flash('Teacher record not found.', 'error')
+        return redirect(url_for('school_admin_teachers'))
+
+    if request.method == 'POST':
+        new_teacher_id = (request.form.get('username', '') or request.form.get('teacher_email', '') or '').strip().lower()
+        firstname = normalize_person_name(request.form.get('firstname', ''))
+        lastname = normalize_person_name(request.form.get('lastname', ''))
+        gender = normalize_teacher_gender(request.form.get('gender', ''))
+        phone = (request.form.get('phone', '') or '').strip()
+        new_password = (request.form.get('new_password', '') or '').strip()
+        send_credentials = (request.form.get('send_credentials', '') or '').strip() in {'1', 'true', 'yes', 'on'}
+
+        if not firstname:
+            flash('Teacher first name is required.', 'error')
+            return redirect(url_for('school_admin_edit_teacher', teacher_id=teacher_id))
+        if not new_teacher_id:
+            flash('Teacher email/login is required.', 'error')
+            return redirect(url_for('school_admin_edit_teacher', teacher_id=teacher_id))
+        if not is_valid_email(new_teacher_id):
+            flash('Teacher email/login must be a valid email address.', 'error')
+            return redirect(url_for('school_admin_edit_teacher', teacher_id=teacher_id))
+
+        try:
+            if new_teacher_id.lower() != teacher_id.lower():
+                _rename_teacher_identifier_across_tables(school_id, teacher_id, new_teacher_id)
+
+            temp_password = ''
+            if not new_password:
+                temp_password = generate_temp_password()
+                new_password = temp_password
+
+            updated_teacher = dict(teacher or {})
+            updated_teacher.update({
+                'firstname': firstname,
+                'lastname': lastname,
+                'gender': gender,
+                'phone': phone,
+            })
+
+            upsert_user(
+                new_teacher_id,
+                hash_password(new_password),
+                'teacher',
+                school_id,
+                overwrite_identity=True,
+            )
+            save_teacher(
+                school_id,
+                new_teacher_id,
+                firstname,
+                lastname,
+                updated_teacher.get('assigned_classes', []),
+                subjects_taught=updated_teacher.get('subjects_taught', []),
+                phone=phone,
+                gender=gender,
+            )
+
+            if send_credentials:
+                school_name = (get_school(school_id) or {}).get('school_name', 'your school')
+                login_url = url_for('login', _external=True)
+                password_label = 'Temporary password' if temp_password else 'Password'
+                subject = f"Teacher Account Updated - {school_name}"
+                body = (
+                    f"Hello {firstname or 'Teacher'},\n\n"
+                    f"Your teacher account has been updated for {school_name}.\n"
+                    f"Username: {new_teacher_id}\n"
+                    f"{password_label}: {new_password}\n\n"
+                    f"Login here: {login_url}\n"
+                    "Please log in and change your password immediately.\n\n"
+                    "If you did not expect this, contact your school admin."
+                )
+                email_result = send_plain_email_message(subject, body, [new_teacher_id])
+                if bool(email_result.get('sent')):
+                    flash(f'Updated login details emailed to {new_teacher_id}.', 'success')
+                else:
+                    err = (email_result.get('errors') or ['Email send failed.'])[0]
+                    flash(f'Updated teacher saved, but email failed ({err}). Share the password manually if needed.', 'warning')
+            elif temp_password:
+                flash(f'Teacher updated. Temporary password: {new_password}', 'warning')
+            else:
+                flash(f'Teacher {new_teacher_id} updated successfully.', 'success')
+        except Exception as exc:
+            logging.exception("Failed to update teacher %s", teacher_id)
+            flash(f'Could not update teacher: {exc}', 'error')
+        return redirect(url_for('school_admin_teachers'))
+
+    return render_template(
+        'school/school_admin_edit_teacher.html',
+        teacher=teacher,
+        teacher_id=teacher_id,
+    )
+
 @app.route('/school-admin/teacher/archive', methods=['POST'])
 def school_admin_archive_teacher():
     if session.get('role') != 'school_admin':

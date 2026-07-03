@@ -294,6 +294,39 @@
             outline: none;
         }
 
+        .password-wrapper {
+            position: relative;
+        }
+
+        .password-wrapper .input {
+            padding-right: 52px;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 50%;
+            background: transparent;
+            color: var(--auth-brand);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .password-toggle:hover,
+        .password-toggle:focus-visible {
+            background: rgba(15, 76, 129, 0.08);
+            color: #0a2c57;
+            outline: none;
+        }
+
         .terms {
             display: flex;
             align-items: flex-start;
@@ -462,7 +495,19 @@
                         <label for="username">Username / Parent Phone</label>
                         <input class="input" type="text" id="username" name="username" autocomplete="username" required>
                         <label for="password">Password</label>
-                        <input class="input" type="password" id="password" name="password" autocomplete="current-password" required>
+                        <div class="password-wrapper">
+                            <input class="input" type="password" id="password" name="password" autocomplete="current-password" required>
+                            <button
+                                type="button"
+                                class="password-toggle"
+                                id="password-toggle"
+                                aria-label="Show password"
+                                aria-pressed="false"
+                                title="Show password"
+                            >
+                                <i class="fas fa-eye" aria-hidden="true"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="terms">
@@ -486,17 +531,33 @@
     </div>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const passwordInput = document.getElementById('password');
+            const passwordToggle = document.getElementById('password-toggle');
             const installBtn = document.getElementById('install-app-btn');
-            if (!installBtn) return;
-            installBtn.addEventListener('click', function () {
-                if (window.__showPwaInstallBanner) {
-                    window.__showPwaInstallBanner();
-                } else {
-                    alert('Use your browser menu to install this app.');
-                }
-            });
+
+            if (passwordInput && passwordToggle) {
+                passwordToggle.addEventListener('click', function () {
+                    const shouldShow = passwordInput.type === 'password';
+                    passwordInput.type = shouldShow ? 'text' : 'password';
+                    passwordToggle.setAttribute('aria-pressed', shouldShow ? 'true' : 'false');
+                    passwordToggle.setAttribute('aria-label', shouldShow ? 'Hide password' : 'Show password');
+                    passwordToggle.title = shouldShow ? 'Hide password' : 'Show password';
+                    passwordToggle.innerHTML = shouldShow
+                        ? '<i class="fas fa-eye-slash" aria-hidden="true"></i>'
+                        : '<i class="fas fa-eye" aria-hidden="true"></i>';
+                });
+            }
+
+            if (installBtn) {
+                installBtn.addEventListener('click', function () {
+                    if (window.__showPwaInstallBanner) {
+                        window.__showPwaInstallBanner();
+                    } else {
+                        alert('Use your browser menu to install this app.');
+                    }
+                });
+            }
         });
     </script>
 </body>
 </html>
-

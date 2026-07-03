@@ -177,13 +177,13 @@
         <a class="btn btn-secondary" href="{{ url_for('school_admin_backup') }}">Download Full JSON Backup</a>
         <form method="post" action="{{ url_for('school_admin_backup_encrypted') }}" class="mt-12">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="password" name="backup_passphrase" placeholder="Backup passphrase (min 8 chars)" minlength="8" required>
+            <input type="password" name="backup_passphrase" placeholder="Backup passphrase (min 8 chars)" minlength="8" data-password-toggle required>
             <button class="btn btn-secondary" type="submit">Download Encrypted Backup</button>
         </form>
         <form method="post" action="{{ url_for('school_admin_restore') }}" enctype="multipart/form-data" class="mt-12">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="file" name="backup_file" accept=".json,application/json" required>
-            <input type="password" name="backup_passphrase" placeholder="Passphrase (only for encrypted backup)">
+            <input type="password" name="backup_passphrase" placeholder="Passphrase (only for encrypted backup)" data-password-toggle>
             <select name="mode">
                 <option value="merge">Merge</option>
                 <option value="replace">Replace Existing</option>
@@ -213,6 +213,7 @@
     </div>
 </div>
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script src="{{ url_for('static', filename='js/password-toggle.js', v='20260703a') }}"></script>
     <script>
         (function () {
             const toggleBtn = document.getElementById('toggle-error-preview');

@@ -647,8 +647,8 @@
                                 <option value="Female">Female</option>
                             </select>
                             <input type="text" name="parent_phone" value="" placeholder="Parent 1 phone number" required>
-                            <input type="password" name="parent_password" placeholder="Parent 1 password (min 6 chars)" autocomplete="new-password" required>
-                            <input type="password" name="confirm_parent_password" placeholder="Confirm Parent 1 password" autocomplete="new-password" required>
+                            <input type="password" name="parent_password" placeholder="Parent 1 password (min 6 chars)" autocomplete="new-password" data-password-toggle required>
+                            <input type="password" name="confirm_parent_password" placeholder="Confirm Parent 1 password" autocomplete="new-password" data-password-toggle required>
                         </div>
                         <div class="mt-12">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Add Parent 1</button>
@@ -681,8 +681,8 @@
                                 <option value="Female">Female</option>
                             </select>
                             <input type="text" name="parent_phone_2" value="" placeholder="Parent 2 phone number" required>
-                            <input type="password" name="parent_password_2" placeholder="Parent 2 password (min 6 chars)" autocomplete="new-password" required>
-                            <input type="password" name="confirm_parent_password_2" placeholder="Confirm Parent 2 password" autocomplete="new-password" required>
+                            <input type="password" name="parent_password_2" placeholder="Parent 2 password (min 6 chars)" autocomplete="new-password" data-password-toggle required>
+                            <input type="password" name="confirm_parent_password_2" placeholder="Confirm Parent 2 password" autocomplete="new-password" data-password-toggle required>
                         </div>
                         <div class="mt-12">
                             <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Add Parent 2</button>
@@ -897,6 +897,7 @@
     </script>
     {% endif %}
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script src="{{ url_for('static', filename='js/password-toggle.js', v='20260703a') }}"></script>
     {% if unread_student_messages %}
     <script>
         (function () {

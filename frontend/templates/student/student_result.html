@@ -2121,7 +2121,7 @@
                 <input type="hidden" name="student_id" value="{{ student.student_id }}">
                 <input type="hidden" name="classname" value="{{ student.class_name }}">
                 <input type="hidden" name="term_token" value="{{ current_term_token }}">
-                <input id="unpublish-admin-password" class="center-modal-input" type="password" name="admin_password" placeholder="School admin password">
+                <input id="unpublish-admin-password" class="center-modal-input" type="password" name="admin_password" placeholder="School admin password" data-password-toggle>
                 <div id="unpublish-modal-error" class="center-modal-error"></div>
                 <div class="center-modal-actions">
                     <button type="button" id="close-unpublish-modal" class="btn btn-secondary">Cancel</button>
@@ -2176,6 +2176,7 @@
             });
         })();
     </script>
+    <script src="{{ url_for('static', filename='js/password-toggle.js', v='20260703a') }}"></script>
     {% endif %}
     {% if session.get('role') in ['student', 'school_admin', 'teacher', 'parent', 'super_admin'] %}
     {% include 'shared/_ai_assistant_widget.html' %}

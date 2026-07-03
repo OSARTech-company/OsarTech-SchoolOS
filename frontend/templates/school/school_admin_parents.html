@@ -133,11 +133,11 @@
                 </div>
                 <div>
                   <label>Parent Password (optional)</label>
-                  <input type="password" name="parent_password" placeholder="Leave blank to auto-generate">
+                  <input type="password" name="parent_password" placeholder="Leave blank to auto-generate" data-password-toggle>
                 </div>
                 <div>
                   <label>Confirm Password</label>
-                  <input type="password" name="confirm_parent_password" placeholder="Confirm password">
+                  <input type="password" name="confirm_parent_password" placeholder="Confirm password" data-password-toggle>
                 </div>
                 <div class="mt-10">
                   <label>
@@ -163,8 +163,8 @@
         }
       })();
     </script>
+    <script src="{{ url_for('static', filename='js/password-toggle.js', v='20260703a') }}"></script>
   </body>
 </html>
-
 
 

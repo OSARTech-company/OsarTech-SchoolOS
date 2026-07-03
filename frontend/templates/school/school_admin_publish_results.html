@@ -1026,7 +1026,7 @@
                               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                               <input type="hidden" name="classname" value="{{ p.classname }}" />
                               <input type="hidden" name="term_token" value="{{ p.academic_year }}::{{ p.term }}" />
-                              <input type="password" name="admin_password" placeholder="Admin password" required class="admin-pass-input" />
+                              <input type="password" name="admin_password" placeholder="Admin password" required class="admin-pass-input" data-password-toggle />
                               <button type="submit" class="btn btn-danger btn-sm">Unpublish</button>
                             </form>
                             <form action="{{ url_for('school_admin_reset_class_student_passwords') }}" method="POST" class="menu-form" onsubmit="return confirm('Reset all ACTIVE student passwords in {{ p.classname }} to default student password?');">
@@ -1159,6 +1159,7 @@
         }, true);
       })();
     </script>
+      <script src="{{ url_for('static', filename='js/password-toggle.js', v='20260703a') }}"></script>
       {% include "shared/_loading_overlay.html" %}
 </body>
 </html>
