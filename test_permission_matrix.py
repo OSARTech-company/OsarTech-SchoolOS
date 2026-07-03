@@ -61,3 +61,38 @@ def test_super_admin_can_open_error_logs_page(client):
         sess["user_id"] = "SA1"
     resp = client.get("/super-admin/error-logs", follow_redirects=False)
     assert resp.status_code == 200
+
+
+def test_bursar_can_open_bursar_dashboard(client, app_module, monkeypatch):
+    monkeypatch.setattr(app_module, "get_school", lambda school_id: {"school_id": school_id})
+    monkeypatch.setattr(app_module, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(app_module, "load_students", lambda *args, **kwargs: {})
+    monkeypatch.setattr(app_module, "get_school_fee_summary", lambda *args, **kwargs: {})
+    monkeypatch.setattr(app_module, "render_template", lambda template, **kwargs: f"RENDERED {template}")
+    with client.session_transaction() as sess:
+        sess["role"] = "bursar"
+        sess["user_id"] = "B1"
+        sess["school_id"] = "SCH1"
+    resp = client.get("/bursar/dashboard", follow_redirects=False)
+    assert resp.status_code == 200
+    assert resp.data == b"RENDERED bursar/bursar_dashboard.html"
+
+
+def test_bursar_cannot_open_school_admin_dashboard(client):
+    with client.session_transaction() as sess:
+        sess["role"] = "bursar"
+        sess["user_id"] = "B1"
+        sess["school_id"] = "SCH1"
+    resp = client.get("/school-admin", follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    assert resp.headers.get("Location", "").endswith("/login")
+
+
+def test_teacher_cannot_open_bursar_dashboard(client):
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["user_id"] = "T1"
+        sess["school_id"] = "SCH1"
+    resp = client.get("/bursar/dashboard", follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    assert resp.headers.get("Location", "").endswith("/login")

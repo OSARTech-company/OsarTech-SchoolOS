@@ -4720,6 +4720,7 @@ ROLE_ROUTE_NAMESPACE_RULES = {
     '/teacher': {'teacher'},
     '/student': {'student'},
     '/parent': {'parent'},
+    '/bursar': {'bursar', 'school_admin'},
 }
 
 ROLE_ROUTE_NAMESPACE_EXCEPTIONS = {
