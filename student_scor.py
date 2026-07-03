@@ -45755,10 +45755,9 @@ def teacher_change_password():
             flash('New passwords do not match.', 'error')
             return redirect(url_for('teacher_change_password_route'))
         
-        # Validate password strength (teachers use same as admins)
-        ok_pwd, pwd_msg = validate_admin_password_strength(new_password)
-        if not ok_pwd:
-            flash(f'Password policy: {pwd_msg}', 'error')
+        # Validate password strength for teachers (minimum 8 characters)
+        if len(new_password) < 8:
+            flash('Password policy: Password must be at least 8 characters.', 'error')
             return redirect(url_for('teacher_change_password_route'))
         
         user = get_user(session.get('user_id'))
