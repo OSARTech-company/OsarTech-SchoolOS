@@ -99,126 +99,6 @@ PWA_BODY_SNIPPET = """
   var deferredPrompt = null;
   var bannerDismissed = false;
 
-  function isStandalone() {
-    try {
-      return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-    } catch (e) {
-      return window.navigator.standalone === true;
-    }
-  }
-
-  function isIOS() {
-    return /iphone|ipad|ipod/i.test(navigator.userAgent || '');
-  }
-
-  function createInstallBanner() {
-    if (document.getElementById('pwa-install-banner')) return;
-    var style = document.createElement('style');
-    style.textContent = [
-      '#pwa-install-banner{position:fixed;right:12px;bottom:12px;z-index:99999;max-width:340px;display:none;padding:12px 14px;border-radius:14px;background:#0f172a;color:#fff;box-shadow:0 12px 30px rgba(15,23,42,.28);font:600 14px/1.4 Arial,sans-serif}',
-      '#pwa-install-banner .row{display:flex;gap:10px;align-items:center;justify-content:space-between}',
-      '#pwa-install-banner .text{margin:0 0 10px 0;font-weight:600}',
-      '#pwa-install-banner .actions{display:flex;gap:8px;flex-wrap:wrap}',
-      '#pwa-install-banner button{border:0;border-radius:999px;padding:9px 12px;font:600 13px Arial,sans-serif;cursor:pointer}',
-      '#pwa-install-banner .install{background:#22c55e;color:#052e16}',
-      '#pwa-install-banner .help{background:#e2e8f0;color:#0f172a}',
-      '#pwa-install-banner .close{background:transparent;color:#cbd5e1;padding:4px 6px;font-size:18px;line-height:1}',
-      '@media (max-width: 480px){#pwa-install-banner{left:12px;right:12px;max-width:none}}'
-    ].join('');
-    document.head.appendChild(style);
-
-    var banner = document.createElement('div');
-    banner.id = 'pwa-install-banner';
-    banner.setAttribute('role', 'dialog');
-    banner.setAttribute('aria-live', 'polite');
-    banner.innerHTML = [
-      '<div class="row">',
-      '<div>',
-      '<div class="text" id="pwa-install-title">Install this app</div>',
-      '<div id="pwa-install-copy" style="font-weight:500;color:#cbd5e1">Open it like a phone or desktop app.</div>',
-      '</div>',
-      '<button class="close" type="button" aria-label="Dismiss">×</button>',
-      '</div>',
-      '<div class="actions" style="margin-top:10px">',
-      '<button class="install" type="button">Install</button>',
-      '<button class="help" type="button">How to install</button>',
-      '</div>'
-    ].join('');
-    document.body.appendChild(banner);
-
-    var closeBtn = banner.querySelector('.close');
-    var installBtn = banner.querySelector('.install');
-    var helpBtn = banner.querySelector('.help');
-    var titleEl = banner.querySelector('#pwa-install-title');
-    var copyEl = banner.querySelector('#pwa-install-copy');
-
-    function hideBanner() {
-      banner.style.display = 'none';
-    }
-
-    closeBtn.addEventListener('click', function () {
-      bannerDismissed = true;
-      hideBanner();
-    });
-
-    installBtn.addEventListener('click', async function () {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        try {
-          await deferredPrompt.userChoice;
-        } catch (e) {}
-        deferredPrompt = null;
-        hideBanner();
-      } else if (isIOS()) {
-        titleEl.textContent = 'Install on iPhone';
-        copyEl.textContent = 'Tap Share, then choose Add to Home Screen in Safari.';
-      } else {
-        titleEl.textContent = 'Install app';
-        copyEl.textContent = 'Use your browser menu and choose Install app or Create shortcut.';
-      }
-    });
-
-    helpBtn.addEventListener('click', function () {
-      if (isIOS()) {
-        alert('On iPhone/iPad: tap Share, then Add to Home Screen.');
-      } else {
-        alert('In Chrome/Edge: open the browser menu and choose Install app or Create shortcut.');
-      }
-    });
-
-    window.__showPwaInstallBanner = function () {
-      bannerDismissed = false;
-      banner.style.display = 'block';
-      return banner;
-    };
-    window.__hidePwaInstallBanner = function () {
-      bannerDismissed = true;
-      hideBanner();
-    };
-
-    return banner;
-  }
-
-  function showBannerForInstall() {
-    if (bannerDismissed || isStandalone()) return;
-    var banner = createInstallBanner();
-    if (!banner) return;
-    banner.style.display = 'block';
-    var titleEl = banner.querySelector('#pwa-install-title');
-    var copyEl = banner.querySelector('#pwa-install-copy');
-    if (deferredPrompt) {
-      titleEl.textContent = 'Install this app';
-      copyEl.textContent = 'Get faster access from your phone or Windows desktop.';
-      banner.querySelector('.install').style.display = 'inline-block';
-      banner.querySelector('.help').style.display = 'inline-block';
-    } else if (isIOS()) {
-      titleEl.textContent = 'Install on iPhone';
-      copyEl.textContent = 'Tap Share, then choose Add to Home Screen in Safari.';
-      banner.querySelector('.install').style.display = 'inline-block';
-      banner.querySelector('.help').style.display = 'inline-block';
-    }
-  }
-
   function ensureOfflineBanner() {
     if (document.getElementById('offline-status-banner')) return;
     var style = document.createElement('style');
@@ -257,20 +137,16 @@ PWA_BODY_SNIPPET = """
   window.addEventListener('beforeinstallprompt', function (event) {
     event.preventDefault();
     deferredPrompt = event;
-    showBannerForInstall();
+    // Install banner disabled - removed from UI
   });
 
   window.addEventListener('appinstalled', function () {
     deferredPrompt = null;
     bannerDismissed = true;
-    var banner = document.getElementById('pwa-install-banner');
-    if (banner) banner.style.display = 'none';
   });
 
   window.addEventListener('load', function () {
-    if (!isStandalone()) {
-      setTimeout(showBannerForInstall, 2500);
-    }
+    // Install banner disabled - skipping display
   });
 
   if (!('serviceWorker' in navigator)) return;
@@ -356,7 +232,7 @@ RESULT_VERIFY_TOKEN_TTL_MINUTES = max(5, int((os.environ.get('RESULT_VERIFY_TOKE
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=SESSION_TIMEOUT_MINUTES)
 
 LOGIN_MAX_ATTEMPTS = 4
-LOGIN_LOCK_MINUTES = 15
+LOGIN_LOCK_MINUTES = 2
 STARTUP_SCHEMA_VERSION = '2026-06-16.1'
 EXPECTED_ALEMBIC_HEAD = '008_class_timetables_online_url'
 _DB_POOL = None
