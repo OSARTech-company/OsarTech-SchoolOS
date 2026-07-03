@@ -45861,6 +45861,46 @@ def teacher_upload_profile_image():
     return redirect(url_for('teacher_dashboard'))
 
 
+@app.route('/teacher/change-password', methods=['GET', 'POST'], endpoint='teacher_change_password_route')
+def teacher_change_password():
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        if not current_password or not new_password or not confirm_password:
+            flash('All fields are required.', 'error')
+            return redirect(url_for('teacher_change_password_route'))
+        
+        if new_password != confirm_password:
+            flash('New passwords do not match.', 'error')
+            return redirect(url_for('teacher_change_password_route'))
+        
+        # Validate password strength (teachers use same as admins)
+        ok_pwd, pwd_msg = validate_admin_password_strength(new_password)
+        if not ok_pwd:
+            flash(f'Password policy: {pwd_msg}', 'error')
+            return redirect(url_for('teacher_change_password_route'))
+        
+        user = get_user(session.get('user_id'))
+        if not user or not check_password(user['password_hash'], current_password):
+            flash('Current password is incorrect.', 'error')
+            return redirect(url_for('teacher_change_password_route'))
+        
+        # Update password
+        password_hash = hash_password(new_password)
+        upsert_user(session.get('user_id'), password_hash, 'teacher', _normalize_school_id_text(session.get('school_id')))
+        session.pop('must_change_password', None)
+        
+        flash('Password changed successfully!', 'success')
+        return redirect(url_for('teacher_dashboard'))
+    
+    return render_template('shared/change_password.html', form_action='teacher_change_password_route', back_url='teacher_dashboard')
+
+
 @app.route('/school-admin/upload-student-profile-image', methods=['POST'])
 @require_roles('school_admin')
 @require_rate_limit('school_admin_upload_student_profile_image', RATE_LIMIT_MUTATION_PER_MIN, 60, redirect_endpoint='school_admin_view_students', methods=('POST',))
@@ -52267,6 +52307,9 @@ def change_password():
         return school_admin_change_password()
     if role == 'bursar':
         return bursar_change_password()
+    if role == 'teacher':
+        # Teacher uses same generic handler
+        return redirect(url_for('teacher_change_password_route'))
     if role == 'student':
         return student_change_password()
 
