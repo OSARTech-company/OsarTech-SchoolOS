@@ -72,6 +72,14 @@
     const existingWrapper = input.closest('.password-toggle-wrapper, .password-wrapper');
     const wrapper = existingWrapper || document.createElement('div');
 
+    const computedStyle = window.getComputedStyle(input);
+    const marginTop = computedStyle.marginTop;
+    const marginBottom = computedStyle.marginBottom;
+    const marginLeft = computedStyle.marginLeft;
+    const marginRight = computedStyle.marginRight;
+    const display = computedStyle.display;
+    const width = input.style.width || computedStyle.width;
+
     if (!existingWrapper) {
       wrapper.className = WRAPPER_CLASS;
       input.parentNode.insertBefore(wrapper, input);
@@ -79,6 +87,30 @@
     } else {
       wrapper.classList.add(WRAPPER_CLASS);
     }
+
+    // Apply layout styles from input to wrapper
+    if (marginTop && marginTop !== '0px') wrapper.style.marginTop = marginTop;
+    if (marginBottom && marginBottom !== '0px') wrapper.style.marginBottom = marginBottom;
+    if (marginLeft && marginLeft !== '0px') wrapper.style.marginLeft = marginLeft;
+    if (marginRight && marginRight !== '0px') wrapper.style.marginRight = marginRight;
+
+    if (display === 'inline' || display === 'inline-block') {
+      wrapper.style.display = 'inline-block';
+      wrapper.style.verticalAlign = 'middle';
+    } else {
+      wrapper.style.display = 'block';
+    }
+
+    if (width && width !== 'auto' && width !== '100%' && width !== '0px') {
+      wrapper.style.width = width;
+    }
+
+    // Reset input margins to avoid double-margins and centering issues
+    input.style.marginTop = '0px';
+    input.style.marginBottom = '0px';
+    input.style.marginLeft = '0px';
+    input.style.marginRight = '0px';
+    input.style.width = '100%';
 
     if (wrapper.querySelector(`.${BUTTON_CLASS}`)) {
       input.setAttribute(READY_ATTR, '1');

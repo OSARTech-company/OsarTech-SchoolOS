@@ -8,586 +8,544 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-            width: 100%;
-            flex: 1 0 auto;
-        }
-        .page-header-block {
-            text-align: center;
-            margin: 8px auto 30px;
-            padding: 18px 20px;
-            max-width: 860px;
-            border: 1px solid rgba(148, 163, 184, 0.25);
-            border-radius: 16px;
-            background: rgba(255, 255, 255, 0.58);
-            backdrop-filter: blur(6px);
-            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
-        }
-        .page-subtitle {
-            margin-top: 8px;
-            color: #546173;
-            font-size: 0.98rem;
-            font-weight: 500;
-        }
-        .page-header {
-            text-align: center;
-            margin-bottom: 40px;
-            padding: 30px 0;
-        }
-        .page-header h1 {
-            font-size: 2.8rem;
-            margin-bottom: 10px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            font-weight: 800;
-        }
-        .page-header p {
-            font-size: 1.1rem;
-            color: #6c757d;
-            margin: 0;
-        }
-        .stats-overview {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 24px;
-            margin-bottom: 40px;
-        }
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 16px;
-            padding: 28px;
-            text-align: center;
-            box-shadow: 0 12px 35px rgba(102, 126, 234, 0.2);
-            transition: all 0.4s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
-            opacity: 0;
-            transition: opacity 0.4s ease;
-        }
-        .stat-card:hover {
-            transform: translateY(-8px) scale(1.02);
-            box-shadow: 0 20px 45px rgba(102, 126, 234, 0.3);
-        }
-        .stat-card:hover::before {
-            opacity: 1;
-        }
-        .stat-card i {
-            font-size: 3.2rem;
-            margin-bottom: 16px;
-            opacity: 0.95;
-            display: block;
-        }
-        .stat-number {
-            font-size: 2.4rem;
-            font-weight: 900;
-            display: block;
-            margin-bottom: 8px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .stat-label {
-            font-size: 1rem;
-            opacity: 0.9;
-            font-weight: 500;
-            letter-spacing: 0.5px;
-        }
-        .controls-section {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 16px;
-            padding: 32px;
-            margin-bottom: 40px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-        }
-        .controls-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-        .controls-header i {
-            font-size: 1.5rem;
-            color: #667eea;
-        }
-        .controls-header h3 {
-            margin: 0;
-            color: #2d3748;
-            font-size: 1.4rem;
-            font-weight: 700;
-        }
+      body {
+        background: radial-gradient(circle at 10% 10%, rgba(31, 122, 140, 0.04), transparent 32%),
+                    radial-gradient(circle at 90% 2%, rgba(15, 76, 129, 0.04), transparent 30%),
+                    #f3f6fa;
+        min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        flex-direction: column;
+      }
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 24px 16px;
+        width: 100%;
+        flex: 1 0 auto;
+        box-sizing: border-box;
+      }
+      
+      /* Glassmorphism Header */
+      .page-header-block {
+        text-align: center;
+        margin: 8px auto 30px;
+        padding: 22px 24px;
+        max-width: 860px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+      }
+      .page-header-block h1 {
+        margin: 0;
+        font-size: 2.2rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--brand, #0f4c81) 0%, var(--brand-2, #1f7a8c) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .page-subtitle {
+        margin-top: 8px;
+        color: #5b6475;
+        font-size: 0.98rem;
+        font-weight: 500;
+      }
+
+      /* Premium Stats Overview */
+      .stats-overview {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+      .stat-card {
+        background: #ffffff;
+        border: 1px solid #d8e0ea;
+        border-radius: 14px;
+        padding: 22px;
+        text-align: center;
+        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.03);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+      }
+      .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+        border-color: var(--brand, #0f4c81);
+      }
+      .stat-card i {
+        font-size: 2.2rem;
+        margin-bottom: 12px;
+        color: var(--brand, #0f4c81);
+        display: block;
+      }
+      .stat-number {
+        font-size: 2rem;
+        font-weight: 850;
+        display: block;
+        margin-bottom: 6px;
+        color: #0f172a;
+      }
+      .stat-label {
+        font-size: 0.9rem;
+        color: #64748b;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+      }
+
+      /* View Switcher and Controls */
+      .controls-section {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(8px);
+        border: 1px solid #d8e0ea;
+        border-radius: 14px;
+        padding: 24px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 20px rgba(15, 23, 42, 0.02);
+      }
+      .controls-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .controls-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .controls-title i {
+        font-size: 1.3rem;
+        color: var(--brand, #0f4c81);
+      }
+      .controls-title h3 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 1.2rem;
+        font-weight: 750;
+      }
+      
+      /* View Switcher */
+      .view-switcher-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #f1f5f9;
+        padding: 4px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+      }
+      .switcher-label {
+        font-size: 0.82rem;
+        color: #475569;
+        font-weight: 600;
+        padding: 0 6px;
+      }
+      .switch-btn {
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #475569;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+      }
+      .switch-btn.active {
+        background: #ffffff;
+        color: var(--brand, #0f4c81);
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+      }
+
+      .search-filter-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        align-items: center;
+      }
+      .search-input-wrapper {
+        position: relative;
+        width: 100%;
+      }
+      .search-input-wrapper i {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+      }
+      .search-input-wrapper input {
+        width: 100%;
+        padding: 11px 12px 11px 38px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.92rem;
+        box-sizing: border-box;
+        background: #ffffff;
+      }
+      .search-input-wrapper input:focus {
+        outline: none;
+        border-color: var(--brand, #0f4c81);
+        box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
+      }
+      
+      .filter-select {
+        width: 100%;
+        padding: 11px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.92rem;
+        box-sizing: border-box;
+        background: #ffffff;
+        cursor: pointer;
+      }
+      .filter-select:focus {
+        outline: none;
+        border-color: var(--brand, #0f4c81);
+      }
+
+      .filter-actions {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+      }
+      .filter-actions .btn {
+        flex: 1;
+        padding: 11px;
+        font-size: 0.92rem;
+        text-align: center;
+        justify-content: center;
+      }
+
+      /* Table Styles & Layout Switcher Logic */
+      .students-table-container {
+        background: #ffffff;
+        border: 1px solid #d8e0ea;
+        border-radius: 14px;
+        overflow-x: auto;
+        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.02);
+        margin-bottom: 30px;
+        padding: 4px;
+      }
+      .students-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 900px;
+      }
+      .students-table thead th {
+        background: #f8fafc;
+        color: #1e3b5c;
+        padding: 14px 16px;
+        text-align: left;
+        font-weight: 700;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #e2e8f0;
+      }
+      .students-table tbody tr {
+        border-bottom: 1px solid #f1f5f9;
+        transition: background-color 0.2s, border-left-color 0.2s;
+        border-left: 3px solid transparent;
+      }
+      .students-table tbody tr:hover {
+        background: #f8fafc;
+        border-left-color: var(--brand, #0f4c81);
+      }
+      .students-table tbody td {
+        padding: 12px 16px;
+        vertical-align: middle;
+      }
+
+      /* Student Identity Cell */
+      .student-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .student-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--brand, #0f4c81) 0%, var(--brand-2, #1f7a8c) 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.1rem;
+        position: relative;
+        flex: 0 0 auto;
+        box-shadow: 0 2px 6px rgba(15, 76, 129, 0.15);
+      }
+      .student-avatar-photo {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
+      }
+      .rank-pill {
+        position: absolute;
+        bottom: -4px;
+        right: -4px;
+        background: #0ea5a9;
+        color: white;
+        padding: 1px 5px;
+        border-radius: 999px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        border: 1.5px solid #fff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .rank-1 { background: #f59e0b; }
+      .rank-2 { background: #94a3b8; }
+      .rank-3 { background: #b45309; }
+
+      .student-details h4 {
+        margin: 0 0 3px;
+        font-size: 0.95rem;
+        color: #0f172a;
+      }
+      .student-id {
+        font-size: 0.8rem;
+        color: #64748b;
+        font-family: monospace;
+      }
+      
+      .subjects-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .subject-tag {
+        background: #f1f5f9;
+        color: #475569;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+      }
+      
+      .grade-badge {
+        display: inline-block;
+        font-size: 0.82rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 6px;
+      }
+      .status-badge {
+        display: inline-block;
+        font-size: 0.82rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 6px;
+      }
+      .status-pass { background: #dcfce7; color: #15803d; }
+      .status-fail { background: #fee2e2; color: #b91c1c; }
+
+      /* Ellipsis Dropdown Actions */
+      .actions-dropdown {
+        position: relative;
+        display: inline-block;
+      }
+      .actions-dropdown-btn {
+        background: transparent;
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #64748b;
+        transition: all 0.2s;
+      }
+      .actions-dropdown-btn:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+      }
+      .actions-dropdown-menu {
+        display: none;
+        position: absolute;
+        right: 0;
+        top: 100%;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        z-index: 100;
+        min-width: 190px;
+        padding: 6px 0;
+        box-sizing: border-box;
+      }
+      .actions-dropdown-menu.show {
+        display: block;
+      }
+      .actions-dropdown-menu a,
+      .actions-dropdown-menu button,
+      .actions-dropdown-menu label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 9px 16px;
+        font-size: 0.85rem;
+        color: #334155;
+        text-decoration: none;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        text-align: left;
+        box-sizing: border-box;
+        font-weight: 500;
+        margin: 0;
+      }
+      .actions-dropdown-menu a:hover,
+      .actions-dropdown-menu button:hover,
+      .actions-dropdown-menu label:hover {
+        background: #f8fafc;
+        color: var(--brand, #0f4c81);
+      }
+      
+      /* Grid mode styles */
+      .students-table.grid-mode {
+        min-width: 0;
+      }
+      .students-table.grid-mode thead {
+        display: none;
+      }
+      .students-table.grid-mode tbody {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+        padding: 12px;
+      }
+      .students-table.grid-mode tbody tr {
+        display: flex;
+        flex-direction: column;
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #cbd5e1;
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.03);
+        padding: 20px;
+        box-sizing: border-box;
+        height: 100%;
+        position: relative;
+        text-align: center;
+        align-items: center;
+        border-left: 1px solid #cbd5e1;
+      }
+      .students-table.grid-mode tbody tr:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        border-color: var(--brand, #0f4c81);
+      }
+      .students-table.grid-mode tbody td {
+        display: block;
+        padding: 0;
+        border: none;
+        width: 100%;
+        text-align: center;
+        margin-bottom: 10px;
+      }
+      .students-table.grid-mode .cell-student {
+        order: 1;
+        margin-bottom: 14px;
+      }
+      .students-table.grid-mode .cell-student .student-info {
+        flex-direction: column;
+        gap: 12px;
+      }
+      .students-table.grid-mode .cell-class {
+        order: 2;
+        font-size: 0.9rem;
+        color: #4b5563;
+      }
+      .students-table.grid-mode .cell-position {
+        order: 3;
+        font-size: 0.88rem;
+      }
+      .students-table.grid-mode .cell-subjects {
+        order: 4;
+        display: flex;
+        justify-content: center;
+      }
+      .students-table.grid-mode .cell-average {
+        order: 5;
+        font-size: 1.15rem;
+        margin-top: 4px;
+      }
+      .students-table.grid-mode .cell-grade {
+        order: 6;
+      }
+      .students-table.grid-mode .cell-status {
+        order: 7;
+      }
+      .students-table.grid-mode .cell-actions {
+        order: 8;
+        margin-top: auto;
+        margin-bottom: 0;
+        padding-top: 12px;
+        border-top: 1px solid #f1f5f9;
+      }
+
+      /* Empty State styling */
+      .empty-state-card {
+        text-align: center;
+        padding: 40px 20px;
+        background: #ffffff;
+        border: 1px solid #d8e0ea;
+        border-radius: 14px;
+      }
+      .empty-state-hero {
+        font-size: 3rem;
+        color: #94a3b8;
+        margin-bottom: 16px;
+      }
+      
+      .pagination-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-top: 20px;
+      }
+      .pagination-summary {
+        font-size: 0.9rem;
+        color: #475569;
+        font-weight: 600;
+      }
+      .pagination-controls {
+        display: flex;
+        gap: 8px;
+      }
+
+      @media (max-width: 768px) {
         .search-filter-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
-            gap: 20px;
-            align-items: end;
-            margin-bottom: 24px;
-        }
-        .search-input, .filter-select {
-            padding: 14px 18px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 15px;
-            transition: all 0.3s ease;
-            background: white;
-            font-weight: 500;
-        }
-        .search-input:focus, .filter-select:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-            transform: translateY(-2px);
-        }
-        .search-input {
-            position: relative;
-        }
-        .search-input i {
-            position: absolute;
-            right: 18px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #a0aec0;
-            font-size: 1.1rem;
-        }
-        .search-input input {
-            padding-right: 50px;
-        }
-        .clear-btn {
-            padding: 14px 24px;
-            background: #6c757d;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .clear-btn:hover {
-            background: #5a6268;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
-        }
-        .export-buttons {
-            display: flex;
-            gap: 16px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        .export-btn {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 14px 24px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            text-decoration: none;
-            border-radius: 10px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-        }
-        .export-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-        }
-        .students-table-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 16px;
-            overflow-x: auto;
-            overflow-y: hidden;
-            -webkit-overflow-scrolling: touch;
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
-            margin-bottom: 40px;
-        }
-        .students-table {
-            width: 100%;
-            min-width: 980px;
-            border-collapse: collapse;
-        }
-        .students-table thead th {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 20px 16px;
-            text-align: left;
-            font-weight: 700;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            border-bottom: 3px solid #3498db;
-            position: relative;
-        }
-        .students-table thead th::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #3498db, #2980b9);
-        }
-        .students-table tbody td {
-            padding: 20px 16px;
-            border-bottom: 1px solid #f1f3f4;
-            vertical-align: middle;
-            transition: all 0.3s ease;
-        }
-        .students-table tbody tr:nth-child(even) {
-            background: #fafbfc;
-        }
-        .students-table tbody tr:hover {
-            background: linear-gradient(135deg, #e8f4fd 0%, #d1ecf1 100%);
-            transform: scale(1.01);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-        }
-        .student-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 1.2rem;
-            margin-right: 15px;
-            position: relative;
-            overflow: hidden;
-            flex: 0 0 auto;
-        }
-        .student-avatar-photo {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
-        .rank-pill {
-            position: absolute;
-            bottom: -6px;
-            right: -8px;
-            background: #0ea5a8;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 999px;
-            font-size: 0.65rem;
-            font-weight: 700;
-            border: 2px solid #fff;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-        }
-        .rank-1 { background: #f59e0b; }
-        .rank-2 { background: #3b82f6; }
-        .rank-3 { background: #16a34a; }
-        .student-info {
-            display: flex;
-            align-items: center;
-        }
-        .student-details h4 {
-            margin: 0;
-            color: #2c3e50;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-        .student-id {
-            color: #7f8c8d;
-            font-size: 0.9rem;
-            margin-top: 2px;
-        }
-        .grade-badge {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-        }
-        .grade-A { background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; }
-        .grade-B { background: linear-gradient(135deg, #3498db, #2980b9); color: white; }
-        .grade-C { background: linear-gradient(135deg, #f39c12, #e67e22); color: white; }
-        .grade-D { background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; }
-        .grade-F { background: linear-gradient(135deg, #95a5a6, #7f8c8d); color: white; }
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .status-pass { background: #d4edda; color: #155724; }
-        .status-fail { background: #f8d7da; color: #721c24; }
-        .subjects-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-        }
-        .subject-tag {
-            background: #ecf0f1;
-            color: #2c3e50;
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-        .action-buttons {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .student-photo-form {
-            display: inline-flex;
-            margin: 0;
-        }
-        .upload-photo-btn {
-            position: relative;
-            overflow: hidden;
-        }
-        .student-photo-input {
-            position: absolute;
-            inset: 0;
-            opacity: 0;
-            cursor: pointer;
-        }
-        .action-btn {
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-        }
-        .action-btn.view { background: #3498db; color: white; }
-        .action-btn.edit { background: #f39c12; color: white; }
-        .action-btn.delete { background: #e74c3c; color: white; }
-        .action-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-        .no-students {
-            text-align: center;
-            padding: 36px 20px 50px;
-            color: #7f8c8d;
-        }
-        .no-students i {
-            font-size: 4rem;
-            margin-bottom: 20px;
-            opacity: 0.5;
-        }
-        .empty-state-card {
-            max-width: 760px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.98);
-            border: 1px solid #dbe4ef;
-            border-radius: 18px;
-            padding: 30px 26px;
-            box-shadow: 0 16px 42px rgba(15, 23, 42, 0.12);
-        }
-        .empty-state-hero {
-            width: 72px;
-            height: 72px;
-            border-radius: 20px;
-            margin: 0 auto 8px;
-            background: linear-gradient(135deg, #edf3ff, #f5f3ff);
-            border: 1px solid #d8e3ff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #5b6fd6;
-            font-size: 2rem;
-        }
-        .empty-state-title {
-            margin: 6px 0 8px;
-            color: #1f2937;
-            font-size: 1.5rem;
-            font-weight: 800;
-        }
-        .empty-state-desc {
-            margin: 0 0 16px;
-            color: #4b5563;
-            font-size: 1rem;
-            line-height: 1.5;
-        }
-        .empty-state-actions {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 10px;
-            margin: 8px 0 16px;
-        }
-        .empty-state-actions .export-btn,
-        .empty-state-actions .clear-btn {
-            min-width: 184px;
-            justify-content: center;
-            text-decoration: none;
-            border-radius: 12px;
-            padding: 13px 18px;
-            font-size: 1rem;
-            font-weight: 700;
-            border: 1px solid #cbd5e1;
-        }
-        .empty-state-actions .clear-btn {
-            background: #f8fafc;
-            color: #1f2937;
-        }
-        .empty-state-actions .clear-btn:hover {
-            background: #eef2f7;
-            color: #0f172a;
-        }
-        .empty-state-checklist {
-            margin: 8px auto 0;
-            padding: 0;
-            list-style: none;
-            display: grid;
-            gap: 8px;
-            max-width: 560px;
-            text-align: left;
-            color: #374151;
-        }
-        .empty-state-checklist li {
-            padding: 8px 10px;
-            border-radius: 10px;
-            background: #f8fafc;
-            border: 1px solid #e5edf6;
-        }
-        .empty-filter-note {
-            display: inline-block;
-            margin-bottom: 10px;
-            padding: 6px 10px;
-            border-radius: 999px;
-            font-size: 0.78rem;
-            font-weight: 700;
-            color: #1d4ed8;
-            background: #eff6ff;
-            border: 1px solid #bfdbfe;
-        }
-        .export-buttons {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        .export-btn {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 20px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        .export-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+          grid-template-columns: 1fr;
         }
         .pagination-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 16px;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
         }
-        .pagination-summary {
-            color: #4b5563;
-            font-weight: 600;
-        }
-        .pagination-controls {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .pagination-pages {
-            display: flex;
-            gap: 6px;
-            align-items: center;
-            max-width: 420px;
-            overflow-x: auto;
-            padding-bottom: 2px;
-        }
-        @media (max-width: 768px) {
-            .page-header-block {
-                margin: 2px auto 18px;
-                padding: 14px 12px;
-            }
-            .search-filter-row {
-                grid-template-columns: 1fr;
-                gap: 10px;
-            }
-            .students-table {
-                font-size: 12px;
-            }
-            .students-table thead th,
-            .students-table tbody td {
-                padding: 8px 6px;
-            }
-            .students-table {
-                min-width: 860px;
-            }
-            .students-table tbody tr:hover {
-                transform: none;
-                box-shadow: none;
-            }
-            .student-avatar {
-                width: 40px;
-                height: 40px;
-                font-size: 1rem;
-            }
-            .action-buttons {
-                flex-direction: column;
-                gap: 4px;
-            }
-            .action-btn {
-                padding: 4px 8px;
-                font-size: 0.7rem;
-            }
-            .empty-state-actions .export-btn,
-            .empty-state-actions .clear-btn {
-                width: 100%;
-            }
-            .pagination-row {
-                align-items: stretch;
-            }
-            .pagination-summary {
-                width: 100%;
-            }
-            .pagination-controls {
-                width: 100%;
-            }
-            .pagination-controls .btn {
-                flex: 1 1 120px;
-                text-align: center;
-                justify-content: center;
-            }
-        }
+      }
     </style>
 </head>
-<body>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
     {% include "shared/_loading_overlay.html" %}
     <div class="container fade-in">
         <div class="page-header-block">
@@ -615,13 +573,31 @@
                 </div>
                 <div class="stat-card">
                     <i class="fas fa-chart-line"></i>
-                    <span class="stat-number">{{ "%.1f"|format(overall_average) }}</span>
+                    <span class="stat-number">{{ "%.1f"|format(overall_average) }}%</span>
                     <span class="stat-label">Average Score</span>
                 </div>
             </div>
 
             <!-- Search and Filter Controls -->
             <div class="controls-section">
+                <div class="controls-header">
+                    <div class="controls-title">
+                        <i class="fas fa-sliders"></i>
+                        <h3>Filters & Tools</h3>
+                    </div>
+                    
+                    <!-- View Layout Switcher -->
+                    <div class="view-switcher-row">
+                        <span class="switcher-label"><i class="fas fa-grip"></i> View:</span>
+                        <button type="button" class="switch-btn active" id="view-list" onclick="setViewMode('list')">
+                            <i class="fas fa-list"></i> Table
+                        </button>
+                        <button type="button" class="switch-btn" id="view-grid" onclick="setViewMode('grid')">
+                            <i class="fas fa-th-large"></i> Cards
+                        </button>
+                    </div>
+                </div>
+
                 <form class="search-filter-row" method="GET" action="{{ url_for(view_students_endpoint) }}" style="margin-bottom: 16px;">
                     <select class="filter-select" name="class">
                         <option value="">All Classes (Server)</option>
@@ -642,16 +618,19 @@
                         <option value="200" {% if per_page == 200 %}selected{% endif %}>200 / page</option>
                     </select>
                     <input type="hidden" name="page" value="1">
-                    <button type="submit" class="btn">
-                        <i class="fas fa-filter"></i> Apply
-                    </button>
-                    <a href="{{ url_for(view_students_endpoint) }}" class="btn clear-btn" style="text-align:center; text-decoration:none; line-height: 1.4;">
-                        <i class="fas fa-undo"></i> Reset
-                    </a>
+                    <div class="filter-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter"></i> Apply
+                        </button>
+                        <a href="{{ url_for(view_students_endpoint) }}" class="btn btn-secondary" style="text-decoration:none; line-height: 1.4; display: inline-flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-undo"></i> Reset
+                        </a>
+                    </div>
                 </form>
 
+                <!-- Client Side Filter Row -->
                 <div class="search-filter-row">
-                    <div class="search-input">
+                    <div class="search-input-wrapper">
                         <input type="text" id="searchInput" placeholder="Search by name, ID, or class...">
                         <i class="fas fa-search"></i>
                     </div>
@@ -680,14 +659,14 @@
                             <option value="{{ term_name }}">{{ term_name }}</option>
                         {% endfor %}
                     </select>
-                    <button type="button" class="btn" onclick="clearFilters()">
+                    <button type="button" class="btn btn-secondary" onclick="clearFilters()">
                         <i class="fas fa-times"></i> Clear
                     </button>
                 </div>
 
-                <div class="export-buttons">
+                <div class="export-buttons" style="margin-top: 14px;">
                     {% if session.get('role') == 'teacher' %}
-                    <a href="{{ url_for('teacher_upload_csv') }}" class="export-btn">
+                    <a href="{{ url_for('teacher_upload_csv') }}" class="btn btn-secondary" style="text-decoration:none;">
                         <i class="fas fa-upload"></i> Upload CSV
                     </a>
                     {% endif %}
@@ -712,7 +691,7 @@
                     <tbody>
                         {% for student in students %}
                         <tr data-grade="{{ student.Grade }}" data-status="{{ student.Status }}" data-class="{{ student.class_name }}" data-term="{{ student.term }}" data-name="{{ student.first_name }} {{ student.student_id }}">
-                            <td>
+                            <td class="cell-student">
                                 <div class="student-info">
                                     <div class="student-avatar">
                                         {% if student.profile_image_url %}
@@ -733,8 +712,8 @@
                                     </div>
                                 </div>
                             </td>
-                            <td>{{ student.class_name }}</td>
-                            <td>
+                            <td class="cell-class" data-label="Class">{{ student.class_name }}</td>
+                            <td class="cell-position" data-label="Position">
                                 {% set p = positions.get(student.student_id) %}
                                 {% if p %}
                                     {{ p.pos|ordinal }}/{{ p.size }}
@@ -742,7 +721,7 @@
                                     -
                                 {% endif %}
                             </td>
-                            <td>
+                            <td class="cell-subjects" data-label="Subjects">
                                 <div class="subjects-list">
                                     {% if student.subjects %}
                                         {% for subject in student.subjects.keys() %}
@@ -751,63 +730,66 @@
                                     {% endif %}
                                 </div>
                             </td>
-                            <td><strong>{{ "%.1f"|format(student.average_marks) }}%</strong></td>
-                            <td><span class="grade-badge {{ grade_css_class_from_grade(student.Grade, school) }}">{{ display_grade_label(student.Grade, school) }}</span></td>
-                            <td><span class="status-badge status-{{ student.Status|lower }}">{{ student.Status }}</span></td>
-                            <td>
-                                <div class="action-buttons">
-                                    {% if session.get('role') == 'teacher' %}
-                                    {% set can_view_teacher_published_result = ((student.class_name or '')|trim|lower) in (teacher_result_classes_lower or []) %}
-                                    <span class="status-badge {{ 'status-pass' if can_view_teacher_published_result else 'status-fail' }}" title="Published result access for this class">
-                                        {{ 'Result Access: Yes' if can_view_teacher_published_result else 'Result Access: No' }}
-                                    </span>
-                                    {% if can_view_teacher_published_result %}
-                                    <a href="{{ url_for('teacher_student_result', student_id=student.student_id) }}" class="action-btn view" title="View Published Result">
-                                        <i class="fas fa-file-alt"></i> Result
-                                    </a>
-                                    {% endif %}
-                                    {% if student.can_edit_full %}
-                                    <a href="{{ url_for('teacher_enter_scores', student_id=student.student_id) }}" class="action-btn edit" title="Edit Scores" style="background: #9b59b6;">
-                                        <i class="fas fa-chart-bar"></i> Scores
-                                    </a>
-                                    {% elif student.subject_actions %}
-                                        {% for subject in student.subject_actions %}
-                                        <a href="{{ url_for('teacher_enter_subject_scores', student_id=student.student_id, subject=subject) }}" class="action-btn edit" title="Edit {{ subject }} Score" style="background: #9b59b6;">
-                                            <i class="fas fa-chart-bar"></i> {{ subject }}
-                                        </a>
-                                        {% endfor %}
-                                    {% endif %}
-                                    {% endif %}
-                                    {% if session.get('role') == 'school_admin' %}
-                                    <a href="{{ url_for('school_admin_student_result', student_id=student.student_id, term=student.result_term_token) if student.result_term_token else url_for('school_admin_student_result', student_id=student.student_id) }}" class="action-btn view" title="View Published Result">
-                                        <i class="fas fa-file-alt"></i> Result
-                                    </a>
-                                    <a href="{{ url_for('school_admin_edit_student', student_id=student.student_id, return_endpoint='school_admin_view_students', return_class=selected_class, return_term=selected_term, return_page=page, return_per_page=per_page) }}" class="action-btn edit" title="Edit Student" style="background: #2563eb;">
-                                        <i class="fas fa-user-pen"></i> Edit
-                                    </a>
-                                    {% if student.can_edit_full and not student.is_published_snapshot %}
-                                    <a href="{{ url_for('teacher_enter_scores', student_id=student.student_id) }}" class="action-btn edit" title="Enter Scores" style="background: #9b59b6;">
-                                        <i class="fas fa-chart-bar"></i> Scores
-                                    </a>
-                                    {% endif %}
-                                    <a href="{{ url_for('school_admin_correct_result', student_id=student.student_id, term=student.result_term_token) if student.result_term_token else url_for('school_admin_correct_result', student_id=student.student_id) }}" class="action-btn edit" title="Correct & Republish">
-                                        <i class="fas fa-pen"></i> Correct
-                                    </a>
-                                    {% if not student.is_published_snapshot %}
-                                    <form action="{{ url_for('school_admin_upload_student_profile_image') }}" method="POST" enctype="multipart/form-data" class="student-photo-form">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <input type="hidden" name="student_id" value="{{ student.student_id }}">
-                                        <input type="hidden" name="return_class" value="{{ selected_class }}">
-                                        <input type="hidden" name="return_term" value="{{ selected_term }}">
-                                        <input type="hidden" name="return_page" value="{{ page }}">
-                                        <input type="hidden" name="return_per_page" value="{{ per_page }}">
-                                        <label class="action-btn edit upload-photo-btn" title="Upload student profile picture" style="background: #0f766e;">
-                                            <i class="fas fa-camera"></i> Photo
-                                            <input type="file" name="profile_image" accept=".png,.jpg,.jpeg,.webp" class="student-photo-input" onchange="if (this.files && this.files.length) { this.form.submit(); }">
-                                        </label>
-                                    </form>
-                                    {% endif %}
-                                    {% endif %}
+                            <td class="cell-average" data-label="Average"><strong>{{ "%.1f"|format(student.average_marks) }}%</strong></td>
+                            <td class="cell-grade" data-label="Grade"><span class="grade-badge {{ grade_css_class_from_grade(student.Grade, school) }}">{{ display_grade_label(student.Grade, school) }}</span></td>
+                            <td class="cell-status" data-label="Status"><span class="status-badge status-{{ student.Status|lower }}">{{ student.Status }}</span></td>
+                            <td class="cell-actions">
+                                <div class="actions-dropdown">
+                                    <button type="button" class="actions-dropdown-btn" onclick="toggleDropdown(this, event)">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                    <div class="actions-dropdown-menu">
+                                        {% if session.get('role') == 'teacher' %}
+                                            {% set can_view_teacher_published_result = ((student.class_name or '')|trim|lower) in (teacher_result_classes_lower or []) %}
+                                            {% if can_view_teacher_published_result %}
+                                            <a href="{{ url_for('teacher_student_result', student_id=student.student_id) }}">
+                                                <i class="fas fa-file-alt"></i> View Result
+                                            </a>
+                                            {% endif %}
+                                            {% if student.can_edit_full %}
+                                            <a href="{{ url_for('teacher_enter_scores', student_id=student.student_id) }}">
+                                                <i class="fas fa-chart-bar"></i> Enter Scores
+                                            </a>
+                                            {% elif student.subject_actions %}
+                                                {% for subject in student.subject_actions %}
+                                                <a href="{{ url_for('teacher_enter_subject_scores', student_id=student.student_id, subject=subject) }}">
+                                                    <i class="fas fa-chart-bar"></i> {{ subject }} Scores
+                                                </a>
+                                                {% endfor %}
+                                            {% endif %}
+                                        {% endif %}
+                                        
+                                        {% if session.get('role') == 'school_admin' %}
+                                            <a href="{{ url_for('school_admin_student_result', student_id=student.student_id, term=student.result_term_token) if student.result_term_token else url_for('school_admin_student_result', student_id=student.student_id) }}">
+                                                <i class="fas fa-file-alt"></i> View Result
+                                            </a>
+                                            <a href="{{ url_for('school_admin_edit_student', student_id=student.student_id, return_endpoint='school_admin_view_students', return_class=selected_class, return_term=selected_term, return_page=page, return_per_page=per_page) }}">
+                                                <i class="fas fa-user-pen"></i> Edit Profile
+                                            </a>
+                                            {% if student.can_edit_full and not student.is_published_snapshot %}
+                                            <a href="{{ url_for('teacher_enter_scores', student_id=student.student_id) }}">
+                                                <i class="fas fa-chart-bar"></i> Enter Scores
+                                            </a>
+                                            {% endif %}
+                                            <a href="{{ url_for('school_admin_correct_result', student_id=student.student_id, term=student.result_term_token) if student.result_term_token else url_for('school_admin_correct_result', student_id=student.student_id) }}">
+                                                <i class="fas fa-pen"></i> Correct Result
+                                            </a>
+                                            {% if not student.is_published_snapshot %}
+                                            <button type="button" onclick="this.nextElementSibling.querySelector('.student-photo-input').click()">
+                                                <i class="fas fa-camera"></i> Upload Photo
+                                            </button>
+                                            <form action="{{ url_for('school_admin_upload_student_profile_image') }}" method="POST" enctype="multipart/form-data" class="student-photo-form" style="display:none;">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="student_id" value="{{ student.student_id }}">
+                                                <input type="hidden" name="return_class" value="{{ selected_class }}">
+                                                <input type="hidden" name="return_term" value="{{ selected_term }}">
+                                                <input type="hidden" name="return_page" value="{{ page }}">
+                                                <input type="hidden" name="return_per_page" value="{{ per_page }}">
+                                                <input type="file" name="profile_image" accept=".png,.jpg,.jpeg,.webp" class="student-photo-input" onchange="if (this.files && this.files.length) { this.form.submit(); }">
+                                            </form>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -815,14 +797,16 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination block -->
             <div class="pagination-row">
                 <div class="pagination-summary">Page {{ page }} of {{ total_pages }} | Total {{ total_students }} students</div>
                 <div class="pagination-controls">
                     {% if page > 1 %}
-                    <a class="btn clear-btn" style="text-decoration:none;" href="{{ url_for(view_students_endpoint) }}?class={{ selected_class|urlencode }}&term={{ selected_term|urlencode }}&per_page={{ per_page }}&page=1">
+                    <a class="btn btn-secondary" style="text-decoration:none;" href="{{ url_for(view_students_endpoint) }}?class={{ selected_class|urlencode }}&term={{ selected_term|urlencode }}&per_page={{ per_page }}&page=1">
                         <i class="fas fa-angles-left"></i> First
                     </a>
-                    <a class="btn clear-btn" style="text-decoration:none;" href="{{ url_for(view_students_endpoint) }}?class={{ selected_class|urlencode }}&term={{ selected_term|urlencode }}&per_page={{ per_page }}&page={{ page - 1 }}">
+                    <a class="btn btn-secondary" style="text-decoration:none;" href="{{ url_for(view_students_endpoint) }}?class={{ selected_class|urlencode }}&term={{ selected_term|urlencode }}&per_page={{ per_page }}&page={{ page - 1 }}">
                         <i class="fas fa-arrow-left"></i> Prev
                     </a>
                     {% endif %}
@@ -841,8 +825,8 @@
                     <div class="pagination-pages">
                         {% for p in range(ns.start, ns.end + 1) %}
                         <a
-                            class="btn {% if p == page %}btn-primary{% else %}clear-btn{% endif %}"
-                            style="text-decoration:none; min-width:42px; text-align:center; flex:0 0 auto;"
+                            class="btn {% if p == page %}btn-primary{% else %}btn-secondary{% endif %}"
+                            style="text-decoration:none; min-width:40px; text-align:center; flex:0 0 auto; box-sizing:border-box;"
                             href="{{ url_for(view_students_endpoint) }}?class={{ selected_class|urlencode }}&term={{ selected_term|urlencode }}&per_page={{ per_page }}&page={{ p }}"
                         >
                             {{ p }}
@@ -852,10 +836,10 @@
                     {% endif %}
 
                     {% if page < total_pages %}
-                    <a class="btn clear-btn" style="text-decoration:none;" href="{{ url_for(view_students_endpoint) }}?class={{ selected_class|urlencode }}&term={{ selected_term|urlencode }}&per_page={{ per_page }}&page={{ page + 1 }}">
+                    <a class="btn btn-secondary" style="text-decoration:none;" href="{{ url_for(view_students_endpoint) }}?class={{ selected_class|urlencode }}&term={{ selected_term|urlencode }}&per_page={{ per_page }}&page={{ page + 1 }}">
                         Next <i class="fas fa-arrow-right"></i>
                     </a>
-                    <a class="btn clear-btn" style="text-decoration:none;" href="{{ url_for(view_students_endpoint) }}?class={{ selected_class|urlencode }}&term={{ selected_term|urlencode }}&per_page={{ per_page }}&page={{ total_pages }}">
+                    <a class="btn btn-secondary" style="text-decoration:none;" href="{{ url_for(view_students_endpoint) }}?class={{ selected_class|urlencode }}&term={{ selected_term|urlencode }}&per_page={{ per_page }}&page={{ total_pages }}">
                         Last <i class="fas fa-angles-right"></i>
                     </a>
                     {% endif %}
@@ -874,10 +858,10 @@
                             Nothing was found for the current selection. Reset the filter or switch class/term.
                         </p>
                         <div class="empty-state-actions">
-                            <a href="{{ url_for(view_students_endpoint) }}" class="export-btn">
+                            <a href="{{ url_for(view_students_endpoint) }}" class="btn btn-primary" style="text-decoration:none;">
                                 <i class="fas fa-rotate-left"></i> Reset Filter
                             </a>
-                            <a href="{{ url_for('school_admin_add_students_by_class') }}" class="clear-btn" style="text-decoration:none;">
+                            <a href="{{ url_for('school_admin_add_students_by_class') }}" class="btn btn-secondary" style="text-decoration:none;">
                                 <i class="fas fa-user-plus"></i> Add Students
                             </a>
                         </div>
@@ -887,13 +871,13 @@
                             Start with student intake and class setup, then this page will show student records, scores, and results.
                         </p>
                         <div class="empty-state-actions">
-                            <a href="{{ url_for('school_admin_add_students_by_class') }}" class="export-btn">
+                            <a href="{{ url_for('school_admin_add_students_by_class') }}" class="btn btn-primary" style="text-decoration:none;">
                                 <i class="fas fa-user-plus"></i> Add Students
                             </a>
-                            <a href="{{ url_for('school_admin_class_subjects') }}" class="clear-btn" style="text-decoration:none;">
+                            <a href="{{ url_for('school_admin_class_subjects') }}" class="btn btn-secondary" style="text-decoration:none;">
                                 <i class="fas fa-book"></i> Configure Class Subjects
                             </a>
-                            <a href="{{ url_for('school_admin_view_parents') }}" class="clear-btn" style="text-decoration:none;">
+                            <a href="{{ url_for('school_admin_view_parents') }}" class="btn btn-secondary" style="text-decoration:none;">
                                 <i class="fas fa-users"></i> View Parents
                             </a>
                         </div>
@@ -907,15 +891,17 @@
                 </div>
             {% else %}
                 <div class="no-students">
-                    <i class="fas fa-users"></i>
-                    <h3>No Students Found</h3>
-                    <p>No students found for the current filter.</p>
+                    <div class="empty-state-card">
+                        <div class="empty-state-hero"><i class="fas fa-users"></i></div>
+                        <h3>No Students Found</h3>
+                        <p>No students found for the current filter.</p>
+                    </div>
                 </div>
             {% endif %}
         {% endif %}
 
         <div style="text-align: center; margin-top: 30px;">
-            <a href="{{ url_for('menu') }}" class="btn">
+            <a href="{{ url_for('menu') }}" class="btn btn-secondary" style="text-decoration:none;">
                 <i class="fas fa-arrow-left"></i> Back to Menu
             </a>
         </div>
@@ -933,6 +919,46 @@
             const classFilter = document.getElementById('classFilter');
             const termFilter = document.getElementById('termFilter');
             const tableRows = document.querySelectorAll('#studentsTable tbody tr');
+            
+            // View switcher functionality
+            window.setViewMode = function(mode) {
+                const table = document.getElementById('studentsTable');
+                const btnList = document.getElementById('view-list');
+                const btnGrid = document.getElementById('view-grid');
+                if (!table || !btnList || !btnGrid) return;
+                
+                if (mode === 'grid') {
+                    table.classList.add('grid-mode');
+                    btnGrid.classList.add('active');
+                    btnList.classList.remove('active');
+                    localStorage.setItem('students-view-mode', 'grid');
+                } else {
+                    table.classList.remove('grid-mode');
+                    btnList.classList.add('active');
+                    btnGrid.classList.remove('active');
+                    localStorage.setItem('students-view-mode', 'list');
+                }
+            };
+            
+            const savedMode = localStorage.getItem('students-view-mode') || 'list';
+            window.setViewMode(savedMode);
+
+            // Toggle ellipsis actions dropdown
+            window.toggleDropdown = function(button, event) {
+                event.stopPropagation();
+                const menu = button.nextElementSibling;
+                document.querySelectorAll('.actions-dropdown-menu').forEach(m => {
+                    if (m !== menu) m.classList.remove('show');
+                });
+                menu.classList.toggle('show');
+            };
+
+            window.addEventListener('click', function() {
+                document.querySelectorAll('.actions-dropdown-menu').forEach(m => {
+                    m.classList.remove('show');
+                });
+            });
+
             if (!searchInput || !gradeFilter || !statusFilter || !classFilter || !termFilter || !tableRows.length) {
                 return;
             }
@@ -975,17 +1001,15 @@
             }
             window.clearFilters = clearFilters;
 
-            // Add event listeners
             searchInput.addEventListener('input', filterStudents);
             gradeFilter.addEventListener('change', filterStudents);
             statusFilter.addEventListener('change', filterStudents);
             classFilter.addEventListener('change', filterStudents);
             termFilter.addEventListener('change', filterStudents);
 
-            // Add sorting functionality
             const tableHeaders = document.querySelectorAll('#studentsTable thead th');
             tableHeaders.forEach((header, index) => {
-                if (index < 6) { // Don't add sorting to actions column
+                if (index < 7) { 
                     header.style.cursor = 'pointer';
                     header.addEventListener('click', () => sortTable(index));
                 }
@@ -999,7 +1023,6 @@
                     const aValue = a.cells[columnIndex].textContent.trim().toLowerCase();
                     const bValue = b.cells[columnIndex].textContent.trim().toLowerCase();
 
-                    // Special handling for numeric columns
                     if (columnIndex === 4) { // Average Score
                         return parseFloat(aValue) - parseFloat(bValue);
                     }
@@ -1007,11 +1030,9 @@
                     return aValue.localeCompare(bValue);
                 });
 
-                // Re-append sorted rows
                 rows.forEach(row => tbody.appendChild(row));
             }
         });
     </script>
 </body>
 </html>
-
