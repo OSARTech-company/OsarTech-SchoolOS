@@ -44551,14 +44551,14 @@ def teacher_class_results_export():
     current_year = (school or {}).get('academic_year', '')
     class_options = get_teacher_classes(school_id, teacher_id, term=current_term, academic_year=current_year)
     class_options = [str(c or '').strip() for c in class_options if str(c or '').strip()]
-    class_lookup = {cls.lower(): cls for cls in class_options}
+    class_lookup = {canonicalize_classname(cls).lower(): cls for cls in class_options}
     selected_class = (request.args.get('classname', '') or '').strip()
     if not selected_class and len(class_options) == 1:
         selected_class = class_options[0]
-    selected_class_key = selected_class.lower()
-    if selected_class_key in class_lookup:
-        selected_class = class_lookup[selected_class_key]
-    if not selected_class or selected_class.lower() not in class_lookup:
+    selected_class_canonical = canonicalize_classname(selected_class).lower()
+    if selected_class_canonical in class_lookup:
+        selected_class = class_lookup[selected_class_canonical]
+    if not selected_class or canonicalize_classname(selected_class).lower() not in class_lookup:
         flash('Choose one of your assigned classes before exporting the result sheet.', 'error')
         return redirect(url_for('teacher_dashboard', tab='overview', export_classname=(selected_class or '')))
 
@@ -44637,13 +44637,14 @@ def teacher_class_results_preview():
     current_term = get_current_term(school)
     current_year = (school or {}).get('academic_year', '')
     class_options = [str(c or '').strip() for c in get_teacher_classes(school_id, teacher_id, term=current_term, academic_year=current_year) if str(c or '').strip()]
-    class_lookup = {cls.lower(): cls for cls in class_options}
+    class_lookup = {canonicalize_classname(cls).lower(): cls for cls in class_options}
     selected_class = (request.args.get('classname', '') or '').strip()
     if not selected_class and len(class_options) == 1:
         selected_class = class_options[0]
-    if selected_class.lower() in class_lookup:
-        selected_class = class_lookup[selected_class.lower()]
-    if not selected_class or selected_class.lower() not in class_lookup:
+    selected_class_canonical = canonicalize_classname(selected_class).lower()
+    if selected_class_canonical in class_lookup:
+        selected_class = class_lookup[selected_class_canonical]
+    if not selected_class or canonicalize_classname(selected_class).lower() not in class_lookup:
         flash('Choose one of your assigned classes before opening the preview.', 'error')
         return redirect(url_for('teacher_dashboard', tab='overview'))
 
