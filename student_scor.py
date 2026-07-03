@@ -44642,9 +44642,11 @@ def teacher_class_results_preview():
     if not selected_class and len(class_options) == 1:
         selected_class = class_options[0]
     selected_class_canonical = canonicalize_classname(selected_class).lower()
+    logging.info(f"[PREVIEW_DEBUG] selected_class={selected_class}, canonical={selected_class_canonical}, class_options={class_options}, class_lookup={class_lookup}")
     if selected_class_canonical in class_lookup:
         selected_class = class_lookup[selected_class_canonical]
     if not selected_class or canonicalize_classname(selected_class).lower() not in class_lookup:
+        logging.warning(f"[PREVIEW_REDIRECT] No match found. selected_class={selected_class}, canonical={canonicalize_classname(selected_class).lower()}, lookup_keys={list(class_lookup.keys())}")
         flash('Choose one of your assigned classes before opening the preview.', 'error')
         return redirect(url_for('teacher_dashboard', tab='overview'))
 
