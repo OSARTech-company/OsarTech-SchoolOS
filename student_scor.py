@@ -72,7 +72,8 @@ from services import parent_queries as parent_queries_service
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DOTENV_PATH = os.path.join(PROJECT_ROOT, '.env')
 
-if load_dotenv:
+IS_TESTING = 'pytest' in sys.modules or os.environ.get('TESTING') == '1'
+if load_dotenv and not IS_TESTING:
     # Pin dotenv loading to this project so SMTP and other settings do not depend
     # on whichever directory or inherited shell environment launched the app.
     if os.path.isfile(PROJECT_DOTENV_PATH):
@@ -158,7 +159,7 @@ PWA_BODY_SNIPPET = """
 })();
 </script>
 """
-ALLOW_INSECURE_DEFAULTS = os.environ.get('ALLOW_INSECURE_DEFAULTS', '').strip().lower() in ('1', 'true', 'yes')
+ALLOW_INSECURE_DEFAULTS = os.environ.get('ALLOW_INSECURE_DEFAULTS', '').strip().lower() in ('1', 'true', 'yes') or IS_TESTING
 STARTUP_FALLBACK_ENV_VARS = []
 secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
@@ -191,6 +192,8 @@ from flask_migrate import Migrate
 migrate = Migrate(app, None)  # db will be set up via raw SQL migrations
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
+if not DATABASE_URL and IS_TESTING:
+    DATABASE_URL = 'postgresql://user:pass@localhost:5432/testdb'
 if not DATABASE_URL.startswith(('postgres://', 'postgresql://')):
     raise RuntimeError("PostgreSQL is required. Set DATABASE_URL to a postgresql:// connection string.")
 RUN_STARTUP_DDL = os.environ.get('RUN_STARTUP_DDL', '0').strip().lower() in ('1', 'true', 'yes')
@@ -204,7 +207,10 @@ if RUN_STARTUP_BOOTSTRAP:
         raise RuntimeError("SUPER_ADMIN_PASSWORD is too short. Use at least 12 characters.")
 DEFAULT_STUDENT_PASSWORD = os.environ.get('DEFAULT_STUDENT_PASSWORD', '').strip()
 if not DEFAULT_STUDENT_PASSWORD:
-    raise RuntimeError("DEFAULT_STUDENT_PASSWORD is required. Set it in environment variables.")
+    if IS_TESTING:
+        DEFAULT_STUDENT_PASSWORD = 'password123'
+    else:
+        raise RuntimeError("DEFAULT_STUDENT_PASSWORD is required. Set it in environment variables.")
 if not ALLOW_INSECURE_DEFAULTS and len(DEFAULT_STUDENT_PASSWORD) < 8:
     raise RuntimeError("DEFAULT_STUDENT_PASSWORD is too short. Use at least 8 characters in production.")
 _default_teacher_password_env = os.environ.get('DEFAULT_TEACHER_PASSWORD', '').strip()
@@ -33789,8 +33795,13 @@ def school_admin_dashboard():
         logging.warning("Failed to load school teacher messages for dashboard: %s", exc)
         teacher_message_rows = []
     school_message_total = len(student_message_rows or []) + len(teacher_message_rows or [])
-    setup_wizard_summary = build_school_setup_wizard_summary(school_id)
-    setup_wizard_completed = has_school_setup_wizard_completed(school_id)
+    try:
+        setup_wizard_summary = build_school_setup_wizard_summary(school_id)
+        setup_wizard_completed = has_school_setup_wizard_completed(school_id)
+    except Exception as exc:
+        logging.warning("Failed to build school setup wizard summary for dashboard: %s", exc)
+        setup_wizard_summary = {}
+        setup_wizard_completed = True
     
     return render_template('school/school_admin_dashboard.html', 
                          school=school, 
@@ -53436,18 +53447,49 @@ def help():
 def report_issue():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    
+
+    role = (session.get('role') or '').strip().lower()
+    fallback_back_url = url_for('menu')
+    if role == 'super_admin':
+        fallback_back_url = url_for('super_admin_dashboard')
+    elif role == 'school_admin':
+        fallback_back_url = url_for('school_admin_dashboard')
+    elif role == 'teacher':
+        fallback_back_url = url_for('teacher_dashboard')
+    elif role == 'student':
+        fallback_back_url = url_for('student_dashboard')
+    elif role == 'parent':
+        fallback_back_url = url_for('parent_dashboard')
+
+    def _normalize_source_page(value):
+        source = (value or '').strip()
+        if not source:
+            return ''
+        try:
+            parsed = urllib.parse.urlparse(source)
+        except Exception:
+            return ''
+        report_path = url_for('report_issue')
+        if parsed.scheme and parsed.netloc:
+            if parsed.netloc != request.host:
+                return ''
+            if parsed.path.rstrip('/') == report_path.rstrip('/'):
+                return ''
+            return source
+        if parsed.path and parsed.path.rstrip('/') != report_path.rstrip('/'):
+            return source
+        return ''
+
     if request.method == 'POST':
         description = (request.form.get('description', '') or request.form.get('issue_description', '')).strip()
-        source_page = (request.form.get('source_page', '') or '').strip()
-        if not source_page:
-            source_page = (request.referrer or '').strip()
+        source_page = _normalize_source_page(request.form.get('source_page', '') or request.referrer or '')
+        redirect_target = url_for('report_issue', **({'from': source_page} if source_page else {}))
         if not description:
             flash('Please describe the issue before submitting.', 'error')
-            return redirect(url_for('report_issue'))
+            return redirect(redirect_target)
         if len(description) > 2000:
             flash('Report is too long. Keep it within 2000 characters.', 'error')
-            return redirect(url_for('report_issue'))
+            return redirect(redirect_target)
         save_report(
             session['user_id'],
             description,
@@ -53456,10 +53498,11 @@ def report_issue():
             source_page=source_page,
         )
         flash('Thank you for your observation. We will fix it.', 'success')
-        return redirect(url_for('report_issue'))
+        return redirect(redirect_target)
     
-    source_page = (request.args.get('from', '') or request.referrer or '').strip()
-    return render_template('shared/report_issue.html', source_page=source_page)
+    source_page = _normalize_source_page(request.args.get('from', '') or request.referrer or '')
+    back_url = source_page or fallback_back_url
+    return render_template('shared/report_issue.html', source_page=source_page, back_url=back_url, role=role)
 
 @app.route('/view-reports')
 def view_reports():

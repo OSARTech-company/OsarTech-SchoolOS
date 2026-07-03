@@ -1,4 +1,4 @@
- """Initial schema creation for school result system.
+"""Initial schema creation for school result system.
 
 Revision ID: 001_initial
 Revises: 

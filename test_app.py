@@ -791,6 +791,8 @@ def test_school_admin_dashboard_passes_assignments_to_publication_statuses(clien
     monkeypatch.setattr(m, "get_last_login_at", lambda user_id: None)
     monkeypatch.setattr(m, "format_timestamp", lambda value: "")
     monkeypatch.setattr(m, "render_template", lambda *args, **kwargs: "OK")
+    monkeypatch.setattr(m, "build_school_setup_wizard_summary", lambda school_id: {})
+    monkeypatch.setattr(m, "has_school_setup_wizard_completed", lambda school_id: True)
 
     def fake_statuses(school_id, term, academic_year, assignments=None):
         captured["assignments"] = assignments
