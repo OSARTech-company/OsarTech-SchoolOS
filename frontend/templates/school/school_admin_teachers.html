@@ -76,91 +76,25 @@
           {% endwith %}
           {% include 'shared/_school_setup_banner.html' %}
 
-          <div class="card">
-            <h2><i class="fas fa-user-plus"></i> Add New Teacher</h2>
-            <form action="{{ url_for('school_admin_add_teacher') }}" method="POST">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-              <div class="form-group">
-                <label for="username">Username (Email)</label>
-                <input type="email" id="username" name="username" placeholder="e.g., teacher@school.com" required />
-              </div>
-              <div class="form-group">
-                <label for="firstname">First Name</label>
-                <input type="text" id="firstname" name="firstname" required />
-              </div>
-              <div class="form-group">
-                <label for="lastname">Last Name</label>
-                <input type="text" id="lastname" name="lastname" />
-              </div>
-              <div class="form-group">
-                <label for="phone">Phone (optional, for SMS)</label>
-                <input type="text" id="phone" name="phone" placeholder="+234..." />
-              </div>
-              <div class="form-group">
-                <label for="gender">Gender</label>
-                <select id="gender" name="gender" required>
-                  <option value="">-- Select Gender --</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="password">Password (optional, auto-generated if empty)</label>
-                <input type="password" id="password" name="password" autocomplete="new-password" data-password-toggle />
-              </div>
-              <div class="form-group">
-                <label class="checkbox-row">
-                  <input type="checkbox" name="send_credentials" value="1" checked />
-                  Email/SMS login details to the teacher
-                </label>
-              </div>
-              <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add Teacher</button>
-            </form>
-          </div>
-
-          <div class="card">
-            <h2><i class="fas fa-wallet"></i> Add Bursar</h2>
-            <p class="meta-muted">Create a finance staff account for fee assessment and payment tracking.</p>
-            <form action="{{ url_for('school_admin_add_bursar') }}" method="POST">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-              <div class="form-group">
-                <label for="bursar_username">Username (Email)</label>
-                <input type="email" id="bursar_username" name="username" placeholder="e.g., bursar@school.com" required />
-              </div>
-              <div class="form-group">
-                <label for="bursar_firstname">First Name</label>
-                <input type="text" id="bursar_firstname" name="firstname" required />
-              </div>
-              <div class="form-group">
-                <label for="bursar_lastname">Last Name</label>
-                <input type="text" id="bursar_lastname" name="lastname" />
-              </div>
-              <div class="form-group">
-                <label for="bursar_phone">Phone (optional, for SMS)</label>
-                <input type="text" id="bursar_phone" name="phone" placeholder="+234..." />
-              </div>
-              <div class="form-group">
-                <label for="bursar_gender">Gender</label>
-                <select id="bursar_gender" name="gender" required>
-                  <option value="">-- Select Gender --</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="bursar_password">Password (optional, auto-generated if empty)</label>
-                <input type="password" id="bursar_password" name="password" autocomplete="new-password" data-password-toggle />
-              </div>
-              <div class="form-group">
-                <label class="checkbox-row">
-                  <input type="checkbox" name="send_credentials" value="1" checked />
-                  Email/SMS login details to the bursar
-                </label>
-              </div>
-              <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add Bursar</button>
-            </form>
+          <div class="card" style="margin-bottom: 24px;">
+            <h2><i class="fas fa-user-plus"></i> Staff Registration Assistants</h2>
+            <p class="meta-muted" style="margin-bottom: 20px;">Use our dedicated registration flows to set up single teachers or finance managers.</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+              <a href="{{ url_for('school_admin_add_teacher') }}" class="btn" style="display: flex; align-items: center; justify-content: center; gap: 12px; background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%); color: white; border: none; padding: 18px; border-radius: 12px; text-decoration: none; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: all 0.2s ease;">
+                <i class="fas fa-chalkboard-teacher" style="font-size: 1.4rem;"></i>
+                <div style="text-align: left;">
+                  <div style="font-size: 1.05rem;">Add Single Teacher</div>
+                  <div style="font-size: 0.8rem; font-weight: normal; opacity: 0.85; margin-top: 2px;">Assign subjects, levels, and roles</div>
+                </div>
+              </a>
+              <a href="{{ url_for('school_admin_add_bursar') }}" class="btn" style="display: flex; align-items: center; justify-content: center; gap: 12px; background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%); color: white; border: none; padding: 18px; border-radius: 12px; text-decoration: none; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: all 0.2s ease;">
+                <i class="fas fa-wallet" style="font-size: 1.4rem;"></i>
+                <div style="text-align: left;">
+                  <div style="font-size: 1.05rem;">Add Bursar Account</div>
+                  <div style="font-size: 0.8rem; font-weight: normal; opacity: 0.85; margin-top: 2px;">Create finance and fee tracking profiles</div>
+                </div>
+              </a>
+            </div>
           </div>
 
           <div class="card">

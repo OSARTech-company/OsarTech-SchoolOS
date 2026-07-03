@@ -297,3 +297,21 @@ def test_assistant_guide_uses_memory_and_persists_exchange(client, app_module, m
     assert captured["saved"] is not None
     assert captured["saved"]["question"] == "and what about now"
     assert "Promotion Audit" in (body.get("answer") or "") or "Monitoring" in (body.get("answer") or "")
+
+
+def test_school_admin_add_teacher_get(client, app_module, monkeypatch):
+    _set_role_session(client, role="school_admin", school_id="SCH1", user_id="A1")
+    monkeypatch.setattr(app_module, "get_school", lambda school_id: {"school_id": school_id})
+    monkeypatch.setattr(app_module, "render_template", lambda template, **kwargs: f"RENDERED {template}")
+    resp = client.get("/school-admin/add-teacher")
+    assert resp.status_code == 200
+    assert resp.data == b"RENDERED school/school_admin_add_teacher.html"
+
+
+def test_school_admin_add_bursar_get(client, app_module, monkeypatch):
+    _set_role_session(client, role="school_admin", school_id="SCH1", user_id="A1")
+    monkeypatch.setattr(app_module, "get_school", lambda school_id: {"school_id": school_id})
+    monkeypatch.setattr(app_module, "render_template", lambda template, **kwargs: f"RENDERED {template}")
+    resp = client.get("/school-admin/add-bursar")
+    assert resp.status_code == 200
+    assert resp.data == b"RENDERED school/school_admin_add_bursar.html"

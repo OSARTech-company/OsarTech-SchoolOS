@@ -9,27 +9,308 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { min-height: 100vh; }
-        .container { width: min(1100px, 100%); margin: 0 auto; padding: 24px; }
-        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .header h1 { margin: 0; font-size: 1.85rem; }
-        .header .back { color: white; text-decoration: none; font-weight: 700; }
-        .student-message-card { border: 1px solid #dbe4ef; border-radius: 10px; padding: 12px; background: #f8fbff; margin-bottom: 10px; }
-        .student-message-card.is-unread { border-left: 4px solid #0F4C81; background: #eef6ff; }
-        .student-message-card h4 { margin: 0 0 6px; font-size: 1rem; color: #1e3a5f; }
-        .student-message-meta { color: #5b6475; font-size: 0.86rem; margin-bottom: 6px; }
-        .student-message-actions { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
+        body {
+            background: radial-gradient(circle at 10% 10%, rgba(31, 122, 140, 0.04), transparent 32%),
+                        radial-gradient(circle at 90% 2%, rgba(15, 76, 129, 0.04), transparent 30%),
+                        #f3f6fa;
+            min-height: 100vh;
+        }
+        .container { width: min(1200px, 100%); margin: 0 auto; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+        .header h1 { margin: 0; font-size: 1.7rem; color: #0f172a; font-weight: 850; }
+        .header .back { color: white; text-decoration: none; font-weight: 750; }
+
+        /* WhatsApp style layout */
+        .chat-container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            height: calc(100vh - 170px);
+            min-height: 600px;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+        }
+        @media (max-width: 900px) {
+            .chat-container {
+                grid-template-columns: 1fr;
+            }
+            .chat-sidebar.is-hidden-mobile {
+                display: none;
+            }
+            .chat-window.is-hidden-mobile {
+                display: none;
+            }
+        }
+
+        /* Sidebar */
+        .chat-sidebar {
+            border-right: 1px solid #cbd5e1;
+            display: flex;
+            flex-direction: column;
+            background: #f8fafc;
+        }
+        .sidebar-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .sidebar-header h3 {
+            margin: 0 0 2px;
+            color: #0f172a;
+            font-size: 1.05rem;
+            font-weight: 800;
+        }
+        .sidebar-search {
+            padding: 10px 20px;
+            position: relative;
+            border-bottom: 1px solid #e2e8f0;
+            background: #ffffff;
+        }
+        .sidebar-search i {
+            position: absolute;
+            left: 32px;
+            top: 20px;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        .sidebar-search input {
+            width: 100%;
+            padding: 8px 12px 8px 34px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            background: #f1f5f9;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: border-color 0.2s;
+        }
+        .sidebar-search input:focus {
+            border-color: var(--brand, #0f4c81);
+            background: #ffffff;
+            outline: none;
+        }
+        .channels-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .channel-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 20px;
+            border-bottom: 1px solid #f1f5f9;
+            cursor: pointer;
+            transition: background 0.2s;
+            background: #ffffff;
+        }
+        .channel-item:hover {
+            background: #f8fafc;
+        }
+        .channel-item.active {
+            background: #e0f2fe;
+            border-left: 4px solid var(--brand, #0f4c81);
+        }
+        .channel-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(15, 76, 129, 0.08);
+            color: var(--brand, #0f4c81);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.05rem;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .unread-dot {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 10px;
+            height: 10px;
+            background: #ef4444;
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+        }
+        .channel-details {
+            flex: 1;
+            min-width: 0;
+        }
+        .channel-details h4 {
+            margin: 0 0 2px;
+            font-size: 0.88rem;
+            font-weight: 750;
+            color: #0f172a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .channel-details .last-msg {
+            margin: 0;
+            font-size: 0.78rem;
+            color: #64748b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Chat window */
+        .chat-window {
+            display: flex;
+            flex-direction: column;
+            background: #efeae2;
+            position: relative;
+        }
+        .chat-window-landing {
+            position: absolute;
+            inset: 0;
+            background: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            z-index: 10;
+            text-align: center;
+        }
+        .landing-content {
+            max-width: 440px;
+        }
+        .landing-icon {
+            font-size: 3.5rem;
+            color: var(--brand, #0f4c81);
+            margin-bottom: 16px;
+            opacity: 0.85;
+        }
+        .landing-content h2 {
+            margin: 0 0 10px;
+            color: #0f172a;
+            font-weight: 850;
+        }
+        .landing-content p {
+            color: #64748b;
+            font-size: 0.92rem;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        /* Active Chat */
+        .chat-window-active {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .chat-header {
+            background: #ffffff;
+            padding: 12px 20px;
+            border-bottom: 1px solid #cbd5e1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 5;
+        }
+        .chat-header-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .chat-header-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: rgba(15, 76, 129, 0.08);
+            color: var(--brand, #0f4c81);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        .chat-header-info h3 {
+            margin: 0;
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .chat-status {
+            font-size: 0.76rem;
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        /* Message bubble list */
+        .chat-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background-color: #efeae2;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Cpath fill-rule='evenodd' d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zM11 61c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm7-29c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm36 2c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm-3 20c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm-27 7c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm34-31c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm-22-17c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm-12 11c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm34 30c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z'/%3E%3C/g%3E%3C/svg%3E");
+        }
+        .chat-bubble {
+            max-width: 75%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            position: relative;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+            word-wrap: break-word;
+            align-self: flex-start;
+            background: #ffffff;
+            color: #111b21;
+            border-top-left-radius: 0;
+        }
+        .bubble-title {
+            font-weight: 750;
+            color: var(--brand, #0f4c81);
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+        }
+        .bubble-content {
+            margin: 4px 0;
+            white-space: pre-wrap;
+        }
+        .bubble-meta {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            font-size: 0.7rem;
+            color: #667781;
+            margin-top: 6px;
+        }
+        .bubble-badge {
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 4px;
+            font-size: 0.68rem;
+        }
+        .bubble-badge.expired { background: #fecaca; color: #991b1b; }
+        .bubble-badge.due-soon { background: #fef3c7; color: #92400e; }
+        .bubble-badge.unread { background: #dbeafe; color: #1e40af; }
+        .bubble-badge.read { background: #f1f5f9; color: #475569; }
+
+        .bubble-actions {
+            margin-top: 8px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .is-hidden { display: none !important; }
     </style>
 </head>
 <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
     <div class="app-shell topbar-layout">
         {% set active_page = 'messages' %}
         {% include 'teacher/_teacher_sidebar.html' %}
+        
         <div class="main-content">
             <div class="container">
                 <div class="header">
-                    <h1><i class="fas fa-bell"></i> Messages</h1>
-                    <a href="{{ url_for('teacher_dashboard', tab='overview') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                    <h1><i class="fas fa-comments"></i> Notifications Inbox</h1>
+                    <a href="{{ url_for('teacher_dashboard', tab='overview') }}" class="back"><i class="fas fa-arrow-left"></i> Dashboard</a>
                 </div>
 
                 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -40,87 +321,253 @@
                     {% endif %}
                 {% endwith %}
 
-                <div class="card">
-                    <h2><i class="fas fa-bell"></i> School Notifications</h2>
-                    {% if unread_teacher_messages %}
-                    <div class="student-message-actions">
-                        <span class="chip chip-warning">Unread: {{ unread_teacher_messages }}</span>
-                        <form method="post" action="{{ url_for('teacher_mark_all_messages_read') }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-primary btn-xs">
-                                <i class="fas fa-check-double"></i> Mark All Read
-                            </button>
-                        </form>
-                    </div>
-                    {% endif %}
-                    {% if teacher_messages %}
-                        {% for msg in teacher_messages %}
-                        <div class="student-message-card {% if not msg.is_read %}is-unread{% endif %}">
-                            <h4>{{ msg.title }}</h4>
-                            <div class="student-message-meta">
-                                Target:
-                                {% if msg.target_classname and msg.target_subject %}
-                                    {{ msg.target_classname }} - {{ msg.target_subject }}
-                                {% elif msg.target_classname %}
-                                    {{ msg.target_classname }} (all subjects)
-                                {% elif msg.target_subject %}
-                                    {{ msg.target_subject }} (all classes)
-                                {% else %}
-                                    All Teachers
-                                {% endif %}
-                                | Deadline: {{ msg.deadline_date if msg.deadline_date else 'None' }}
-                                {% if msg.is_expired %}
-                                    | <span class="chip chip-danger">Expired</span>
-                                {% elif msg.is_due_soon %}
-                                    | <span class="chip chip-warning">Due Soon</span>
-                                {% endif %}
-                                {% if msg.is_read %}
-                                    | <span class="chip chip-success">Read</span>
-                                {% else %}
-                                    | <span class="chip chip-warning">Unread</span>
-                                {% endif %}
-                                | Sent: {{ msg.created_at }}
+                <div class="chat-container">
+                    <!-- Sidebar channels -->
+                    <div class="chat-sidebar" id="chatSidebar">
+                        <div class="sidebar-header" style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <h3>Announcements</h3>
+                                <p class="note">View school notice channels</p>
                             </div>
-                            <div>{{ msg.message }}</div>
-                            {% if msg.attachment_url %}
-                            <div class="mt-10">
-                                {% if msg.attachment_mime and msg.attachment_mime.startswith('image/') %}
-                                <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">
-                                    <i class="fas fa-image"></i> Open Attached Image
-                                </a>
-                                <div class="mt-10">
-                                    <img src="{{ msg.attachment_url }}" alt="Attachment" style="max-width:100%; max-height:260px; border-radius:10px; border:1px solid #dbe4ef;">
-                                </div>
-                                {% else %}
-                                <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">
-                                    <i class="fas fa-file"></i> Download Attachment
-                                </a>
-                                {% endif %}
-                            </div>
-                            {% endif %}
-                            {% if not msg.is_read %}
-                            <div class="student-message-actions">
-                                <form method="post" action="{{ url_for('teacher_mark_message_read') }}">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <input type="hidden" name="message_id" value="{{ msg.id }}">
-                                    <button type="submit" class="btn btn-primary btn-xs">
-                                        <i class="fas fa-check"></i> Mark as Read
-                                    </button>
-                                </form>
-                            </div>
+                            {% if unread_teacher_messages %}
+                            <form method="post" action="{{ url_for('teacher_mark_all_messages_read') }}" style="margin:0;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-primary btn-xs" style="padding: 4px 8px;">
+                                    <i class="fas fa-check-double"></i> Read All
+                                </button>
+                            </form>
                             {% endif %}
                         </div>
-                        {% endfor %}
-                    {% else %}
-                    <p class="note">No teacher notifications yet.</p>
-                    {% endif %}
+                        <div class="sidebar-search">
+                            <i class="fas fa-search"></i>
+                            <input type="text" placeholder="Search notices..." id="noticeSearchInput">
+                        </div>
+                        <div class="channels-list">
+                            <!-- All General Notices -->
+                            <div class="channel-item active" data-channel-type="all" data-name="General Announcements">
+                                <div class="channel-avatar">
+                                    <i class="fas fa-bullhorn"></i>
+                                    {% if unread_teacher_messages %}<span class="unread-dot"></span>{% endif %}
+                                </div>
+                                <div class="channel-details">
+                                    <h4>General Announcements</h4>
+                                    <p class="last-msg">Sent to all school teachers</p>
+                                </div>
+                            </div>
+
+                            <!-- Class specific notice channels -->
+                            <div class="channel-item" data-channel-type="class" data-name="My Class Notices">
+                                <div class="channel-avatar"><i class="fas fa-chalkboard-user"></i></div>
+                                <div class="channel-details">
+                                    <h4>My Class Notices</h4>
+                                    <p class="last-msg">Class specific requirements</p>
+                                </div>
+                            </div>
+
+                            <!-- Subject specific notice channels -->
+                            <div class="channel-item" data-channel-type="subject" data-name="My Subject Notices">
+                                <div class="channel-avatar"><i class="fas fa-book"></i></div>
+                                <div class="channel-details">
+                                    <h4>My Subject Notices</h4>
+                                    <p class="last-msg">Subject specific requirements</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Window -->
+                    <div class="chat-window" id="chatWindow">
+                        <div class="chat-window-active">
+                            <div class="chat-header">
+                                <div class="chat-header-info">
+                                    <div class="chat-header-avatar" id="activeChatAvatar"><i class="fas fa-bullhorn"></i></div>
+                                    <div>
+                                        <h3 id="activeChatName">General Announcements</h3>
+                                        <span class="chat-status" id="activeChatStatus">Official Notification Feed</span>
+                                    </div>
+                                </div>
+                                <div class="chat-header-actions">
+                                    <button class="btn btn-secondary btn-xs" id="activeChatBackBtn" style="display:none;"><i class="fas fa-chevron-left"></i> Channels</button>
+                                </div>
+                            </div>
+
+                            <!-- Chat body container -->
+                            <div class="chat-body" id="chatHistoryContainer">
+                                <!-- Bubble content populated by JS -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Payload of teacher messages -->
+    <script id="teacherMessagesPayload" type="application/json">{{ teacher_messages|tojson }}</script>
+    <script id="csrfTokenPayload" type="application/json">{"token": "{{ csrf_token() }}", "url": "{{ url_for('teacher_mark_message_read') }}"}</script>
+
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+        (function () {
+            var messages = [];
+            var csrf = {};
+            try {
+                messages = JSON.parse(document.getElementById('teacherMessagesPayload').textContent || '[]');
+                csrf = JSON.parse(document.getElementById('csrfTokenPayload').textContent || '{}');
+            } catch (e) { console.error(e); }
+
+            var channelsList = document.querySelector('.channels-list');
+            var channelItems = document.querySelectorAll('.channel-item');
+            var chatHistoryContainer = document.getElementById('chatHistoryContainer');
+            var activeChatName = document.getElementById('activeChatName');
+            var activeChatAvatar = document.getElementById('activeChatAvatar');
+            var noticeSearchInput = document.getElementById('noticeSearchInput');
+            var chatSidebar = document.getElementById('chatSidebar');
+            var chatWindow = document.getElementById('chatWindow');
+            var activeChatBackBtn = document.getElementById('activeChatBackBtn');
+
+            var activeFilter = 'all';
+
+            // Mobile back button
+            if (activeChatBackBtn) {
+                activeChatBackBtn.addEventListener('click', function () {
+                    chatSidebar.classList.remove('is-hidden-mobile');
+                    chatWindow.classList.add('is-hidden-mobile');
+                });
+            }
+
+            // Search filter
+            if (noticeSearchInput) {
+                noticeSearchInput.addEventListener('input', function () {
+                    renderHistory();
+                });
+            }
+
+            channelItems.forEach(function (item) {
+                item.addEventListener('click', function () {
+                    channelItems.forEach(function (i) { i.classList.remove('active'); });
+                    item.classList.add('active');
+
+                    var filter = item.getAttribute('data-channel-type');
+                    var name = item.getAttribute('data-name');
+                    activeFilter = filter;
+
+                    activeChatName.textContent = name;
+                    if (filter === 'all') {
+                        activeChatAvatar.innerHTML = '<i class="fas fa-bullhorn"></i>';
+                    } else if (filter === 'class') {
+                        activeChatAvatar.innerHTML = '<i class="fas fa-chalkboard-user"></i>';
+                    } else {
+                        activeChatAvatar.innerHTML = '<i class="fas fa-book"></i>';
+                    }
+
+                    if (window.innerWidth <= 900) {
+                        chatSidebar.classList.add('is-hidden-mobile');
+                        chatWindow.classList.remove('is-hidden-mobile');
+                        activeChatBackBtn.style.display = 'block';
+                    }
+
+                    renderHistory();
+                });
+            });
+
+            function renderHistory() {
+                chatHistoryContainer.innerHTML = '';
+                var searchQuery = noticeSearchInput ? (noticeSearchInput.value || '').toLowerCase().trim() : '';
+
+                var filtered = messages.filter(function (msg) {
+                    // Match Search Query
+                    if (searchQuery) {
+                        var title = (msg.title || '').toLowerCase();
+                        var body = (msg.message || '').toLowerCase();
+                        if (title.indexOf(searchQuery) === -1 && body.indexOf(searchQuery) === -1) {
+                            return false;
+                        }
+                    }
+
+                    // Match Target Category
+                    if (activeFilter === 'all') {
+                        return !msg.target_classname && !msg.target_subject;
+                    }
+                    if (activeFilter === 'class') {
+                        return !!msg.target_classname && !msg.target_subject;
+                    }
+                    if (activeFilter === 'subject') {
+                        return !!msg.target_subject;
+                    }
+                    return true;
+                });
+
+                if (filtered.length === 0) {
+                    chatHistoryContainer.innerHTML = '<div style="margin: auto; text-align:center; padding:20px; background: rgba(255,255,255,0.7); border-radius:10px; max-width:280px; font-weight:600; color:#64748b;"><i class="fas fa-envelope-open"></i> No notifications in this folder.</div>';
+                    return;
+                }
+
+                filtered.forEach(function (msg) {
+                    var bubble = document.createElement('div');
+                    bubble.className = 'chat-bubble';
+
+                    var titleHtml = '<div class="bubble-title"><i class="fas fa-bell"></i> ' + escapeHtml(msg.title) + '</div>';
+                    
+                    var attachmentHtml = '';
+                    if (msg.attachment_url) {
+                        var isImg = msg.attachment_mime && msg.attachment_mime.indexOf('image/') === 0;
+                        if (isImg) {
+                            attachmentHtml = '<div style="margin: 8px 0;"><img src="' + msg.attachment_url + '" style="max-width:100%; max-height:220px; border-radius:8px; border:1px solid #cbd5e1;" /></div>';
+                        } else {
+                            attachmentHtml = '<div style="margin: 8px 0;"><a href="' + msg.attachment_url + '" target="_blank" class="btn btn-secondary btn-xs" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><i class="fas fa-file-download"></i> Attachment</a></div>';
+                        }
+                    }
+
+                    var badgeHtml = '';
+                    if (msg.is_expired) {
+                        badgeHtml = '<span class="bubble-badge expired">Expired</span> ';
+                    } else if (msg.is_due_soon) {
+                        badgeHtml = '<span class="bubble-badge due-soon">Due Soon</span> ';
+                    }
+
+                    var statusHtml = '';
+                    if (msg.is_read) {
+                        statusHtml = '<span class="bubble-badge read">Read</span>';
+                    } else {
+                        statusHtml = '<span class="bubble-badge unread">Unread</span>';
+                    }
+
+                    var actionHtml = '';
+                    if (!msg.is_read && csrf.token) {
+                        actionHtml = '<div class="bubble-actions">' +
+                                     '<form method="post" action="' + csrf.url + '">' +
+                                     '<input type="hidden" name="csrf_token" value="' + csrf.token + '">' +
+                                     '<input type="hidden" name="message_id" value="' + msg.id + '">' +
+                                     '<button type="submit" class="btn btn-primary btn-xs" style="padding:4px 8px;"><i class="fas fa-check"></i> Mark Read</button>' +
+                                     '</form>' +
+                                     '</div>';
+                    }
+
+                    var timeHtml = '<div class="bubble-meta">' +
+                                   badgeHtml +
+                                   statusHtml +
+                                   '<span>Deadline: ' + (msg.deadline_date || 'None') + '</span> | ' +
+                                   '<span>' + msg.created_at + '</span>' +
+                                   '</div>';
+
+                    bubble.innerHTML = titleHtml + attachmentHtml + '<div class="bubble-content">' + escapeHtml(msg.message) + '</div>' + timeHtml + actionHtml;
+                    chatHistoryContainer.appendChild(bubble);
+                });
+
+                // Scroll to bottom
+                chatHistoryContainer.scrollTop = chatHistoryContainer.scrollHeight;
+            }
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+            }
+
+            // Init load
+            renderHistory();
+        })();
+    </script>
     {% include "shared/_loading_overlay.html" %}
 </body>
 </html>
-
-

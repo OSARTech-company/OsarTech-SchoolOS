@@ -38273,16 +38273,21 @@ def super_admin_change_password():
         return redirect(url_for('super_admin_dashboard'))
     return render_template('shared/change_password.html', form_action='super_admin_change_password', back_url='super_admin_dashboard')
 
-@app.route('/school-admin/add-teacher', methods=['POST'])
+@app.route('/school-admin/add-teacher', methods=['GET', 'POST'])
 def school_admin_add_teacher():
     if session.get('role') != 'school_admin':
         return redirect(url_for('login'))
     
     school_id = _normalize_school_id_text(session.get('school_id'))
-    fallback_redirect = safe_referrer_or(url_for('school_admin_dashboard'))
     if not school_id:
         flash('School session is missing. Please log in again.', 'error')
         return redirect(url_for('login'))
+
+    school = get_school(school_id) or {}
+    if request.method == 'GET':
+        return render_template('school/school_admin_add_teacher.html', school=school)
+
+    fallback_redirect = url_for('school_admin_teachers')
     username = request.form.get('username', '').strip().lower()
     firstname = normalize_person_name(request.form.get('firstname', '').strip())
     lastname = normalize_person_name(request.form.get('lastname', '').strip())
@@ -38385,16 +38390,21 @@ def school_admin_add_teacher():
     
     return redirect(fallback_redirect)
 
-@app.route('/school-admin/add-bursar', methods=['POST'])
+@app.route('/school-admin/add-bursar', methods=['GET', 'POST'])
 def school_admin_add_bursar():
     if session.get('role') != 'school_admin':
         return redirect(url_for('login'))
 
     school_id = _normalize_school_id_text(session.get('school_id'))
-    fallback_redirect = safe_referrer_or(url_for('school_admin_teachers'))
     if not school_id:
         flash('School session is missing. Please log in again.', 'error')
         return redirect(url_for('login'))
+
+    school = get_school(school_id) or {}
+    if request.method == 'GET':
+        return render_template('school/school_admin_add_bursar.html', school=school)
+
+    fallback_redirect = url_for('school_admin_teachers')
     username = request.form.get('username', '').strip().lower()
     firstname = normalize_person_name(request.form.get('firstname', '').strip())
     lastname = normalize_person_name(request.form.get('lastname', '').strip())

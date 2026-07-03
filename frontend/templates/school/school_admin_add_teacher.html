@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add Teacher - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      :root {
+        --brand-color: #1e3a8a;
+        --brand-gradient: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        --surface-color: #ffffff;
+        --bg-color: #f1f5f9;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+        --border-color: #e2e8f0;
+        --accent-color: #3b82f6;
+      }
+      body {
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        font-family: 'Outfit', sans-serif;
+        min-height: 100vh;
+        margin: 0;
+      }
+      .app-shell {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      .container {
+        width: min(720px, 100%);
+        margin: 40px auto;
+        padding: 0 20px;
+        box-sizing: border-box;
+      }
+      .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.95rem;
+        margin-bottom: 20px;
+        transition: color 0.2s ease;
+      }
+      .back-btn:hover {
+        color: var(--brand-color);
+      }
+      .form-card {
+        background: var(--surface-color);
+        border-radius: 16px;
+        box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.05);
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+      }
+      .form-header {
+        background: var(--brand-gradient);
+        color: white;
+        padding: 32px;
+        position: relative;
+      }
+      .form-header h1 {
+        margin: 0;
+        font-size: 1.75rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .form-header p {
+        margin: 8px 0 0 0;
+        color: rgba(255,255,255,0.85);
+        font-size: 0.95rem;
+      }
+      .form-body {
+        padding: 32px;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      @media(max-width: 600px) {
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .form-group {
+        margin-bottom: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .form-group.full-width {
+        grid-column: span 2;
+      }
+      @media(max-width: 600px) {
+        .form-group.full-width {
+          grid-column: span 1;
+        }
+      }
+      label {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--text-main);
+      }
+      input[type="text"],
+      input[type="email"],
+      input[type="password"],
+      select {
+        padding: 12px 16px;
+        border: 1.5px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
+        background-color: #f8fafc;
+      }
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent-color);
+        background-color: #fff;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+      }
+      .password-input-wrapper {
+        position: relative;
+        display: flex;
+      }
+      .password-input-wrapper input {
+        flex: 1;
+        padding-right: 48px;
+      }
+      .password-toggle-btn {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 1.1rem;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .password-toggle-btn:hover {
+        color: var(--brand-color);
+      }
+      .checkbox-card {
+        background: #f8fafc;
+        border: 1.5px solid var(--border-color);
+        border-radius: 10px;
+        padding: 16px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .checkbox-card:hover {
+        border-color: var(--accent-color);
+        background: #f0f7ff;
+      }
+      .checkbox-card input[type="checkbox"] {
+        margin-top: 3px;
+        width: 18px;
+        height: 18px;
+        accent-color: var(--accent-color);
+      }
+      .checkbox-label-text {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .checkbox-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--text-main);
+      }
+      .checkbox-desc {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 16px;
+        margin-top: 12px;
+        border-top: 1px solid var(--border-color);
+        padding-top: 24px;
+      }
+      .btn {
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+      }
+      .btn-secondary {
+        background: #e2e8f0;
+        color: #475569;
+        border: none;
+      }
+      .btn-secondary:hover {
+        background: #cbd5e1;
+      }
+      .btn-primary {
+        background: var(--brand-gradient);
+        color: white;
+        border: none;
+        box-shadow: 0 4px 10px rgba(30, 58, 138, 0.25);
+      }
+      .btn-primary:hover {
+        box-shadow: 0 6px 15px rgba(30, 58, 138, 0.35);
+        transform: translateY(-1px);
+      }
+      .flash-messages {
+        margin-bottom: 20px;
+      }
+      .flash {
+        padding: 14px 20px;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 500;
+      }
+      .flash.error {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+      }
+      .flash.success {
+        background-color: #dcfce7;
+        color: #166534;
+        border: 1px solid #86efac;
+      }
+      .flash.warning {
+        background-color: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde047;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <div class="container">
+        <a href="{{ url_for('school_admin_teachers') }}" class="back-btn">
+          <i class="fas fa-arrow-left"></i> Back to Teachers Directory
+        </a>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flash-messages">
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">
+                  <i class="fas {% if category == 'error' %}fa-exclamation-circle{% elif category == 'success' %}fa-check-circle{% else %}fa-exclamation-triangle{% endif %}"></i>
+                  <span>{{ message }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <div class="form-card">
+          <div class="form-header">
+            <h1><i class="fas fa-chalkboard-teacher"></i> Add New Teacher</h1>
+            <p>Register a teacher account to assign subjects, enter scores, and manage classes.</p>
+          </div>
+          <form action="{{ url_for('school_admin_add_teacher') }}" method="POST" class="form-body">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label for="username">Username (Email Address)</label>
+                <input type="email" id="username" name="username" placeholder="e.g., teacher.name@school.com" required />
+              </div>
+              
+              <div class="form-group">
+                <label for="firstname">First Name</label>
+                <input type="text" id="firstname" name="firstname" placeholder="First Name" required />
+              </div>
+              
+              <div class="form-group">
+                <label for="lastname">Last Name</label>
+                <input type="text" id="lastname" name="lastname" placeholder="Last Name" />
+              </div>
+
+              <div class="form-group">
+                <label for="gender">Gender</label>
+                <select id="gender" name="gender" required>
+                  <option value="">-- Select Gender --</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="phone">Phone Number (For SMS)</label>
+                <input type="text" id="phone" name="phone" placeholder="e.g. +234..." />
+              </div>
+
+              <div class="form-group full-width">
+                <label for="password">Password</label>
+                <div class="password-input-wrapper">
+                  <input type="password" id="password" name="password" placeholder="Leave blank to auto-generate secure password" autocomplete="new-password" />
+                  <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility()" aria-label="Toggle Password Visibility">
+                    <i class="fas fa-eye" id="togglePasswordIcon"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-group full-width" style="margin-bottom: 8px;">
+                <label class="checkbox-card">
+                  <input type="checkbox" name="send_credentials" value="1" checked />
+                  <span class="checkbox-label-text">
+                    <span class="checkbox-title">Send credentials automatically</span>
+                    <span class="checkbox-desc">Email and SMS the login credentials to this teacher immediately.</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div class="actions">
+              <a href="{{ url_for('school_admin_teachers') }}" class="btn btn-secondary">Cancel</a>
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Register Teacher
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function togglePasswordVisibility() {
+        const passwordInput = document.getElementById('password');
+        const icon = document.getElementById('togglePasswordIcon');
+        if (passwordInput.type === 'password') {
+          passwordInput.type = 'text';
+          icon.classList.remove('fa-eye');
+          icon.classList.add('fa-eye-slash');
+        } else {
+          passwordInput.type = 'password';
+          icon.classList.remove('fa-eye-slash');
+          icon.classList.add('fa-eye');
+        }
+      }
+    </script>
+  </body>
+</html>

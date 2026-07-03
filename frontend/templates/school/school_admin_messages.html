@@ -9,31 +9,398 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
     <style>
-      body { min-height: 100vh; }
-      .container { width: min(1120px, 100%); margin: 0 auto; padding: 24px; }
-      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-      .header h1 { margin: 0; font-size: 1.85rem; }
-      .header .back { color: white; text-decoration: none; font-weight: 700; }
-      .grid-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
-      .student-message-list { margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 10px; }
-      .student-message-item { border: 1px solid #dbe4ef; border-radius: 10px; padding: 10px; margin-bottom: 8px; background: #f8fbff; }
-      .student-message-item h4 { margin: 0 0 6px; color: #1e3a5f; font-size: 0.98rem; }
-      .student-message-meta { color: #5b6475; font-size: 0.85rem; margin-bottom: 4px; }
-      .student-message-target-fields { display: none; }
-      .student-message-target-fields.show { display: block; }
-      .sms-help { display: none; }
-      .sms-help.is-visible { display: block; }
+      body {
+        background: radial-gradient(circle at 10% 10%, rgba(31, 122, 140, 0.04), transparent 32%),
+                    radial-gradient(circle at 90% 2%, rgba(15, 76, 129, 0.04), transparent 30%),
+                    #f3f6fa;
+        min-height: 100vh;
+      }
+      .container { width: min(1200px, 100%); margin: 0 auto; padding: 20px; }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+      .header h1 { margin: 0; font-size: 1.7rem; color: #0f172a; font-weight: 850; }
+      .header .back { color: white; text-decoration: none; font-weight: 750; }
+
+      /* WhatsApp split layout container */
+      .chat-container {
+        display: grid;
+        grid-template-columns: 340px 1fr;
+        height: calc(100vh - 170px);
+        min-height: 600px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+      }
+      @media (max-width: 900px) {
+        .chat-container {
+          grid-template-columns: 1fr;
+        }
+        .chat-sidebar.is-hidden-mobile {
+          display: none;
+        }
+        .chat-window.is-hidden-mobile {
+          display: none;
+        }
+      }
+
+      /* Sidebar */
+      .chat-sidebar {
+        border-right: 1px solid #cbd5e1;
+        display: flex;
+        flex-direction: column;
+        background: #f8fafc;
+      }
+      .sidebar-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .sidebar-header h3 {
+        margin: 0 0 2px;
+        color: #0f172a;
+        font-size: 1.05rem;
+        font-weight: 800;
+      }
+      .sidebar-search {
+        padding: 10px 20px;
+        position: relative;
+        border-bottom: 1px solid #e2e8f0;
+        background: #ffffff;
+      }
+      .sidebar-search i {
+        position: absolute;
+        left: 32px;
+        top: 20px;
+        color: #94a3b8;
+        font-size: 0.9rem;
+      }
+      .sidebar-search input {
+        width: 100%;
+        padding: 8px 12px 8px 34px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #f1f5f9;
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: border-color 0.2s;
+      }
+      .sidebar-search input:focus {
+        border-color: var(--brand, #0f4c81);
+        background: #ffffff;
+        outline: none;
+      }
+      .channels-list {
+        flex: 1;
+        overflow-y: auto;
+      }
+      .channel-category {
+        padding: 10px 20px 4px;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+        font-weight: 750;
+        background: #f1f5f9;
+      }
+      .channel-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        cursor: pointer;
+        transition: background 0.2s;
+        background: #ffffff;
+      }
+      .channel-item:hover {
+        background: #f8fafc;
+      }
+      .channel-item.active {
+        background: #e0f2fe;
+        border-left: 4px solid var(--brand, #0f4c81);
+      }
+      .channel-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(15, 76, 129, 0.08);
+        color: var(--brand, #0f4c81);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.05rem;
+        flex-shrink: 0;
+      }
+      .channel-details {
+        flex: 1;
+        min-width: 0;
+      }
+      .channel-details h4 {
+        margin: 0 0 2px;
+        font-size: 0.88rem;
+        font-weight: 750;
+        color: #0f172a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .channel-details .last-msg {
+        margin: 0;
+        font-size: 0.78rem;
+        color: #64748b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Chat Window */
+      .chat-window {
+        display: flex;
+        flex-direction: column;
+        background: #efeae2;
+        position: relative;
+      }
+      .chat-window-landing {
+        position: absolute;
+        inset: 0;
+        background: #f8fafc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 30px;
+        z-index: 10;
+        text-align: center;
+      }
+      .landing-content {
+        max-width: 440px;
+      }
+      .landing-icon {
+        font-size: 3.5rem;
+        color: #22c55e;
+        margin-bottom: 16px;
+      }
+      .landing-content h2 {
+        margin: 0 0 10px;
+        color: #0f172a;
+        font-weight: 850;
+      }
+      .landing-content p {
+        color: #64748b;
+        font-size: 0.92rem;
+        line-height: 1.6;
+        margin-bottom: 24px;
+      }
+
+      /* Active Window */
+      .chat-window-active {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      .chat-header {
+        background: #ffffff;
+        padding: 12px 20px;
+        border-bottom: 1px solid #cbd5e1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 5;
+      }
+      .chat-header-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .chat-header-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: rgba(15, 76, 129, 0.08);
+        color: var(--brand, #0f4c81);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+      }
+      .chat-header-info h3 {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #0f172a;
+      }
+      .chat-status {
+        font-size: 0.76rem;
+        color: #22c55e;
+        font-weight: 700;
+      }
+
+      /* Chat body - bubbles */
+      .chat-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background-color: #efeae2;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Cpath fill-rule='evenodd' d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zM11 61c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm7-29c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm36 2c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm-3 20c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm-27 7c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm34-31c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm-22-17c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm-12 11c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm34 30c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z'/%3E%3C/g%3E%3C/svg%3E");
+      }
+      .chat-bubble {
+        max-width: 75%;
+        padding: 10px 14px;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        position: relative;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+        word-wrap: break-word;
+        align-self: flex-end;
+        background: #d9fdd3;
+        color: #111b21;
+        border-top-right-radius: 0;
+      }
+      .bubble-title {
+        font-weight: 750;
+        color: var(--brand, #0f4c81);
+        font-size: 0.85rem;
+        margin-bottom: 4px;
+      }
+      .bubble-content {
+        margin: 4px 0;
+        white-space: pre-wrap;
+      }
+      .bubble-meta {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        font-size: 0.7rem;
+        color: #667781;
+        margin-top: 6px;
+      }
+      .bubble-badge {
+        font-weight: 700;
+        padding: 1px 4px;
+        border-radius: 4px;
+        font-size: 0.68rem;
+      }
+      .bubble-badge.expired { background: #fecaca; color: #991b1b; }
+      .bubble-badge.due-soon { background: #fef3c7; color: #92400e; }
+
+      /* Footer composer */
+      .chat-footer {
+        background: #f0f2f5;
+        padding: 12px 20px;
+        border-top: 1px solid #cbd5e1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 5;
+      }
+      .chat-compose-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        background: #ffffff;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+      }
+      .control-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .control-row input[type="text"] {
+        flex: 1;
+        min-width: 180px;
+        border: none;
+        font-size: 0.88rem;
+        font-weight: 700;
+        outline: none;
+        padding: 4px 0;
+      }
+      .control-row input[type="date"] {
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        padding: 4px 8px;
+        outline: none;
+      }
+      .file-input-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .file-input-wrapper input[type="file"] {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .channels-checkboxes {
+        margin-left: auto;
+        display: flex;
+        gap: 12px;
+      }
+
+      .chat-compose-textarea-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .chat-compose-textarea-row textarea {
+        flex: 1;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 12px;
+        resize: none;
+        font-size: 0.9rem;
+        font-weight: 600;
+        background: #ffffff;
+        outline: none;
+        height: 38px;
+        line-height: 1.3;
+      }
+      .chat-send-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: var(--brand, #0f4c81);
+        color: #ffffff;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        transition: all 0.2s;
+      }
+      .chat-send-btn:hover {
+        background: var(--brand-2, #1f7a8c);
+        transform: scale(1.05);
+      }
+      
+      .char-counter {
+        font-size: 0.72rem;
+        color: #94a3b8;
+        margin-left: 8px;
+      }
+      .is-hidden { display: none !important; }
     </style>
   </head>
   <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
     <div class="app-shell topbar-layout">
       {% set active_page = 'messages' %}
       {% include 'school/_school_admin_sidebar.html' %}
+      
       <div class="main-content">
         <div class="container">
           <div class="header">
-            <h1><i class="fas fa-bell"></i> Messages Center</h1>
-            <a href="{{ url_for('school_admin_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+            <h1><i class="fas fa-comments"></i> Message Center</h1>
+            <a href="{{ url_for('school_admin_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Dashboard</a>
           </div>
 
           {% with messages = get_flashed_messages(with_categories=true) %}
@@ -44,263 +411,183 @@
             {% endif %}
           {% endwith %}
 
-          <div class="card">
-            <h2><i class="fas fa-comments"></i> Message Feature</h2>
-            <p class="note">
-              These messaging tools promote efficient and effective processes. Through the school messaging system,
-              schools can improve communication flow with all stakeholders: teachers, students, employees, and parents/guardians.
-              A good flow of communication helps institutions meet their goals and fulfill their mission.
-            </p>
-            <h3>Benefits</h3>
-            <ul class="note" style="margin-top: 6px;">
-              <li><strong>Improved Information Dissemination:</strong> Messages, announcements, and news can be circulated quickly. The feature supports bulk notices, targeted messages, and file sharing so everyone stays informed.</li>
-              <li><strong>Document Exchange:</strong> Keep records of important conversations and files. Stakeholders can access shared documents for academic purposes.</li>
-              <li><strong>Accessible to Stakeholders:</strong> Responsive on mobile and desktop. Teachers can broadcast from laptops; students and parents receive messages on mobile.</li>
-              <li><strong>Helps in Strategic Planning:</strong> Collaborate on exams, schedules, and class activities. Better communication supports stronger workflows.</li>
-              <li><strong>Targeted Audience:</strong> Filter recipients by class, stream, subject, or role so notices reach the right people.</li>
-              <li><strong>Data Backup:</strong> Messages are stored in the app for future reference and audits.</li>
-            </ul>
-            <p class="note">SMS delivery uses Twilio when configured. Email delivery uses SMTP. If either is not set, the system will still send in-app messages only.</p>
-          </div>
-
-          <div class="card">
-            <h2><i class="fas fa-sms"></i> Test SMS</h2>
-            <p class="note">Send a quick SMS to confirm Twilio credentials. Use E.164 format (example: +2348012345678).</p>
-            {% if twilio_ready %}
-            <form action="{{ url_for('school_admin_test_sms') }}" method="POST">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-              <div class="form-group">
-                <label for="test_sms_phone">Test Phone</label>
-                <input type="text" id="test_sms_phone" name="test_phone" placeholder="+2348012345678" required />
-              </div>
-              <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send Test SMS</button>
-            </form>
-            {% else %}
-            <p class="note">Twilio is not configured yet. Set `SMS_PROVIDER=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` or `TWILIO_MESSAGING_SERVICE_SID`.</p>
-            {% endif %}
-          </div>
-
-          <div class="grid-two">
-            <div class="card">
-              <h2><i class="fas fa-bullhorn"></i> Student Message Broadcast</h2>
-              <p class="note">Send deadline notices or school messages to all students, one class, or one stream in a class.</p>
-              <form action="{{ url_for('school_admin_send_student_message') }}" method="POST" enctype="multipart/form-data">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                <div class="form-group">
-                  <label for="student_msg_title">Title</label>
-                  <input type="text" id="student_msg_title" name="title" maxlength="160" required placeholder="e.g., Score Submission Deadline" />
-                </div>
-                <div class="form-group">
-                  <label for="student_msg_body">Message</label>
-                  <textarea id="student_msg_body" name="message" rows="4" maxlength="3000" required placeholder="Enter message to students..."></textarea>
-                </div>
-                <div class="form-group">
-                  <label for="student_msg_target_mode">Target</label>
-                  <select id="student_msg_target_mode" name="target_mode">
-                    <option value="all">All Students</option>
-                    <option value="class">One Class</option>
-                    <option value="stream">One Stream in Class</option>
-                  </select>
-                </div>
-                <div id="studentMsgClassGroup" class="form-group student-message-target-fields">
-                  <label for="student_msg_classname">Class</label>
-                  <select id="student_msg_classname" name="target_classname">
-                    <option value="">-- Select Class --</option>
-                    {% for class_name in class_options %}
-                    <option value="{{ class_name }}">{{ class_name }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                <div id="studentMsgStreamGroup" class="form-group student-message-target-fields">
-                  <label for="student_msg_stream">Stream</label>
-                  <select id="student_msg_stream" name="target_stream">
-                    <option value="">-- Select Stream --</option>
-                    <option value="Science">Science</option>
-                    <option value="Art">Art</option>
-                    <option value="Commercial">Commercial</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label for="student_msg_deadline">Deadline (optional)</label>
-                  <input type="date" id="student_msg_deadline" name="deadline_date" />
-                </div>
-                <div class="form-group">
-                  <label for="student_msg_attachment">Attachment (optional)</label>
-                  <input type="file" id="student_msg_attachment" name="attachment_file" accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" />
-                  <p class="note">Allowed: JPG/PNG/GIF/WEBP/PDF. Max 8MB (configurable).</p>
-                </div>
-                <div class="form-group">
-                  <label class="checkbox">
-                    <input type="checkbox" name="send_sms" value="1" />
-                    Send SMS to parents (Twilio)
-                  </label>
-                  <p class="note sms-help">Use E.164 format. Default country: {{ sms_default_country }}.</p>
-                </div>
-                <div class="form-group">
-                  <label class="checkbox">
-                    <input type="checkbox" name="send_email" value="1" />
-                    Send Email to students (uses student email)
-                  </label>
-                </div>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send to Students</button>
-              </form>
-              <div class="student-message-list">
-                <h3 class="no-margin">Recent Student Messages</h3>
-                {% for msg in student_message_rows %}
-                <div class="student-message-item">
-                  <h4>{{ msg.title }}</h4>
-                  <div class="student-message-meta">
-                    Target:
-                    {% if msg.target_classname and msg.target_stream %}
-                      {{ msg.target_classname }} - {{ msg.target_stream }}
-                    {% elif msg.target_classname %}
-                      {{ msg.target_classname }} (all streams)
-                    {% else %}
-                      All Students
-                    {% endif %}
-                    |
-                    Deadline: {{ msg.deadline_date if msg.deadline_date else 'None' }}
-                    {% if msg.is_expired %}
-                      | <span class="chip chip-danger">Expired</span>
-                    {% endif %}
-                    |
-                    Sent: {{ msg.created_at }}
-                    | Reads: {{ msg.read_count }} students, {{ msg.parent_read_count }} parents
-                  </div>
-                  <div>{{ msg.message }}</div>
-                  {% if msg.attachment_url %}
-                  <div class="mt-10">
-                    {% if msg.attachment_mime and msg.attachment_mime.startswith('image/') %}
-                    <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">
-                      <i class="fas fa-image"></i> Open Attached Image
-                    </a>
-                    <div class="mt-10">
-                      <img src="{{ msg.attachment_url }}" alt="Attachment" style="max-width:100%; max-height:260px; border-radius:10px; border:1px solid #dbe4ef;">
-                    </div>
-                    {% else %}
-                    <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">
-                      <i class="fas fa-file"></i> Download Attachment
-                    </a>
-                    {% endif %}
-                  </div>
-                  {% endif %}
-                </div>
+          <!-- SMS Settings Health Checker -->
+          <div class="card" style="margin-bottom: 12px; padding: 14px 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+              <div>
+                <strong>Twilio SMS Gateway:</strong>
+                {% if twilio_ready %}
+                <span class="chip chip-success" style="font-weight:700;"><i class="fas fa-check-circle"></i> Configured</span>
                 {% else %}
-                <p class="note">No student messages sent yet.</p>
+                <span class="chip chip-warning" style="font-weight:750;"><i class="fas fa-exclamation-triangle"></i> Not Configured (In-App Only)</span>
+                {% endif %}
+              </div>
+              {% if twilio_ready %}
+              <form action="{{ url_for('school_admin_test_sms') }}" method="POST" style="display:inline-flex; align-items:center; gap:6px; margin:0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <input type="text" name="test_phone" placeholder="Test number +234..." style="padding: 4px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.8rem; outline:none;" required />
+                <button type="submit" class="btn btn-primary btn-xs" style="padding: 5px 10px;"><i class="fas fa-paper-plane"></i> Send Test</button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Chat Window -->
+          <div class="chat-container">
+            <!-- Sidebar -->
+            <div class="chat-sidebar" id="chatSidebar">
+              <div class="sidebar-header">
+                <h3>Broadcast Channels</h3>
+                <p class="note">Select a group target to begin composing</p>
+              </div>
+              <div class="sidebar-search">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search target groups..." id="channelSearchInput">
+              </div>
+              <div class="channels-list" id="channelsList">
+                
+                <!-- Category: Students & Parents -->
+                <div class="channel-category">Students & Parents</div>
+                
+                <div class="channel-item" data-target-type="student" data-target-mode="all" data-name="All Students & Parents">
+                  <div class="channel-avatar"><i class="fas fa-users"></i></div>
+                  <div class="channel-details">
+                    <h4>All Students & Parents</h4>
+                    <p class="last-msg">Broadcast to all students</p>
+                  </div>
+                </div>
+
+                {% for class_name in class_options %}
+                <div class="channel-item" data-target-type="student" data-target-mode="class" data-classname="{{ class_name }}" data-name="{{ class_name }} Students">
+                  <div class="channel-avatar"><i class="fas fa-graduation-cap"></i></div>
+                  <div class="channel-details">
+                    <h4>{{ class_name }} Students</h4>
+                    <p class="last-msg">Filter by class stream</p>
+                  </div>
+                </div>
                 {% endfor %}
+
+                <!-- Category: Teachers -->
+                <div class="channel-category">Teachers</div>
+                
+                <div class="channel-item" data-target-type="teacher" data-target-mode="all" data-name="All Teachers">
+                  <div class="channel-avatar"><i class="fas fa-chalkboard-user"></i></div>
+                  <div class="channel-details">
+                    <h4>All Teachers</h4>
+                    <p class="last-msg">Broadcast to all teachers</p>
+                  </div>
+                </div>
+
+                {% for class_name in class_options %}
+                <div class="channel-item" data-target-type="teacher" data-target-mode="class" data-classname="{{ class_name }}" data-name="{{ class_name }} Teachers">
+                  <div class="channel-avatar"><i class="fas fa-user-tie"></i></div>
+                  <div class="channel-details">
+                    <h4>{{ class_name }} Teachers</h4>
+                    <p class="last-msg">Target class assigned teachers</p>
+                  </div>
+                </div>
+                {% endfor %}
+
+                {% for subject_name in subject_options %}
+                <div class="channel-item" data-target-type="teacher" data-target-mode="subject" data-subject="{{ subject_name }}" data-name="{{ subject_name }} Teachers">
+                  <div class="channel-avatar"><i class="fas fa-book"></i></div>
+                  <div class="channel-details">
+                    <h4>{{ subject_name }} Teachers</h4>
+                    <p class="last-msg">Target subject assignments</p>
+                  </div>
+                </div>
+                {% endfor %}
+
               </div>
             </div>
 
-            <div class="card">
-              <h2><i class="fas fa-bullhorn"></i> Teacher Message Broadcast</h2>
-              <p class="note">Send notices to all teachers, one class teacher group, one subject teacher group, or class + subject teachers.</p>
-              <form action="{{ url_for('school_admin_send_teacher_message') }}" method="POST" enctype="multipart/form-data">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                <div class="form-group">
-                  <label for="teacher_msg_title">Title</label>
-                  <input type="text" id="teacher_msg_title" name="title" maxlength="160" required placeholder="e.g., Submit all scores before Friday" />
+            <!-- Main Pane -->
+            <div class="chat-window" id="chatWindow">
+              <!-- Landing state -->
+              <div class="chat-window-landing" id="chatWindowLanding">
+                <div class="landing-content">
+                  <div class="landing-icon"><i class="fab fa-whatsapp" style="color: #25d366;"></i></div>
+                  <h2>SchoolOS Broadcast Messenger</h2>
+                  <p>Send standard announcements, upload assignments, configure SMS alerts, and review sent message archives in a WhatsApp-style UI.</p>
+                  <span class="note" style="font-weight:600;"><i class="fas fa-lock"></i> Select a channel from the left menu to compose a broadcast</span>
                 </div>
-                <div class="form-group">
-                  <label for="teacher_msg_body">Message</label>
-                  <textarea id="teacher_msg_body" name="message" rows="4" maxlength="3000" required placeholder="Enter message to teachers..."></textarea>
-                </div>
-                <div class="form-group">
-                  <label for="teacher_msg_target_mode">Target</label>
-                  <select id="teacher_msg_target_mode" name="target_mode">
-                    <option value="all">All Teachers</option>
-                    <option value="class">One Class</option>
-                    <option value="subject">One Subject</option>
-                    <option value="class_subject">Class + Subject</option>
-                  </select>
-                </div>
-                <div id="teacherMsgClassGroup" class="form-group student-message-target-fields">
-                  <label for="teacher_msg_classname">Class</label>
-                  <select id="teacher_msg_classname" name="target_classname">
-                    <option value="">-- Select Class --</option>
-                    {% for class_name in class_options %}
-                    <option value="{{ class_name }}">{{ class_name }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                <div id="teacherMsgSubjectGroup" class="form-group student-message-target-fields">
-                  <label for="teacher_msg_subject">Subject</label>
-                  <select id="teacher_msg_subject" name="target_subject">
-                    <option value="">-- Select Subject --</option>
-                    {% for subject_name in subject_options %}
-                    <option value="{{ subject_name }}">{{ subject_name }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label for="teacher_msg_deadline">Deadline (optional)</label>
-                  <input type="date" id="teacher_msg_deadline" name="deadline_date" />
-                </div>
-                <div class="form-group">
-                  <label for="teacher_msg_attachment">Attachment (optional)</label>
-                  <input type="file" id="teacher_msg_attachment" name="attachment_file" accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" />
-                  <p class="note">Allowed: JPG/PNG/GIF/WEBP/PDF. Max 8MB (configurable).</p>
-                </div>
-                <div class="form-group">
-                  <label class="checkbox">
-                    <input type="checkbox" name="send_sms" value="1" />
-                    Send SMS to teachers (Twilio)
-                  </label>
-                  <p class="note sms-help">Use E.164 format. Default country: {{ sms_default_country }}.</p>
-                </div>
-                <div class="form-group">
-                  <label class="checkbox">
-                    <input type="checkbox" name="send_email" value="1" />
-                    Send Email to teachers (uses teacher login email + SMTP)
-                  </label>
-                </div>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send to Teachers</button>
-              </form>
-              <div class="student-message-list">
-                <h3 class="no-margin">Recent Teacher Messages</h3>
-                {% for msg in teacher_message_rows %}
-                <div class="student-message-item">
-                  <h4>{{ msg.title }}</h4>
-                  <div class="student-message-meta">
-                    Target:
-                    {% if msg.target_classname and msg.target_subject %}
-                      {{ msg.target_classname }} - {{ msg.target_subject }}
-                    {% elif msg.target_classname %}
-                      {{ msg.target_classname }} (all subjects)
-                    {% elif msg.target_subject %}
-                      {{ msg.target_subject }} (all classes)
-                    {% else %}
-                      All Teachers
-                    {% endif %}
-                    |
-                    Deadline: {{ msg.deadline_date if msg.deadline_date else 'None' }}
-                    {% if msg.is_expired %}
-                      | <span class="chip chip-danger">Expired</span>
-                    {% endif %}
-                    |
-                    Sent: {{ msg.created_at }}
-                    | Reads: {{ msg.read_count }}
-                  </div>
-                  <div>{{ msg.message }}</div>
-                  {% if msg.attachment_url %}
-                  <div class="mt-10">
-                    {% if msg.attachment_mime and msg.attachment_mime.startswith('image/') %}
-                    <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">
-                      <i class="fas fa-image"></i> Open Attached Image
-                    </a>
-                    <div class="mt-10">
-                      <img src="{{ msg.attachment_url }}" alt="Attachment" style="max-width:100%; max-height:260px; border-radius:10px; border:1px solid #dbe4ef;">
+              </div>
+
+              <!-- Chat Active State -->
+              <div class="chat-window-active is-hidden" id="chatWindowActive">
+                <div class="chat-header">
+                  <div class="chat-header-info">
+                    <div class="chat-header-avatar" id="activeChatAvatar"><i class="fas fa-users"></i></div>
+                    <div>
+                      <h3 id="activeChatName">All Students & Parents</h3>
+                      <span class="chat-status" id="activeChatStatus">Active Channel</span>
                     </div>
-                    {% else %}
-                    <a href="{{ msg.attachment_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">
-                      <i class="fas fa-file"></i> Download Attachment
-                    </a>
-                    {% endif %}
                   </div>
-                  {% endif %}
+                  <div class="chat-header-actions">
+                    <button class="btn btn-secondary btn-xs" id="activeChatBackBtn" style="display:none;"><i class="fas fa-chevron-left"></i> Channels</button>
+                    <span id="activeChannelMeta" class="note" style="font-weight: 700;"></span>
+                  </div>
                 </div>
-                {% else %}
-                <p class="note">No teacher messages sent yet.</p>
-                {% endfor %}
+
+                <!-- Chat history list -->
+                <div class="chat-body" id="chatHistoryContainer">
+                  <!-- Javascript updates these bubbles -->
+                </div>
+
+                <!-- Footer editor -->
+                <form id="chatComposeForm" method="POST" enctype="multipart/form-data" class="chat-footer">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <input type="hidden" id="formTargetMode" name="target_mode" value="all" />
+                  <input type="hidden" id="formTargetClassname" name="target_classname" value="" />
+                  <input type="hidden" id="formTargetSubject" name="target_subject" value="" />
+
+                  <!-- Composing meta row -->
+                  <div class="chat-compose-controls">
+                    <div class="control-row">
+                      <input type="text" id="msgTitle" name="title" required placeholder="Announcement Title (e.g. Third Term Exam Schedule)" maxlength="150" />
+                      <input type="date" id="msgDeadline" name="deadline_date" title="Set Optional Action Deadline" />
+                    </div>
+
+                    <!-- Filter options dynamically displayed -->
+                    <div class="control-row is-hidden" id="streamSelectRow">
+                      <label for="selectStream" class="note" style="font-weight:750;">Target Stream:</label>
+                      <select id="selectStream" name="target_stream" class="filter-select" style="padding: 4px; font-size: 0.8rem;">
+                        <option value="">All Streams</option>
+                        <option value="Science">Science</option>
+                        <option value="Art">Art</option>
+                        <option value="Commercial">Commercial</option>
+                      </select>
+                    </div>
+
+                    <div class="control-row" style="margin-top: 4px;">
+                      <!-- File attached -->
+                      <div class="file-input-wrapper">
+                        <button type="button" class="btn btn-secondary btn-xs" style="padding: 4px 8px;"><i class="fas fa-paperclip"></i> Add File</button>
+                        <input type="file" id="msgAttachment" name="attachment_file" accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" />
+                        <span id="fileNameLabel" class="note" style="font-weight:600; color: #64748b;">No file attached</span>
+                      </div>
+                      
+                      <!-- Notification checkboxes -->
+                      <div class="channels-checkboxes">
+                        <label class="checkbox" style="font-weight:700; font-size:0.82rem;">
+                          <input type="checkbox" name="send_sms" id="sendSmsCheckbox" value="1" />
+                          SMS Alerts
+                        </label>
+                        <label class="checkbox" style="font-weight:700; font-size:0.82rem;">
+                          <input type="checkbox" name="send_email" value="1" />
+                          SMTP Email
+                        </label>
+                        <span class="char-counter" id="charCounter">0 / 3000 chars</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Text input & Send button -->
+                  <div class="chat-compose-textarea-row">
+                    <textarea id="msgBody" name="message" required placeholder="Type announcement message here..." maxlength="3000"></textarea>
+                    <button type="submit" class="chat-send-btn" id="btnSendBroadcast" title="Send Broadcast"><i class="fas fa-paper-plane"></i></button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>
@@ -308,83 +595,208 @@
       </div>
     </div>
 
+    <!-- Data payloads for message threads -->
+    <script id="sentStudentMessagesData" type="application/json">{{ student_message_rows|tojson }}</script>
+    <script id="sentTeacherMessagesData" type="application/json">{{ teacher_message_rows|tojson }}</script>
+
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
     <script>
       (function () {
-        var body = document.body;
-        if (window.innerWidth > 600) {
-          body.classList.add('rail-expanded');
+        var studentMsgs = [];
+        var teacherMsgs = [];
+        try {
+          studentMsgs = JSON.parse(document.getElementById('sentStudentMessagesData').textContent || '[]');
+        } catch (e) { console.error(e); }
+        try {
+          teacherMsgs = JSON.parse(document.getElementById('sentTeacherMessagesData').textContent || '[]');
+        } catch (e) { console.error(e); }
+
+        var channelsList = document.getElementById('channelsList');
+        var channelItems = document.querySelectorAll('.channel-item');
+        var channelSearchInput = document.getElementById('channelSearchInput');
+        var chatWindowLanding = document.getElementById('chatWindowLanding');
+        var chatWindowActive = document.getElementById('chatWindowActive');
+        var chatSidebar = document.getElementById('chatSidebar');
+        var chatWindow = document.getElementById('chatWindow');
+
+        var activeChatAvatar = document.getElementById('activeChatAvatar');
+        var activeChatName = document.getElementById('activeChatName');
+        var activeChatStatus = document.getElementById('activeChatStatus');
+        var activeChannelMeta = document.getElementById('activeChannelMeta');
+        var chatHistoryContainer = document.getElementById('chatHistoryContainer');
+        var activeChatBackBtn = document.getElementById('activeChatBackBtn');
+
+        // Form elements
+        var chatComposeForm = document.getElementById('chatComposeForm');
+        var formTargetMode = document.getElementById('formTargetMode');
+        var formTargetClassname = document.getElementById('formTargetClassname');
+        var formTargetSubject = document.getElementById('formTargetSubject');
+        var streamSelectRow = document.getElementById('streamSelectRow');
+        var selectStream = document.getElementById('selectStream');
+        var msgTitle = document.getElementById('msgTitle');
+        var msgDeadline = document.getElementById('msgDeadline');
+        var msgAttachment = document.getElementById('msgAttachment');
+        var fileNameLabel = document.getElementById('fileNameLabel');
+        var msgBody = document.getElementById('msgBody');
+        var charCounter = document.getElementById('charCounter');
+        var sendSmsCheckbox = document.getElementById('sendSmsCheckbox');
+
+        var activeTarget = null;
+
+        // Character counting
+        if (msgBody && charCounter) {
+          msgBody.addEventListener('input', function () {
+            charCounter.textContent = msgBody.value.length + ' / 3000 chars';
+          });
         }
-      })();
-    </script>
-    <script>
-      (function () {
-        var mode = document.getElementById('student_msg_target_mode');
-        var classGroup = document.getElementById('studentMsgClassGroup');
-        var streamGroup = document.getElementById('studentMsgStreamGroup');
-        var classInput = document.getElementById('student_msg_classname');
-        var streamInput = document.getElementById('student_msg_stream');
-        if (!mode || !classGroup || !streamGroup || !classInput || !streamInput) return;
-        function syncMode() {
-          var value = (mode.value || 'all').toLowerCase();
-          classGroup.classList.toggle('show', value === 'class' || value === 'stream');
-          streamGroup.classList.toggle('show', value === 'stream');
-          classInput.required = (value === 'class' || value === 'stream');
-          streamInput.required = (value === 'stream');
-          if (value === 'all') {
-            classInput.value = '';
-            streamInput.value = '';
-          } else if (value === 'class') {
-            streamInput.value = '';
-          }
+
+        // File label
+        if (msgAttachment && fileNameLabel) {
+          msgAttachment.addEventListener('change', function () {
+            var file = msgAttachment.files[0];
+            fileNameLabel.textContent = file ? file.name : 'No file attached';
+          });
         }
-        mode.addEventListener('change', syncMode);
-        syncMode();
-      })();
-    </script>
-    <script>
-      (function () {
-        var mode = document.getElementById('teacher_msg_target_mode');
-        var classGroup = document.getElementById('teacherMsgClassGroup');
-        var subjectGroup = document.getElementById('teacherMsgSubjectGroup');
-        var classInput = document.getElementById('teacher_msg_classname');
-        var subjectInput = document.getElementById('teacher_msg_subject');
-        if (!mode || !classGroup || !subjectGroup || !classInput || !subjectInput) return;
-        function syncMode() {
-          var value = (mode.value || 'all').toLowerCase();
-          classGroup.classList.toggle('show', value === 'class' || value === 'class_subject');
-          subjectGroup.classList.toggle('show', value === 'subject' || value === 'class_subject');
-          classInput.required = (value === 'class' || value === 'class_subject');
-          subjectInput.required = (value === 'subject' || value === 'class_subject');
-          if (value === 'all') {
-            classInput.value = '';
-            subjectInput.value = '';
-          } else if (value === 'class') {
-            subjectInput.value = '';
-          } else if (value === 'subject') {
-            classInput.value = '';
-          }
+
+        // Search filtering
+        if (channelSearchInput) {
+          channelSearchInput.addEventListener('input', function () {
+            var query = (channelSearchInput.value || '').toLowerCase().trim();
+            channelItems.forEach(function (item) {
+              var name = (item.getAttribute('data-name') || '').toLowerCase();
+              item.classList.toggle('is-hidden', query && name.indexOf(query) === -1);
+            });
+          });
         }
-        mode.addEventListener('change', syncMode);
-        syncMode();
-      })();
-    </script>
-    <script>
-      (function () {
-        var smsChecks = document.querySelectorAll('input[name="send_sms"]');
-        smsChecks.forEach(function (chk) {
-          var help = chk.closest('.form-group').querySelector('.sms-help');
-          function sync() {
-            if (!help) return;
-            help.classList.toggle('is-visible', chk.checked);
-          }
-          chk.addEventListener('change', sync);
-          sync();
+
+        // Back button for mobile
+        if (activeChatBackBtn) {
+          activeChatBackBtn.addEventListener('click', function () {
+            chatSidebar.classList.remove('is-hidden-mobile');
+            chatWindow.classList.add('is-hidden-mobile');
+          });
+        }
+
+        // Handle thread loading
+        channelItems.forEach(function (item) {
+          item.addEventListener('click', function () {
+            channelItems.forEach(function (i) { i.classList.remove('active'); });
+            item.classList.add('active');
+
+            var type = item.getAttribute('data-target-type');
+            var mode = item.getAttribute('data-target-mode');
+            var classname = item.getAttribute('data-classname') || '';
+            var subject = item.getAttribute('data-subject') || '';
+            var name = item.getAttribute('data-name') || '';
+
+            activeTarget = { type: type, mode: mode, classname: classname, subject: subject, name: name };
+
+            // Switch view
+            chatWindowLanding.classList.add('is-hidden');
+            chatWindowActive.classList.remove('is-hidden');
+
+            if (window.innerWidth <= 900) {
+              chatSidebar.classList.add('is-hidden-mobile');
+              chatWindow.classList.remove('is-hidden-mobile');
+              activeChatBackBtn.style.display = 'block';
+            }
+
+            // Update header info
+            activeChatName.textContent = name;
+            activeChatStatus.textContent = 'Active Broadcast Channel';
+            if (type === 'student') {
+              activeChatAvatar.innerHTML = '<i class="fas fa-users"></i>';
+              activeChannelMeta.textContent = 'Students/Parents';
+              chatComposeForm.action = "{{ url_for('school_admin_send_student_message') }}";
+              streamSelectRow.classList.toggle('is-hidden', mode !== 'class');
+            } else {
+              activeChatAvatar.innerHTML = '<i class="fas fa-chalkboard-user"></i>';
+              activeChannelMeta.textContent = 'Teachers';
+              chatComposeForm.action = "{{ url_for('school_admin_send_teacher_message') }}";
+              streamSelectRow.classList.add('is-hidden');
+            }
+
+            // Update form fields
+            formTargetMode.value = mode;
+            formTargetClassname.value = classname;
+            formTargetSubject.value = subject;
+            selectStream.value = '';
+
+            // Render bubbles
+            renderMessages();
+          });
         });
+
+        function renderMessages() {
+          if (!activeTarget) return;
+          chatHistoryContainer.innerHTML = '';
+
+          var list = activeTarget.type === 'student' ? studentMsgs : teacherMsgs;
+          var matches = list.filter(function (msg) {
+            if (activeTarget.mode === 'all') {
+              return msg.target_mode === 'all';
+            }
+            if (activeTarget.mode === 'class') {
+              return (msg.target_mode === 'class' || msg.target_mode === 'stream') &&
+                     (msg.target_classname || '').toLowerCase() === activeTarget.classname.toLowerCase();
+            }
+            if (activeTarget.mode === 'subject') {
+              return msg.target_mode === 'subject' &&
+                     (msg.target_subject || '').toLowerCase() === activeTarget.subject.toLowerCase();
+            }
+            return false;
+          });
+
+          if (matches.length === 0) {
+            chatHistoryContainer.innerHTML = '<div style="margin: auto; text-align:center; padding:20px; background: rgba(255,255,255,0.7); border-radius:10px; max-width:280px; font-weight:600; color:#64748b;"><i class="fas fa-comment-dots"></i> No announcements sent to this group yet.</div>';
+            return;
+          }
+
+          matches.forEach(function (msg) {
+            var bubble = document.createElement('div');
+            bubble.className = 'chat-bubble';
+
+            var titleHtml = '<div class="bubble-title"><i class="fas fa-bullhorn"></i> ' + escapeHtml(msg.title) + '</div>';
+            var attachmentHtml = '';
+            if (msg.attachment_url) {
+              var isImg = msg.attachment_mime && msg.attachment_mime.indexOf('image/') === 0;
+              if (isImg) {
+                attachmentHtml = '<div style="margin-bottom:8px;"><img src="' + msg.attachment_url + '" style="max-width:100%; max-height:200px; border-radius:6px; border:1px solid #cbd5e1;" /></div>';
+              } else {
+                attachmentHtml = '<div style="margin-bottom:8px;"><a href="' + msg.attachment_url + '" target="_blank" class="btn btn-secondary btn-xs" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;"><i class="fas fa-file-download"></i> Attachment</a></div>';
+              }
+            }
+
+            var badgeHtml = '';
+            if (msg.is_expired) {
+              badgeHtml = '<span class="bubble-badge expired">Expired</span>';
+            }
+
+            var readsText = activeTarget.type === 'student'
+              ? 'Reads: ' + (msg.read_count || 0) + 's / ' + (msg.parent_read_count || 0) + 'p'
+              : 'Reads: ' + (msg.read_count || 0);
+
+            var timeHtml = '<div class="bubble-meta">' +
+                           badgeHtml +
+                           '<span class="bubble-reads">' + readsText + '</span>' +
+                           '<span>' + msg.created_at + '</span>' +
+                           '<i class="fas fa-check-double" style="color: #53bdeb;"></i>' +
+                           '</div>';
+
+            bubble.innerHTML = titleHtml + attachmentHtml + '<div class="bubble-content">' + escapeHtml(msg.message) + '</div>' + timeHtml;
+            chatHistoryContainer.appendChild(bubble);
+          });
+
+          // Scroll to bottom
+          chatHistoryContainer.scrollTop = chatHistoryContainer.scrollHeight;
+        }
+
+        function escapeHtml(str) {
+          if (!str) return '';
+          return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
       })();
     </script>
-      {% include "shared/_loading_overlay.html" %}
-</body>
+    {% include "shared/_loading_overlay.html" %}
+  </body>
 </html>
-
-
