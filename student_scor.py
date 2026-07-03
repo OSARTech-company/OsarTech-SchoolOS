@@ -43953,6 +43953,13 @@ def teacher_dashboard():
     if selected_score_subject not in valid_subjects_for_nav:
         selected_score_subject = ''
     selected_score_class = (request.args.get('score_class', '') or '').strip()
+
+    # Auto-preselect if the teacher has exactly one subject/class assignment
+    if not selected_score_subject and len(score_nav_tree) == 1:
+        selected_score_subject = score_nav_tree[0]['subject']
+        if not selected_score_class and len(score_nav_tree[0]['classes']) == 1:
+            selected_score_class = score_nav_tree[0]['classes'][0]
+
     if selected_score_subject:
         valid_classes_for_subject = set(score_subject_nav_map.get(selected_score_subject, set()))
         if selected_score_class not in valid_classes_for_subject:

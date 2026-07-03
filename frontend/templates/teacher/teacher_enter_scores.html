@@ -9,10 +9,16 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(180deg, #f3f7fd 0%, #edf4fb 100%); }
-        .container { max-width: 1560px; margin: 0 auto; padding: 24px; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(circle at 10% 10%, rgba(31, 122, 140, 0.04), transparent 32%),
+                        radial-gradient(circle at 90% 2%, rgba(15, 76, 129, 0.04), transparent 30%),
+                        #f3f6fa;
+        }
+        .container { max-width: 1560px; margin: 0 auto; padding: 24px 14px; }
+        
         .header {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            background: linear-gradient(135deg, var(--brand, #0f4c81) 0%, var(--brand-2, #1f7a8c) 100%);
             color: white;
             padding: 24px 28px;
             border-radius: 18px;
@@ -22,36 +28,41 @@
             align-items: flex-start;
             gap: 12px;
             flex-wrap: wrap;
-            box-shadow: 0 18px 36px rgba(30, 60, 114, 0.18);
+            box-shadow: 0 10px 30px rgba(15, 76, 129, 0.15);
         }
         .header h1 { margin: 0; font-size: 2rem; }
         .header .back { color: white; text-decoration: none; font-weight: 700; }
+        
         .card {
-            background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+            background: #ffffff;
             border-radius: 18px;
             padding: 28px;
             margin-bottom: 20px;
-            box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
+            box-shadow: 0 8px 30px rgba(15, 23, 42, 0.04);
             border: 1px solid #dce7f5;
         }
-        .btn { padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; font-weight: 500; }
-        .btn-primary { background: #3498db; color: white; }
-        .btn-primary:hover { background: #2980b9; }
-        .btn-secondary { background: #6c757d; color: white; }
+        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; }
+        .btn-primary { background: var(--brand, #0f4c81); color: white; transition: all 0.2s; }
+        .btn-primary:hover:not([disabled]) { background: var(--brand-2, #1f7a8c); }
+        .btn-primary[disabled] { background: #cbd5e1; color: #94a3b8; cursor: not-allowed; }
+        .btn-secondary { background: #e2e8f0; color: #334155; transition: all 0.2s; }
+        .btn-secondary:hover { background: #cbd5e1; }
+        
         .flash { padding: 15px; margin-bottom: 20px; border-radius: 5px; }
         .flash.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .flash.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        
         .table-wrap {
             overflow-x: auto;
             border: 1px solid #dbe6f3;
-            border-radius: 18px;
+            border-radius: 14px;
             background: #fff;
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.55);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.01);
         }
         table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 0; min-width: 1400px; }
         th, td { padding: 14px 12px; text-align: center; border-right: 1px solid #d7dde4; border-bottom: 1px solid #d7dde4; vertical-align: middle; }
         thead th {
-            background: linear-gradient(180deg, #17355c 0%, #214b7f 100%);
+            background: linear-gradient(180deg, var(--brand, #0f4c81) 0%, var(--brand-2, #1f7a8c) 100%);
             color: #fff;
             font-weight: 700;
             font-size: 0.86rem;
@@ -74,59 +85,127 @@
             position: sticky;
             left: 0;
             z-index: 1;
+            border-left: 3px solid transparent;
+            transition: border-left-color 0.2s;
+        }
+        tbody tr.row-modified th {
+            border-left-color: #f59e0b;
         }
         tbody tr:nth-child(even) td { background: #fbfdff; }
         tbody tr:hover td,
         tbody tr:hover th { background: #f2f7ff; }
+        
         input[type="number"], .score-input {
             width: 118px;
-            min-height: 46px;
-            padding: 10px 12px;
+            min-height: 44px;
+            padding: 8px 10px;
             border: 1px solid #bfcddd;
-            border-radius: 10px;
+            border-radius: 8px;
             text-align: center;
             font-size: 1rem;
             font-weight: 700;
             background: #fff;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+            transition: all 0.2s;
         }
         .score-input:focus {
             outline: none;
-            border-color: #2563eb;
-            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
-            transform: translateY(-1px);
+            border-color: var(--brand, #0f4c81);
+            box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.12);
         }
-        input[readonly] {
-            background: #eef4fb;
+        
+        /* Error validation styling */
+        .score-input.has-error {
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+            background: #fef2f2 !important;
+            animation: shake 0.3s ease;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+        .error-message {
+            color: #ef4444;
+            font-size: 0.72rem;
             font-weight: 700;
-            color: #16324a;
+            margin-top: 4px;
+            display: block;
         }
-        .readonly-cell { background: #f4f8fc; }
+
+        input[readonly] {
+            background: #f1f5f9;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        .readonly-cell { background: #f8fafc; }
+        
         .grade-chip {
             display: inline-flex;
             min-width: 44px;
             justify-content: center;
-            padding: 8px 10px;
+            padding: 6px 10px;
             border-radius: 999px;
-            background: #e8f1ff;
+            background: rgba(15, 76, 129, 0.08);
             font-weight: 800;
-            color: #1e3c72;
+            color: var(--brand, #0f4c81);
         }
+        
         .student-info {
-            background: linear-gradient(135deg, #e7f3ff 0%, #f7fbff 100%);
-            padding: 18px 20px;
+            background: linear-gradient(135deg, #f0f7ff 0%, #f8fafc 100%);
+            padding: 20px;
             border-radius: 14px;
-            margin-bottom: 20px;
-            border: 1px solid #cfe1f7;
+            margin-bottom: 24px;
+            border: 1px solid #d0e1fd;
         }
-        .hint { margin-top: 12px; color: #4e5d6c; font-size: 0.97rem; }
+        .hint { margin-top: 12px; color: #64748b; font-size: 0.95rem; }
+        
         .subject-comment-input {
             width: 220px;
             min-height: 42px;
             border: 1px solid #ccd3db;
-            border-radius: 10px;
-            padding: 10px 12px;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 0.9rem;
         }
+        
+        /* Unsaved modified indicator */
+        .row-modified-marker {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #f59e0b;
+            border-radius: 50%;
+            margin-left: 6px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        tr.row-modified .row-modified-marker {
+            opacity: 1;
+        }
+
+        /* Sticky bottom action bar */
+        .sticky-actions-bar {
+            position: fixed;
+            bottom: -90px;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid #cbd5e1;
+            padding: 16px 24px;
+            box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            z-index: 1000;
+            transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sticky-actions-bar.show {
+            bottom: 0;
+        }
+
         @media (max-width: 640px) {
             .container { padding: 12px; }
             .header { padding: 14px; margin-bottom: 16px; }
@@ -136,10 +215,11 @@
             table { min-width: 1200px; }
             input[type="number"], .score-input { width: 104px; min-height: 42px; }
             .subject-comment-input { width: 180px; }
+            .sticky-actions-bar { flex-direction: column; padding: 12px; gap: 8px; }
         }
     </style>
 </head>
-<body>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
     {% include "shared/_loading_overlay.html" %}
     <div class="app-shell topbar-layout">
     {% set active_page = 'score_entry' %}
@@ -175,7 +255,7 @@
                 {% endif %}
             </div>
             
-            <form method="POST">
+            <form method="POST" id="score-entry-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="table-wrap">
                     <table id="score-entry-table"
@@ -217,6 +297,7 @@
                                 <tr class="subject-row" data-subj-key="{{ subj_key }}">
                                     <th>
                                         {{ subject }}
+                                        <span class="row-modified-marker" title="Unsaved changes in this row"></span>
                                         <input type="hidden" name="entry_touched_{{ subj_key }}" value="0" class="entry-touched" data-subj-key="{{ subj_key }}">
                                         {% if row_locked_by_submission %}
                                         <br><small style="color:#b36b00; font-weight:600;">Locked: waiting for subject teacher submission</small>
@@ -224,12 +305,14 @@
                                     </th>
                                     {% if school.test_enabled %}
                                         {% for i in range(1, school.max_tests + 1) %}
+                                        {% set single_test_max = school.test_score_max / school.max_tests if school.max_tests else school.test_score_max %}
                                         <td>
                                             <input type="text"
                                                    step="0.01"
                                                    class="score-input calc-input"
                                                    data-subj-key="{{ subj_key }}"
                                                    data-kind="test"
+                                                   data-max="{{ single_test_max }}"
                                                    name="test_{{ i }}_{{ subj_key }}"
                                                    inputmode="decimal"
                                                    placeholder="0 or -"
@@ -242,7 +325,7 @@
                                                    data-subj-key="{{ subj_key }}"
                                                    value="{{ s.get('total_test', 0) }}">
                                         </td>
-                                    {% endif %}
+                                        {% endif %}
                                     {% if school.exam_enabled %}
                                         {% if exam_config.exam_mode == 'combined' %}
                                         <td>
@@ -251,6 +334,7 @@
                                                    class="score-input calc-input"
                                                    data-subj-key="{{ subj_key }}"
                                                    data-kind="exam_combined"
+                                                   data-max="{{ exam_config.exam_score_max or 70 }}"
                                                    name="exam_score_{{ subj_key }}"
                                                    inputmode="decimal"
                                                    placeholder="0 or -"
@@ -264,6 +348,7 @@
                                                    class="score-input calc-input"
                                                    data-subj-key="{{ subj_key }}"
                                                    data-kind="objective"
+                                                   data-max="{{ exam_config.objective_max or 30 }}"
                                                    name="objective_{{ subj_key }}"
                                                    inputmode="decimal"
                                                    placeholder="0 or -"
@@ -276,6 +361,7 @@
                                                    class="score-input calc-input"
                                                    data-subj-key="{{ subj_key }}"
                                                    data-kind="theory"
+                                                   data-max="{{ exam_config.theory_max or 40 }}"
                                                    name="theory_{{ subj_key }}"
                                                    inputmode="decimal"
                                                    placeholder="0 or -"
@@ -348,11 +434,11 @@
                 {% if can_edit_teacher_comment %}
                 <div style="margin-top:14px;">
                     <label for="teacher_comment" style="display:block; margin-bottom:6px; font-weight:600; color:#2c3e50;">{{ 'School Comment' if role == 'school_admin' else 'Teacher Comment' }}</label>
-                    <textarea id="teacher_comment" name="teacher_comment" rows="4" style="width:100%; border:1px solid #ccd3db; border-radius:6px; padding:10px;" placeholder="Enter comment for this student's report" {% if is_locked %}disabled{% endif %}>{{ student.teacher_comment or '' }}</textarea>
+                    <textarea id="teacher_comment" name="teacher_comment" rows="4" style="width:100%; border:1px solid #ccd3db; border-radius:8px; padding:10px; box-sizing:border-box;" placeholder="Enter comment for this student's report" {% if is_locked %}disabled{% endif %}>{{ student.teacher_comment or '' }}</textarea>
                 </div>
                 <div style="margin-top:14px;">
                     <label for="score_override_reason" style="display:block; margin-bottom:6px; font-weight:600; color:#2c3e50;">Reason For Score Change</label>
-                    <textarea id="score_override_reason" name="score_override_reason" rows="3" style="width:100%; border:1px solid #ccd3db; border-radius:6px; padding:10px;" placeholder="{% if role == 'school_admin' %}Required when school admin changes score entered by a teacher.{% else %}Required when class teacher changes score entered by subject teacher.{% endif %}" {% if is_locked %}disabled{% endif %}></textarea>
+                    <textarea id="score_override_reason" name="score_override_reason" rows="3" style="width:100%; border:1px solid #ccd3db; border-radius:8px; padding:10px; box-sizing:border-box;" placeholder="{% if role == 'school_admin' %}Required when school admin changes score entered by a teacher.{% else %}Required when class teacher changes score entered by subject teacher.{% endif %}" {% if is_locked %}disabled{% endif %}></textarea>
                     <p class="hint">
                         {% if role == 'school_admin' %}
                         School admin must provide this reason when overriding score values entered by a teacher.
@@ -389,21 +475,43 @@
                 <div style="margin-top:18px; border:1px solid #dbe4ef; border-radius:12px; background:#f8fbff; padding:14px;">
                     <label style="display:block; margin-bottom:8px; font-weight:700; color:#2c3e50;">Behaviour Assessment</label>
                     <p class="hint" style="margin:0 0 10px;">Behaviour entry for class teachers is now on its own page so each student's traits can be managed separately from score entry.</p>
-                    <a href="{{ url_for('teacher_behaviour_assessment', classname=student.classname) }}" class="btn btn-secondary">Open Behaviour Assessment</a>
+                    <a href="{{ url_for('teacher_behaviour_assessment', classname=student.classname) }}" class="btn btn-secondary" style="text-decoration:none; display:inline-block; width:auto; font-size:0.9rem;">Open Behaviour Assessment</a>
                 </div>
                 {% endif %}
                 
-                <button type="submit" class="btn btn-primary" {% if is_locked %}disabled{% endif %}><i class="fas fa-save"></i> Save Scores</button>
-                <a href="{{ url_for('school_admin_view_students') if role == 'school_admin' else url_for('teacher_dashboard') }}" class="btn btn-secondary btn-cancel-inline" style="margin-left: 10px;">Cancel</a>
+                <div class="actions-row-base" style="margin-top: 24px; display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary" id="save-scores-btn" {% if is_locked %}disabled{% endif %}><i class="fas fa-save"></i> Save Scores</button>
+                    <a href="{{ url_for('school_admin_view_students') if role == 'school_admin' else url_for('teacher_dashboard') }}" class="btn btn-secondary btn-cancel-inline" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Cancel</a>
+                </div>
             </form>
         </div>
     </div>
     </div>
     </div>
+
+    <!-- Floating Sticky Save Bar -->
+    <div class="sticky-actions-bar" id="sticky-save-bar">
+        <span style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">
+            <i class="fas fa-circle-exclamation" style="color: #f59e0b; margin-right: 6px;"></i> You have unsaved score modifications!
+        </span>
+        <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-primary" style="padding: 10px 20px; font-size:0.9rem;" onclick="submitMainForm()">
+                <i class="fas fa-save"></i> Save Now
+            </button>
+            <button type="button" class="btn btn-secondary" style="padding: 10px 20px; font-size:0.9rem;" onclick="discardFormChanges()">
+                Discard
+            </button>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
     <script>
         (function () {
             const table = document.getElementById('score-entry-table');
+            const mainForm = document.getElementById('score-entry-form');
+            const stickyBar = document.getElementById('sticky-save-bar');
+            const saveBtn = document.getElementById('save-scores-btn');
+            
             if (!table) return;
 
             const thresholds = {
@@ -412,6 +520,9 @@
                 c: Number(table.dataset.gradeC || 50),
                 d: Number(table.dataset.gradeD || 40)
             };
+
+            let formHasChanges = false;
+            let validationErrors = new Set();
 
             function gradeFromScore(score) {
                 if (score >= thresholds.a) return 'A';
@@ -435,6 +546,48 @@
             function setText(selector, value) {
                 const el = document.querySelector(selector);
                 if (el) el.textContent = value;
+            }
+
+            // Real-time input boundary validation
+            function validateInput(input) {
+                const maxVal = parseFloat(input.dataset.max || 100);
+                const valueStr = input.value.trim();
+                const parentCell = input.parentNode;
+                
+                // Clear existing error message
+                let errorMsg = parentCell.querySelector('.error-message');
+                if (errorMsg) {
+                    errorMsg.remove();
+                }
+                input.classList.remove('has-error');
+                validationErrors.delete(input.name);
+
+                if (valueStr === '-' || valueStr === '') {
+                    // Valid empty/absent state
+                    updateFormSubmitState();
+                    return;
+                }
+
+                const valueNum = parseFloat(valueStr);
+                if (isNaN(valueNum) || valueNum < 0 || valueNum > maxVal) {
+                    input.classList.add('has-error');
+                    validationErrors.add(input.name);
+                    
+                    const label = document.createElement('span');
+                    label.className = 'error-message';
+                    label.textContent = isNaN(valueNum) ? 'Must be a number' : `Max is ${maxVal}`;
+                    parentCell.appendChild(label);
+                }
+                
+                updateFormSubmitState();
+            }
+
+            function updateFormSubmitState() {
+                const hasErrors = validationErrors.size > 0;
+                const submitButtons = document.querySelectorAll('button[type="submit"], .sticky-actions-bar button');
+                submitButtons.forEach(btn => {
+                    btn.disabled = hasErrors;
+                });
             }
 
             function recalcForSubject(subjKey) {
@@ -470,6 +623,18 @@
             function markTouched(subjKey) {
                 const touched = document.querySelector(`.entry-touched[data-subj-key="${subjKey}"]`);
                 if (touched) touched.value = '1';
+                
+                // Visual row modification cue
+                const row = document.querySelector(`.subject-row[data-subj-key="${subjKey}"]`);
+                if (row) {
+                    row.classList.add('row-modified');
+                }
+                
+                // Show sticky action bar
+                formHasChanges = true;
+                if (stickyBar) {
+                    stickyBar.classList.add('show');
+                }
             }
 
             function getEditableScoreRows() {
@@ -505,10 +670,13 @@
 
             document.querySelectorAll('.calc-input').forEach((input) => {
                 input.addEventListener('input', () => {
+                    validateInput(input);
                     recalcForSubject(input.dataset.subjKey);
                     markTouched(input.dataset.subjKey);
                 });
+                
                 input.addEventListener('keydown', (event) => {
+                    // Vertical Arrow Key navigation
                     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
                         const directionMap = {
                             ArrowLeft: 'left',
@@ -524,28 +692,28 @@
                         }
                         return;
                     }
-                    if (event.key !== 'Enter') return;
-                    event.preventDefault();
-                    const editableInputs = Array.from(
-                        document.querySelectorAll('.calc-input:not([disabled])')
-                    );
-                    const currentIndex = editableInputs.indexOf(input);
-                    if (currentIndex === -1) return;
-                    const nextInput = editableInputs[currentIndex + 1];
-                    if (nextInput) {
-                        nextInput.focus();
-                        nextInput.select();
-                        return;
-                    }
-                    const subjectCommentInputs = Array.from(
-                        document.querySelectorAll('.subject-comment-input:not([disabled])')
-                    );
-                    if (subjectCommentInputs.length) {
-                        const firstComment = subjectCommentInputs[0];
-                        firstComment.focus();
-                        firstComment.select();
+                    
+                    // Vertical Excel-style navigation on Enter/Shift+Enter keys
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        const direction = event.shiftKey ? 'up' : 'down';
+                        const nextCell = moveScoreFocus(input, direction);
+                        if (nextCell) {
+                            nextCell.focus();
+                            nextCell.select();
+                        } else if (!event.shiftKey) {
+                            // If no row below, go to first comments box
+                            const subjectCommentInputs = Array.from(
+                                document.querySelectorAll('.subject-comment-input:not([disabled])')
+                            );
+                            if (subjectCommentInputs.length) {
+                                subjectCommentInputs[0].focus();
+                                subjectCommentInputs[0].select();
+                            }
+                        }
                     }
                 });
+                
                 input.addEventListener('focus', () => {
                     if (typeof input.select === 'function') {
                         input.select();
@@ -553,37 +721,42 @@
                 });
             });
 
-            document.querySelectorAll('.subject-comment-input').forEach((input) => {
-                input.addEventListener('input', () => {
-                    const row = input.closest('.subject-row[data-subj-key]');
-                    if (!row) return;
-                    markTouched(row.dataset.subjKey);
-                });
-                input.addEventListener('keydown', (event) => {
-                    if (event.key !== 'Enter') return;
-                    event.preventDefault();
-                    const commentInputs = Array.from(
-                        document.querySelectorAll('.subject-comment-input:not([disabled])')
-                    );
-                    const currentIndex = commentInputs.indexOf(input);
-                    if (currentIndex === -1) return;
-                    const nextComment = commentInputs[currentIndex + 1];
-                    if (nextComment) {
-                        nextComment.focus();
-                        nextComment.select();
-                        return;
+            document.querySelectorAll('.subject-comment-input, textarea, select').forEach((input) => {
+                input.addEventListener('change', () => {
+                    formHasChanges = true;
+                    if (stickyBar) {
+                        stickyBar.classList.add('show');
                     }
-                    const submitButton = document.querySelector('button[type="submit"]:not([disabled])');
-                    if (submitButton) {
-                        submitButton.focus();
+                    const row = input.closest('.subject-row[data-subj-key]');
+                    if (row) {
+                        markTouched(row.dataset.subjKey);
                     }
                 });
             });
+
+            // Prevent navigating away with unsaved changes
+            window.addEventListener('beforeunload', function (e) {
+                if (formHasChanges) {
+                    const msg = 'You have unsaved changes. Are you sure you want to leave?';
+                    e.returnValue = msg;
+                    return msg;
+                }
+            });
+
+            window.submitMainForm = function() {
+                formHasChanges = false; // Prevent beforeunload popup
+                if (mainForm) mainForm.submit();
+            };
+
+            window.discardFormChanges = function() {
+                if (confirm('Discard all unsaved changes?')) {
+                    formHasChanges = false; // Prevent beforeunload popup
+                    window.location.reload();
+                }
+            };
 
             recalcAll();
         })();
     </script>
 </body>
 </html>
-
-

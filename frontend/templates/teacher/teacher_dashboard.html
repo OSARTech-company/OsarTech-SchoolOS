@@ -251,9 +251,15 @@
                             <h3>Class Teacher Assignment</h3>
                             <div class="assignment-count">{{ classes|length }}</div>
                             {% if classes %}
-                            <ul class="assignment-list">
+                            <ul class="assignment-list" style="list-style:none; padding-left:0;">
                                 {% for cls in classes %}
-                                <li>{{ cls }}</li>
+                                <li style="margin-bottom:6px;">
+                                    {% if school and school.score_entry_mode == 'dean_led' %}
+                                    <a href="{{ url_for('teacher_dashboard', tab='score', score_class=cls) }}" class="btn-badge btn-badge-primary"><i class="fas fa-folder-open"></i> {{ cls }}</a>
+                                    {% else %}
+                                    <a href="{{ url_for('teacher_class_list') }}" class="btn-badge btn-badge-secondary"><i class="fas fa-list"></i> {{ cls }}</a>
+                                    {% endif %}
+                                </li>
                                 {% endfor %}
                             </ul>
                             {% else %}
@@ -265,9 +271,20 @@
                             <h3>Subject Teacher Assignment</h3>
                             <div class="assignment-count">{{ subject_assignment_count or 0 }}</div>
                             {% if subject_assignment_summary %}
-                            <ul class="assignment-list">
+                            <ul class="assignment-list" style="list-style:none; padding-left:0;">
                                 {% for row in subject_assignment_summary %}
-                                <li><strong>{{ row.classname }}:</strong> {{ row.subjects|join(', ') }}</li>
+                                <li style="margin-bottom:12px;">
+                                    <strong>{{ row.classname }}:</strong>
+                                    <div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:4px;">
+                                        {% for subject in row.subjects %}
+                                            {% if school and school.score_entry_mode == 'subject_sheet' %}
+                                            <a href="{{ url_for('teacher_subject_score_sheet', class=row.classname, subject=subject) }}" class="btn-badge btn-badge-primary"><i class="fas fa-pen-to-square"></i> {{ subject }}</a>
+                                            {% else %}
+                                            <a href="{{ url_for('teacher_dashboard', tab='score', score_subject=subject, score_class=row.classname) }}" class="btn-badge btn-badge-primary"><i class="fas fa-pen-to-square"></i> {{ subject }}</a>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </li>
                                 {% endfor %}
                             </ul>
                             {% else %}
@@ -296,8 +313,18 @@
                             <tbody>
                                 {% for row in subject_assignment_summary %}
                                 <tr>
-                                    <td>{{ row.classname }}</td>
-                                    <td>{{ row.subjects|join(', ') }}</td>
+                                    <td style="font-weight: 750;">{{ row.classname }}</td>
+                                    <td>
+                                        <div style="display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-start;">
+                                            {% for subject in row.subjects %}
+                                                {% if school and school.score_entry_mode == 'subject_sheet' %}
+                                                <a href="{{ url_for('teacher_subject_score_sheet', class=row.classname, subject=subject) }}" class="btn-badge btn-badge-primary"><i class="fas fa-pen-to-square"></i> {{ subject }}</a>
+                                                {% else %}
+                                                <a href="{{ url_for('teacher_dashboard', tab='score', score_subject=subject, score_class=row.classname) }}" class="btn-badge btn-badge-primary"><i class="fas fa-pen-to-square"></i> {{ subject }}</a>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    </td>
                                 </tr>
                                 {% else %}
                                 <tr><td colspan="2" class="text-center">No subject assignment rows available for {{ current_term }}.</td></tr>
