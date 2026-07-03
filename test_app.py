@@ -826,6 +826,74 @@ def test_school_admin_dashboard_passes_assignments_to_publication_statuses(clien
     # monkeypatch render_template to capture kwargs
     
 
+def test_school_admin_login_skips_setup_wizard_when_setup_is_complete(client, app_module, monkeypatch):
+    m = app_module
+    marked = {}
+
+    monkeypatch.setattr(m, "RATE_LIMIT_ENABLED", False)
+    monkeypatch.setattr(m, "get_client_ip", lambda: "127.0.0.1")
+    monkeypatch.setattr(m, "is_login_blocked", lambda *args, **kwargs: (False, 0))
+    monkeypatch.setattr(m, "get_user", lambda username: {
+        "username": username,
+        "password_hash": "hashed",
+        "role": "school_admin",
+        "school_id": "SCH1",
+        "terms_accepted": 1,
+    })
+    monkeypatch.setattr(m, "check_password", lambda stored, password: True)
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"school_id": school_id, "academic_year": "2025-2026"})
+    monkeypatch.setattr(m, "build_school_access_state", lambda school: {"is_allowed": True})
+    monkeypatch.setattr(m, "has_user_seen_first_login_tutorial", lambda username: True)
+    monkeypatch.setattr(m, "is_password_expired", lambda user: False)
+    monkeypatch.setattr(m, "_resolve_login_display_name", lambda role, username, school_id='': "Admin")
+    monkeypatch.setattr(m, "clear_failed_login", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "record_login_audit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "update_login_timestamps", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "has_school_setup_wizard_completed", lambda school_id: False)
+    monkeypatch.setattr(m, "build_school_setup_wizard_summary", lambda school_id: {"is_complete": True})
+    monkeypatch.setattr(m, "mark_school_setup_wizard_completed", lambda school_id: marked.setdefault("school_id", school_id) or True)
+    monkeypatch.setattr(m, "has_school_setup_wizard_started", lambda school_id: False)
+
+    resp = client.post("/login", data={"username": "admin@school.com", "password": "secret"})
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/school-admin")
+    assert marked.get("school_id") == "SCH1"
+
+
+def test_school_admin_login_still_opens_setup_wizard_when_setup_incomplete(client, app_module, monkeypatch):
+    m = app_module
+    marked = []
+
+    monkeypatch.setattr(m, "RATE_LIMIT_ENABLED", False)
+    monkeypatch.setattr(m, "get_client_ip", lambda: "127.0.0.1")
+    monkeypatch.setattr(m, "is_login_blocked", lambda *args, **kwargs: (False, 0))
+    monkeypatch.setattr(m, "get_user", lambda username: {
+        "username": username,
+        "password_hash": "hashed",
+        "role": "school_admin",
+        "school_id": "SCH1",
+        "terms_accepted": 1,
+    })
+    monkeypatch.setattr(m, "check_password", lambda stored, password: True)
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"school_id": school_id, "academic_year": "2025-2026"})
+    monkeypatch.setattr(m, "build_school_access_state", lambda school: {"is_allowed": True})
+    monkeypatch.setattr(m, "has_user_seen_first_login_tutorial", lambda username: True)
+    monkeypatch.setattr(m, "is_password_expired", lambda user: False)
+    monkeypatch.setattr(m, "_resolve_login_display_name", lambda role, username, school_id='': "Admin")
+    monkeypatch.setattr(m, "clear_failed_login", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "record_login_audit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "update_login_timestamps", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "has_school_setup_wizard_completed", lambda school_id: False)
+    monkeypatch.setattr(m, "build_school_setup_wizard_summary", lambda school_id: {"is_complete": False})
+    monkeypatch.setattr(m, "mark_school_setup_wizard_completed", lambda school_id: marked.append(school_id) or True)
+    monkeypatch.setattr(m, "has_school_setup_wizard_started", lambda school_id: False)
+
+    resp = client.post("/login", data={"username": "admin@school.com", "password": "secret"})
+    assert resp.status_code == 302
+    assert "/school-admin/setup-wizard" in resp.headers["Location"]
+    assert marked == []
+
+
 def test_teacher_enter_scores_does_not_carry_previous_term_scores(client, app_module, monkeypatch):
     m = app_module
     saved_rows = []

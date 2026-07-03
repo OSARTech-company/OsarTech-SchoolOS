@@ -418,7 +418,7 @@ def inject_school_setup_wizard_context():
     if not school_id:
         return {'school_setup_wizard': {'show_banner': False}}
     try:
-        completed = has_school_setup_wizard_completed(school_id)
+        completed = school_setup_wizard_is_completed(school_id, auto_mark=True)
         setup_flow = build_school_setup_wizard_flow(school_id)
         steps = setup_flow.get('steps') or []
         current_step = next((step for step in steps if not step.get('done')), steps[0] if steps else {})
@@ -15055,6 +15055,30 @@ def mark_school_setup_wizard_completed(school_id):
     return _app_meta_set_value(f'school_setup_wizard_completed:{sid}', '1')
 
 
+def school_setup_wizard_is_completed(school_id, auto_mark=False):
+    """
+    Resolve whether the school setup wizard is complete.
+
+    If the persisted completion flag is missing but the live setup summary is
+    already complete, optionally persist the completion flag so older schools
+    stop getting forced back into onboarding.
+    """
+    sid = _normalize_school_id_text(school_id)
+    if not sid:
+        return False
+    if has_school_setup_wizard_completed(sid):
+        return True
+    summary = build_school_setup_wizard_summary(sid)
+    if summary.get('is_complete'):
+        if auto_mark:
+            try:
+                mark_school_setup_wizard_completed(sid)
+            except Exception as exc:
+                logging.warning("Failed to persist school setup wizard completion for school_id=%s: %s", sid, exc)
+        return True
+    return False
+
+
 def has_school_setup_wizard_started(school_id):
     sid = _normalize_school_id_text(school_id)
     if not sid:
@@ -20890,7 +20914,7 @@ def _complete_authenticated_login(user, user_school_id):
         return redirect(url_for('super_admin_dashboard'))
     if role == 'school_admin':
         try:
-            if not has_school_setup_wizard_completed(user_school_id):
+            if not school_setup_wizard_is_completed(user_school_id, auto_mark=True):
                 session['show_first_login_tutorial'] = False
                 session.pop('show_first_login_tutorial', None)
                 session.pop('first_login_tutorial_role', None)
@@ -34221,6 +34245,113 @@ def school_admin_teachers():
         archived_bursar_rows=_build_bursar_rows(archived_bursars),
     )
 
+
+def _build_teacher_profile_context(school_id, teacher_id):
+    """Build a read-only teacher profile context for the school admin UI."""
+    school = get_school(school_id) or {}
+    current_term = get_current_term(school)
+    current_year = (school or {}).get('academic_year', '')
+    teacher = get_teacher(school_id, teacher_id) or {}
+    user = get_user(teacher_id) or {}
+    if not teacher:
+        return {}
+
+    teachers_all = get_teachers(school_id, include_archived=True) or {}
+    teacher_record = teachers_all.get(teacher_id) or teachers_all.get((teacher_id or '').strip().lower()) or {}
+    class_assignments = get_class_assignments(school_id) or []
+    subject_assignments = get_teacher_subject_assignments(school_id, term=current_term, academic_year=current_year) or []
+
+    owned_classes = []
+    class_notes = []
+    for row in class_assignments:
+        tid = (row.get('teacher_id') or '').strip()
+        cls = (row.get('classname') or '').strip()
+        if not tid or not cls:
+            continue
+        if tid.lower() != (teacher_id or '').strip().lower():
+            continue
+        if (row.get('term') or '').strip() != current_term:
+            continue
+        if (row.get('academic_year') or '').strip() != (current_year or ''):
+            continue
+        owned_classes.append(cls)
+        note = [cls]
+        if row.get('term'):
+            note.append(row.get('term'))
+        if row.get('academic_year'):
+            note.append(row.get('academic_year'))
+        class_notes.append(' | '.join(note))
+
+    subject_notes = []
+    subject_names = []
+    for row in subject_assignments:
+        tid = (row.get('teacher_id') or '').strip()
+        cls = (row.get('classname') or '').strip()
+        subj = normalize_subject_name(row.get('subject', ''))
+        if not tid or not cls or not subj:
+            continue
+        if tid.lower() != (teacher_id or '').strip().lower():
+            continue
+        subject_names.append(subj)
+        subject_notes.append(f'{cls}: {subj}')
+
+    profile_image = (teacher.get('profile_image') or teacher_record.get('profile_image') or '').strip()
+    signature_image = (teacher.get('signature_image') or teacher_record.get('signature_image') or '').strip()
+    full_name = ' '.join(part for part in [teacher.get('firstname', ''), teacher.get('lastname', '')] if part).strip()
+    full_name = full_name or teacher_id
+    account_role = (user.get('role') or 'teacher').strip().lower()
+    account_school_id = (user.get('school_id') or school_id or '').strip()
+    account_status = 'Archived' if int(teacher_record.get('is_archived', 0) or 0) else 'Active'
+
+    return {
+        'school': school,
+        'teacher_id': teacher_id,
+        'teacher': teacher,
+        'full_name': full_name,
+        'profile_image': profile_image,
+        'signature_image': signature_image,
+        'current_term': current_term,
+        'current_year': current_year,
+        'owned_classes': sorted(set(owned_classes), key=lambda value: str(value).lower()),
+        'class_notes': class_notes,
+        'subject_names': sorted(set(subject_names), key=lambda value: str(value).lower()),
+        'subject_notes': sorted(set(subject_notes), key=lambda value: str(value).lower()),
+        'account_role': account_role,
+        'account_school_id': account_school_id,
+        'account_status': account_status,
+        'terms_accepted': int(user.get('terms_accepted') or 0),
+        'password_changed_at': format_timestamp(user.get('password_changed_at')),
+        'last_login_at': format_timestamp(get_last_login_at(teacher_id)),
+        'is_archived': bool(int(teacher_record.get('is_archived', 0) or 0)),
+        'archived_at': format_timestamp(teacher_record.get('archived_at')),
+    }
+
+
+@app.route('/school-admin/teacher/<path:teacher_id>')
+def school_admin_teacher_profile(teacher_id):
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+
+    profile = _build_teacher_profile_context(school_id, teacher_id)
+    if not profile:
+        flash('Teacher record not found.', 'error')
+        return redirect(url_for('school_admin_teachers'))
+
+    return render_template(
+        'school/school_admin_teacher_profile.html',
+        active_page='teachers',
+        school=profile['school'],
+        profile=profile,
+        current_term=profile['current_term'],
+        current_year=profile['current_year'],
+    )
+
+
 @app.route('/school-admin/teacher-assignments')
 def school_admin_teacher_assignments():
     if session.get('role') != 'school_admin':
@@ -46629,10 +46760,35 @@ def school_admin_edit_teacher(teacher_id):
             flash(f'Could not update teacher: {exc}', 'error')
         return redirect(url_for('school_admin_teachers'))
 
+    school = get_school(school_id) or {}
+    current_term = get_current_term(school)
+    current_year = (school or {}).get('academic_year', '')
+
+    class_assignments = get_class_assignments(school_id) or []
+    subject_assignments = get_teacher_subject_assignments(school_id, term=current_term) or []
+
+    assigned_classes = []
+    for row in class_assignments:
+        if (row.get('teacher_id') or '').strip().lower() == teacher_id.lower():
+            if (row.get('term') or '').strip() == current_term and (row.get('academic_year') or '').strip() == (current_year or ''):
+                assigned_classes.append((row.get('classname') or '').strip())
+
+    assigned_subjects = []
+    for row in subject_assignments:
+        if (row.get('teacher_id') or '').strip().lower() == teacher_id.lower():
+            cls = (row.get('classname') or '').strip()
+            subj = normalize_subject_name(row.get('subject', ''))
+            assigned_subjects.append(f"{cls}: {subj}")
+
     return render_template(
         'school/school_admin_edit_teacher.html',
+        school=school,
+        current_term=current_term,
+        current_year=current_year,
         teacher=teacher,
         teacher_id=teacher_id,
+        assigned_classes=sorted(assigned_classes, key=lambda x: str(x).lower()),
+        assigned_subjects=sorted(assigned_subjects, key=lambda x: str(x).lower()),
     )
 
 @app.route('/school-admin/teacher/archive', methods=['POST'])

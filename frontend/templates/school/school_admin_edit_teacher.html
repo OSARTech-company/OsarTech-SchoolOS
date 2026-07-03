@@ -3,88 +3,268 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Edit Teacher</title>
+    <title>Teacher Profile - School Admin</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
     <style>
-      .page-shell {
-        width: min(860px, 100%);
+      body { min-height: 100vh; background: #f5f7fa; }
+      .container { padding: 24px 14px; }
+      .profile-card {
+        max-width: 600px;
         margin: 0 auto;
-        padding: 24px;
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 30px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+        border: 1px solid #d8e0ea;
       }
-      .header-row {
+      .profile-header {
+        text-align: center;
+        margin-bottom: 24px;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 20px;
+      }
+      .profile-header h1 {
+        margin: 0 0 6px;
+        font-size: 1.6rem;
+        color: #0f172a;
+      }
+      .profile-header .meta-line {
+        color: #64748b;
+        font-size: 0.95rem;
+        margin: 0;
+      }
+      .profile-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--brand, #0f4c81) 0%, var(--brand-2, #1f7a8c) 100%);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        font-weight: bold;
+        margin: 0 auto 16px;
+        box-shadow: 0 4px 12px rgba(15, 76, 129, 0.2);
+      }
+      .info-group {
+        margin-bottom: 24px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 18px;
+      }
+      .info-group h3 {
+        margin: 0 0 14px;
+        font-size: 1rem;
+        color: #1e293b;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .info-row {
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: flex-start;
         gap: 12px;
+        margin-bottom: 12px;
+        font-size: 0.95rem;
+      }
+      .info-row:last-child {
+        margin-bottom: 0;
+      }
+      .info-label {
+        color: #64748b;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .info-val {
+        color: #0f172a;
+        font-weight: 600;
+        text-align: right;
+      }
+      .chip-list {
+        display: flex;
         flex-wrap: wrap;
+        gap: 6px;
+        justify-content: flex-end;
       }
-      .header-row h1 {
-        margin: 0;
-        font-size: 1.8rem;
+      .chip-item {
+        border: 1px solid #c9d8ea;
+        background: #f0f6ff;
+        color: #1e40af;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 0.78rem;
       }
-      .teacher-edit-grid {
+      .form-section-title {
+        font-size: 1.15rem;
+        color: #0f172a;
+        margin: 28px 0 16px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid var(--brand, #0f4c81);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .form-grid {
         display: grid;
-        gap: 14px;
+        gap: 16px;
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
-      .teacher-edit-grid .form-group {
+      .form-grid .form-group {
         margin: 0;
       }
-      .teacher-edit-grid .full-span {
+      .form-grid .full-span {
         grid-column: 1 / -1;
       }
-      .password-note {
-        margin: 8px 0 0;
-        color: #5b6475;
+      .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        color: #475569;
+        font-weight: 500;
         font-size: 0.9rem;
+      }
+      .form-group input,
+      .form-group select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        box-sizing: border-box;
+      }
+      .password-note {
+        margin: 6px 0 0;
+        color: #64748b;
+        font-size: 0.85rem;
       }
       .action-row {
         display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin-top: 14px;
+        gap: 12px;
+        margin-top: 24px;
       }
-      @media (max-width: 720px) {
-        .page-shell {
-          padding: 16px;
+      .action-row .btn {
+        flex: 1;
+        padding: 12px;
+        font-size: 1rem;
+        font-weight: 600;
+        text-align: center;
+      }
+      .danger-zone {
+        margin-top: 32px;
+        border: 1px dashed #fca5a5;
+        background: #fef2f2;
+        padding: 18px;
+        border-radius: 10px;
+      }
+      .danger-zone h4 {
+        margin: 0 0 6px;
+        color: #991b1b;
+        font-size: 1rem;
+      }
+      .danger-zone p {
+        margin: 0 0 12px;
+        color: #7f1d1d;
+        font-size: 0.85rem;
+      }
+      @media (max-width: 640px) {
+        .profile-card {
+          padding: 20px;
         }
-        .teacher-edit-grid {
+        .form-grid {
           grid-template-columns: 1fr;
+        }
+        .action-row {
+          flex-direction: column;
         }
       }
     </style>
   </head>
-  <body>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
     {% include "shared/_loading_overlay.html" %}
     <div class="app-shell topbar-layout">
       {% include 'school/_school_admin_sidebar.html' %}
       <div class="main-content">
-        <div class="page-shell">
-          <div class="header-row">
-            <div>
-              <h1><i class="fas fa-user-pen"></i> Edit Teacher</h1>
-              <p class="meta-line">Current login: {{ teacher_id }}</p>
-            </div>
-            <a href="{{ url_for('school_admin_teachers') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Teachers</a>
-          </div>
-
+        <div class="container">
+          
           {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
               {% for category, message in messages %}
-                <div class="flash {{ category }}">{{ message }}</div>
+                <div class="flash {{ category }}" style="max-width:600px; margin: 0 auto 20px;">{{ message }}</div>
               {% endfor %}
             {% endif %}
           {% endwith %}
 
-          <div class="card">
-            <h2><i class="fas fa-id-card"></i> Teacher Details</h2>
-            <p class="note">Update the teacher login email like a Gmail address, and reset the password when you save.</p>
+          <div class="profile-card">
+            {% set initials = (teacher.firstname or 'T')[0]|upper + (teacher.lastname or '')[0]|upper %}
+            <div class="profile-avatar">{{ initials }}</div>
+            <div class="profile-header">
+              <h1>{{ teacher.firstname or '' }} {{ teacher.lastname or '' }}</h1>
+              <p class="meta-line"><i class="fas fa-envelope"></i> {{ teacher_id }}</p>
+            </div>
+
+            <!-- View Detailed Stats -->
+            <div class="info-group">
+              <h3><i class="fas fa-info-circle"></i> Teacher Information</h3>
+              <div class="info-row">
+                <span class="info-label">Gender:</span>
+                <span class="info-val">{{ (teacher.gender or 'Not set')|title }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Phone:</span>
+                <span class="info-val">{{ teacher.phone or 'Not set' }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Current Class Assigned:</span>
+                <div class="info-val">
+                  {% if assigned_classes %}
+                    <div class="chip-list">
+                      {% for cls in assigned_classes %}
+                        <span class="chip-item">{{ cls }}</span>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <span class="meta-muted">No current class assignment</span>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Current Subject Assigned:</span>
+                <div class="info-val">
+                  {% if assigned_subjects %}
+                    <div class="chip-list">
+                      {% for subj in assigned_subjects %}
+                        <span class="chip-item">{{ subj }}</span>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <span class="meta-muted">No current subject assignment</span>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Signature Uploaded:</span>
+                <span class="info-val">
+                  {% if teacher.signature_image %}
+                    <span class="badge badge-success"><i class="fas fa-check"></i> Yes</span>
+                  {% else %}
+                    <span class="meta-muted">No</span>
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+
+            <!-- Edit Fields & Password Reset Form -->
+            <h2 class="form-section-title"><i class="fas fa-user-pen"></i> Update Account</h2>
             <form method="post" action="{{ url_for('school_admin_edit_teacher', teacher_id=teacher_id) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-              <div class="teacher-edit-grid">
+              <div class="form-grid">
                 <div class="form-group full-span">
                   <label for="username">Login Email / Username</label>
                   <input type="email" id="username" name="username" value="{{ teacher_id }}" placeholder="teacher@school.com" required />
@@ -113,24 +293,41 @@
                 <div class="form-group full-span">
                   <label for="new_password">New Password</label>
                   <input type="password" id="new_password" name="new_password" autocomplete="new-password" data-password-toggle />
-                  <p class="password-note">Leave this blank and we will generate a fresh temporary password when you save.</p>
+                  <p class="password-note">Leave blank to generate a fresh temporary password.</p>
                 </div>
                 <div class="form-group full-span">
                   <label class="checkbox-row">
                     <input type="checkbox" name="send_credentials" value="1" checked />
-                    Email the updated login details to the teacher
+                    Email new login credentials to the teacher
                   </label>
                 </div>
               </div>
               <div class="action-row">
-                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Teacher</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
                 <a href="{{ url_for('school_admin_teachers') }}" class="btn btn-secondary">Cancel</a>
               </div>
             </form>
+
+            <!-- Danger Zone -->
+            <div class="danger-zone">
+              <h4><i class="fas fa-triangle-exclamation"></i> Danger Zone</h4>
+              <p>Archiving will suspend access and clear current term assignments.</p>
+              <form action="{{ url_for('school_admin_archive_teacher') }}" method="POST" onsubmit="return confirm('Archive this teacher and clear current assignments?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <input type="hidden" name="teacher_id" value="{{ teacher_id }}" />
+                <input type="hidden" name="return_to" value="school_admin_teachers" />
+                <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-box-archive"></i> Archive Teacher</button>
+              </form>
+            </div>
+
           </div>
         </div>
       </div>
     </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
     <script src="{{ url_for('static', filename='js/password-toggle.js', v='20260703a') }}"></script>
+    <script>
+      if (window.innerWidth > 600) document.body.classList.add('rail-expanded');
+    </script>
   </body>
 </html>

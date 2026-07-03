@@ -249,10 +249,6 @@
                   <tr>
                     <th>Teacher</th>
                     <th>Username</th>
-                    <th>Gender</th>
-                    <th>Phone</th>
-                    <th>Current Class Assigned</th>
-                    <th>Current Subject Assigned</th>
                     <th>Action</th>
                   </tr>
                 </thead>
@@ -261,38 +257,8 @@
                   <tr>
                     <td><strong>{{ row.name }}</strong></td>
                     <td class="meta-muted">{{ row.teacher_id }}</td>
-                    <td>{{ (row.gender or 'Not set')|title }}</td>
-                    <td>{{ row.phone or 'Not set' }}</td>
                     <td>
-                      {% if row.classes %}
-                        <div class="chip-list">
-                          {% for cls in row.classes %}
-                          <span class="chip-item">{{ cls }}</span>
-                          {% endfor %}
-                        </div>
-                      {% else %}
-                        <span class="meta-muted">No current class assignment</span>
-                      {% endif %}
-                    </td>
-                    <td>
-                      {% if row.subjects %}
-                        <div class="chip-list">
-                          {% for subj in row.subjects %}
-                          <span class="chip-item">{{ subj }}</span>
-                          {% endfor %}
-                        </div>
-                      {% else %}
-                        <span class="meta-muted">No current subject assignment</span>
-                      {% endif %}
-                    </td>
-                    <td>
-                      <a href="{{ url_for('school_admin_edit_teacher', teacher_id=row.teacher_id) }}" class="btn btn-primary">Edit</a>
-                      <form action="{{ url_for('school_admin_archive_teacher') }}" method="POST" onsubmit="return confirm('Archive this teacher and clear current assignments?');">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                        <input type="hidden" name="teacher_id" value="{{ row.teacher_id }}" />
-                        <input type="hidden" name="return_to" value="school_admin_teachers" />
-                        <button type="submit" class="btn btn-danger">Archive</button>
-                      </form>
+                      <a href="{{ url_for('school_admin_edit_teacher', teacher_id=row.teacher_id) }}" class="btn btn-primary"><i class="fas fa-eye"></i> View</a>
                     </td>
                   </tr>
                   {% endfor %}
