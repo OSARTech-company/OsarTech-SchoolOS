@@ -48,10 +48,12 @@
                     <i class="fas fa-user-check"></i>
                     <span>Attendance</span>
                 </a>
+                {% if not school or (school.school_type != 'primary' and school.school_type != 'nursery') %}
                 <a href="{{ url_for('teacher_period_attendance') }}" class="side-link{% if active_page == 'period_attendance' %} active{% endif %}">
                     <i class="fas fa-clock"></i>
                     <span>Period Attendance</span>
                 </a>
+                {% endif %}
                 {% endif %}
             </div>
         </details>
@@ -104,10 +106,12 @@
                     <span>CBT</span>
                 </a>
                 {% endif %}
+                {% if not school or (school.school_type != 'primary' and school.school_type != 'nursery') %}
                 <a href="{{ url_for('teacher_subject_rank_history') }}" class="side-link{% if active_page == 'subject_ranks' %} active{% endif %}">
                     <i class="fas fa-list-ol"></i>
                     <span>Subject Ranks</span>
                 </a>
+                {% endif %}
                 <a href="{{ url_for('teacher_class_results_preview', classname=(classes[0] if classes is defined and classes else None), term=current_term, academic_year=current_year) if classes is defined and classes else url_for('teacher_dashboard', tab='overview') }}" class="side-link{% if active_page == 'result_preview' %} active{% endif %}">
                     <i class="fas fa-eye"></i>
                     <span>Result Preview</span>
@@ -120,7 +124,7 @@
                     <i class="fas fa-comments"></i>
                     <span>Subject Comments</span>
                 </a>
-                {% if not school or school.score_entry_mode != 'dean_led' %}
+                {% if not school or (school.score_entry_mode != 'dean_led' and school.school_type != 'primary' and school.school_type != 'nursery') %}
                 <a href="{{ url_for('teacher_subject_handover') }}" class="side-link{% if active_page == 'subject_handover' %} active{% endif %}">
                     <i class="fas fa-clipboard-check"></i>
                     <span>Subject Handover</span>

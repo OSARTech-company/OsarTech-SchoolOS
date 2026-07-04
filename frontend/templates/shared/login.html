@@ -451,10 +451,110 @@
                 width: min(100%, 130px);
             }
         }
+
+        /* --- Floating Theme Toggle for Auth --- */
+        .theme-toggle-floating {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--auth-card);
+            border: 1px solid var(--auth-line);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--auth-brand);
+            font-size: 1.25rem;
+        }
+
+        .theme-toggle-floating:hover {
+            transform: scale(1.1) rotate(15deg);
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.25);
+        }
+
+        /* --- Dark Mode Variables & Overrides for Auth --- */
+        :root[data-theme="dark"] {
+            --auth-bg: #0b0f19;
+            --auth-card: #161e2e;
+            --auth-line: #243249;
+            --auth-text: #f1f5f9;
+            --auth-muted: #94a3b8;
+            --auth-brand: #38bdf8;
+            --auth-brand-2: #06b6d4;
+            --auth-danger: #f87171;
+            --auth-warn-line: #451a03;
+            --auth-warn-bg: #1c1917;
+            --auth-warn-text: #f59e0b;
+        }
+
+        [data-theme="dark"] .input {
+            background: var(--auth-bg) !important;
+            border-color: var(--auth-line) !important;
+            color: var(--auth-text) !important;
+        }
+
+        [data-theme="dark"] .btn-alt {
+            background: var(--auth-bg) !important;
+            border-color: var(--auth-line) !important;
+            color: var(--auth-brand) !important;
+        }
+
+        [data-theme="dark"] .auth-card {
+            background: var(--auth-card) !important;
+        }
+
+        [data-theme="dark"] .auth-info {
+            background: linear-gradient(155deg, #090d16 0%, #111827 100%) !important;
+            border-right: 1px solid var(--auth-line) !important;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --auth-bg: #0b0f19;
+                --auth-card: #161e2e;
+                --auth-line: #243249;
+                --auth-text: #f1f5f9;
+                --auth-muted: #94a3b8;
+                --auth-brand: #38bdf8;
+                --auth-brand-2: #06b6d4;
+                --auth-danger: #f87171;
+                --auth-warn-line: #451a03;
+                --auth-warn-bg: #1c1917;
+                --auth-warn-text: #f59e0b;
+            }
+
+            :root:not([data-theme="light"]) .input {
+                background: var(--auth-bg) !important;
+                border-color: var(--auth-line) !important;
+                color: var(--auth-text) !important;
+            }
+
+            :root:not([data-theme="light"]) .btn-alt {
+                background: var(--auth-bg) !important;
+                border-color: var(--auth-line) !important;
+                color: var(--auth-brand) !important;
+            }
+
+            :root:not([data-theme="light"]) .auth-card {
+                background: var(--auth-card) !important;
+            }
+
+            :root:not([data-theme="light"]) .auth-info {
+                background: linear-gradient(155deg, #090d16 0%, #111827 100%) !important;
+                border-right: 1px solid var(--auth-line) !important;
+            }
+        }
     </style>
 </head>
 <body>
     {% include "shared/_loading_overlay.html" %}
+    <button type="button" class="theme-toggle-floating" id="auth-theme-toggle" style="cursor: pointer;" aria-label="Toggle theme"><i class="fas fa-moon"></i></button>
     <div class="container">
         <div class="auth-shell">
             <aside class="auth-info">
@@ -562,6 +662,39 @@
                 });
             }
         });
+    </script>
+    <script>
+        (function() {
+            const toggleBtn = document.getElementById('auth-theme-toggle');
+            if (!toggleBtn) return;
+            
+            const updateToggleUI = (theme) => {
+                if (theme === 'dark') {
+                    toggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
+                } else {
+                    toggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
+                }
+            };
+            
+            let activeTheme = localStorage.getItem('theme');
+            if (!activeTheme) {
+                activeTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            updateToggleUI(activeTheme);
+            
+            toggleBtn.addEventListener('click', () => {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                if (newTheme === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }
+                updateToggleUI(newTheme);
+            });
+        })();
     </script>
 </body>
 </html>

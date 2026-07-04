@@ -81,6 +81,7 @@
                     <i class="fas fa-chart-line"></i>
                     <span>Compare Terms</span>
                 </a>
+                {% if child.school_type != 'primary' and child.school_type != 'nursery' %}
                 <a href="{{ url_for('parent_submit_dispute', student_key=child.key) }}" class="side-link{% if request.endpoint == 'parent_submit_dispute' and child_is_active %} active{% endif %}">
                     <i class="fas fa-balance-scale"></i>
                     <span>Report Dispute</span>
@@ -93,6 +94,7 @@
                     <i class="fas fa-table"></i>
                     <span>Timetable</span>
                 </a>
+                {% endif %}
                 <a href="{{ url_for('parent_subject_comments', student_key=child.key) }}" class="side-link{% if request.endpoint == 'parent_subject_comments' and child_is_active %} active{% endif %}">
                     <i class="fas fa-comments"></i>
                     <span>Subject Comments</span>

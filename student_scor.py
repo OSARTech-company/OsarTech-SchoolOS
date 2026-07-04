@@ -299,6 +299,7 @@ def inject_teacher_nav_flags():
             'teacher_selected_score_subject': '',
             'teacher_selected_score_class': '',
             'teacher_unread_notifications': 0,
+            'school': {},
         }
     school_id = (session.get('school_id') or '').strip()
     teacher_id = (session.get('user_id') or '').strip()
@@ -311,6 +312,7 @@ def inject_teacher_nav_flags():
             'teacher_selected_score_subject': '',
             'teacher_selected_score_class': '',
             'teacher_unread_notifications': 0,
+            'school': {},
         }
     school = get_school(school_id) or {}
     current_term = get_current_term(school)
@@ -387,6 +389,7 @@ def inject_teacher_nav_flags():
         'teacher_selected_score_subject': teacher_selected_score_subject,
         'teacher_selected_score_class': teacher_selected_score_class,
         'teacher_unread_notifications': unread_notifications,
+        'school': school,
     }
 
 @app.context_processor
@@ -510,6 +513,9 @@ def inject_school_feature_flags():
         return {'school_cbt_enabled': True}
     try:
         school = get_school(school_id) or {}
+        school_type = normalize_school_type(school.get('school_type', 'mixed'))
+        if school_type in {'primary', 'nursery'}:
+            return {'school_cbt_enabled': False}
         return {'school_cbt_enabled': bool(normalize_school_cbt_enabled(school.get('cbt_enabled', 1), default=1))}
     except Exception:
         return {'school_cbt_enabled': True}
@@ -4928,8 +4934,12 @@ def canonicalize_classname(value):
     if not cleaned:
         return ''
     # Normalize common aliases for primary and secondary classes.
-    if cleaned.startswith('KINDERGARTEN'):
+    if cleaned.startswith('KINDERGARTING'):
+        cleaned = 'NURSERY' + cleaned[len('KINDERGARTING'):]
+    elif cleaned.startswith('KINDERGARTEN'):
         cleaned = 'NURSERY' + cleaned[len('KINDERGARTEN'):]
+    elif cleaned.startswith('KINDER'):
+        cleaned = 'NURSERY' + cleaned[len('KINDER'):]
     elif cleaned.startswith('NURSERY'):
         cleaned = 'NURSERY' + cleaned[len('NURSERY'):]
     elif cleaned.startswith('NUR'):
@@ -14387,6 +14397,10 @@ def normalize_school_type(value, default='mixed'):
         'combined school': 'mixed',
         'coed': 'mixed',
         'co-educational': 'mixed',
+        'kindergarten': 'nursery',
+        'kindergarten school': 'nursery',
+        'preschool': 'nursery',
+        'pre-primary': 'nursery',
     }
     return aliases.get(raw, default if default in SCHOOL_TYPES else 'mixed')
 
@@ -30872,7 +30886,8 @@ def enforce_school_cbt_access_policy():
         logging.warning("Skipping CBT access policy check due lookup error: %s", exc)
         return None
 
-    if normalize_school_cbt_enabled(school.get('cbt_enabled', 1), default=1):
+    school_type = normalize_school_type(school.get('school_type', 'mixed'))
+    if school_type not in {'primary', 'nursery'} and normalize_school_cbt_enabled(school.get('cbt_enabled', 1), default=1):
         return None
 
     message = _school_cbt_disabled_message()
@@ -30891,6 +30906,72 @@ def enforce_school_cbt_access_policy():
         return redirect(url_for('cbt_login'))
     flash(message, 'error')
     return redirect(url_for('student_dashboard'))
+
+
+@app.before_request
+def enforce_primary_nursery_restrictions():
+    endpoint = (request.endpoint or '').strip()
+    secondary_only_endpoints = {
+        'teacher_period_attendance',
+        'parent_period_attendance',
+        'teacher_subject_rank_history',
+        'teacher_subject_rank_export',
+        'teacher_subject_handover',
+        'school_admin_timetable_coverage',
+        'parent_submit_dispute',
+        'parent_disputes',
+        'parent_dispute_thread',
+        'school_admin_disputes',
+        'school_admin_update_dispute',
+        'school_admin_dispute_thread',
+    }
+    if endpoint not in secondary_only_endpoints:
+        return None
+
+    role = (session.get('role') or '').strip().lower()
+    school_id = (session.get('school_id') or '').strip()
+
+    if role == 'parent':
+        student_key = (request.values.get('student_key', '') or '').strip()
+        if not student_key:
+            dispute_id = request.view_args.get('dispute_id') if (request.view_args and 'dispute_id' in request.view_args) else None
+            if dispute_id:
+                try:
+                    with db_connection() as conn:
+                        c = conn.cursor()
+                        db_execute(c, "SELECT school_id FROM result_disputes WHERE id = ?", (dispute_id,))
+                        row = c.fetchone()
+                        if row:
+                            school_id = row[0]
+                except Exception:
+                    pass
+        else:
+            if '::' in student_key:
+                school_id = student_key.split('::', 1)[0]
+
+    if not school_id:
+        return None
+
+    try:
+        school = get_school(school_id) or {}
+    except Exception:
+        return None
+
+    school_type = normalize_school_type(school.get('school_type', 'mixed'))
+    if school_type not in {'primary', 'nursery'}:
+        return None
+
+    message = "This feature is only available for secondary schools."
+    flash(message, 'error')
+    if role == 'teacher':
+        return redirect(url_for('teacher_dashboard'))
+    elif role == 'school_admin':
+        return redirect(url_for('school_admin_dashboard'))
+    elif role == 'parent':
+        return redirect(url_for('parent_dashboard'))
+    elif role == 'student':
+        return redirect(url_for('student_dashboard'))
+    return redirect(url_for('home'))
 
 
 @app.before_request
@@ -49435,6 +49516,7 @@ def _build_parent_sidebar_context(limit_per_school=120):
             'key': key,
             'school_id': school_id,
             'school_name': (school or {}).get('school_name', school_id),
+            'school_type': normalize_school_type((school or {}).get('school_type', 'mixed')),
             'student_id': student_id,
             'firstname': student.get('firstname', ''),
             'classname': student.get('classname', ''),
@@ -50452,6 +50534,7 @@ def parent_period_attendance():
             'key': key,
             'school_id': school_id,
             'school_name': (school or {}).get('school_name', school_id),
+            'school_type': normalize_school_type((school or {}).get('school_type', 'mixed')),
             'student_id': student_id,
             'firstname': student.get('firstname', ''),
             'classname': student.get('classname', ''),

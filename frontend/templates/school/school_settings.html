@@ -95,15 +95,21 @@
                     <input type="text" id="school_name" name="school_name" value="{{ settings_form.school_name if settings_form else '' }}" required>
                 </div>
                 <div class="form-group">
-                    <label for="school_type">School Type:</label>
-                    <select id="school_type" name="school_type">
-                        <option value="mixed" {% if settings_form and settings_form.school_type == 'mixed' %}selected{% endif %}>Mixed School</option>
-                        <option value="primary" {% if settings_form and settings_form.school_type == 'primary' %}selected{% endif %}>Primary School</option>
-                        <option value="secondary" {% if settings_form and settings_form.school_type == 'secondary' %}selected{% endif %}>Secondary School</option>
-                        <option value="nursery" {% if settings_form and settings_form.school_type == 'nursery' %}selected{% endif %}>Nursery School</option>
-                    </select>
-                    <small style="color:#5a6c7d; display:block; margin-top:6px;">
-                        Primary schools use class-teacher flow, while secondary schools rely more on subject-teacher assignments.
+                    <label>School Type:</label>
+                    {% set school_type_val = school.school_type if school else 'mixed' %}
+                    <div style="padding: 10px 12px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; font-weight: 500; color: #374151; display: inline-block;">
+                        {% if school_type_val == 'nursery' %}
+                            Nursery School
+                        {% elif school_type_val == 'primary' %}
+                            Primary School
+                        {% elif school_type_val == 'secondary' %}
+                            Secondary School
+                        {% else %}
+                            Mixed School
+                        {% endif %}
+                    </div>
+                    <small style="color: #6b7280; display: block; margin-top: 8px;">
+                        <i class="fas fa-lock" style="color: #9ca3af; margin-right: 4px;"></i> School type is locked to prevent grading and feature conflicts. To request a change, please contact support or your system administrator.
                     </small>
                 </div>
                 <div class="form-group">

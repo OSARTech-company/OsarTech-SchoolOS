@@ -2269,3 +2269,62 @@ def test_teacher_score_entry_select_subject_redirects_for_single_subject(client,
     assert "tab=score" in resp.headers["Location"]
     assert "score_class=JSS1" in resp.headers["Location"]
     assert "score_subject=Mathematics" in resp.headers["Location"]
+
+
+def test_school_type_restrictions(client, app_module, monkeypatch):
+    m = app_module
+    
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "teacher1"
+
+    school = {"school_id": "SCH1", "school_type": "primary", "cbt_enabled": 1, "academic_year": "2025-2026", "current_term": "First Term"}
+    monkeypatch.setattr(m, "get_user", lambda user_id: {"user_id": user_id, "role": "teacher", "school_id": "SCH1"})
+    monkeypatch.setattr(m, "get_school", lambda school_id: school)
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "get_teacher_classes", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "get_teacher_subject_assignments", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "get_teacher", lambda *args, **kwargs: {"firstname": "Test", "lastname": "Teacher"})
+    monkeypatch.setattr(m, "get_teacher_messages_for_teacher", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "ensure_extended_features_schema", lambda *args, **kwargs: True)
+
+    import contextlib
+    @contextlib.contextmanager
+    def fake_db_conn(*args, **kwargs):
+        class DummyCursor:
+            def execute(self, *args, **kwargs): pass
+            def fetchall(self): return []
+            def fetchone(self): return None
+        class DummyConn:
+            def cursor(self): return DummyCursor()
+            def commit(self): pass
+        yield DummyConn()
+    monkeypatch.setattr(m, "db_connection", fake_db_conn)
+
+    # Attempting to access Period Attendance should redirect with an error since it is primary
+    resp = client.get("/teacher/period-attendance")
+    assert resp.status_code == 302
+    assert "/teacher" in resp.headers["Location"]
+
+    # Change school type to secondary
+    school["school_type"] = "secondary"
+    resp = client.get("/teacher/period-attendance")
+    # Should not redirect due to primary/nursery restrictions anymore
+    assert resp.status_code != 302 or "/teacher" not in resp.headers["Location"] or "This feature is only available" not in (resp.headers.get("Location", ""))
+
+
+def test_kindergarten_normalization(app_module):
+    m = app_module
+    
+    # Classname normalization tests
+    assert m.canonicalize_classname("Kindergarten 1") == "NURSERY1"
+    assert m.canonicalize_classname("kindergarting 2") == "NURSERY2"
+    assert m.canonicalize_classname("KINDER 3") == "NURSERY3"
+    assert m.canonicalize_classname("KG 1") == "NURSERY1"
+    
+    # School type normalization tests
+    assert m.normalize_school_type("kindergarten") == "nursery"
+    assert m.normalize_school_type("kindergarten school") == "nursery"
+    assert m.normalize_school_type("preschool") == "nursery"
+    assert m.normalize_school_type("pre-primary") == "nursery"

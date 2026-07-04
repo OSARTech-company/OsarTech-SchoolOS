@@ -21,6 +21,7 @@
                 <a class="home-link" href="{{ url_for('home') }}#roles">Roles</a>
                 <a class="home-link" href="{{ url_for('school_access_request') }}">School Access</a>
                 <a class="home-btn" href="{{ url_for('cbt_login') }}"><i class="fas fa-laptop-code"></i> CBT</a>
+                <button type="button" class="home-btn" id="landing-theme-toggle" style="cursor: pointer; padding: 10px 14px;" aria-label="Toggle theme"><i class="fas fa-moon"></i></button>
                 <a class="home-btn primary" href="{{ url_for('login') }}"><i class="fas fa-sign-in-alt"></i> Login</a>
             </div>
         </nav>
@@ -152,5 +153,38 @@
             </span>
         </footer>
     </div>
+    <script>
+        (function() {
+            const toggleBtn = document.getElementById('landing-theme-toggle');
+            if (!toggleBtn) return;
+            
+            const updateToggleUI = (theme) => {
+                if (theme === 'dark') {
+                    toggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
+                } else {
+                    toggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
+                }
+            };
+            
+            let activeTheme = localStorage.getItem('theme');
+            if (!activeTheme) {
+                activeTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            updateToggleUI(activeTheme);
+            
+            toggleBtn.addEventListener('click', () => {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                if (newTheme === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }
+                updateToggleUI(newTheme);
+            });
+        })();
+    </script>
 </body>
 </html>

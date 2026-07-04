@@ -2166,7 +2166,6 @@ input[type="number"],
   appearance: textfield !important;
 }
 
-input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button,
 .form-group input[type="number"]::-webkit-outer-spin-button,
 .form-group input[type="number"]::-webkit-inner-spin-button {
@@ -2174,3 +2173,267 @@ input[type="number"]::-webkit-inner-spin-button,
   appearance: none !important;
   margin: 0 !important;
 }
+
+/* ==========================================================================
+   DARK MODE OVERRIDES
+   ========================================================================== */
+
+/* Dark mode variables */
+:root[data-theme="dark"] {
+  --bg: #0b0f19;
+  --surface: #161e2e;
+  --surface-soft: #1e293b;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --line: #243249;
+  --brand: #38bdf8;
+  --brand-2: #06b6d4;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+}
+
+/* Selector overrides for data-theme="dark" */
+[data-theme="dark"] body {
+  background: var(--bg);
+  color: var(--text);
+}
+[data-theme="dark"] .side-taskbar {
+  background: var(--surface);
+  border-right-color: var(--line);
+}
+[data-theme="dark"] .side-brand {
+  background: var(--surface-soft);
+  border-color: var(--line);
+  color: var(--text);
+}
+[data-theme="dark"] .side-brand span {
+  color: var(--text);
+}
+[data-theme="dark"] .teacher-brand .teacher-brand-name {
+  color: var(--text);
+}
+[data-theme="dark"] .side-group-toggle {
+  color: var(--muted);
+}
+[data-theme="dark"] .side-group-toggle:hover {
+  background: var(--surface-soft);
+  color: var(--brand);
+}
+[data-theme="dark"] .side-link {
+  color: var(--muted);
+}
+[data-theme="dark"] .side-link i {
+  color: var(--muted);
+}
+[data-theme="dark"] .side-link:hover {
+  background: var(--surface-soft);
+  color: var(--brand);
+}
+[data-theme="dark"] .side-link:hover i {
+  color: var(--brand);
+}
+[data-theme="dark"] .side-link.active {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--brand);
+}
+[data-theme="dark"] .side-link.active i {
+  color: var(--brand);
+}
+[data-theme="dark"] .card h2 {
+  color: var(--brand);
+}
+[data-theme="dark"] .stat-card, 
+[data-theme="dark"] .summary-card {
+  background: linear-gradient(165deg, var(--surface) 0%, var(--surface-soft) 100%);
+}
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group select,
+[data-theme="dark"] .form-group textarea,
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="password"],
+[data-theme="dark"] input[type="email"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--bg);
+  border-color: var(--line);
+  color: var(--text);
+}
+[data-theme="dark"] .assignment-table {
+  background: var(--surface);
+}
+[data-theme="dark"] th,
+[data-theme="dark"] .assignment-table th {
+  background: var(--surface-soft);
+  color: var(--brand);
+}
+[data-theme="dark"] tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+[data-theme="dark"] tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+[data-theme="dark"] .student-info {
+  border-color: var(--line);
+  background: linear-gradient(155deg, rgba(56, 189, 248, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+}
+[data-theme="dark"] .teacher-card {
+  background: var(--surface);
+  border-color: var(--line);
+}
+[data-theme="dark"] .topbar-layout {
+  background: var(--bg) !important;
+}
+[data-theme="dark"] .topbar-layout .header {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--line) !important;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2) !important;
+}
+[data-theme="dark"] .topbar-layout .header h1 {
+  color: var(--text) !important;
+}
+[data-theme="dark"] .topbar-layout .meta-line {
+  color: var(--muted) !important;
+}
+[data-theme="dark"] .rail-toggle {
+  background: var(--surface) !important;
+  border-color: var(--line) !important;
+  color: var(--text) !important;
+}
+[data-theme="dark"] .rail-toggle:hover {
+  background: var(--surface-soft) !important;
+}
+
+/* Media query prefers-color-scheme: dark */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0f19;
+    --surface: #161e2e;
+    --surface-soft: #1e293b;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --line: #243249;
+    --brand: #38bdf8;
+    --brand-2: #06b6d4;
+    --success: #34d399;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+  }
+
+  :root:not([data-theme="light"]) body {
+    background: var(--bg);
+    color: var(--text);
+  }
+  :root:not([data-theme="light"]) .side-taskbar {
+    background: var(--surface);
+    border-right-color: var(--line);
+  }
+  :root:not([data-theme="light"]) .side-brand {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+  }
+  :root:not([data-theme="light"]) .side-brand span {
+    color: var(--text);
+  }
+  :root:not([data-theme="light"]) .teacher-brand .teacher-brand-name {
+    color: var(--text);
+  }
+  :root:not([data-theme="light"]) .side-group-toggle {
+    color: var(--muted);
+  }
+  :root:not([data-theme="light"]) .side-group-toggle:hover {
+    background: var(--surface-soft);
+    color: var(--brand);
+  }
+  :root:not([data-theme="light"]) .side-link {
+    color: var(--muted);
+  }
+  :root:not([data-theme="light"]) .side-link i {
+    color: var(--muted);
+  }
+  :root:not([data-theme="light"]) .side-link:hover {
+    background: var(--surface-soft);
+    color: var(--brand);
+  }
+  :root:not([data-theme="light"]) .side-link:hover i {
+    color: var(--brand);
+  }
+  :root:not([data-theme="light"]) .side-link.active {
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--brand);
+  }
+  :root:not([data-theme="light"]) .side-link.active i {
+    color: var(--brand);
+  }
+  :root:not([data-theme="light"]) .card h2 {
+    color: var(--brand);
+  }
+  :root:not([data-theme="light"]) .stat-card, 
+  :root:not([data-theme="light"]) .summary-card {
+    background: linear-gradient(165deg, var(--surface) 0%, var(--surface-soft) 100%);
+  }
+  :root:not([data-theme="light"]) .form-group input,
+  :root:not([data-theme="light"]) .form-group select,
+  :root:not([data-theme="light"]) .form-group textarea,
+  :root:not([data-theme="light"]) input[type="text"],
+  :root:not([data-theme="light"]) input[type="password"],
+  :root:not([data-theme="light"]) input[type="email"],
+  :root:not([data-theme="light"]) input[type="number"],
+  :root:not([data-theme="light"]) select,
+  :root:not([data-theme="light"]) textarea {
+    background: var(--bg);
+    border-color: var(--line);
+    color: var(--text);
+  }
+  :root:not([data-theme="light"]) .assignment-table {
+    background: var(--surface);
+  }
+  :root:not([data-theme="light"]) th,
+  :root:not([data-theme="light"]) .assignment-table th {
+    background: var(--surface-soft);
+    color: var(--brand);
+  }
+  :root:not([data-theme="light"]) tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  :root:not([data-theme="light"]) tbody tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  :root:not([data-theme="light"]) .student-info {
+    border-color: var(--line);
+    background: linear-gradient(155deg, rgba(56, 189, 248, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+  }
+  :root:not([data-theme="light"]) .teacher-card {
+    background: var(--surface);
+    border-color: var(--line);
+  }
+  :root:not([data-theme="light"]) .topbar-layout {
+    background: var(--bg) !important;
+  }
+  :root:not([data-theme="light"]) .topbar-layout .header {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    border-color: var(--line) !important;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2) !important;
+  }
+  :root:not([data-theme="light"]) .topbar-layout .header h1 {
+    color: var(--text) !important;
+  }
+  :root:not([data-theme="light"]) .topbar-layout .meta-line {
+    color: var(--muted) !important;
+  }
+  :root:not([data-theme="light"]) .rail-toggle {
+    background: var(--surface) !important;
+    border-color: var(--line) !important;
+    color: var(--text) !important;
+  }
+  :root:not([data-theme="light"]) .rail-toggle:hover {
+    background: var(--surface-soft) !important;
+  }
+}
+

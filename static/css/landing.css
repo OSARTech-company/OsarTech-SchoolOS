@@ -895,3 +895,92 @@ body::before {
         flex-direction: column;
     }
 }
+
+/* ==========================================================================
+   DARK MODE FOR LANDING PAGES
+   ========================================================================== */
+
+/* Dark mode variables */
+:root[data-theme="dark"] {
+    --home-ink: #f1f5f9;
+    --home-muted: #94a3b8;
+    --home-line: #243249;
+    --home-brand: #38bdf8;
+    --home-brand-2: #06b6d4;
+    --home-bg: #0b0f19;
+}
+
+[data-theme="dark"] .home-nav {
+    background: rgba(22, 30, 46, 0.94) !important;
+    border-bottom-color: rgba(36, 50, 73, 0.86) !important;
+}
+
+[data-theme="dark"] .feature-card,
+[data-theme="dark"] .home-band,
+[data-theme="dark"] .home-footer,
+[data-theme="dark"] .home-btn,
+[data-theme="dark"] .visual-card {
+    background: #161e2e !important;
+    border-color: var(--home-line) !important;
+}
+
+[data-theme="dark"] .home-link {
+    color: var(--home-muted) !important;
+}
+
+[data-theme="dark"] .home-link:hover {
+    color: var(--home-brand) !important;
+}
+
+[data-theme="dark"] .home-hero-visual {
+    background: #1e293b !important;
+}
+
+[data-theme="dark"] .home-visual-frame {
+    background: #0f172a !important;
+    border-color: var(--home-line) !important;
+}
+
+/* Media query prefers-color-scheme: dark */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --home-ink: #f1f5f9;
+        --home-muted: #94a3b8;
+        --home-line: #243249;
+        --home-brand: #38bdf8;
+        --home-brand-2: #06b6d4;
+        --home-bg: #0b0f19;
+    }
+
+    :root:not([data-theme="light"]) .home-nav {
+        background: rgba(22, 30, 46, 0.94) !important;
+        border-bottom-color: rgba(36, 50, 73, 0.86) !important;
+    }
+
+    :root:not([data-theme="light"]) .feature-card,
+    :root:not([data-theme="light"]) .home-band,
+    :root:not([data-theme="light"]) .home-footer,
+    :root:not([data-theme="light"]) .home-btn,
+    :root:not([data-theme="light"]) .visual-card {
+        background: #161e2e !important;
+        border-color: var(--home-line) !important;
+    }
+
+    :root:not([data-theme="light"]) .home-link {
+        color: var(--home-muted) !important;
+    }
+
+    :root:not([data-theme="light"]) .home-link:hover {
+        color: var(--home-brand) !important;
+    }
+
+    :root:not([data-theme="light"]) .home-hero-visual {
+        background: #1e293b !important;
+    }
+
+    :root:not([data-theme="light"]) .home-visual-frame {
+        background: #0f172a !important;
+        border-color: var(--home-line) !important;
+    }
+}
+

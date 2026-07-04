@@ -54,6 +54,49 @@ body {
     --transition-slow: 0.5s ease;
 }
 
+/* Dark Theme Variables */
+:root[data-theme="dark"] {
+    --primary-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+    --secondary-gradient: linear-gradient(135deg, #1e1b4b 0%, #2d1052 100%);
+    --success-gradient: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+    --warning-gradient: linear-gradient(135deg, #78350f 0%, #92400e 100%);
+    --danger-gradient: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+
+    --primary-color: #818cf8;
+    --secondary-color: #a78bfa;
+    --accent-color: #f472b6;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-light: #64748b;
+    --bg-light: #0b0f19;
+    --bg-white: #161e2e;
+    --shadow-light: rgba(0, 0, 0, 0.4);
+    --shadow-medium: rgba(0, 0, 0, 0.5);
+    --shadow-heavy: rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --primary-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+        --secondary-gradient: linear-gradient(135deg, #1e1b4b 0%, #2d1052 100%);
+        --success-gradient: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+        --warning-gradient: linear-gradient(135deg, #78350f 0%, #92400e 100%);
+        --danger-gradient: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+
+        --primary-color: #818cf8;
+        --secondary-color: #a78bfa;
+        --accent-color: #f472b6;
+        --text-primary: #f1f5f9;
+        --text-secondary: #94a3b8;
+        --text-light: #64748b;
+        --bg-light: #0b0f19;
+        --bg-white: #161e2e;
+        --shadow-light: rgba(0, 0, 0, 0.4);
+        --shadow-medium: rgba(0, 0, 0, 0.5);
+        --shadow-heavy: rgba(0, 0, 0, 0.6);
+    }
+}
+
 body {
     font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: var(--primary-gradient);

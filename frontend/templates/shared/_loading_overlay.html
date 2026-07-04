@@ -1,3 +1,13 @@
+<script>
+    (function() {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+    })();
+</script>
 <!-- Loading Overlay with Spinning Animation -->
 <div id="loading-overlay" class="loading-overlay">
     <div class="loading-spinner-container">
@@ -23,6 +33,15 @@
         flex-direction: column;
         z-index: 99999;
         backdrop-filter: blur(2px);
+    }
+
+    [data-theme="dark"] .loading-overlay {
+        background: rgba(11, 15, 25, 0.96);
+    }
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) .loading-overlay {
+            background: rgba(11, 15, 25, 0.96);
+        }
     }
 
     .loading-overlay.show {
@@ -91,6 +110,17 @@
         z-index: 10;
     }
 
+    [data-theme="dark"] .loading-logo {
+        background: #161e2e;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    }
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) .loading-logo {
+            background: #161e2e;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+    }
+
     @keyframes spin-1 {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
@@ -113,6 +143,15 @@
         margin: 0;
         letter-spacing: 1px;
         animation: pulse-text 1.5s ease-in-out infinite;
+     }
+
+    [data-theme="dark"] .loading-text {
+        color: #38bdf8;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) .loading-text {
+            color: #38bdf8;
+        }
     }
 
     @keyframes pulse-text {

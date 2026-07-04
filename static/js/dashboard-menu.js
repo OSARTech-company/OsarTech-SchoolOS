@@ -132,4 +132,55 @@
       collapseRail();
     }
   });
+
+  // --- Dark Mode Toggle Injection ---
+  const sideLinksContainer = sidebar.querySelector(".side-links");
+  if (sideLinksContainer) {
+    const logoutForm = sideLinksContainer.querySelector("form[action*='logout']") || sideLinksContainer.querySelector(".side-link-logout");
+    if (logoutForm && !sideLinksContainer.querySelector(".theme-toggle-btn")) {
+      const themeBtn = document.createElement("button");
+      themeBtn.type = "button";
+      themeBtn.className = "side-link theme-toggle-btn";
+      themeBtn.style.cursor = "pointer";
+      themeBtn.style.border = "none";
+      themeBtn.style.width = "100%";
+      themeBtn.style.background = "transparent";
+      themeBtn.style.textAlign = "left";
+      
+      const updateThemeBtnUI = (theme) => {
+        if (theme === "dark") {
+          themeBtn.innerHTML = '<i class="fas fa-sun"></i><span>Light Mode</span>';
+        } else {
+          themeBtn.innerHTML = '<i class="fas fa-moon"></i><span>Dark Mode</span>';
+        }
+      };
+
+      // Get current theme state
+      let activeTheme = localStorage.getItem("theme");
+      if (!activeTheme) {
+        activeTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      updateThemeBtnUI(activeTheme);
+
+      themeBtn.addEventListener("click", () => {
+        const currentTheme = document.documentElement.getAttribute("data-theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        const newTheme = currentTheme === "dark" ? "light" : "dark";
+        if (newTheme === "dark") {
+          document.documentElement.setAttribute("data-theme", "dark");
+          localStorage.setItem("theme", "dark");
+        } else {
+          document.documentElement.setAttribute("data-theme", "light");
+          localStorage.setItem("theme", "light");
+        }
+        updateThemeBtnUI(newTheme);
+      });
+
+      // Insert right before the logout form / link
+      if (logoutForm.parentNode === sideLinksContainer) {
+        sideLinksContainer.insertBefore(themeBtn, logoutForm);
+      } else if (logoutForm.parentNode.parentNode === sideLinksContainer) {
+        sideLinksContainer.insertBefore(themeBtn, logoutForm.parentNode);
+      }
+    }
+  }
 })();
