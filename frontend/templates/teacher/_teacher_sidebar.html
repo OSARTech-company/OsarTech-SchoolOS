@@ -61,7 +61,7 @@
                 <span>Academics</span><i class="fas fa-chevron-down"></i>
             </summary>
             <div class="side-group-links">
-                <a href="{{ url_for('teacher_dashboard', tab='score', score_subject=teacher_selected_score_subject if teacher_selected_score_subject else None, score_class=teacher_selected_score_class if teacher_selected_score_class else None) }}" class="side-link{% if active_page == 'score_entry' %} active{% endif %}">
+                <a href="{{ url_for('teacher_score_entry_start') }}" class="side-link{% if active_page == 'score_entry' %} active{% endif %}">
                     <i class="fas fa-pen-to-square"></i>
                     <span>Score Entry</span>
                 </a>
@@ -112,7 +112,7 @@
                     <i class="fas fa-eye"></i>
                     <span>Result Preview</span>
                 </a>
-                <a href="{{ url_for('teacher_dashboard', tab='overview') }}#result-export-card" class="side-link">
+                <a href="{{ url_for('teacher_reports') }}" class="side-link{% if active_page == 'reports' %} active{% endif %}">
                     <i class="fas fa-file-export"></i>
                     <span>Result Export</span>
                 </a>

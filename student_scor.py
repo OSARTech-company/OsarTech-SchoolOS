@@ -44662,6 +44662,199 @@ def teacher_class_results_export():
         headers={'Content-Disposition': f'attachment; filename={filename}'},
     )
 
+@app.route('/teacher/score-entry', endpoint='teacher_score_entry_start')
+def teacher_score_entry_start():
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    teacher_id = session.get('user_id')
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+        
+    school = get_school(school_id) or {}
+    current_term = get_current_term(school)
+    current_year = (school or {}).get('academic_year', '')
+    
+    classes = get_teacher_classes(school_id, teacher_id, term=current_term, academic_year=current_year)
+    classes = sorted([str(c or '').strip() for c in classes if str(c or '').strip()], key=lambda x: str(x).lower())
+    
+    subject_assignment_rows = get_teacher_subject_assignments(
+        school_id,
+        teacher_id=teacher_id,
+        term=current_term,
+    )
+    assigned_classes = set(classes)
+    for row in subject_assignment_rows:
+        cls = (row.get('classname') or '').strip()
+        if cls:
+            assigned_classes.add(cls)
+            
+    classes_list = sorted(list(assigned_classes), key=lambda x: str(x).lower())
+    
+    if not classes_list:
+        flash('You have no class or subject assignments for this term.', 'warning')
+        return redirect(url_for('teacher_dashboard'))
+        
+    if len(classes_list) == 1:
+        return redirect(url_for('teacher_score_entry_select_subject', classname=classes_list[0]))
+        
+    return render_template('teacher/score_entry_select_class.html', classes=classes_list, school=school)
+
+@app.route('/teacher/score-entry/select-subject/<classname>', endpoint='teacher_score_entry_select_subject')
+def teacher_score_entry_select_subject(classname):
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    teacher_id = session.get('user_id')
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+        
+    school = get_school(school_id) or {}
+    current_term = get_current_term(school)
+    current_year = (school or {}).get('academic_year', '')
+    
+    subjects = []
+    
+    if school_uses_dean_led_score_entry(school):
+        config = get_class_subject_config(school_id, classname) or {}
+        subjects = normalize_subjects_list(
+            (config.get('core_subjects') or [])
+            + (config.get('science_subjects') or [])
+            + (config.get('art_subjects') or [])
+            + (config.get('commercial_subjects') or [])
+            + (config.get('optional_subjects') or [])
+        )
+        if not subjects:
+            defaults = _catalog_defaults_for_class(classname)
+            subjects = normalize_subjects_list(
+                (defaults.get('core') or [])
+                + (defaults.get('science') or [])
+                + (defaults.get('art') or [])
+                + (defaults.get('commercial') or [])
+                + (defaults.get('optional') or [])
+            )
+    else:
+        subject_assignment_rows = get_teacher_subject_assignments(
+            school_id,
+            teacher_id=teacher_id,
+            term=current_term,
+        )
+        for row in subject_assignment_rows:
+            cls = (row.get('classname') or '').strip()
+            subj = normalize_subject_name(row.get('subject', ''))
+            if cls.lower() == classname.lower() and subj:
+                subjects.append(subj)
+                
+    subjects = sorted(list(set(subjects)), key=lambda x: str(x).lower())
+    
+    if not subjects:
+        flash(f'No subjects are assigned to you for class {classname}.', 'warning')
+        return redirect(url_for('teacher_score_entry_start'))
+        
+    if len(subjects) == 1:
+        if school.get('score_entry_mode') == 'subject_sheet':
+            return redirect(url_for('teacher_subject_score_sheet', subject=subjects[0], **{'class': classname}))
+        else:
+            return redirect(url_for('teacher_dashboard', tab='score', score_class=classname, score_subject=subjects[0]))
+            
+    return render_template('teacher/score_entry_select_subject.html', classname=classname, subjects=subjects, school=school)
+
+@app.route('/teacher/reports', endpoint='teacher_reports')
+def teacher_reports():
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+    
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    teacher_id = session.get('user_id')
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+        
+    school = get_school(school_id) or {}
+    current_term = get_current_term(school)
+    current_year = (school or {}).get('academic_year', '')
+    
+    teacher_profile = get_teachers(school_id).get(teacher_id, {})
+    teacher_name = f"{teacher_profile.get('firstname', '')} {teacher_profile.get('lastname', '')}".strip() or teacher_id
+    teacher_phone = (teacher_profile.get('phone') or '').strip()
+    teacher_profile_image = (teacher_profile.get('profile_image') or '').strip()
+    has_teacher_signature = bool(teacher_profile.get('signature_image'))
+    
+    classes = get_teacher_classes(school_id, teacher_id, term=current_term, academic_year=current_year)
+    selected_export_class = (request.args.get('export_classname', '') or '').strip()
+    class_lookup = {str(cls or '').strip().lower(): str(cls or '').strip() for cls in classes if str(cls or '').strip()}
+    if not selected_export_class and classes:
+        selected_export_class = classes[0]
+    selected_export_key = selected_export_class.lower()
+    if selected_export_class and selected_export_key in class_lookup:
+        selected_export_class = class_lookup[selected_export_key]
+    elif classes:
+        selected_export_class = classes[0]
+
+    # Sidebar components:
+    teacher_messages = get_teacher_messages_for_teacher(
+        school_id=school_id,
+        teacher_id=teacher_id,
+        classes=classes,
+        subjects=[],
+        limit=20,
+    )
+    unread_teacher_messages = sum(1 for row in teacher_messages if not row.get('is_read'))
+    
+    subject_assignment_rows = get_teacher_subject_assignments(
+        school_id,
+        teacher_id=teacher_id,
+        term=current_term,
+    )
+    
+    score_subject_nav_map = {}
+    for row in subject_assignment_rows:
+        cls = (row.get('classname') or '').strip()
+        subj = normalize_subject_name(row.get('subject', ''))
+        if not cls or not subj:
+            continue
+        score_subject_nav_map.setdefault(subj, set()).add(cls)
+        
+    score_nav_tree = [
+        {
+            'subject': subj,
+            'classes': sorted(score_subject_nav_map.get(subj, set()), key=lambda x: str(x).lower()),
+        }
+        for subj in sorted(score_subject_nav_map.keys(), key=lambda x: str(x).lower())
+    ]
+    
+    teacher_selected_score_subject = ''
+    teacher_selected_score_class = ''
+    teacher_has_class_assignment_nav = len(classes) > 0
+    
+    return render_template(
+        'teacher/teacher_reports.html',
+        classes=classes,
+        school=school,
+        teacher_name=teacher_name,
+        teacher_id=teacher_id,
+        teacher_phone=teacher_phone,
+        teacher_profile_image=teacher_profile_image,
+        has_teacher_signature=has_teacher_signature,
+        selected_export_class=selected_export_class,
+        current_term=current_term,
+        current_year=current_year,
+        unread_teacher_messages=unread_teacher_messages,
+        score_nav_tree=score_nav_tree,
+        teacher_selected_score_subject=teacher_selected_score_subject,
+        teacher_selected_score_class=teacher_selected_score_class,
+        teacher_has_class_assignment_nav=teacher_has_class_assignment_nav,
+        teacher_sidebar_profile_image=teacher_profile_image,
+        teacher_sidebar_display_name=teacher_name,
+        teacher_unread_notifications=unread_teacher_messages,
+        teacher_score_nav_tree=score_nav_tree,
+        active_page='reports'
+    )
+
 @app.route('/teacher/class-results/preview')
 def teacher_class_results_preview():
     if session.get('role') != 'teacher':
@@ -45836,7 +46029,7 @@ def teacher_update_profile():
     phone = (request.form.get('phone', '') or '').strip()
     if phone and not re.fullmatch(r'^[0-9+\-\s()]{7,25}$', phone):
         flash('Invalid phone number format.', 'error')
-        return redirect(url_for('teacher_dashboard'))
+        return redirect(url_for('teacher_reports'))
     if not school_id:
         flash('School session is missing. Please log in again.', 'error')
         return redirect(url_for('login'))
@@ -45848,7 +46041,7 @@ def teacher_update_profile():
             (phone, school_id, teacher_id),
         )
     flash('Profile phone number updated successfully.', 'success')
-    return redirect(url_for('teacher_dashboard'))
+    return redirect(url_for('teacher_reports'))
 
 @app.route('/teacher/upload-signature', methods=['POST'])
 def teacher_upload_signature():
@@ -45870,14 +46063,14 @@ def teacher_upload_signature():
     )
     if not class_assignments:
         flash('Teacher signature is only required for class teachers.', 'error')
-        return redirect(url_for('teacher_dashboard'))
+        return redirect(url_for('teacher_reports'))
     signature_data, err = parse_uploaded_signature(request.files.get('teacher_signature'))
     if err:
         flash(err, 'error')
-        return redirect(url_for('teacher_dashboard'))
+        return redirect(url_for('teacher_reports'))
     set_teacher_signature(school_id, teacher_id, signature_data)
     flash('Teacher signature saved successfully.', 'success')
-    return redirect(url_for('teacher_dashboard'))
+    return redirect(url_for('teacher_reports'))
 
 @app.route('/teacher/upload-profile-image', methods=['POST'])
 def teacher_upload_profile_image():
@@ -45891,12 +46084,12 @@ def teacher_upload_profile_image():
     image_data, err = parse_uploaded_profile_image(request.files.get('profile_image'))
     if err:
         flash(err, 'error')
-        return redirect(url_for('teacher_dashboard'))
+        return redirect(url_for('teacher_reports'))
     if not set_teacher_profile_image(school_id, teacher_id, image_data):
         flash('Profile picture column is not available in the database yet. Run DB fixes/startup DDL, then retry.', 'error')
-        return redirect(url_for('teacher_dashboard'))
+        return redirect(url_for('teacher_reports'))
     flash('Profile picture saved successfully.', 'success')
-    return redirect(url_for('teacher_dashboard'))
+    return redirect(url_for('teacher_reports'))
 
 
 @app.route('/teacher/change-password', methods=['GET', 'POST'], endpoint='teacher_change_password_route')

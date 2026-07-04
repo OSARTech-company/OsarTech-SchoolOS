@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Subject - Score Entry</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .container { max-width: 500px; width: 100%; padding: 20px; box-sizing: border-box; }
+        .card { background: white; border-radius: 14px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #dbe7f3; }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 5px; font-size: 1.8rem; }
+        .subtitle { text-align: center; color: #64748b; margin-bottom: 30px; font-size: 0.95rem; }
+        .list-group { display: flex; flex-direction: column; gap: 12px; }
+        .list-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border: 1px solid #cbd5e1; border-radius: 10px; text-decoration: none; color: #334155; font-weight: 600; font-size: 1.05rem; transition: all 0.2s ease; background: #fff; }
+        .list-item:hover { border-color: var(--brand, #0f4c81); background: #f8fbff; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(15, 76, 129, 0.08); }
+        .list-item i { color: var(--brand, #0f4c81); font-size: 1.2rem; }
+        .back-link { display: block; text-align: center; margin-top: 25px; color: #64748b; text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+        .back-link:hover { color: #334155; }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    {% include "shared/_loading_overlay.html" %}
+    <div class="container">
+        <div class="card">
+            <h1><i class="fas fa-book"></i> Select Subject</h1>
+            <p class="subtitle">Class: <strong>{{ classname }}</strong></p>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+             <div class="list-group">
+                {% for subject in subjects %}
+                {% if school and school.score_entry_mode == 'subject_sheet' %}
+                <a href="{{ url_for('teacher_subject_score_sheet', class=classname, subject=subject) }}" class="list-item">
+                {% else %}
+                <a href="{{ url_for('teacher_dashboard', tab='score', score_class=classname, score_subject=subject) }}" class="list-item">
+                {% endif %}
+                    <span>{{ subject }}</span>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                {% endfor %}
+            </div>
+            
+            <a href="{{ url_for('teacher_score_entry_start') }}" class="back-link"><i class="fas fa-arrow-left"></i> Change Class</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Result Export & Profile Settings - Teacher Dashboard</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      body { min-height: 100vh; }
+      .container { width: min(1220px, 100%); margin: 0 auto; padding: 24px; }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+      .header h1 { margin: 0; font-size: 1.8rem; }
+      .header .back { color: white; text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+      .grid-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr); gap: 20px; align-items: start; }
+      @media (max-width: 900px) {
+        .grid-layout { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% include 'teacher/_teacher_sidebar.html' %}
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-file-export"></i> Result Export & Profile</h1>
+            <a href="{{ url_for('teacher_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          <div class="grid-layout">
+            <!-- Left Column: Export form -->
+            <div style="display: grid; gap: 20px;">
+              <div class="card" id="result-export-card">
+                <h2><i class="fas fa-file-export"></i> End-of-Term Export</h2>
+                {% if classes %}
+                <p class="note">Open a print-friendly preview or download the class result as CSV or Excel. Subjects are ordered by how many students offer them, then the sheet ends with Total, Average, and Grade.</p>
+                <form action="{{ url_for('teacher_class_results_preview') }}" method="GET">
+                  <input type="hidden" name="term" value="{{ current_term }}">
+                  <input type="hidden" name="academic_year" value="{{ current_year }}">
+                  <div class="form-group">
+                    <label for="export_classname">Class</label>
+                    <select id="export_classname" name="classname" class="filter-select" style="width: 100%;" required>
+                      {% for cls in classes %}
+                      <option value="{{ cls }}" {% if selected_export_class == cls %}selected{% endif %}>{{ cls }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 14px;">
+                    <button type="submit" class="btn btn-primary">
+                      <i class="fas fa-eye"></i> Open Preview
+                    </button>
+                    <button type="submit" class="btn btn-secondary" formaction="{{ url_for('teacher_class_results_export') }}">
+                      <i class="fas fa-download"></i> Download CSV
+                    </button>
+                    <button type="submit" class="btn btn-secondary" formaction="{{ url_for('teacher_class_results_export', format='xlsx') }}">
+                      <i class="fas fa-file-excel"></i> Download Excel
+                    </button>
+                  </div>
+                </form>
+                {% else %}
+                <p class="note">No class assignment yet, so there is nothing to export.</p>
+                {% endif %}
+              </div>
+
+              {% if classes %}
+              <div class="card">
+                <h2><i class="fas fa-route"></i> Your Workflow</h2>
+                {% if school and school.score_entry_mode == 'dean_led' %}
+                <p class="workflow-step">1. Open Score Entry from the class list.</p>
+                <p class="workflow-step">2. Enter scores for all subjects offered by the student.</p>
+                <p class="workflow-step">3. If daily attendance was not marked, open Submission and enter Days Open plus Days Present.</p>
+                <p class="workflow-step">4. Review and save before class result approval.</p>
+                {% else %}
+                <p class="workflow-step">1. Enter your assigned subject scores for students.</p>
+                <p class="workflow-step">2. Submit completed subjects to the class teacher when your handoff is ready.</p>
+                <p class="workflow-step">3. Class teacher waits for all subject handoffs, then submits the class result to school admin.</p>
+                {% endif %}
+              </div>
+              {% endif %}
+            </div>
+
+            <!-- Right Column: Settings & Signatures -->
+            <div style="display: grid; gap: 20px;">
+              {% if classes %}
+              <div class="card">
+                <h2><i class="fas fa-signature"></i> Teacher Signature</h2>
+                <p>
+                  Status:
+                  <strong class="chip {{ 'chip-success' if has_teacher_signature else 'chip-warning' }}">
+                    {{ 'Uploaded' if has_teacher_signature else 'Not Uploaded' }}
+                  </strong>
+                </p>
+                <p class="note" style="margin-bottom: 12px;">Signature is required only when submitting a class result for approval.</p>
+                <form action="{{ url_for('teacher_upload_signature') }}" method="POST" enctype="multipart/form-data">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <div class="form-group">
+                    <label for="teacher_signature">Upload Signature Image (PNG/JPG/WEBP, max 2MB)</label>
+                    <input type="file" id="teacher_signature" name="teacher_signature" accept=".png,.jpg,.jpeg,.webp,image/*" required />
+                  </div>
+                  <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Save Signature</button>
+                </form>
+              </div>
+              {% endif %}
+
+              <div class="card">
+                <h2><i class="fas fa-image"></i> Profile Picture</h2>
+                <p class="note" style="margin-bottom: 12px;">Upload your profile picture (PNG/JPG/WEBP, max 2MB).</p>
+                <form action="{{ url_for('teacher_upload_profile_image') }}" method="POST" enctype="multipart/form-data">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <div class="form-group">
+                    <label for="profile_image">Choose Image</label>
+                    <input type="file" id="profile_image" name="profile_image" accept=".png,.jpg,.jpeg,.webp,image/*" required />
+                  </div>
+                  <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Save Picture</button>
+                </form>
+              </div>
+
+              <div class="card">
+                <h2><i class="fas fa-phone"></i> Contact Number</h2>
+                <p class="note" style="margin-bottom: 12px;">Update your phone number for school contact and result follow-up.</p>
+                <form action="{{ url_for('teacher_update_profile') }}" method="POST">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="text" id="phone" name="phone" value="{{ teacher_phone or '' }}" placeholder="+234..." style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;" />
+                  </div>
+                  <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Save Number</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+      (function () {
+        var body = document.body;
+        if (window.innerWidth > 600) {
+          body.classList.add('rail-expanded');
+        }
+      })();
+    </script>
+    {% include "shared/_loading_overlay.html" %}
+  </body>
+</html>

@@ -2197,3 +2197,75 @@ def test_grade_from_score_uses_custom_grade_scale_json(app_module):
     assert m.grade_from_score(12, school) == "F9"
     assert m.normalize_grade_band("A+", school) == "A"
     assert m.normalize_grade_band("B", school) == "D"
+
+
+def test_teacher_score_entry_start_redirects_for_single_class(client, app_module, monkeypatch):
+    m = app_module
+    
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "teacher1"
+        
+    school = {"academic_year": "2025-2026", "current_term": "First Term"}
+    monkeypatch.setattr(m, "get_user", lambda user_id: {"user_id": user_id, "role": "teacher", "school_id": "SCH1"})
+    monkeypatch.setattr(m, "get_school", lambda school_id: school)
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "get_teacher_classes", lambda *args, **kwargs: ["JSS1"])
+    monkeypatch.setattr(m, "get_teacher_subject_assignments", lambda *args, **kwargs: [])
+    
+    resp = client.get("/teacher/score-entry")
+    assert resp.status_code == 302
+    assert "/teacher/score-entry/select-subject/JSS1" in resp.headers["Location"]
+
+
+def test_teacher_score_entry_select_class_shows_multi_classes(client, app_module, monkeypatch):
+    m = app_module
+    
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "teacher1"
+        
+    school = {"academic_year": "2025-2026", "current_term": "First Term"}
+    monkeypatch.setattr(m, "get_user", lambda user_id: {"user_id": user_id, "role": "teacher", "school_id": "SCH1"})
+    monkeypatch.setattr(m, "get_school", lambda school_id: school)
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "get_teacher_classes", lambda *args, **kwargs: ["JSS1", "JSS2"])
+    monkeypatch.setattr(m, "get_teacher_subject_assignments", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "get_teacher", lambda *args, **kwargs: {"firstname": "Teacher", "lastname": "One", "profile_image": ""})
+    monkeypatch.setattr(m, "get_teacher_messages_for_teacher", lambda *args, **kwargs: [])
+    
+    resp = client.get("/teacher/score-entry")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "JSS1" in body
+    assert "JSS2" in body
+    assert "Select Class" in body
+
+
+def test_teacher_score_entry_select_subject_redirects_for_single_subject(client, app_module, monkeypatch):
+    m = app_module
+    
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "teacher1"
+        
+    school = {"academic_year": "2025-2026", "current_term": "First Term", "score_entry_mode": "teacher_subject"}
+    monkeypatch.setattr(m, "get_user", lambda user_id: {"user_id": user_id, "role": "teacher", "school_id": "SCH1"})
+    monkeypatch.setattr(m, "get_school", lambda school_id: school)
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "school_uses_dean_led_score_entry", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        m,
+        "get_teacher_subject_assignments",
+        lambda *args, **kwargs: [{"classname": "JSS1", "subject": "Mathematics"}]
+    )
+    
+    resp = client.get("/teacher/score-entry/select-subject/JSS1")
+    assert resp.status_code == 302
+    assert "/teacher?" in resp.headers["Location"]
+    assert "tab=score" in resp.headers["Location"]
+    assert "score_class=JSS1" in resp.headers["Location"]
+    assert "score_subject=Mathematics" in resp.headers["Location"]
