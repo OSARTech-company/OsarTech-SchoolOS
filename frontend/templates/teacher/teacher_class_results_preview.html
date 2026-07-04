@@ -140,10 +140,7 @@
     </style>
 </head>
 <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
-<div class="app-shell topbar-layout">
-    {% include 'teacher/_teacher_sidebar.html' %}
-    <div class="main-content">
-        <div class="page-shell">
+    <div class="page-shell">
             <div class="page-header">
                 <div>
                     <h1><i class="fas fa-eye"></i> Class Result Preview</h1>
@@ -262,9 +259,6 @@
                 </div>
             </div>
         </div>
-    </div>
-</div>
-<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 {% include "shared/_loading_overlay.html" %}
 </body>
 </html>

@@ -1,45 +1,72 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>School Reports</title>
+    <title>Reports Export - School Admin</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f3f6fa; min-height: 100vh; }
+        .container { max-width: 800px; margin: 50px auto; padding: 24px 16px; width: 100%; box-sizing: border-box; }
+        .card { background: white; border-radius: 14px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #dbe7f3; margin-bottom: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 30px; }
+        .header h1 { margin: 0; font-size: 1.8rem; color: #2c3e50; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
+        .btn-primary { background: var(--brand, #0f4c81); color: white; }
+        .btn-primary:hover { background: var(--brand-2, #1f7a8c); }
+        .btn-secondary { background: #cbd5e1; color: #334155; }
+        .btn-secondary:hover { background: #cbd5e1; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 600; color: #475569; }
+        .form-control { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 0.95rem; }
+        .note { color: #64748b; font-size: 0.9rem; margin-top: 6px; }
+        .ml-10 { margin-left: 10px; }
+        .filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 12px; }
+        @media (max-width: 640px) {
+            .container { margin: 16px auto; padding: 12px; }
+            .card { padding: 20px; }
+            .filter-grid { grid-template-columns: 1fr; }
+            .btn { display: flex; width: 100%; margin-left: 0 !important; margin-top: 10px; }
+            .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+        }
+    </style>
 </head>
-<body>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
     {% include "shared/_loading_overlay.html" %}
-<div class="app-shell topbar-layout">
-    {% set active_page = 'reports' %}
-    {% include 'school/_school_admin_sidebar.html' %}
-    <div class="main-content">
-<div class="container">
-    <div class="header">
-        <h1>Reports Export</h1>
-        <p><a class="btn" href="{{ url_for('school_admin_dashboard') }}">Back to Dashboard</a></p>
-    </div>
-    <div class="card">
-        <form method="get">
-            <label>Term</label>
-            <input type="text" name="term" value="{{ selected_term }}">
-            <label>Academic Year</label>
-            <input type="text" name="academic_year" value="{{ selected_year }}">
-            <button class="btn" type="submit">Apply</button>
-        </form>
-    </div>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-file-export"></i> Reports Export</h1>
+            <a class="btn btn-secondary" href="{{ url_for('school_admin_dashboard') }}"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+        </div>
+        
+        <div class="card">
+            <form method="get">
+                <div class="filter-grid">
+                    <div class="form-group">
+                        <label for="term">Term</label>
+                        <input type="text" id="term" name="term" value="{{ selected_term }}" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="academic_year">Academic Year</label>
+                        <input type="text" id="academic_year" name="academic_year" value="{{ selected_year }}" class="form-control">
+                    </div>
+                </div>
+                <button class="btn btn-primary" type="submit"><i class="fas fa-filter"></i> Apply Filter</button>
+            </form>
+        </div>
 
-    <div class="card">
-        <h2>Exports</h2>
-        <p class="note">Download summaries as CSV files for the selected term and academic year.</p>
-        <a class="btn" href="{{ url_for('school_admin_reports_export', kind='term_summary', term=selected_term, academic_year=selected_year) }}">Term Summary</a>
-        <a class="btn ml-10" href="{{ url_for('school_admin_reports_export', kind='attendance_summary', term=selected_term, academic_year=selected_year) }}">Attendance Summary</a>
-        <a class="btn ml-10" href="{{ url_for('school_admin_reports_export', kind='subject_performance', term=selected_term, academic_year=selected_year) }}">Subject Performance</a>
+        <div class="card">
+            <h2>Available Exports</h2>
+            <p class="note" style="margin-bottom: 20px;">Download summaries as CSV files for the selected term and academic year.</p>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a class="btn btn-primary" href="{{ url_for('school_admin_reports_export', kind='term_summary', term=selected_term, academic_year=selected_year) }}">Term Summary</a>
+                <a class="btn btn-primary" href="{{ url_for('school_admin_reports_export', kind='attendance_summary', term=selected_term, academic_year=selected_year) }}">Attendance Summary</a>
+                <a class="btn btn-primary" href="{{ url_for('school_admin_reports_export', kind='subject_performance', term=selected_term, academic_year=selected_year) }}">Subject Performance</a>
+            </div>
+        </div>
     </div>
-</div>
-    </div>
-</div>
-<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 </body>
 </html>
-
