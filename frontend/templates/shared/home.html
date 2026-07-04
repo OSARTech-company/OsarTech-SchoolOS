@@ -18,7 +18,10 @@
             </a>
             <div class="home-nav-actions">
                 <a class="home-link" href="{{ url_for('home') }}#features">Features</a>
+                <a class="home-link" href="{{ url_for('home') }}#interactive-preview">Preview</a>
                 <a class="home-link" href="{{ url_for('home') }}#roles">Roles</a>
+                <a class="home-link" href="{{ url_for('home') }}#tech-stack">Stack</a>
+                <a class="home-link" href="{{ url_for('home') }}#faq">FAQ</a>
                 <a class="home-link" href="{{ url_for('school_access_request') }}">School Access</a>
                 <a class="home-btn" href="{{ url_for('cbt_login') }}"><i class="fas fa-laptop-code"></i> CBT</a>
                 <button type="button" class="home-btn" id="landing-theme-toggle" style="cursor: pointer; padding: 10px 14px;" aria-label="Toggle theme"><i class="fas fa-moon"></i></button>
@@ -78,6 +81,27 @@
             </div>
         </header>
 
+        <section class="home-stats" aria-label="Key Statistics">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-number">99.9%</span>
+                    <span class="stat-label">Uptime SLA</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number">150+</span>
+                    <span class="stat-label">Registered Schools</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number">100k+</span>
+                    <span class="stat-label">Processed Results</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number">&lt; 2s</span>
+                    <span class="stat-label">Average Response</span>
+                </div>
+            </div>
+        </section>
+
         <main>
             <section class="home-section" id="features">
                 <div class="section-head">
@@ -108,6 +132,179 @@
                 </div>
             </section>
 
+            <section class="home-section home-showcase" id="interactive-preview">
+                <div class="section-head">
+                    <h2>Experience SchoolOS in Action</h2>
+                    <p>Click on the tabs below to preview the intuitive interfaces designed for each academic role.</p>
+                </div>
+                <div class="showcase-container">
+                    <div class="showcase-tabs" role="tablist">
+                        <button class="showcase-tab active" role="tab" aria-selected="true" data-target="admin-view">
+                            <i class="fas fa-user-tie"></i> Admin Panel
+                        </button>
+                        <button class="showcase-tab" role="tab" aria-selected="false" data-target="teacher-view">
+                            <i class="fas fa-chalkboard-teacher"></i> Teacher Console
+                        </button>
+                        <button class="showcase-tab" role="tab" aria-selected="false" data-target="student-view">
+                            <i class="fas fa-user-graduate"></i> Student Portal
+                        </button>
+                        <button class="showcase-tab" role="tab" aria-selected="false" data-target="parent-view">
+                            <i class="fas fa-users"></i> Parent Center
+                        </button>
+                    </div>
+                    <div class="showcase-content">
+                        <!-- Admin View -->
+                        <div class="showcase-panel active" id="admin-view" role="tabpanel">
+                            <div class="mockup-window">
+                                <div class="mockup-header">
+                                    <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+                                    <div class="mockup-url">schoolos.osartech.com/school-admin/dashboard</div>
+                                </div>
+                                <div class="mockup-body admin-mockup">
+                                    <div class="mockup-sidebar">
+                                        <div class="mockup-item active"><i class="fas fa-chart-pie"></i> Overview</div>
+                                        <div class="mockup-item"><i class="fas fa-school"></i> School Setup</div>
+                                        <div class="mockup-item"><i class="fas fa-users"></i> Student Registry</div>
+                                        <div class="mockup-item"><i class="fas fa-file-invoice-dollar"></i> Billing</div>
+                                    </div>
+                                    <div class="mockup-main">
+                                        <div class="mockup-widget-row">
+                                            <div class="mockup-widget">
+                                                <span>Total Students</span>
+                                                <h3>1,248</h3>
+                                                <span class="trend up"><i class="fas fa-arrow-up"></i> +12%</span>
+                                            </div>
+                                            <div class="mockup-widget">
+                                                <span>Active Classes</span>
+                                                <h3>36</h3>
+                                                <span class="trend"><i class="fas fa-check-circle"></i> Configured</span>
+                                            </div>
+                                            <div class="mockup-widget">
+                                                <span>Term Status</span>
+                                                <h3>Mid-Term</h3>
+                                                <span class="trend accent">2nd Term</span>
+                                            </div>
+                                        </div>
+                                        <div class="mockup-chart">
+                                            <div class="mockup-chart-header">
+                                                <strong>Activity Analytics</strong>
+                                                <span>Last 7 Days</span>
+                                            </div>
+                                            <div class="mockup-bars">
+                                                <div class="bar-col"><div class="bar-val" style="height: 60px;"></div><span>Mon</span></div>
+                                                <div class="bar-col"><div class="bar-val" style="height: 75px;"></div><span>Tue</span></div>
+                                                <div class="bar-col"><div class="bar-val" style="height: 90px;"></div><span>Wed</span></div>
+                                                <div class="bar-col"><div class="bar-val" style="height: 80px;"></div><span>Thu</span></div>
+                                                <div class="bar-col"><div class="bar-val" style="height: 95px;"></div><span>Fri</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Teacher View -->
+                        <div class="showcase-panel" id="teacher-view" role="tabpanel" style="display: none;">
+                            <div class="mockup-window">
+                                <div class="mockup-header">
+                                    <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+                                    <div class="mockup-url">schoolos.osartech.com/teacher/scores</div>
+                                </div>
+                                <div class="mockup-body teacher-mockup">
+                                    <div class="mockup-main-full">
+                                        <div class="mockup-top-bar">
+                                            <h3>Gradebook: Class 10A - Mathematics</h3>
+                                            <button class="home-btn primary compact" type="button"><i class="fas fa-save"></i> Save Grades</button>
+                                        </div>
+                                        <div class="mockup-table">
+                                            <div class="table-header-row">
+                                                <span>Student Name</span><span>CA (40)</span><span>Exam (60)</span><span>Total</span><span>Grade</span>
+                                            </div>
+                                            <div class="table-body-row">
+                                                <span>Adeola Benson</span><input type="text" value="34" disabled> <input type="text" value="52" disabled> <strong>86</strong> <span class="badge a">A</span>
+                                            </div>
+                                            <div class="table-body-row">
+                                                <span>Chioma Okoro</span><input type="text" value="28" disabled> <input type="text" value="48" disabled> <strong>76</strong> <span class="badge b">B</span>
+                                            </div>
+                                            <div class="table-body-row">
+                                                <span>Musa Ibrahim</span><input type="text" value="31" disabled> <input type="text" value="42" disabled> <strong>73</strong> <span class="badge b">B</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Student View -->
+                        <div class="showcase-panel" id="student-view" role="tabpanel" style="display: none;">
+                            <div class="mockup-window">
+                                <div class="mockup-header">
+                                    <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+                                    <div class="mockup-url">schoolos.osartech.com/student/cbt</div>
+                                </div>
+                                <div class="mockup-body student-mockup">
+                                    <div class="mockup-main-full">
+                                        <div class="mockup-top-bar">
+                                            <div>
+                                                <h3>CBT Portal: Biology 101</h3>
+                                                <span>Time Left: <strong>14:25</strong></span>
+                                            </div>
+                                            <span class="badge warning"><i class="fas fa-clock"></i> Session Live</span>
+                                        </div>
+                                        <div class="mockup-cbt-box">
+                                            <p class="question"><strong>Question 4 of 20:</strong> Which of the following is responsible for photosynthesis in plant cells?</p>
+                                            <div class="cbt-options">
+                                                <label class="cbt-option"><input type="radio" name="mock-cbt" disabled> Mitochondria</label>
+                                                <label class="cbt-option active"><input type="radio" name="mock-cbt" checked disabled> Chloroplast</label>
+                                                <label class="cbt-option"><input type="radio" name="mock-cbt" disabled> Ribosome</label>
+                                                <label class="cbt-option"><input type="radio" name="mock-cbt" disabled> Nucleus</label>
+                                            </div>
+                                            <div class="cbt-actions-mock">
+                                                <button class="home-btn compact" type="button"><i class="fas fa-chevron-left"></i> Previous</button>
+                                                <button class="home-btn primary compact" type="button">Next <i class="fas fa-chevron-right"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Parent View -->
+                        <div class="showcase-panel" id="parent-view" role="tabpanel" style="display: none;">
+                            <div class="mockup-window">
+                                <div class="mockup-header">
+                                    <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+                                    <div class="mockup-url">schoolos.osartech.com/parent/dashboard</div>
+                                </div>
+                                <div class="mockup-body parent-mockup">
+                                    <div class="mockup-main-full">
+                                        <div class="mockup-top-bar">
+                                            <h3>Child Profile: Tunde Benson</h3>
+                                            <span class="badge info">JSS 3 Blue</span>
+                                        </div>
+                                        <div class="parent-grid-mock">
+                                            <div class="parent-card-mock">
+                                                <h4>Term Performance</h4>
+                                                <div class="subject-row"><span>Mathematics</span><strong>88%</strong></div>
+                                                <div class="subject-row"><span>English Language</span><strong>79%</strong></div>
+                                                <div class="subject-row"><span>Basic Science</span><strong>91%</strong></div>
+                                            </div>
+                                            <div class="parent-card-mock">
+                                                <h4>Attendance Summary</h4>
+                                                <div class="attendance-stat">
+                                                    <div class="circle-progress">
+                                                        <strong>96%</strong>
+                                                        <span>Present</span>
+                                                    </div>
+                                                    <p>36 days attended out of 38 total term days.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section class="home-section home-section-soft" id="roles" aria-label="Role workflows">
                 <div class="section-head">
                     <h2>Clear access for every user</h2>
@@ -134,6 +331,138 @@
                         <h3>Parent</h3>
                         <p>Linked-child results, comparisons, attendance, timetable, messages, and disputes.</p>
                     </article>
+                </div>
+            </section>
+
+            <section class="home-section home-tech-stack" id="tech-stack">
+                <div class="section-head">
+                    <h2>Robust & Modern Technology Stack</h2>
+                    <p>SchoolOS is engineered with industry-grade technologies to guarantee security, speed, and 99.9% reliability.</p>
+                </div>
+                <div class="tech-grid">
+                    <div class="tech-card-item">
+                        <div class="tech-icon"><i class="fab fa-python"></i></div>
+                        <h3>Flask (Python)</h3>
+                        <p>Core backend framework powering fast WSGI request handling, session control, and robust API endpoints.</p>
+                    </div>
+                    <div class="tech-card-item">
+                        <div class="tech-icon"><i class="fas fa-database"></i></div>
+                        <h3>PostgreSQL & SQLite</h3>
+                        <p>Relational databases using SQLAlchemy ORM for data persistence, indexing, and transactional integrity.</p>
+                    </div>
+                    <div class="tech-card-item">
+                        <div class="tech-icon"><i class="fas fa-bolt"></i></div>
+                        <h3>Socket.IO & Eventlet</h3>
+                        <p>Asynchronous runtime driving instant communication, real-time message sync, and zero-latency CBT notifications.</p>
+                    </div>
+                    <div class="tech-card-item">
+                        <div class="tech-icon"><i class="fas fa-shield-halved"></i></div>
+                        <h3>Enterprise Security</h3>
+                        <p>Role-based authorization rules, encrypted password hashing (bcrypt), and cross-site scripting (XSS/CSRF) guards.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="home-section testimonials-section" id="testimonials">
+                <div class="section-head">
+                    <h2>What Educational Leaders Say</h2>
+                    <p>See how school administrators and teachers are transforming their daily workflow with OSARtech SchoolOS.</p>
+                </div>
+                <div class="testimonials-grid">
+                    {% if testimonials %}
+                        {% for t in testimonials %}
+                            <div class="testimonial-card">
+                                <div class="stars">
+                                    {% for i in range(t.stars) %}
+                                        <i class="fas fa-star"></i>
+                                    {% endfor %}
+                                </div>
+                                <p class="testimonial-text">{{ t.quote_text }}</p>
+                                <div class="testimonial-author">
+                                    <div class="author-details">
+                                        <strong>{{ t.author_name }}</strong>
+                                        <span>{{ t.author_title }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="testimonial-card">
+                            <div class="stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                            <p class="testimonial-text">"OSARtech SchoolOS has completely transformed our result processing. What used to take our teachers weeks now takes just a couple of clicks. The CBT module is a massive bonus!"</p>
+                            <div class="testimonial-author">
+                                <div class="author-details">
+                                    <strong>Mrs. Funmi Alao</strong>
+                                    <span>Principal, Grace Academy</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="testimonial-card">
+                            <div class="stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                            <p class="testimonial-text">"The parent portal has reduced our administrative phone calls by 80%. Parents can log in and view their child's timetable and performance immediately. Highly recommended!"</p>
+                            <div class="testimonial-author">
+                                <div class="author-details">
+                                    <strong>Mr. Emeka Okoye</strong>
+                                    <span>Proprietor, Kings College</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="testimonial-card">
+                            <div class="stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                            <p class="testimonial-text">"Entering grades and taking daily attendance is incredibly fast. The UI is clean, intuitive, and works flawlessly on my tablet during class hours."</p>
+                            <div class="testimonial-author">
+                                <div class="author-details">
+                                    <strong>Mr. Ibrahim Musa</strong>
+                                    <span>Senior Teacher, Zenith High</span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="home-section faq-section" id="faq">
+                <div class="section-head">
+                    <h2>Frequently Asked Questions</h2>
+                    <p>Find answers to common questions about setting up and using OSARtech SchoolOS.</p>
+                </div>
+                <div class="faq-container">
+                    <div class="faq-item">
+                        <button class="faq-question" type="button" aria-expanded="false">
+                            <span>How easy is it to migrate our current school data?</span>
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Extremely easy! We support bulk Excel uploads for students, parents, teachers, and class structures. Our support team can also assist with direct database migrations if needed.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <button class="faq-question" type="button" aria-expanded="false">
+                            <span>Can parents access their children's results on mobile?</span>
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Yes. OSARtech SchoolOS is built from the ground up to be fully mobile-responsive. Parents can view results, attendance sheets, exam schedules, and send messages directly from their mobile phones.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <button class="faq-question" type="button" aria-expanded="false">
+                            <span>How does the Computer Based Testing (CBT) autosave work?</span>
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Our CBT module uses local caching and continuous auto-saving to the server. If a student's system goes off or the network drops, their answers are stored locally and immediately synced once connection is restored, ensuring zero data loss.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <button class="faq-question" type="button" aria-expanded="false">
+                            <span>Is our school's academic data secure?</span>
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Security is our highest priority. The system enforces strict role-based access control, secure HTTPS communication, encrypted password hashing, and regular automated database backups, ensuring your information remains private and safe.</p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -183,6 +512,60 @@
                     localStorage.setItem('theme', 'light');
                 }
                 updateToggleUI(newTheme);
+            });
+        })();
+
+        // Showcase tab switching logic
+        (function() {
+            const tabs = document.querySelectorAll('.showcase-tab');
+            const panels = document.querySelectorAll('.showcase-panel');
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => {
+                        t.classList.remove('active');
+                        t.setAttribute('aria-selected', 'false');
+                    });
+                    tab.classList.add('active');
+                    tab.setAttribute('aria-selected', 'true');
+                    
+                    panels.forEach(panel => {
+                        panel.style.display = 'none';
+                        panel.classList.remove('active');
+                    });
+                    
+                    const targetId = tab.getAttribute('data-target');
+                    const targetPanel = document.getElementById(targetId);
+                    if (targetPanel) {
+                        targetPanel.style.display = 'block';
+                        setTimeout(() => {
+                            targetPanel.classList.add('active');
+                        }, 20);
+                    }
+                });
+            });
+        })();
+
+        // FAQ Accordion logic
+        (function() {
+            const faqQuestions = document.querySelectorAll('.faq-question');
+            
+            faqQuestions.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const faqItem = btn.parentElement;
+                    const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+                    
+                    btn.setAttribute('aria-expanded', !isExpanded);
+                    faqItem.classList.toggle('active');
+                    
+                    const allItems = document.querySelectorAll('.faq-item');
+                    allItems.forEach(item => {
+                        if (item !== faqItem) {
+                            item.classList.remove('active');
+                            item.querySelector('.faq-question').setAttribute('aria-expanded', 'false');
+                        }
+                    });
+                });
             });
         })();
     </script>

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leader Testimonials - Super Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .testimonials-grid { display: grid; gap: 20px; grid-template-columns: 1fr; }
+        @media (min-width: 992px) {
+            .testimonials-grid { grid-template-columns: 2fr 1fr; }
+        }
+        .stars-select { display: flex; gap: 8px; font-size: 24px; cursor: pointer; color: #cbd5e1; }
+        .stars-select i.active { color: #f59e0b; }
+        .quote-bubble { background: #f8fafc; border-left: 4px solid #1f7a8c; padding: 12px 16px; border-radius: 0 8px 8px 0; font-style: italic; margin-bottom: 12px; }
+        [data-theme="dark"] .quote-bubble { background: #1e293b; border-left-color: #38bdf8; color: #f1f5f9; }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'testimonials' %}
+        {% include 'super/_super_admin_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-quote-left"></i> Homepage Testimonials</h1>
+                    <p class="meta-line">Manage the "What Educational Leaders Say" section displayed on the landing page.</p>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="testimonials-grid">
+                    <!-- Left: Current Testimonials List -->
+                    <div class="card">
+                        <h2><i class="fas fa-list-ol"></i> Current Testimonials</h2>
+                        {% if testimonials %}
+                            <table class="enhanced-table">
+                                <thead>
+                                    <tr>
+                                        <th>Author</th>
+                                        <th>Quote / Testimonial</th>
+                                        <th>Stars & Order</th>
+                                        <th style="text-align: right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for t in testimonials %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ t.author_name }}</strong><br>
+                                                <small class="muted">{{ t.author_title }}</small>
+                                            </td>
+                                            <td>
+                                                <div class="quote-bubble">
+                                                    {{ t.quote_text }}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    {% for i in range(t.stars) %}
+                                                        <i class="fas fa-star" style="color: #f59e0b; font-size: 12px;"></i>
+                                                    {% endfor %}
+                                                </div>
+                                                <small class="muted">Order: {{ t.order_index }}</small>
+                                            </td>
+                                            <td style="text-align: right;">
+                                                <button type="button" class="btn btn-secondary btn-sm" onclick="populateEditForm({{ t|tojson|safe }})">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this testimonial?');">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="action" value="delete">
+                                                    <input type="hidden" name="quote_id" value="{{ t.id }}">
+                                                    <button type="submit" class="btn btn-danger btn-sm" style="background: var(--gradient-danger);">
+                                                        <i class="fas fa-trash"></i> Delete
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <p class="muted">No custom testimonials found. The system is currently falling back to standard presets.</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Right: Add / Edit Form -->
+                    <div class="card">
+                        <h2 id="form-title"><i class="fas fa-plus-circle"></i> Add Testimonial</h2>
+                        <form method="post" id="testimonial-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="action" id="form-action" value="add">
+                            <input type="hidden" name="quote_id" id="form-quote-id" value="">
+
+                            <div class="form-group">
+                                <label for="author_name">Author Name:</label>
+                                <input type="text" id="author_name" name="author_name" placeholder="e.g. Mrs. Funmi Alao" required>
+                            </div>
+
+                            <div class="form-group mt-12">
+                                <label for="author_title">Author Title & School:</label>
+                                <input type="text" id="author_title" name="author_title" placeholder="e.g. Principal, Grace Academy" required>
+                            </div>
+
+                            <div class="form-group mt-12">
+                                <label for="quote_text">Testimonial Quote:</label>
+                                <textarea id="quote_text" name="quote_text" rows="4" placeholder="Enter what they say..." required></textarea>
+                            </div>
+
+                            <div class="form-group mt-12">
+                                <label>Stars rating:</label>
+                                <div class="stars-select" id="stars-container">
+                                    <i class="fas fa-star active" data-val="1"></i>
+                                    <i class="fas fa-star active" data-val="2"></i>
+                                    <i class="fas fa-star active" data-val="3"></i>
+                                    <i class="fas fa-star active" data-val="4"></i>
+                                    <i class="fas fa-star active" data-val="5"></i>
+                                </div>
+                                <input type="hidden" name="stars" id="form-stars" value="5">
+                            </div>
+
+                            <div class="form-group mt-12">
+                                <label for="order_index">Order Index (lower values display first):</label>
+                                <input type="number" id="order_index" name="order_index" value="0" min="0" required>
+                            </div>
+
+                            <div class="mt-16 flex gap-10">
+                                <button type="submit" class="btn btn-primary" id="submit-btn" style="flex: 1;">Save Testimonial</button>
+                                <button type="button" class="btn btn-secondary" id="cancel-btn" style="display: none;" onclick="resetForm()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    <script>
+        // Stars selector logic
+        const stars = document.querySelectorAll('#stars-container i');
+        const starsInput = document.getElementById('form-stars');
+        stars.forEach(star => {
+            star.addEventListener('click', function() {
+                const val = parseInt(this.getAttribute('data-val'));
+                starsInput.value = val;
+                stars.forEach((s, idx) => {
+                    if (idx < val) {
+                        s.classList.add('active');
+                    } else {
+                        s.classList.remove('active');
+                    }
+                });
+            });
+        });
+
+        // Edit mode populate
+        function populateEditForm(t) {
+            document.getElementById('form-title').innerHTML = '<i class="fas fa-edit"></i> Edit Testimonial';
+            document.getElementById('form-action').value = 'edit';
+            document.getElementById('form-quote-id').value = t.id;
+            document.getElementById('author_name').value = t.author_name;
+            document.getElementById('author_title').value = t.author_title;
+            document.getElementById('quote_text').value = t.quote_text;
+            document.getElementById('order_index').value = t.order_index;
+            
+            // Set stars
+            starsInput.value = t.stars;
+            stars.forEach((s, idx) => {
+                if (idx < t.stars) {
+                    s.classList.add('active');
+                } else {
+                    s.classList.remove('active');
+                }
+            });
+
+            document.getElementById('cancel-btn').style.display = 'block';
+            document.getElementById('submit-btn').textContent = 'Update Testimonial';
+            document.getElementById('testimonial-form').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Reset form
+        function resetForm() {
+            document.getElementById('form-title').innerHTML = '<i class="fas fa-plus-circle"></i> Add Testimonial';
+            document.getElementById('form-action').value = 'add';
+            document.getElementById('form-quote-id').value = '';
+            document.getElementById('testimonial-form').reset();
+            
+            starsInput.value = 5;
+            stars.forEach(s => s.classList.add('active'));
+
+            document.getElementById('cancel-btn').style.display = 'none';
+            document.getElementById('submit-btn').textContent = 'Save Testimonial';
+        }
+    </script>
+</body>
+</html>

@@ -239,8 +239,8 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=SESSION_TIMEOUT_MIN
 
 LOGIN_MAX_ATTEMPTS = 4
 LOGIN_LOCK_MINUTES = 2
-STARTUP_SCHEMA_VERSION = '2026-06-16.1'
-EXPECTED_ALEMBIC_HEAD = '013_student_fee_review_queue'
+STARTUP_SCHEMA_VERSION = '2026-07-04.1'
+EXPECTED_ALEMBIC_HEAD = '014_leader_quotes'
 _DB_POOL = None
 _SCHOOL_LOGO_CACHE = {}
 _SCHOOL_LOGO_CACHE_TTL = 600
@@ -7339,6 +7339,26 @@ def init_db():
     db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_cbt_attempt_events_lookup ON cbt_attempt_events(school_id, attempt_id, created_at DESC)')
     db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_cbt_attempts_activity_lookup ON cbt_attempts(school_id, test_id, last_activity_at DESC)')
     db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_cbt_accommodations_lookup ON cbt_test_accommodations(school_id, test_id, student_id)')
+    db_execute(c, """CREATE TABLE IF NOT EXISTS leader_quotes (
+                        id SERIAL PRIMARY KEY,
+                        author_name TEXT NOT NULL,
+                        author_title TEXT NOT NULL,
+                        quote_text TEXT NOT NULL,
+                        stars INTEGER DEFAULT 5,
+                        order_index INTEGER DEFAULT 0
+                    )""")
+    # Seed default testimonials if table is empty
+    db_execute(c, "SELECT COUNT(*) FROM leader_quotes")
+    count_row = c.fetchone()
+    if count_row and count_row[0] == 0:
+        db_execute(c, """INSERT INTO leader_quotes (author_name, author_title, quote_text, stars, order_index) VALUES 
+            (?, ?, ?, ?, ?),
+            (?, ?, ?, ?, ?),
+            (?, ?, ?, ?, ?)""", (
+                "Mrs. Funmi Alao", "Principal, Grace Academy", '"OSARtech SchoolOS has completely transformed our result processing. What used to take our teachers weeks now takes just a couple of clicks. The CBT module is a massive bonus!"', 5, 1,
+                "Mr. Emeka Okoye", "Proprietor, Kings College", '"The parent portal has reduced our administrative phone calls by 80%. Parents can log in and view their child\'s timetable and performance immediately. Highly recommended!"', 5, 2,
+                "Mr. Ibrahim Musa", "Senior Teacher, Zenith High", '"Entering grades and taking daily attendance is incredibly fast. The UI is clean, intuitive, and works flawlessly on my tablet during class hours."', 5, 3
+            ))
     db_execute(c, """CREATE TABLE IF NOT EXISTS sms_delivery_logs (
                         id SERIAL PRIMARY KEY,
                         school_id TEXT NOT NULL,
@@ -29975,13 +29995,34 @@ def school_logo_proxy(school_id):
     resp.headers['Cache-Control'] = 'public, max-age=600'
     return resp
 
+def get_leader_quotes():
+    """Fetch all leader quotes ordered by order_index, then id."""
+    out = []
+    try:
+        with db_connection() as conn:
+            c = conn.cursor()
+            db_execute(c, "SELECT id, author_name, author_title, quote_text, stars, order_index FROM leader_quotes ORDER BY order_index ASC, id ASC")
+            for r in c.fetchall() or []:
+                out.append({
+                    'id': r[0],
+                    'author_name': r[1] or '',
+                    'author_title': r[2] or '',
+                    'quote_text': r[3] or '',
+                    'stars': int(r[4] or 5),
+                    'order_index': int(r[5] or 0)
+                })
+    except Exception as exc:
+        logging.warning("Error fetching leader quotes: %s", exc)
+    return out
+
 @app.route('/')
 def home():
     if session.get('cbt_only') and session.get('role') == 'student':
         return redirect(url_for('student_cbt'))
     if session.get('role'):
         return redirect(url_for('menu'))
-    return render_template('shared/home.html', now=datetime.now())
+    testimonials = get_leader_quotes()
+    return render_template('shared/home.html', now=datetime.now(), testimonials=testimonials)
 
 
 def _issue_school_access_challenge():
@@ -54172,6 +54213,147 @@ def super_admin_system_settings():
         sms_override_set=sms_override_set,
         email_env_enabled=bool(EMAIL_SENDING_ENABLED),
         sms_env_enabled=bool(SMS_SENDING_ENABLED),
+    )
+
+@app.route('/super-admin/testimonials', methods=['GET', 'POST'])
+def super_admin_testimonials():
+    if (session.get('role') or '').strip().lower() != 'super_admin':
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        action = (request.form.get('action') or '').strip()
+        
+        if action == 'add':
+            author_name = (request.form.get('author_name') or '').strip()
+            author_title = (request.form.get('author_title') or '').strip()
+            quote_text = (request.form.get('quote_text') or '').strip()
+            stars = int(request.form.get('stars') or 5)
+            order_index = int(request.form.get('order_index') or 0)
+            
+            if not author_name or not author_title or not quote_text:
+                flash('All fields are required.', 'error')
+            else:
+                try:
+                    with db_connection() as conn:
+                        c = conn.cursor()
+                        db_execute(c, """INSERT INTO leader_quotes (author_name, author_title, quote_text, stars, order_index)
+                                         VALUES (?, ?, ?, ?, ?)""", (author_name, author_title, quote_text, stars, order_index))
+                        conn.commit()
+                    flash('Testimonial added successfully.', 'success')
+                except Exception as exc:
+                    flash(f'Failed to add testimonial: {exc}', 'error')
+                    
+        elif action == 'edit':
+            quote_id = request.form.get('quote_id')
+            author_name = (request.form.get('author_name') or '').strip()
+            author_title = (request.form.get('author_title') or '').strip()
+            quote_text = (request.form.get('quote_text') or '').strip()
+            stars = int(request.form.get('stars') or 5)
+            order_index = int(request.form.get('order_index') or 0)
+            
+            if not author_name or not author_title or not quote_text or not quote_id:
+                flash('All fields are required.', 'error')
+            else:
+                try:
+                    with db_connection() as conn:
+                        c = conn.cursor()
+                        db_execute(c, """UPDATE leader_quotes 
+                                         SET author_name = ?, author_title = ?, quote_text = ?, stars = ?, order_index = ?
+                                         WHERE id = ?""", (author_name, author_title, quote_text, stars, order_index, int(quote_id)))
+                        conn.commit()
+                    flash('Testimonial updated successfully.', 'success')
+                except Exception as exc:
+                    flash(f'Failed to update testimonial: {exc}', 'error')
+                    
+        elif action == 'delete':
+            quote_id = request.form.get('quote_id')
+            if quote_id:
+                try:
+                    with db_connection() as conn:
+                        c = conn.cursor()
+                        db_execute(c, "DELETE FROM leader_quotes WHERE id = ?", (int(quote_id),))
+                        conn.commit()
+                    flash('Testimonial deleted successfully.', 'success')
+                except Exception as exc:
+                    flash(f'Failed to delete testimonial: {exc}', 'error')
+                    
+        return redirect(url_for('super_admin_testimonials'))
+        
+    testimonials = get_leader_quotes()
+    _schools, overview = _build_super_admin_school_overview()
+    last_login_at = format_timestamp(get_last_login_at(session.get('user_id')))
+    return render_template(
+        'super/super_admin_testimonials.html',
+        active_page='testimonials',
+        testimonials=testimonials,
+        overview=overview,
+        last_login_at=last_login_at
+    )
+
+@app.route('/super-admin/profile', methods=['GET', 'POST'])
+def super_admin_profile():
+    if (session.get('role') or '').strip().lower() != 'super_admin':
+        return redirect(url_for('login'))
+        
+    username = session.get('user_id')
+    user = get_user(username)
+    
+    if request.method == 'POST':
+        email = (request.form.get('email') or '').strip().lower()
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        if not email:
+            flash('Email is required.', 'error')
+            return redirect(url_for('super_admin_profile'))
+            
+        # Optional password update
+        if current_password or new_password or confirm_password:
+            if not current_password or not new_password or not confirm_password:
+                flash('All password fields are required if you want to change your password.', 'error')
+                return redirect(url_for('super_admin_profile'))
+                
+            if new_password != confirm_password:
+                flash('New passwords do not match.', 'error')
+                return redirect(url_for('super_admin_profile'))
+                
+            ok_pwd, pwd_msg = validate_admin_password_strength(new_password)
+            if not ok_pwd:
+                flash(f'Password strength: {pwd_msg}', 'error')
+                return redirect(url_for('super_admin_profile'))
+                
+            if not user or not check_password(user['password_hash'], current_password):
+                flash('Current password is incorrect.', 'error')
+                return redirect(url_for('super_admin_profile'))
+                
+            password_hash = hash_password(new_password)
+        else:
+            password_hash = user['password_hash']
+            
+        try:
+            with db_connection() as conn:
+                c = conn.cursor()
+                if email != username:
+                    db_execute(c, "UPDATE users SET username = ?, password_hash = ? WHERE username = ?", (email, password_hash, username))
+                    session['user_id'] = email
+                else:
+                    db_execute(c, "UPDATE users SET password_hash = ? WHERE username = ?", (password_hash, username))
+                conn.commit()
+            flash('Profile updated successfully.', 'success')
+        except Exception as exc:
+            flash(f'Failed to update profile: {exc}', 'error')
+            
+        return redirect(url_for('super_admin_profile'))
+        
+    _schools, overview = _build_super_admin_school_overview()
+    last_login_at = format_timestamp(get_last_login_at(session.get('user_id')))
+    return render_template(
+        'super/super_admin_profile.html',
+        active_page='profile',
+        user=user,
+        overview=overview,
+        last_login_at=last_login_at
     )
 
 @app.route('/view-reports/mark-all-read', methods=['POST'])
