@@ -240,7 +240,7 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=SESSION_TIMEOUT_MIN
 LOGIN_MAX_ATTEMPTS = 4
 LOGIN_LOCK_MINUTES = 2
 STARTUP_SCHEMA_VERSION = '2026-06-16.1'
-EXPECTED_ALEMBIC_HEAD = '008_class_timetables_online_url'
+EXPECTED_ALEMBIC_HEAD = '013_student_fee_review_queue'
 _DB_POOL = None
 _SCHOOL_LOGO_CACHE = {}
 _SCHOOL_LOGO_CACHE_TTL = 600
@@ -5991,7 +5991,7 @@ try:
     os.makedirs(_LOG_DIR, exist_ok=True)
 except Exception:
     _LOG_DIR = os.path.dirname(__file__)
-_LOG_PATH = os.path.join(_LOG_DIR, 'app.log')
+_LOG_PATH = os.path.join(_LOG_DIR, 'test.log' if IS_TESTING else 'app.log')
 _LOG_HANDLER = RotatingFileHandler(_LOG_PATH, maxBytes=2 * 1024 * 1024, backupCount=5, encoding='utf-8')
 _LOG_HANDLER.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 _ROOT_LOGGER = logging.getLogger()
@@ -19819,6 +19819,8 @@ def _background_worker_loop():
         _BACKGROUND_WORKER_STOP.wait(max(BACKGROUND_WORKER_INTERVAL_SECONDS, wait_seconds))
 
 def _should_start_background_worker():
+    if IS_TESTING:
+        return False
     if not ENABLE_BACKGROUND_WORKER:
         return False
     try:

@@ -9,150 +9,583 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { min-height: 100vh; }
-        .container { width: min(1000px, 100%); margin: 0 auto; padding: 24px; }
-        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .header h1 { margin: 0; font-size: 1.8rem; }
-        .header .back { color: white; text-decoration: none; font-weight: 700; }
-        .student-list { max-height: 420px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
-        .student-item { padding: 12px 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .student-item:last-child { border-bottom: none; }
-        .student-item:hover { background: #f8f9fa; }
-        .student-meta { flex: 1; min-width: 220px; cursor: pointer; }
-        .student-name { font-weight: 800; display: block; }
-        .student-note { color: #5a6c7d; font-size: 0.92rem; margin-top: 3px; }
-        .student-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-        .student-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 0.82rem; font-weight: 700; margin-top: 6px; }
-        .student-chip.pass { background: #dcfce7; color: #166534; }
-        .student-chip.fail { background: #fee2e2; color: #991b1b; }
-        .student-chip.auto { background: #e0f2fe; color: #075985; }
-        .info-box { background: #fff8dd; border: 1px solid #f1d98b; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 10px; }
+        :root {
+            --brand-color: #1e3a8a;
+            --brand-gradient: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            --surface-color: #ffffff;
+            --bg-color: #f1f5f9;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --accent-color: #3b82f6;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            width: min(1000px, 100%);
+            margin: 0 auto;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header .back {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: color 0.2s ease;
+        }
+        .header .back:hover {
+            color: var(--brand-color);
+        }
+        
+        .promo-instructions {
+            background: #fffbeb;
+            border: 1.5px solid #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        .promo-instructions p {
+            margin: 4px 0;
+            font-size: 0.88rem;
+            color: #78350f;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .promo-wizard-flow {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+
+        .wizard-step-card {
+            background: var(--surface-color);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.05);
+            padding: 24px;
+        }
+
+        .wizard-step-card h2 {
+            margin-top: 0;
+            font-size: 1.15rem;
+            font-weight: 750;
+            color: var(--text-main);
+            border-bottom: 1.5px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-select-group {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .form-select-group .form-group {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            background-color: #f8fafc;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+        select:focus {
+            border-color: var(--accent-color);
+            background-color: #fff;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        /* Action Buttons */
+        .bulk-action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            background: #f8fafc;
+            padding: 14px 18px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 16px;
+        }
+        .bulk-title {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--text-main);
+        }
+        .bulk-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .student-list-container {
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #ffffff;
+        }
+        
+        .student-list-header {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            background: #f8fafc;
+            padding: 12px 20px;
+            border-bottom: 1.5px solid var(--border-color);
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .student-list-body {
+            max-height: 480px;
+            overflow-y: auto;
+        }
+
+        .student-item-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s ease;
+        }
+        .student-item-row:last-child {
+            border-bottom: none;
+        }
+        .student-item-row:hover {
+            background-color: #f8fafc;
+        }
+
+        .student-details-pane {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .student-fullname {
+            font-weight: 750;
+            font-size: 1rem;
+            color: var(--text-main);
+        }
+        .student-academic-meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .meta-divider {
+            color: var(--border-color);
+        }
+
+        .recommended-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            margin-top: 4px;
+            width: fit-content;
+        }
+        .recommended-badge.promote {
+            background-color: #dcfce7;
+            color: #15803d;
+        }
+        .recommended-badge.repeat {
+            background-color: #fee2e2;
+            color: #b91c1c;
+        }
+
+        /* custom switch selector row */
+        .action-selector-group {
+            display: flex;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: 8px;
+            border: 1.5px solid var(--border-color);
+            gap: 2px;
+        }
+        .action-option-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .action-option-label input[type="radio"] {
+            display: none;
+        }
+        .action-option-label:hover {
+            color: var(--text-main);
+        }
+        
+        /* radio colors on check */
+        .action-option-label.checked-promote {
+            background-color: #22c55e;
+            color: #ffffff !important;
+            box-shadow: 0 2px 4px rgba(34, 197, 94, 0.25);
+        }
+        .action-option-label.checked-repeat {
+            background-color: #ef4444;
+            color: #ffffff !important;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.25);
+        }
+        .action-option-label.checked-remove {
+            background-color: #64748b;
+            color: #ffffff !important;
+            box-shadow: 0 2px 4px rgba(100, 116, 139, 0.25);
+        }
+
+        .submit-section {
+            display: flex;
+            justify-content: flex-end;
+            gap: 16px;
+            margin-top: 12px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 24px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            border: none;
+        }
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        .btn-secondary:hover {
+            background: #cbd5e1;
+        }
+        .btn-primary {
+            background: var(--brand-gradient);
+            color: white;
+            box-shadow: 0 4px 10px rgba(30, 58, 138, 0.15);
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(30, 58, 138, 0.25);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+            color: white;
+            box-shadow: 0 4px 10px rgba(22, 163, 74, 0.15);
+        }
+        .btn-success:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(22, 163, 74, 0.25);
+        }
+        .btn-xs {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            border-radius: 6px;
+        }
+
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        .flash {
+            padding: 14px 20px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 500;
+        }
+        .flash.error {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .flash.success {
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
+        }
+        .flash.info {
+            background-color: #e0f2fe;
+            color: #0369a1;
+            border: 1px solid #bae6fd;
+        }
     </style>
 </head>
 <body>
     {% include "shared/_loading_overlay.html" %}
     <div class="app-shell topbar-layout">
-    {% set active_page = 'promote' %}
-    {% include 'school/_school_admin_sidebar.html' %}
-    <div class="main-content">
-    <div class="container">
-        <div class="header">
-            <h1><i class="fas fa-arrow-up"></i> Promote Students</h1>
-            <a href="{{ url_for('school_admin_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back</a>
-        </div>
+        {% set active_page = 'promote' %}
+        {% include 'school/_school_admin_sidebar.html' %}
         
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="flash {{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        
-        <div class="card">
-            <h2><i class="fas fa-info-circle"></i> Instructions</h2>
-            <div class="info-box">
-                <p>1. Select the current class and the class to promote students to.</p>
-                <p>2. Choose action per student: <strong>Promote</strong>, <strong>Repeat</strong>, or <strong>Remove (Left School)</strong>.</p>
-                <p>3. Students set to Repeat stay in the same class.</p>
-                <p>4. Normal flow is Nursery to Primary, Primary 6 to JSS1, and SS3 to <strong>Graduated</strong>.</p>
-                <p>5. Use <strong>Auto-select actions</strong> to prefill Promote/Repeat from the school's pass mark, then review before saving.</p>
-            </div>
-
-            <div class="note" style="margin-bottom:16px;">
-                Promotion pass mark: <strong>{{ pass_mark }}</strong>.
-                Anything below this score is treated as a repeat in auto-promotion.
-            </div>
-
-            <form method="GET" style="margin-bottom: 20px;">
-                <div class="form-group">
-                    <label for="from_class_filter">Current Class (View List):</label>
-                    <select id="from_class_filter" name="from_class" onchange="this.form.submit()">
-                        <option value="">Select Class...</option>
-                        {% for cls in classes %}
-                        <option value="{{ cls }}" {% if selected_class == cls %}selected{% endif %}>{{ cls }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="student-actions" style="margin-bottom: 6px;">
-                    {% if selected_class %}
-                    <a href="{{ url_for('school_admin_promote', from_class=selected_class, auto=1) }}" class="btn btn-secondary">
-                        <i class="fas fa-wand-magic-sparkles"></i> Auto-select Actions
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-arrow-up"></i> Promote Students</h1>
+                    <a href="{{ url_for('school_admin_dashboard') }}" class="back">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
                     </a>
-                    {% endif %}
-                    {% if auto_decide %}
-                    <span class="student-chip auto">Auto-select mode active</span>
-                    {% endif %}
                 </div>
-            </form>
 
-            <form method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <div class="form-group">
-                    <label for="from_class">Current Class:</label>
-                    <select id="from_class" name="from_class" required>
-                        <option value="">Select Class...</option>
-                        {% for cls in classes %}
-                        <option value="{{ cls }}" {% if selected_class == cls %}selected{% endif %}>{{ cls }}</option>
-                        {% endfor %}
-                    </select>
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flash-messages">
+                            {% for category, message in messages %}
+                                <div class="flash {{ category }}">
+                                    <i class="fas {% if category == 'error' %}fa-exclamation-circle{% elif category == 'success' %}fa-check-circle{% else %}fa-info-circle{% endif %}"></i>
+                                    <span>{{ message }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <div class="promo-instructions">
+                    <p><i class="fas fa-info-circle"></i> Promote, Repeat, or Remove students from classes. The pass mark threshold is <strong>{{ pass_mark }}</strong>.</p>
                 </div>
-                
-                <div class="form-group">
-                    <label for="to_class">Promote To:</label>
-                    <select id="to_class" name="to_class" required>
-                        <option value="">Select Class...</option>
-                        {% for cls in to_class_options %}
-                        <option value="{{ cls }}">{{ cls }}</option>
-                        {% endfor %}
-                    </select>
-                    {% if suggested_next_class %}
-                    <small style="display:block;margin-top:8px;color:#555;">
-                        Suggested next class for selected students: <strong>{{ suggested_next_class }}</strong>
-                    </small>
+
+                <div class="promo-wizard-flow">
+                    <!-- Step 1: Select Scope -->
+                    <div class="wizard-step-card">
+                        <h2><i class="fas fa-filter"></i> Step 1: Select Target Classes</h2>
+                        <form method="GET" id="classSelectorForm" class="form-select-group">
+                            <div class="form-group">
+                                <label for="from_class_filter" style="font-weight: 700; margin-bottom: 6px; display: block;">Promote From (Source Class):</label>
+                                <select id="from_class_filter" name="from_class" onchange="this.form.submit()">
+                                    <option value="">-- Select Source Class --</option>
+                                    {% for cls in classes %}
+                                    <option value="{{ cls }}" {% if selected_class == cls %}selected{% endif %}>{{ cls }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Step 2: Manage Promotions (Only if class is selected) -->
+                    {% if selected_class %}
+                    <div class="wizard-step-card">
+                        <h2><i class="fas fa-users-gear"></i> Step 2: Assign Actions & Submit</h2>
+                        
+                        <form method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="from_class" value="{{ selected_class }}"/>
+
+                            <div class="form-group" style="margin-bottom: 24px;">
+                                <label for="to_class" style="font-weight: 700; margin-bottom: 6px; display: block;">Promote To (Target Class):</label>
+                                <select id="to_class" name="to_class" required style="max-width: 320px;">
+                                    <option value="">-- Select Target Class --</option>
+                                    {% for cls in to_class_options %}
+                                    <option value="{{ cls }}" {% if cls == suggested_next_class %}selected{% endif %}>{{ cls }}</option>
+                                    {% endfor %}
+                                </select>
+                                {% if suggested_next_class %}
+                                <small style="display:block; margin-top:8px; color:var(--text-muted);">
+                                    Suggested next class: <strong>{{ suggested_next_class }}</strong>
+                                </small>
+                                {% endif %}
+                            </div>
+
+                            <!-- Bulk actions bar -->
+                            <div class="bulk-action-bar">
+                                <span class="bulk-title"><i class="fas fa-bolt"></i> Bulk Select Actions:</span>
+                                <div class="bulk-buttons">
+                                    <button type="button" class="btn btn-secondary btn-xs" onclick="setAllActions('promote')">
+                                        <i class="fas fa-check"></i> Promote All
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-xs" onclick="setAllActions('repeat')">
+                                        <i class="fas fa-redo"></i> Repeat All
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-xs" onclick="resetToRecommended()">
+                                        <i class="fas fa-wand-magic-sparkles"></i> Reset to Recommended
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label style="font-weight: 700; margin-bottom: 12px; display: block;">Class Students:</label>
+                                
+                                <div class="student-list-container">
+                                    <div class="student-list-header">
+                                        <span>Student Info</span>
+                                        <span style="text-align: right; padding-right: 24px;">Action Choice</span>
+                                    </div>
+                                    <div class="student-list-body">
+                                        {% for student_id, student in students.items() %}
+                                        <div class="student-item-row" data-student-id="{{ student_id }}" data-recommended="{{ student.recommended_action }}">
+                                            <div class="student-details-pane">
+                                                <span class="student-fullname">{{ student.firstname }}</span>
+                                                <div class="student-academic-meta">
+                                                    <span>{{ student.classname }}</span>
+                                                    {% if student.average_marks is not none %}
+                                                    <span class="meta-divider">|</span>
+                                                    <span>Avg: <strong>{{ '%.2f'|format(student.average_marks or 0) }}%</strong></span>
+                                                    {% endif %}
+                                                    <span class="meta-divider">|</span>
+                                                    <span>Status: {{ student.result_status or 'N/A' }}</span>
+                                                </div>
+                                                <span class="recommended-badge {{ student.recommended_action }}">
+                                                    Recommended: {{ 'Promote' if student.recommended_action == 'promote' else 'Repeat' }}
+                                                </span>
+                                            </div>
+                                            
+                                            <!-- Action Selector switches -->
+                                            <div class="action-selector-group">
+                                                <label class="action-option-label" id="lbl_promote_{{ student_id }}">
+                                                    <input type="radio" name="action_{{ student_id }}" value="promote" onchange="updateRowState('{{ student_id }}')" {% if student.default_action == 'promote' %}checked{% endif %}> Promote
+                                                </label>
+                                                <label class="action-option-label" id="lbl_repeat_{{ student_id }}">
+                                                    <input type="radio" name="action_{{ student_id }}" value="repeat" onchange="updateRowState('{{ student_id }}')" {% if student.default_action != 'promote' %}checked{% endif %}> Repeat
+                                                </label>
+                                                <label class="action-option-label" id="lbl_remove_{{ student_id }}">
+                                                    <input type="radio" name="action_{{ student_id }}" value="remove" onchange="updateRowState('{{ student_id }}')"> Remove
+                                                </label>
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <div style="padding: 30px; text-align: center; color: var(--text-muted);">
+                                            <i class="fas fa-user-slash" style="font-size: 2rem; margin-bottom: 8px; display: block; opacity: 0.5;"></i>
+                                            No active students found in this class.
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="submit-section">
+                                <a href="{{ url_for('school_admin_dashboard') }}" class="btn btn-secondary">Cancel</a>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-check-double"></i> Save Promotions
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    {% else %}
+                    <div class="wizard-step-card" style="text-align: center; padding: 48px 24px; color: var(--text-muted);">
+                        <i class="fas fa-graduation-cap" style="font-size: 3.5rem; margin-bottom: 16px; color: var(--brand-color); opacity: 0.25;"></i>
+                        <h3 style="margin: 0; color: var(--text-main);">No Class Selected</h3>
+                        <p style="margin: 8px 0 0 0;">Select a source class in Step 1 to load the list of students eligible for promotion.</p>
+                    </div>
                     {% endif %}
                 </div>
-                
-                <div class="form-group">
-                    <label>Class Students and Actions:</label>
-                    <div class="student-list">
-                        {% for student_id, student in students.items() %}
-                        <div class="student-item">
-                            <label class="student-meta" for="promote_{{ student_id }}">
-                                <span class="student-name">{{ student.firstname }}</span>
-                                <div class="student-note">
-                                    {{ student.classname }}
-                                    {% if student.average_marks is not none %}
-                                    | Avg: {{ '%.2f'|format(student.average_marks or 0) }}
-                                    {% endif %}
-                                    | Status: {{ student.result_status or 'N/A' }}
-                                </div>
-                                <span class="student-chip {{ 'pass' if student.recommended_action == 'promote' else 'fail' }}">
-                                    Recommended: {{ 'Promote' if student.recommended_action == 'promote' else 'Repeat' }}
-                                </span>
-                            </label>
-                            <div class="student-actions">
-                                <label><input type="radio" name="action_{{ student_id }}" value="promote" {% if student.default_action == 'promote' %}checked{% endif %}> Promote</label>
-                                <label><input type="radio" name="action_{{ student_id }}" value="repeat" {% if student.default_action != 'promote' %}checked{% endif %}> Repeat</label>
-                                <label><input type="radio" name="action_{{ student_id }}" value="remove"> Remove</label>
-                            </div>
-                        </div>
-                        {% else %}
-                        <p style="padding: 20px; text-align: center;">No students found for this class.</p>
-                        {% endfor %}
-                    </div>
-                </div>
-                
-                <button type="submit" class="btn btn-success"><i class="fas fa-arrow-up"></i> Apply Actions</button>
-                <button type="submit" name="auto_decide" value="1" class="btn btn-primary" style="margin-left: 10px;">
-                    <i class="fas fa-wand-magic-sparkles"></i> Auto Promote & Save
-                </button>
-                <a href="{{ url_for('school_admin_dashboard') }}" class="btn btn-secondary" style="margin-left: 10px;">Cancel</a>
-            </form>
+            </div>
         </div>
     </div>
-    </div>
-    </div>
+
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    {% if selected_class %}
+    <script>
+        function updateRowState(studentId) {
+            const row = document.querySelector(`.student-item-row[data-student-id="${studentId}"]`);
+            const promoteLabel = document.getElementById(`lbl_promote_${studentId}`);
+            const repeatLabel = document.getElementById(`lbl_repeat_${studentId}`);
+            const removeLabel = document.getElementById(`lbl_remove_${studentId}`);
+            
+            const radioPromote = promoteLabel.querySelector('input');
+            const radioRepeat = repeatLabel.querySelector('input');
+            const radioRemove = removeLabel.querySelector('input');
+
+            // clear previous active classes
+            promoteLabel.classList.remove('checked-promote');
+            repeatLabel.classList.remove('checked-repeat');
+            removeLabel.classList.remove('checked-remove');
+
+            if (radioPromote.checked) {
+                promoteLabel.classList.add('checked-promote');
+            } else if (radioRepeat.checked) {
+                repeatLabel.classList.add('checked-repeat');
+            } else if (radioRemove.checked) {
+                removeLabel.classList.add('checked-remove');
+            }
+        }
+
+        // Initialize state colors on page load
+        document.querySelectorAll('.student-item-row').forEach(row => {
+            const studentId = row.getAttribute('data-student-id');
+            updateRowState(studentId);
+        });
+
+        // Set all checkboxes bulk
+        function setAllActions(actionType) {
+            document.querySelectorAll(`.student-item-row`).forEach(row => {
+                const studentId = row.getAttribute('data-student-id');
+                const label = document.getElementById(`lbl_${actionType}_${studentId}`);
+                if (label) {
+                    const input = label.querySelector('input');
+                    input.checked = true;
+                    updateRowState(studentId);
+                }
+            });
+        }
+
+        // Reset to system recommendations
+        function resetToRecommended() {
+            document.querySelectorAll('.student-item-row').forEach(row => {
+                const studentId = row.getAttribute('data-student-id');
+                const recommended = row.getAttribute('data-recommended'); // 'promote' or 'repeat'
+                const targetAction = recommended === 'promote' ? 'promote' : 'repeat';
+                const label = document.getElementById(`lbl_${targetAction}_${studentId}`);
+                if (label) {
+                    label.querySelector('input').checked = true;
+                    updateRowState(studentId);
+                }
+            });
+        }
+    </script>
+    {% endif %}
 </body>
 </html>

@@ -15,22 +15,10 @@
                         radial-gradient(circle at 90% 2%, rgba(15, 76, 129, 0.04), transparent 30%),
                         #f3f6fa;
         }
-        .container { max-width: 1560px; margin: 0 auto; padding: 24px 14px; }
+        .container { width: min(1220px, 100%); margin: 0 auto; padding: 24px; }
         
-        .header {
-            background: linear-gradient(135deg, var(--brand, #0f4c81) 0%, var(--brand-2, #1f7a8c) 100%);
-            color: white;
-            padding: 24px 28px;
-            border-radius: 18px;
-            margin-bottom: 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 12px;
-            flex-wrap: wrap;
-            box-shadow: 0 10px 30px rgba(15, 76, 129, 0.15);
-        }
-        .header h1 { margin: 0; font-size: 2rem; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.8rem; }
         .header .back { color: white; text-decoration: none; font-weight: 700; }
         
         .card {
@@ -54,10 +42,26 @@
         
         .table-wrap {
             overflow-x: auto;
+            max-height: 70vh;
+            overflow-y: auto;
             border: 1px solid #dbe6f3;
             border-radius: 14px;
             background: #fff;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.01);
+        }
+        .table-wrap::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .table-wrap::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .table-wrap::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .table-wrap::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
         }
         table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 0; min-width: 1400px; }
         th, td { padding: 14px 12px; text-align: center; border-right: 1px solid #d7dde4; border-bottom: 1px solid #d7dde4; vertical-align: middle; }
@@ -149,6 +153,19 @@
             background: rgba(15, 76, 129, 0.08);
             font-weight: 800;
             color: var(--brand, #0f4c81);
+            transition: all 0.2s ease;
+        }
+        /* Dynamic grade colors */
+        .grade-a { background: #d1fae5 !important; color: #065f46 !important; border: 1px solid #a7f3d0 !important; }
+        .grade-b { background: #e0f2fe !important; color: #0369a1 !important; border: 1px solid #bae6fd !important; }
+        .grade-c { background: #fef3c7 !important; color: #92400e !important; border: 1px solid #fde68a !important; }
+        .grade-d { background: #ffedd5 !important; color: #9a3412 !important; border: 1px solid #fed7aa !important; }
+        .grade-f { background: #fee2e2 !important; color: #991b1b !important; border: 1px solid #fca5a5 !important; }
+
+        /* Row highlight on active cell */
+        tbody tr.row-active td,
+        tbody tr.row-active th {
+            background: #eaf3ff !important;
         }
         
         .student-info {
@@ -381,7 +398,8 @@
                                                value="{{ s.get('overall_mark', 0) }}">
                                     </td>
                                     <td class="readonly-cell">
-                                        <span class="grade-chip auto-grade" data-subj-key="{{ subj_key }}">{{ s.get('grade', '-') }}</span>
+                                        {% set g_letter = (s.get('grade', '-') or '-').strip().upper() %}
+                                        <span class="grade-chip auto-grade {% if g_letter in ['A', 'B', 'C', 'D', 'F'] %}grade-{{ g_letter|lower }}{% endif %}" data-subj-key="{{ subj_key }}">{{ s.get('grade', '-') }}</span>
                                     </td>
                                     <td>
                                         <input type="text"
@@ -612,7 +630,15 @@
                 setInput(`.total-test[data-subj-key="${subjKey}"]`, totalTest);
                 setInput(`.total-exam[data-subj-key="${subjKey}"]`, totalExam);
                 setInput(`.overall-mark[data-subj-key="${subjKey}"]`, totalScore);
-                setText(`.auto-grade[data-subj-key="${subjKey}"]`, grade);
+                
+                const gradeCell = document.querySelector(`.auto-grade[data-subj-key="${subjKey}"]`);
+                if (gradeCell) {
+                    gradeCell.textContent = grade;
+                    gradeCell.className = 'grade-chip auto-grade';
+                    if (['A', 'B', 'C', 'D', 'F'].includes(grade)) {
+                        gradeCell.classList.add('grade-' + grade.toLowerCase());
+                    }
+                }
             }
 
             function recalcAll() {
@@ -715,8 +741,19 @@
                 });
                 
                 input.addEventListener('focus', () => {
+                    const row = input.closest('.subject-row');
+                    if (row) {
+                        row.classList.add('row-active');
+                    }
                     if (typeof input.select === 'function') {
                         input.select();
+                    }
+                });
+                
+                input.addEventListener('blur', () => {
+                    const row = input.closest('.subject-row');
+                    if (row) {
+                        row.classList.remove('row-active');
                     }
                 });
             });
@@ -732,6 +769,16 @@
                         markTouched(row.dataset.subjKey);
                     }
                 });
+                if (input.classList.contains('subject-comment-input')) {
+                    input.addEventListener('focus', () => {
+                        const row = input.closest('.subject-row');
+                        if (row) row.classList.add('row-active');
+                    });
+                    input.addEventListener('blur', () => {
+                        const row = input.closest('.subject-row');
+                        if (row) row.classList.remove('row-active');
+                    });
+                }
             });
 
             // Prevent navigating away with unsaved changes
@@ -744,6 +791,10 @@
             });
 
             window.submitMainForm = function() {
+                if (validationErrors.size > 0) {
+                    alert('Please correct the validation errors before saving.');
+                    return;
+                }
                 formHasChanges = false; // Prevent beforeunload popup
                 if (mainForm) mainForm.submit();
             };
