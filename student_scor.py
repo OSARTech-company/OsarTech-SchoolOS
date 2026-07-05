@@ -4922,6 +4922,7 @@ def _is_transient_db_transport_error(exc):
 
 SUPPORTED_CLASS_SEQUENCE = [
     'NURSERY1', 'NURSERY2', 'NURSERY3',
+    'KG1', 'KG2', 'KG3',
     'PRIMARY1', 'PRIMARY2', 'PRIMARY3', 'PRIMARY4', 'PRIMARY5', 'PRIMARY6',
     'JSS1', 'JSS2', 'JSS3',
     'SS1', 'SS2', 'SS3',
@@ -4935,17 +4936,17 @@ def canonicalize_classname(value):
         return ''
     # Normalize common aliases for primary and secondary classes.
     if cleaned.startswith('KINDERGARTING'):
-        cleaned = 'NURSERY' + cleaned[len('KINDERGARTING'):]
+        cleaned = 'KG' + cleaned[len('KINDERGARTING'):]
     elif cleaned.startswith('KINDERGARTEN'):
-        cleaned = 'NURSERY' + cleaned[len('KINDERGARTEN'):]
+        cleaned = 'KG' + cleaned[len('KINDERGARTEN'):]
     elif cleaned.startswith('KINDER'):
-        cleaned = 'NURSERY' + cleaned[len('KINDER'):]
+        cleaned = 'KG' + cleaned[len('KINDER'):]
     elif cleaned.startswith('NURSERY'):
         cleaned = 'NURSERY' + cleaned[len('NURSERY'):]
     elif cleaned.startswith('NUR'):
         cleaned = 'NURSERY' + cleaned[len('NUR'):]
     elif cleaned.startswith('KG'):
-        cleaned = 'NURSERY' + cleaned[len('KG'):]
+        cleaned = 'KG' + cleaned[len('KG'):]
     elif cleaned.startswith('PRIMARY'):
         cleaned = 'PRIMARY' + cleaned[len('PRIMARY'):]
     elif cleaned.startswith('BASIC'):
@@ -4980,7 +4981,7 @@ def canonicalize_classname(value):
 def _class_sort_key(value):
     cls = canonicalize_classname(value)
     level, number, arm = _split_class_level_number_arm(cls)
-    level_order = {'NURSERY': 0, 'PRIMARY': 1, 'JSS': 2, 'SS': 3}
+    level_order = {'NURSERY': 0, 'KG': 1, 'PRIMARY': 2, 'JSS': 3, 'SS': 4}
     if level and number is not None:
         return (level_order.get(level, 99), number, arm, cls)
     if cls == 'GRADUATED':
@@ -4992,12 +4993,12 @@ def is_primary_classname(value):
     cls = canonicalize_classname(value)
     if not cls:
         return False
-    match = re.fullmatch(r'(NURSERY|PRIMARY)(\d)([A-Z]*)', cls)
+    match = re.fullmatch(r'(NURSERY|KG|PRIMARY)(\d)([A-Z]*)', cls)
     if not match:
         return False
     level = match.group(1)
     level_num = int(match.group(2))
-    if level == 'NURSERY':
+    if level in ('NURSERY', 'KG'):
         return 1 <= level_num <= 3
     return 1 <= level_num <= 6
 
@@ -9396,7 +9397,7 @@ def _split_class_level_number_arm(classname):
     - SS2B -> ('SS', 2, 'B')
     """
     normalized = re.sub(r'[^A-Za-z0-9]+', '', (classname or '')).upper()
-    m = re.fullmatch(r'(NURSERY|PRIMARY|JSS|SSS|SS)(\d+)([A-Z]+)?', normalized)
+    m = re.fullmatch(r'(NURSERY|KG|PRIMARY|JSS|SSS|SS)(\d+)([A-Z]+)?', normalized)
     if not m:
         return '', None, ''
     level = m.group(1)
@@ -9420,7 +9421,7 @@ def _entry_year_for_first_level(current_year, first_year_class):
     """
     normalized = re.sub(r'[^A-Za-z0-9]+', '', (first_year_class or '')).upper()
     class_no = _extract_class_number(first_year_class) or 1
-    if normalized.startswith('NURSERY') or normalized.startswith('PRIMARY'):
+    if normalized.startswith('NURSERY') or normalized.startswith('KG') or normalized.startswith('PRIMARY'):
         return current_year - max(0, class_no - 1)
     if normalized.startswith('JSS'):
         return current_year - max(0, class_no - 1)
@@ -9595,6 +9596,9 @@ def next_class_in_sequence(classname):
         'NURSERY1': 'NURSERY2',
         'NURSERY2': 'NURSERY3',
         'NURSERY3': 'PRIMARY1',
+        'KG1': 'KG2',
+        'KG2': 'KG3',
+        'KG3': 'PRIMARY1',
         'PRIMARY1': 'PRIMARY2',
         'PRIMARY2': 'PRIMARY3',
         'PRIMARY3': 'PRIMARY4',

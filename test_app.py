@@ -2318,10 +2318,10 @@ def test_kindergarten_normalization(app_module):
     m = app_module
     
     # Classname normalization tests
-    assert m.canonicalize_classname("Kindergarten 1") == "NURSERY1"
-    assert m.canonicalize_classname("kindergarting 2") == "NURSERY2"
-    assert m.canonicalize_classname("KINDER 3") == "NURSERY3"
-    assert m.canonicalize_classname("KG 1") == "NURSERY1"
+    assert m.canonicalize_classname("Kindergarten 1") == "KG1"
+    assert m.canonicalize_classname("kindergarting 2") == "KG2"
+    assert m.canonicalize_classname("KINDER 3") == "KG3"
+    assert m.canonicalize_classname("KG 1") == "KG1"
     
     # School type normalization tests
     assert m.normalize_school_type("kindergarten") == "nursery"
