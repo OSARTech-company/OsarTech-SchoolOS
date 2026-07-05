@@ -1,3 +1,31 @@
+{% set is_nursery = false %}
+{% set is_primary = false %}
+{% set cn_upper = (student.class_name|string or '')|upper %}
+{% set s_type = (school.school_type|string or '')|lower if school else '' %}
+
+{% if 'NURSERY' in cn_upper or 'KINDERGARTEN' in cn_upper or 'KINDER' in cn_upper or 'KG' in cn_upper or 'PRE-PRIMARY' in cn_upper or 'PRE-SCHOOL' in cn_upper or 'PRESCHOOL' in cn_upper or s_type == 'nursery' %}
+    {% set is_nursery = true %}
+{% endif %}
+
+{% if not is_nursery and ('PRIMARY' in cn_upper or 'PRY' in cn_upper or s_type == 'primary') %}
+    {% set is_primary = true %}
+{% endif %}
+
+{% if is_nursery %}
+    {% set student_label = 'Child' %}
+    {% set student_plural = 'Children' %}
+    {% set portal_icon = 'fa-child-reaching' %}
+{% elif is_primary %}
+    {% set student_label = 'Pupil' %}
+    {% set student_plural = 'Pupils' %}
+    {% set portal_icon = 'fa-child' %}
+{% else %}
+    {% set student_label = 'Student' %}
+    {% set student_plural = 'Students' %}
+    {% set portal_icon = 'fa-graduation-cap' %}
+{% endif %}
+
+{% set is_nursery_primary = is_nursery or is_primary %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1537,11 +1565,64 @@
                 border-bottom: 0;
             }
         }
+
+        /* Nursery/Primary Softer Playful Theme overrides */
+        .school-primary-nursery {
+            font-family: 'Outfit', 'Manrope', system-ui, -apple-system, sans-serif;
+            background-color: #fafbfc;
+        }
+        .school-primary-nursery .report-card {
+            border-radius: 32px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.05);
+            border: 4px solid rgba(var(--school-primary-rgb, 30, 60, 114), 0.05);
+        }
+        .school-primary-nursery .subjects-table, 
+        .school-primary-nursery .behaviour-panel, 
+        .school-primary-nursery .comment-grid > div,
+        .school-primary-nursery .student-info > div {
+            border-radius: 24px !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03) !important;
+            border: 2px solid rgba(139, 143, 148, 0.12) !important;
+            overflow: hidden;
+        }
+        .school-primary-nursery .table-pill {
+            border-radius: 12px;
+            background: rgba(254, 243, 199, 0.8) !important;
+            color: #d97706 !important;
+            border: 1.5px dashed #fcd34d !important;
+            font-weight: 700;
+        }
+        .school-primary-nursery .header-student-profile {
+            border-radius: 20px;
+        }
+        .school-primary-nursery .info-group-title,
+        .school-primary-nursery .table-title {
+            font-size: var(--font-md);
+            font-weight: 800;
+            color: var(--school-primary);
+            letter-spacing: 0.02em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .school-primary-nursery .subjects-table th {
+            background: linear-gradient(135deg, var(--school-primary) 0%, var(--school-secondary) 100%);
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+        .school-primary-nursery .hero-ribbon {
+            background: rgba(var(--school-primary-rgb, 30, 60, 114), 0.03);
+            border-radius: 20px;
+            padding: 14px;
+        }
+        .school-primary-nursery .hero-chip {
+            border-radius: 12px;
+        }
     </style>
 </head>
-<body class="report-page" style="--school-primary: {{ school.theme_primary_color if school and school.theme_primary_color else '#1E3C72' }}; --school-secondary: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#2A5298' }}; --school-accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+<body class="report-page{% if is_nursery_primary %} school-primary-nursery{% endif %}" style="--school-primary: {{ school.theme_primary_color if school and school.theme_primary_color else '#1E3C72' }}; --school-secondary: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#2A5298' }}; --school-accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
     <div class="portal-header">
-        <h1><i class="fas fa-graduation-cap"></i> Student Result Portal</h1>
+        <h1><i class="fas {{ portal_icon }}"></i> {{ student_label }} Result Portal</h1>
         <p>View your academic performance</p>
     </div>
 
@@ -1599,12 +1680,12 @@
                         {% else %}
                         <div class="header-student-fallback">{{ student_initial }}</div>
                         {% endif %}
-                        <div class="header-student-label">Student</div>
+                        <div class="header-student-label">{{ student_label }}</div>
                     </div>
                 </div>
             </div>
         </div>
-
+ 
         <div class="hero-ribbon">
             <div class="hero-chip hero-chip--accent"><i class="fas fa-calendar-alt"></i><strong>{{ student.term }}</strong>{% if student.academic_year %}<span>{{ student.academic_year }}</span>{% endif %}</div>
             <div class="hero-chip"><i class="fas fa-chalkboard"></i><strong>{{ student.class_name if student.class_name else 'Class Not Set' }}</strong></div>
@@ -1613,16 +1694,19 @@
             <div class="hero-chip"><i class="fas fa-book-open"></i><strong>{{ student.number_of_subject if student.number_of_subject is not none else 0 }} Subjects</strong></div>
             <div class="hero-chip"><i class="fas fa-circle-check"></i><strong>{{ student.Status if student.Status else 'Status Pending' }}</strong></div>
         </div>
-
+ 
         <div class="student-info">
             <div class="info-group">
-                <div class="info-group-title">Student Details</div>
+                <div class="info-group-title">
+                    {% if is_nursery_primary %}<i class="fas fa-star" style="color: #f59e0b;"></i> {% endif %}
+                    {{ student_label }} Details
+                </div>
                 <div class="info-row">
-                    <div class="info-label">Student Name</div>
+                    <div class="info-label">{{ student_label }} Name</div>
                     <div class="info-value">{{ student.first_name }}</div>
                 </div>
                 <div class="info-row">
-                    <div class="info-label">Student ID</div>
+                    <div class="info-label">{{ student_label }} ID</div>
                     <div class="info-value">{{ student.student_id }}</div>
                 </div>
                 <div class="info-row">
@@ -1634,7 +1718,7 @@
                     <div class="info-value">{{ student.gender if student.gender else 'N/A' }}</div>
                 </div>
                 <div class="info-row">
-                    <div class="info-label">Students in Class</div>
+                    <div class="info-label">{{ student_plural }} in Class</div>
                     <div class="info-value">{{ student.class_size if student.class_size is not none else 'N/A' }}</div>
                 </div>
                 <div class="info-row">
@@ -1738,9 +1822,9 @@
                 <i class="fas fa-trophy"></i>
                 Class Position:
                 {% if position.is_stream_separate %}
-                    {{ position.pos|ordinal }} out of {{ position.size }} {{ position.stream_label }} students in {{ position.class }}
+                    {{ position.pos|ordinal }} out of {{ position.size }} {{ position.stream_label }} {{ student_plural|lower }} in {{ position.class }}
                 {% else %}
-                    {{ position.pos|ordinal }} out of {{ position.size }} students in {{ position.class }}
+                    {{ position.pos|ordinal }} out of {{ position.size }} {{ student_plural|lower }} in {{ position.class }}
                 {% endif %}
             </strong>
         </div>
@@ -1798,30 +1882,82 @@
 
         {% set leadership_label = 'Head Teacher' if school and school.leadership_title == 'head_teacher' else 'Principal' %}
         {% if student.subjects %}
+        {% set is_third_term_combined = (student.term or '').strip().lower() == 'third term' and school and school.combine_third_term_results %}
+        {% set term_summary_mode = is_third_term_combined and school.third_term_layout_mode == 'term_summary' %}
         <div class="subjects-table">
             <div class="table-title">Subject Performance Details</div>
             {% set combined_exam = exam_config and exam_config.exam_mode == 'combined' %}
             <div class="table-support">
+                {% if term_summary_mode %}
+                <span class="table-pill"><i class="fas fa-calendar-days"></i> Term-by-Term Cumulative Summary</span>
+                {% else %}
                 <span class="table-pill"><i class="fas fa-layer-group"></i> {{ result_max_tests }} CA Slot{{ '' if result_max_tests == 1 else 's' }}</span>
                 {% if combined_exam %}
                 <span class="table-pill"><i class="fas fa-file-pen"></i> Combined Exam Score</span>
                 {% else %}
                 <span class="table-pill"><i class="fas fa-table-cells-large"></i> Objective + Theory Split</span>
                 {% endif %}
+                {% endif %}
                 <span class="table-pill"><i class="fas fa-percent"></i> Total Mark Out Of 100</span>
             </div>
             <div class="table-wrap">
             <table class="subject-performance-table">
+                {% if term_summary_mode %}
+                <thead>
+                    <tr>
+                        <th style="width: 25%;">Subject</th>
+                        <th>1st Term (100)</th>
+                        <th>2nd Term (100)</th>
+                        <th>3rd Term (100)</th>
+                        <th>Cumulative Average</th>
+                        <th>Grade</th>
+                        <th>Position</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for subject, s in student.subjects.items() %}
+                    <tr>
+                        <td data-label="Subject" style="font-weight: 500; text-align: left;">{{ subject }}</td>
+                        <td class="score-cell" data-label="1st Term">{{ s.get('first_term_mark', '-') }}</td>
+                        <td class="score-cell" data-label="2nd Term">{{ s.get('second_term_mark', '-') }}</td>
+                        <td class="score-cell" data-label="3rd Term">{{ s.get('third_term_mark', '-') }}</td>
+                        <td class="subject-total-cell" data-label="Cumulative Average">{{ s.get('overall_mark', '-') }}</td>
+                        <td class="subject-grade-cell {{ grade_css_class_from_grade(s.get('grade', '-'), school) }}" data-label="Grade">
+                            {{ display_grade_label(s.get('grade', '-'), school) if s.get('grade', '-') != '-' else '-' }}
+                        </td>
+                        <td class="subject-position-cell" data-label="{{ student_label }} Position">
+                            {% set sp = subject_positions.get(subject) if subject_positions else None %}
+                            {% if sp %}
+                                {{ sp.pos|ordinal }}/{{ sp.size }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="summary-row">
+                        <td style="text-align: left; font-weight: bold;">OVERALL AVERAGE</td>
+                        <td colspan="3" style="text-align: center; font-weight: bold;">Average Score</td>
+                        <td style="font-weight: bold;">{{ "%.1f"|format(student.average_marks) }}</td>
+                        <td style="font-weight: bold;">{{ display_grade_label(student.Grade, school) }}</td>
+                        <td class="{{ status_css_class_from_status(student.Status, school) }}" style="font-weight: bold;">
+                            {{ student.Status if student.Status else 'Status Pending' }}
+                        </td>
+                    </tr>
+                </tfoot>
+                {% else %}
                 <thead>
                     <tr>
                         <th rowspan="2" style="width: 15%;">Subject</th>
-                        <th colspan="{{ result_max_tests }}">Continuous Assessment</th>
-                        <th colspan="{{ 1 if combined_exam else 2 }}">Examination (70%)</th>
+                        <th colspan="{{ result_max_tests }}">Continuous Assessment {% if is_third_term_combined %}(3rd Term){% endif %}</th>
+                        <th colspan="{{ 1 if combined_exam else 2 }}">Examination {% if is_third_term_combined %}(3rd Term){% endif %}</th>
                         <th rowspan="2">Highest<br>In Class</th>
                         <th rowspan="2">Lowest<br>In Class</th>
-                        <th rowspan="2">Total<br>(100%)</th>
+                        <th rowspan="2">{% if is_third_term_combined %}Cumulative<br>Total{% else %}Total<br>(100%){% endif %}</th>
                         <th rowspan="2">Grade</th>
-                        <th rowspan="2">Subject Position</th>
+                        <th rowspan="2">Position</th>
                     </tr>
                     <tr>
                         {% for i in range(1, result_max_tests + 1) %}
@@ -1851,11 +1987,11 @@
                         {% set sp = subject_positions.get(subject) if subject_positions else None %}
                         <td class="class-stat-cell" data-label="Highest In Class">{{ "%.1f"|format(sp.highest) if sp and sp.highest is not none else '-' }}</td>
                         <td class="class-stat-cell" data-label="Lowest In Class">{{ "%.1f"|format(sp.lowest) if sp and sp.lowest is not none else '-' }}</td>
-                        <td class="subject-total-cell" data-label="Total (100%)">{{ s.get('overall_mark', s.get('total', '-')) if s.get('overall_mark', s.get('total', '-')) != '-' else '-' }}</td>
+                        <td class="subject-total-cell" data-label="{% if is_third_term_combined %}Cumulative Total{% else %}Total (100%){% endif %}">{{ s.get('overall_mark', s.get('total', '-')) if s.get('overall_mark', s.get('total', '-')) != '-' else '-' }}</td>
                         <td class="subject-grade-cell {{ grade_css_class_from_grade(s.get('grade', '-'), school) }}" data-label="Grade">
                             {{ display_grade_label(s.get('grade', '-'), school) if s.get('grade', '-') != '-' else '-' }}
                         </td>
-                        <td class="subject-position-cell" data-label="Subject Position">
+                        <td class="subject-position-cell" data-label="{{ student_label }} Position">
                             {% if sp %}
                                 {{ sp.pos|ordinal }}/{{ sp.size }}
                             {% else %}
@@ -1876,6 +2012,7 @@
                         </td>
                     </tr>
                 </tfoot>
+                {% endif %}
             </table>
             </div>
         </div>

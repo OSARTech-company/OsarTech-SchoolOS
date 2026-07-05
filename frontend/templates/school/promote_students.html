@@ -395,8 +395,18 @@
                     {% endif %}
                 {% endwith %}
 
-                <div class="promo-instructions">
-                    <p><i class="fas fa-info-circle"></i> Promote, Repeat, or Remove students from classes. The pass mark threshold is <strong>{{ pass_mark }}</strong>.</p>
+                <div class="promo-instructions" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <p style="margin: 0;"><i class="fas fa-info-circle"></i> Promote, Repeat, or Remove students from classes. The pass mark threshold is <strong id="pass-mark-display">{{ pass_mark }}</strong>.</p>
+                        <div id="pass-mark-edit-container" style="display: none; align-items: center; gap: 8px;">
+                            <input type="number" id="pass-mark-input" min="0" max="100" value="{{ pass_mark }}" style="width: 70px; padding: 4px 8px; border: 1.5px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; outline: none; margin: 0;">
+                            <button type="button" class="btn btn-success btn-xs" id="save-pass-mark-btn" style="padding: 4px 8px; font-size: 0.8rem;">Save</button>
+                            <button type="button" class="btn btn-secondary btn-xs" id="cancel-pass-mark-btn" style="padding: 4px 8px; font-size: 0.8rem;">Cancel</button>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-xs" id="edit-pass-mark-btn" style="padding: 6px 10px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border-color); background: #ffffff; color: var(--text-main); font-weight: 600;">
+                        <i class="fas fa-cog"></i> Edit Pass Mark
+                    </button>
                 </div>
 
                 <div class="promo-wizard-flow">
@@ -587,5 +597,69 @@
         }
     </script>
     {% endif %}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const editBtn = document.getElementById('edit-pass-mark-btn');
+            const saveBtn = document.getElementById('save-pass-mark-btn');
+            const cancelBtn = document.getElementById('cancel-pass-mark-btn');
+            const editContainer = document.getElementById('pass-mark-edit-container');
+            const displaySpan = document.getElementById('pass-mark-display');
+            const passMarkInput = document.getElementById('pass-mark-input');
+
+            if (editBtn && editContainer) {
+                editBtn.addEventListener('click', () => {
+                    editBtn.style.display = 'none';
+                    editContainer.style.display = 'inline-flex';
+                    passMarkInput.focus();
+                });
+            }
+
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => {
+                    editContainer.style.display = 'none';
+                    editBtn.style.display = 'inline-flex';
+                    passMarkInput.value = displaySpan.textContent.trim();
+                });
+            }
+
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => {
+                    const value = parseInt(passMarkInput.value, 10);
+                    if (isNaN(value) || value < 0 || value > 100) {
+                        alert('Pass mark must be a number between 0 and 100.');
+                        return;
+                    }
+
+                    saveBtn.disabled = true;
+                    fetch('/school-admin/update-pass-mark-ajax', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({ pass_mark: value })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        saveBtn.disabled = false;
+                        if (data.success) {
+                            displaySpan.textContent = data.pass_mark;
+                            editContainer.style.display = 'none';
+                            editBtn.style.display = 'inline-flex';
+                            // Reload the page to apply recommendations instantly
+                            window.location.reload();
+                        } else {
+                            alert(data.error || 'Failed to update pass mark.');
+                        }
+                    })
+                    .catch(err => {
+                        saveBtn.disabled = false;
+                        console.error(err);
+                        alert('An error occurred. Please try again.');
+                    });
+                });
+            }
+        });
+    </script>
 </body>
 </html>

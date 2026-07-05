@@ -5,206 +5,375 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Report Issue - Student Score Management System</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
-            background:
-                radial-gradient(circle at top right, rgba(31, 122, 140, 0.12), transparent 30%),
-                radial-gradient(circle at bottom left, rgba(15, 76, 129, 0.08), transparent 28%),
-                var(--bg);
+            background: radial-gradient(circle at top right, rgba(31, 122, 140, 0.06), transparent 35%),
+                        radial-gradient(circle at bottom left, rgba(15, 76, 129, 0.04), transparent 30%),
+                        var(--bg);
+            min-height: 100vh;
         }
 
         .container.report-issue-page {
-            width: min(920px, 100%);
+            width: min(1000px, 100%);
             padding-top: 28px;
             padding-bottom: 40px;
         }
 
-        .issue-overview {
+        .report-grid {
             display: grid;
-            gap: 14px;
+            gap: 24px;
+            grid-template-columns: 1fr;
+            margin-top: 20px;
         }
 
-        .issue-intro {
-            border-left: 4px solid var(--brand-2);
-            background: linear-gradient(180deg, #f8fcff 0%, #eef7fb 100%);
-            border-radius: 12px;
-            padding: 16px 18px;
-            color: #35506b;
-            line-height: 1.65;
+        @media (min-width: 992px) {
+            .report-grid {
+                grid-template-columns: 3fr 2fr;
+            }
         }
 
-        .issue-meta {
-            display: grid;
+        .severity-group {
+            display: flex;
             gap: 12px;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        }
-
-        .issue-meta-item {
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            background: #fff;
-            padding: 14px;
-            min-width: 0;
-        }
-
-        .issue-meta-item strong {
-            display: block;
-            margin-bottom: 6px;
-            color: #0f3558;
-        }
-
-        .issue-meta-item span {
-            color: var(--muted);
-            line-height: 1.55;
-        }
-
-        .issue-form textarea {
-            min-height: 180px;
-            resize: vertical;
-        }
-
-        .issue-form .toolbar {
-            justify-content: space-between;
-            align-items: center;
             margin-top: 8px;
         }
 
-        .btn-secondary {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            border: 1px solid var(--line);
-            border-radius: 10px;
-            padding: 10px 14px;
-            text-decoration: none;
-            font-size: 0.95rem;
-            font-weight: 700;
+        .severity-option {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid var(--line, #e2e8f0);
+            border-radius: 8px;
+            text-align: center;
             cursor: pointer;
-            color: #164d7c;
-            background: #fff;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--surface, white);
+            color: var(--text);
+            font-weight: 600;
         }
 
-        .btn-secondary:hover {
-            background: #f4f9ff;
-            border-color: #c8d9ec;
+        .severity-option i {
+            display: block;
+            font-size: 20px;
+            margin-bottom: 6px;
         }
 
-        .issue-note {
-            margin-top: 14px;
-            color: var(--muted);
-            font-size: 0.96rem;
+        .severity-option[data-sev="Low"]:hover { border-color: #10b981; background: rgba(16, 185, 129, 0.05); }
+        .severity-option[data-sev="Medium"]:hover { border-color: #f59e0b; background: rgba(245, 158, 11, 0.05); }
+        .severity-option[data-sev="High"]:hover { border-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
+        
+        .severity-option[data-sev="Low"].active {
+            border-color: #10b981;
+            background: #10b981;
+            color: white;
+        }
+        .severity-option[data-sev="Medium"].active {
+            border-color: #f59e0b;
+            background: #f59e0b;
+            color: white;
+        }
+        .severity-option[data-sev="High"].active {
+            border-color: #ef4444;
+            background: #ef4444;
+            color: white;
         }
 
-        .issue-note code {
-            padding: 2px 6px;
-            border-radius: 6px;
-            background: #eef5fb;
-            color: #163a5f;
+        [data-theme="dark"] .severity-option {
+            background: var(--surface);
+            border-color: var(--line);
+            color: var(--text);
+        }
+        [data-theme="dark"] .severity-option[data-sev="Low"]:hover { background: rgba(16, 185, 129, 0.15); }
+        [data-theme="dark"] .severity-option[data-sev="Medium"]:hover { background: rgba(245, 158, 11, 0.15); }
+        [data-theme="dark"] .severity-option[data-sev="High"]:hover { background: rgba(239, 68, 68, 0.15); }
+
+        .char-counter {
+            text-align: right;
+            font-size: 0.8rem;
+            color: var(--muted, #7f8c8d);
+            margin-top: 4px;
+        }
+
+        .info-bubble {
+            background: linear-gradient(135deg, #f0f7ff 0%, #e0edff 100%);
+            border-left: 4px solid #0f4c81;
+            border-radius: 0 12px 12px 0;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        [data-theme="dark"] .info-bubble {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-left-color: #38bdf8;
+            color: var(--text);
+        }
+
+        .info-bubble h4 {
+            color: #0f4c81;
+            margin-bottom: 6px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        [data-theme="dark"] .info-bubble h4 {
+            color: #38bdf8;
+        }
+
+        .step-list {
+            margin-left: 20px;
+            margin-top: 10px;
+            color: var(--text);
+        }
+
+        .step-list li {
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .issue-form textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        .btn-flex-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-top: 20px;
         }
 
         @media (max-width: 640px) {
-            .container.report-issue-page {
-                padding: 18px 14px 28px;
-            }
-
-            .header,
-            .card {
-                padding: 18px;
-            }
-
-            .issue-form textarea {
-                min-height: 150px;
-            }
-
-            .issue-form .toolbar {
-                flex-direction: column;
+            .btn-flex-container {
+                flex-direction: column-reverse;
                 align-items: stretch;
             }
-
-            .issue-form .toolbar .btn,
-            .issue-form .toolbar .btn-secondary {
+            .btn-flex-container button, .btn-flex-container a {
                 width: 100%;
+                text-align: center;
             }
         }
     </style>
 </head>
 <body>
     {% include "shared/_loading_overlay.html" %}
+    
+    <!-- Premium Success Notification Modal -->
+    {% if success_ref %}
+    <div class="modal-backdrop" id="success-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 10000; animation: fadeIn 0.3s ease;">
+        <div class="card" style="max-width: 440px; width: 90%; text-align: center; padding: 32px; border-radius: 16px; box-shadow: var(--shadow-lg); animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);">
+            <div class="success-icon" style="font-size: 56px; color: #10b981; margin-bottom: 16px; animation: bounceIn 0.5s ease;">
+                <i class="fas fa-circle-check"></i>
+            </div>
+            <h2 style="margin-top: 0; color: var(--text); font-size: 1.6rem;">Ticket Submitted Successfully</h2>
+            <p style="color: var(--muted); line-height: 1.5; margin-bottom: 24px; font-size: 0.95rem;">Your report has been successfully dispatched to the support queue.</p>
+            
+            <div style="background: var(--bg-light, #f1f5f9); border: 1px dashed var(--line); padding: 14px; border-radius: 8px; margin-bottom: 24px;">
+                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); display: block; margin-bottom: 4px; font-weight: 600;">Reference Code</span>
+                <strong style="font-size: 1.4rem; color: #0f4c81; font-family: monospace; letter-spacing: 0.03em;" id="modal-ref-code">{{ success_ref }}</strong>
+            </div>
+            
+            <button type="button" class="btn btn-primary w-100" onclick="closeSuccessModal()">Done</button>
+        </div>
+    </div>
+    <style>
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.05); opacity: 1; }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); }
+        }
+    </style>
+    <script>
+        function closeSuccessModal() {
+            const modal = document.getElementById('success-modal');
+            if (modal) {
+                modal.style.animation = 'fadeIn 0.2s reverse forwards';
+                setTimeout(() => modal.remove(), 200);
+            }
+        }
+    </script>
+    {% endif %}
+
     <div class="container report-issue-page">
         <div class="header">
-            <h1><i class="fas fa-bug"></i> Report an Issue</h1>
-            <p class="muted">Use this page for bugs, broken screens, failed saves, login problems, or anything unexpected in the app.</p>
+            <h1><i class="fas fa-bug text-danger"></i> Support Ticket Portal</h1>
+            <p class="muted">Report bugs, interface issues, slow saves, calculation errors, or general technical issues.</p>
         </div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="flash {{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        <div class="report-grid">
+            <!-- Left Panel: Issue Form -->
+            <div class="card">
+                <h2><i class="fas fa-edit"></i> Create Ticket</h2>
+                <form method="POST" id="support-issue-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="source_page" id="source_page" value="{{ source_page or '' }}">
+                    <input type="hidden" name="description" id="hidden_description">
 
-        <div class="card issue-overview">
-            <div class="issue-intro">
-                This report is sent with your role, school, and page context so support can trace the issue faster.
+                    <div class="form-group">
+                        <label for="issue_category"><i class="fas fa-tags"></i> Issue Category</label>
+                        <select id="issue_category" required>
+                            <option value="Bug / System Error">Bug / System Error (Unexpected red popups, failed saves)</option>
+                            <option value="Login & Access Issue">Login & Access Issue (Cannot log in, locked out, missing school)</option>
+                            <option value="Scores & Grades">Scores & Grades (Inaccurate marks, promotion logic, reports)</option>
+                            <option value="Performance / Slowness">Performance / Slowness (Slow pages, lag during CBT)</option>
+                            <option value="Suggestion / Question">Other Suggestion / Question (General query, layout improvement)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group mt-16">
+                        <label><i class="fas fa-circle-exclamation"></i> Severity Level</label>
+                        <div class="severity-group">
+                            <div class="severity-option active" data-sev="Low">
+                                <i class="fas fa-circle-info text-success"></i> Low
+                            </div>
+                            <div class="severity-option" data-sev="Medium">
+                                <i class="fas fa-triangle-exclamation text-warning"></i> Medium
+                            </div>
+                            <div class="severity-option" data-sev="High">
+                                <i class="fas fa-circle-xmark text-danger"></i> High
+                            </div>
+                        </div>
+                        <input type="hidden" id="issue_severity" value="Low">
+                    </div>
+
+                    <div class="form-group mt-16">
+                        <label for="contact_info"><i class="fas fa-envelope"></i> Follow-up Contact Info (Optional)</label>
+                        <input type="text" id="contact_info" placeholder="Email address or phone number" maxlength="100">
+                    </div>
+
+                    <div class="form-group mt-16">
+                        <label for="issue_message">
+                            <i class="fas fa-comment-dots"></i> Detailed Description
+                        </label>
+                        <textarea
+                            id="issue_message"
+                            placeholder="Please tell us what happened. What did you click, what did you expect to happen, and what was the error?"
+                            maxlength="1800"
+                            required
+                        ></textarea>
+                        <div class="char-counter" id="char-counter">0 / 1800 characters</div>
+                    </div>
+
+                    <div class="btn-flex-container">
+                        <a href="{{ back_url }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Cancel & Back
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Submit Ticket
+                        </button>
+                    </div>
+                </form>
             </div>
-            <div class="issue-meta">
-                <div class="issue-meta-item">
-                    <strong>Best for</strong>
-                    <span>Errors, broken buttons, unexpected redirects, and failed submissions.</span>
+
+            <!-- Right Panel: Status & Instructions -->
+            <div>
+                <!-- System Status Widget -->
+                <div class="card" style="padding: 18px; margin-bottom: 20px;">
+                    <h3 style="margin-top: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;"><i class="fas fa-signal text-success"></i> Live Support Systems</h3>
+                    <div style="display: grid; gap: 10px; margin-top: 14px; font-size: 0.85rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px; border-bottom: 1px solid var(--line);">
+                            <span>Database Node:</span>
+                            <span class="badge badge-success" style="background: rgba(16, 185, 129, 0.12); color: #10b981; font-weight: 700; padding: 2px 6px; border-radius: 4px;"><i class="fas fa-circle" style="font-size: 6px; vertical-align: middle; margin-right: 4px;"></i> Online</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px; border-bottom: 1px solid var(--line);">
+                            <span>SMTP Dispatcher:</span>
+                            <span class="badge badge-success" style="background: rgba(16, 185, 129, 0.12); color: #10b981; font-weight: 700; padding: 2px 6px; border-radius: 4px;"><i class="fas fa-circle" style="font-size: 6px; vertical-align: middle; margin-right: 4px;"></i> Online</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>Support Queue SLA:</span>
+                            <span style="color: var(--muted); font-weight: 600;">Within 2 Hours</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="issue-meta-item">
-                    <strong>Include</strong>
-                    <span>The exact error text, what you clicked, and what you expected to happen.</span>
-                </div>
-                <div class="issue-meta-item">
-                    <strong>Use another page for</strong>
-                    <span>Privacy, export, or deletion requests. Those belong on the privacy request form.</span>
+
+                <div class="card">
+                    <h2><i class="fas fa-circle-info"></i> Reporting Guidelines</h2>
+                    
+                    <div class="info-bubble">
+                        <h4><i class="fas fa-bolt"></i> Fast Tracing Enabled</h4>
+                        <p>Your ticket automatically captures important system details so our support team can resolve issues immediately:</p>
+                        <ul class="step-list">
+                            <li>User role context: <code>{{ role|upper }}</code></li>
+                            {% if source_page %}
+                                <li>Originating path: <code>{{ source_page }}</code></li>
+                            {% endif %}
+                        </ul>
+                    </div>
+
+                    <div class="mt-16">
+                        <h3>How to write a great report:</h3>
+                        <ul class="step-list">
+                            <li><strong>Step-by-step description:</strong> Mention exactly what you were doing right before the issue occurred.</li>
+                            <li><strong>Include error text:</strong> If a red box or popup alert appeared on screen, copy and paste the message exactly.</li>
+                            <li><strong>For data requests:</strong> Use the Privacy/Data Request form on the portal instead of technical support tickets.</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="card issue-form">
-            <form method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="source_page" id="source_page" value="{{ source_page or '' }}">
-                <div class="form-group">
-                    <label for="issue_description">
-                        <i class="fas fa-comment-dots"></i> Describe the issue
-                    </label>
-                    <textarea
-                        id="issue_description"
-                        name="description"
-                        placeholder="Please tell us what happened, what page you were on, and the exact error if you saw one."
-                        maxlength="2000"
-                        required
-                    ></textarea>
-                </div>
-
-                <div class="toolbar">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-paper-plane"></i> Submit Report
-                    </button>
-                    <a href="{{ back_url }}" class="btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Back
-                    </a>
-                </div>
-            </form>
-
-            <p class="issue-note">
-                {% if source_page %}
-                    Captured source page: <code>{{ source_page }}</code>
-                {% else %}
-                    If you arrived here from another page, we will capture that context automatically when available.
-                {% endif %}
-            </p>
+        <!-- Support History Panel -->
+        {% if past_reports %}
+        <div class="card mt-24">
+            <h2><i class="fas fa-history"></i> Your Support History (Last 5 Tickets)</h2>
+            <div style="overflow-x: auto; margin-top: 14px;">
+                <table class="enhanced-table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th>Ticket Ref</th>
+                            <th>Category</th>
+                            <th>Severity</th>
+                            <th>Description</th>
+                            <th>Date / Time</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in past_reports %}
+                        <tr>
+                            <td><strong style="font-family: monospace; font-size: 0.95rem; color: #0f4c81;">{{ t.ticket_ref }}</strong></td>
+                            <td>{{ t.category }}</td>
+                            <td>
+                                {% if t.severity == 'High' %}
+                                    <span class="badge" style="background: rgba(239, 68, 68, 0.12); color: #ef4444; padding: 4px 8px; border-radius: 6px; font-weight: 700;">High</span>
+                                {% elif t.severity == 'Medium' %}
+                                    <span class="badge" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; padding: 4px 8px; border-radius: 6px; font-weight: 700;">Medium</span>
+                                {% else %}
+                                    <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #10b981; padding: 4px 8px; border-radius: 6px; font-weight: 700;">Low</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span style="font-size: 0.9rem; max-width: 260px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ t.description }}">
+                                    {{ t.description }}
+                                </span>
+                            </td>
+                            <td><small style="color: var(--muted);">{{ t.timestamp }}</small></td>
+                            <td>
+                                {% if t.status == 'unread' %}
+                                    <span class="badge" style="background: rgba(71, 85, 105, 0.1); color: #475569; padding: 4px 8px; border-radius: 6px; font-weight: 600;"><i class="fas fa-clock" style="font-size: 11px;"></i> Open</span>
+                                {% else %}
+                                    <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #10b981; padding: 4px 8px; border-radius: 6px; font-weight: 600;"><i class="fas fa-circle-check" style="font-size: 11px;"></i> Resolved</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
+        {% endif %}
     </div>
 
     <script>
+        // Source referrer capturing
         (function () {
             var sourceInput = document.getElementById('source_page');
             if (!sourceInput || sourceInput.value.trim()) {
@@ -214,6 +383,41 @@
                 sourceInput.value = document.referrer.trim();
             }
         })();
+
+        // Severity Selector logic
+        const sevOptions = document.querySelectorAll('.severity-option');
+        const hiddenSevInput = document.getElementById('issue_severity');
+        sevOptions.forEach(opt => {
+            opt.addEventListener('click', function() {
+                sevOptions.forEach(o => o.classList.remove('active'));
+                this.classList.add('active');
+                hiddenSevInput.value = this.getAttribute('data-sev');
+            });
+        });
+
+        // Character counter
+        const textarea = document.getElementById('issue_message');
+        const counter = document.getElementById('char-counter');
+        textarea.addEventListener('input', function() {
+            const count = this.value.length;
+            counter.textContent = `${count} / 1800 characters`;
+        });
+
+        // Form Submit Formatter
+        document.getElementById('support-issue-form').addEventListener('submit', function(e) {
+            const category = document.getElementById('issue_category').value;
+            const severity = hiddenSevInput.value;
+            const contact = document.getElementById('contact_info').value.trim();
+            const message = textarea.value.trim();
+
+            let formatted = `[Category: ${category}] [Severity: ${severity}]\n`;
+            if (contact) {
+                formatted += `[Contact: ${contact}]\n`;
+            }
+            formatted += `\nDescription:\n${message}`;
+
+            document.getElementById('hidden_description').value = formatted;
+        });
     </script>
 </body>
 </html>

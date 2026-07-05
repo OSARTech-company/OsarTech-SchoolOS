@@ -463,6 +463,17 @@
                         </option>
                     </select>
                 </div>
+                <div class="form-group" id="third_term_layout_mode_group" {% if not settings_form or not settings_form.combine_third_term_results %}style="display:none;"{% endif %}>
+                    <label for="third_term_layout_mode">Cumulative Layout Mode</label>
+                    <select id="third_term_layout_mode" name="third_term_layout_mode">
+                        <option value="term_summary" {% if not settings_form or settings_form.third_term_layout_mode == 'term_summary' %}selected{% endif %}>
+                            Option A - Term-by-Term summary (1st, 2nd, 3rd, and Cumulative Totals)
+                        </option>
+                        <option value="cumulative_details" {% if settings_form and settings_form.third_term_layout_mode == 'cumulative_details' %}selected{% endif %}>
+                            Option B - Detailed (3rd Term CA & Exam breakdown + Cumulative Total)
+                        </option>
+                    </select>
+                </div>
                 <div class="form-group">
                     <label for="parent_timetable_show_teacher">Parent Timetable Teacher Names</label>
                     <select id="parent_timetable_show_teacher" name="parent_timetable_show_teacher">
@@ -1057,6 +1068,17 @@
             });
             renumberStatusScaleRows();
         }
+        // Toggle cumulative layout mode group based on combine setting
+        const combineEl = document.getElementById('combine_third_term_results');
+        const layoutGroupEl = document.getElementById('third_term_layout_mode_group');
+        if (combineEl && layoutGroupEl) {
+            const updateVisibility = () => {
+                layoutGroupEl.style.display = combineEl.value === '1' ? 'block' : 'none';
+            };
+            combineEl.addEventListener('change', updateVisibility);
+            updateVisibility();
+        }
+
         syncCalendarScopeWithMainSettings();
         loadSelectedCalendarIfSaved();
         calcDaysOpenPreview();

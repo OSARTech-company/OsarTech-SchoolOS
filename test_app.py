@@ -2328,3 +2328,340 @@ def test_kindergarten_normalization(app_module):
     assert m.normalize_school_type("kindergarten school") == "nursery"
     assert m.normalize_school_type("preschool") == "nursery"
     assert m.normalize_school_type("pre-primary") == "nursery"
+
+
+def test_parent_merge_profiles_flow(client, app_module, monkeypatch):
+    m = app_module
+    
+    # Mock DB connection at the very beginning of the test to avoid PostgreSQL connection attempts
+    updated = []
+    import contextlib
+    @contextlib.contextmanager
+    def fake_db_conn(*args, **kwargs):
+        class DummyCursor:
+            def execute(self, query, params=None):
+                if "UPDATE students" in query:
+                    updated.append(params)
+            def fetchall(self): return []
+            def fetchone(self): return None
+        class DummyConn:
+            def cursor(self): return DummyCursor()
+            def commit(self): pass
+        yield DummyConn()
+
+    monkeypatch.setattr(m, "db_connection", fake_db_conn)
+    monkeypatch.setattr(m, "students_has_parent_multi_access_columns", lambda: True)
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"school_id": school_id, "school_name": "Mock School", "school_type": "mixed"})
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+
+    # 1. Accessing merge-profiles while unauthenticated redirects to login
+    resp = client.get("/parent/merge-profiles")
+    assert resp.status_code == 302
+    assert "/login" in resp.headers["Location"]
+    
+    # 2. Simulate logged in parent with unmerged candidates
+    fake_session_data = {
+        "role": "parent",
+        "parent_phone": "08012345678",
+        "parent_logged_in_password_hash": "hash_A",
+        "school_id": "SCH1",
+        "parent_student_keys": ["SCH1::STU1"],
+    }
+    
+    # Set session values
+    with client.session_transaction() as sess:
+        for k, v in fake_session_data.items():
+            sess[k] = v
+            
+    # Mock candidate profiles (STU1 has same password hash, STU2 has different)
+    candidates = [
+        {"school_id": "SCH1", "student_id": "STU1", "firstname": "Child One", "parent_phone": "08012345678", "parent_password_hash": "hash_A"},
+        {"school_id": "SCH2", "student_id": "STU2", "firstname": "Child Two", "parent_phone": "08012345678", "parent_password_hash": "hash_B"},
+    ]
+    
+    monkeypatch.setattr(m, "get_parent_students_by_phone", lambda phone: candidates)
+    monkeypatch.setattr(m, "get_sms_sending_enabled", lambda: False)
+    
+    # Check GET page - should render merge-profiles page
+    resp = client.get("/parent/merge-profiles")
+    assert resp.status_code == 200
+    assert b"Merge Parent Profiles" in resp.data
+    assert b"Child Two" in resp.data
+    
+    # Check GET page with send_otp=1 - should generate OTP and set in session
+    resp = client.get("/parent/merge-profiles?send_otp=1")
+    assert resp.status_code == 302
+    assert "/parent/merge-profiles" in resp.headers["Location"]
+    
+    with client.session_transaction() as sess:
+        assert "parent_merge_otp" in sess
+        otp_code = sess["parent_merge_otp"]
+        
+    # Check POST with correct OTP and passwords
+    post_data = {
+        "otp": otp_code,
+        "new_password": "new_secure_pwd",
+        "confirm_password": "new_secure_pwd",
+    }
+    resp = client.post("/parent/merge-profiles", data=post_data)
+    assert resp.status_code == 302
+    assert "/parent" in resp.headers["Location"]
+    
+    # Assert DB update was executed with the new password hash for the parent phone number
+    assert len(updated) > 0
+    assert updated[0][1] == "08012345678"
+
+
+def test_third_term_layout_mode_settings(app_module, monkeypatch):
+    m = app_module
+    # Test _combine_student_snapshots correctly sets first_term_mark, second_term_mark, third_term_mark
+    snapshots = [
+        {
+            'term': 'First Term',
+            'average_marks': 50.0,
+            'subjects': ['Math'],
+            'scores': {'Math': {'overall_mark': 50.0, 'test_1': 10, 'exam_score': 40}},
+        },
+        {
+            'term': 'Second Term',
+            'average_marks': 60.0,
+            'subjects': ['Math'],
+            'scores': {'Math': {'overall_mark': 60.0, 'test_1': 15, 'exam_score': 45}},
+        },
+        {
+            'term': 'Third Term',
+            'average_marks': 70.0,
+            'subjects': ['Math'],
+            'scores': {'Math': {'overall_mark': 70.0, 'test_1': 20, 'exam_score': 50}},
+        }
+    ]
+    monkeypatch.setattr(m, "get_school", lambda sid: {"combine_third_term_results": 1, "third_term_layout_mode": "term_summary"})
+    monkeypatch.setattr(m, "get_grade_config", lambda sid: {"pass_mark": 0, "grade_a_min": 70, "grade_b_min": 60, "grade_c_min": 50, "grade_d_min": 40})
+    
+    combined = m._combine_student_snapshots(snapshots, "SCH")
+    assert combined is not None
+    math_scores = combined['scores']['Math']
+    assert math_scores['first_term_mark'] == 50.0
+    assert math_scores['second_term_mark'] == 60.0
+    assert math_scores['third_term_mark'] == 70.0
+    assert math_scores['overall_mark'] == pytest.approx(60.0)
+
+
+def test_update_pass_mark_ajax(client, app_module, monkeypatch):
+    m = app_module
+    with client.session_transaction() as sess:
+        sess['role'] = 'school_admin'
+        sess['school_id'] = 'SCH'
+        sess['user_id'] = 'admin1'
+
+    updated_db = []
+    def fake_db_connection(commit=False):
+        class FakeCursor:
+            def execute(self, query, params=None):
+                if "UPDATE schools SET pass_mark" in query:
+                    updated_db.append(params)
+            def fetchone(self):
+                return None
+        class FakeConn:
+            def cursor(self):
+                return FakeCursor()
+            def commit(self):
+                pass
+        @contextlib.contextmanager
+        def ctx(commit=False):
+            yield FakeConn()
+        return ctx(commit)
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "get_school", lambda sid: {"id": "SCH", "pass_mark": 50})
+    monkeypatch.setattr(m, "invalidate_school_cache", lambda sid: None)
+    monkeypatch.setattr(m, "record_admin_action_audit", lambda *args, **kwargs: None)
+
+    resp = client.post("/school-admin/update-pass-mark-ajax", json={"pass_mark": 65})
+    assert resp.status_code == 200
+    assert resp.get_json()["success"] is True
+    assert resp.get_json()["pass_mark"] == 65
+    assert len(updated_db) == 1
+    assert updated_db[0] == (65, "SCH")
+
+
+def test_nursery_primary_report_customization(client, app_module, monkeypatch):
+    import flask
+    m = app_module
+
+    # 1. Test PDF Builder function directly
+    report_data = {
+        'school_name': 'Greenfields Nursery School',
+        'school_type': 'nursery',
+        'student_name': 'Chidi Obi',
+        'student_id': 'PUP-001',
+        'class_name': 'Nursery 1A',
+        'term': 'First Term',
+        'year': '2026/2027',
+        'average': 85.5,
+        'class_average': 78.0,
+        'grade': 'A',
+        'status': 'Promoted',
+        'show_positions': True,
+        'subject_rows': [
+            {'subject': 'Numeracy', 'total_exam': 45.0, 'highest': 50.0, 'lowest': 20.0, 'total': 90.0, 'grade': 'A', 'position': '1/15'}
+        ]
+    }
+
+    pdf_bytes = m._build_rich_result_pdf_reportlab(report_data)
+    assert pdf_bytes is not None
+    assert len(pdf_bytes) > 0
+
+    # 2. Test HTML Rendering in context for Nursery / KG class
+    with m.app.test_request_context():
+        # Case A: Nursery / KG Class (Child)
+        rendered_kg = flask.render_template(
+            'student/student_result.html',
+            student={
+                'first_name': 'Chidi',
+                'student_id': 'PUP-001',
+                'class_name': 'KG 1A',
+                'term': 'First Term',
+                'academic_year': '2026/2027',
+                'average_marks': 85.5,
+                'total_score': 90.0,
+                'number_of_subject': 1,
+                'Status': 'Promoted',
+                'Grade': 'A',
+                'subjects': {
+                    'Numeracy': {'first_term_mark': 40, 'second_term_mark': 45, 'third_term_mark': 45, 'overall_mark': 90, 'grade': 'A'}
+                }
+            },
+            school={
+                'school_name': 'Greenfields Academy',
+                'school_type': 'mixed',
+                'show_positions': 1,
+                'test_score_max': 30,
+                'max_tests': 3
+            },
+            position={'pos': 1, 'size': 15, 'class': 'KG 1A', 'is_stream_separate': False},
+            subject_positions={'Numeracy': {'pos': 1, 'size': 15, 'highest': 90.0, 'lowest': 50.0}},
+            published_terms=[],
+            current_term_token='t1',
+            available_result_classes=[],
+            selected_result_class='',
+            term_notice='',
+            term_view_endpoint='parent_view_result',
+            student_key='key',
+            prev_term=None,
+            next_term=None,
+            behaviour_grade_scale={},
+            teacher_signature=None,
+            teacher_name='Mrs. Smith',
+            principal_name='Mrs. Principal',
+            principal_signature=None,
+            result_max_tests=3,
+            exam_config={'exam_mode': 'separate'}
+        )
+        assert 'class="report-page school-primary-nursery"' in rendered_kg
+        assert 'Child Details' in rendered_kg
+        assert 'Child Name' in rendered_kg
+        assert 'Children in Class' in rendered_kg
+
+        # Case B: Primary Class (Pupil)
+        rendered_pry = flask.render_template(
+            'student/student_result.html',
+            student={
+                'first_name': 'Chidi',
+                'student_id': 'PUP-001',
+                'class_name': 'Primary 2B',
+                'term': 'First Term',
+                'academic_year': '2026/2027',
+                'average_marks': 85.5,
+                'total_score': 90.0,
+                'number_of_subject': 1,
+                'Status': 'Promoted',
+                'Grade': 'A',
+                'subjects': {
+                    'Numeracy': {'first_term_mark': 40, 'second_term_mark': 45, 'third_term_mark': 45, 'overall_mark': 90, 'grade': 'A'}
+                }
+            },
+            school={
+                'school_name': 'Greenfields Academy',
+                'school_type': 'mixed',
+                'show_positions': 1,
+                'test_score_max': 30,
+                'max_tests': 3
+            },
+            position={'pos': 1, 'size': 15, 'class': 'Primary 2B', 'is_stream_separate': False},
+            subject_positions={'Numeracy': {'pos': 1, 'size': 15, 'highest': 90.0, 'lowest': 50.0}},
+            published_terms=[],
+            current_term_token='t1',
+            available_result_classes=[],
+            selected_result_class='',
+            term_notice='',
+            term_view_endpoint='parent_view_result',
+            student_key='key',
+            prev_term=None,
+            next_term=None,
+            behaviour_grade_scale={},
+            teacher_signature=None,
+            teacher_name='Mrs. Smith',
+            principal_name='Mrs. Principal',
+            principal_signature=None,
+            result_max_tests=3,
+            exam_config={'exam_mode': 'separate'}
+        )
+        assert 'class="report-page school-primary-nursery"' in rendered_pry
+        assert 'Pupil Details' in rendered_pry
+        assert 'Pupil Name' in rendered_pry
+        assert 'Pupils in Class' in rendered_pry
+
+        # Case C: Secondary Class (Student)
+        rendered_sec = flask.render_template(
+            'student/student_result.html',
+            student={
+                'first_name': 'Chidi',
+                'student_id': 'PUP-001',
+                'class_name': 'JSS 2B',
+                'term': 'First Term',
+                'academic_year': '2026/2027',
+                'average_marks': 85.5,
+                'total_score': 90.0,
+                'number_of_subject': 1,
+                'Status': 'Promoted',
+                'Grade': 'A',
+                'subjects': {
+                    'Numeracy': {'first_term_mark': 40, 'second_term_mark': 45, 'third_term_mark': 45, 'overall_mark': 90, 'grade': 'A'}
+                }
+            },
+            school={
+                'school_name': 'Greenfields Academy',
+                'school_type': 'mixed',
+                'show_positions': 1,
+                'test_score_max': 30,
+                'max_tests': 3
+            },
+            position={'pos': 1, 'size': 15, 'class': 'JSS 2B', 'is_stream_separate': False},
+            subject_positions={'Numeracy': {'pos': 1, 'size': 15, 'highest': 90.0, 'lowest': 50.0}},
+            published_terms=[],
+            current_term_token='t1',
+            available_result_classes=[],
+            selected_result_class='',
+            term_notice='',
+            term_view_endpoint='parent_view_result',
+            student_key='key',
+            prev_term=None,
+            next_term=None,
+            behaviour_grade_scale={},
+            teacher_signature=None,
+            teacher_name='Mrs. Smith',
+            principal_name='Mrs. Principal',
+            principal_signature=None,
+            result_max_tests=3,
+            exam_config={'exam_mode': 'separate'}
+        )
+        assert 'class="report-page school-primary-nursery"' not in rendered_sec
+        assert 'Student Details' in rendered_sec
+        assert 'Student Name' in rendered_sec
+        assert 'Students in Class' in rendered_sec
+
+
+
+
+

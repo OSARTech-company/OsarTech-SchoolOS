@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merge Parent Accounts - Student Score Management System</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308d') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: radial-gradient(circle at top right, rgba(31, 122, 140, 0.06), transparent 35%),
+                        radial-gradient(circle at bottom left, rgba(15, 76, 129, 0.04), transparent 30%),
+                        var(--bg);
+            min-height: 100vh;
+        }
+
+        .container.merge-page {
+            width: min(800px, 100%);
+            padding-top: 28px;
+            padding-bottom: 40px;
+        }
+
+        .step-card {
+            border-radius: 16px;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 24px;
+            padding: 24px;
+        }
+
+        .child-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .child-row:last-child {
+            border-bottom: none;
+        }
+
+        .child-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .child-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(31, 122, 140, 0.1);
+            color: #1F7A8C;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .otp-input-field {
+            font-size: 2rem;
+            letter-spacing: 0.5rem;
+            text-align: center;
+            font-family: monospace;
+            max-width: 240px;
+            margin: 12px auto;
+            display: block;
+        }
+
+        .btn-flex-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        @media (max-width: 640px) {
+            .btn-flex-container {
+                flex-direction: column-reverse;
+                align-items: stretch;
+            }
+            .btn-flex-container button, .btn-flex-container a {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+
+    <div class="container merge-page">
+        <div class="header">
+            <h1><i class="fas fa-link text-primary"></i> Merge Parent Profiles</h1>
+            <p class="muted">Link your children's profiles from different schools into a single unified parent dashboard.</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Child Profiles to Merge -->
+        <div class="card step-card">
+            <h2 style="margin-top: 0;"><i class="fas fa-graduation-cap"></i> Profiles to be Linked</h2>
+            <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 16px;">The following student accounts are associated with your phone number but currently use different passwords. Merging them will let you see them all under one login.</p>
+            
+            <div style="border: 1px solid var(--line); border-radius: 12px; background: var(--bg-light); overflow: hidden;">
+                {% for child in unmerged %}
+                <div class="child-row">
+                    <div class="child-info">
+                        <div class="child-avatar">
+                            <i class="fas fa-user-graduate"></i>
+                        </div>
+                        <div>
+                            <strong style="font-size: 1rem; color: var(--text);">{{ child.firstname }}</strong>
+                            <span style="font-size: 0.8rem; display: block; color: var(--muted);">Class: {{ child.classname }} {{ child.stream }}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="badge" style="background: rgba(31, 122, 140, 0.15); color: #1F7A8C; font-weight: bold; padding: 4px 8px; border-radius: 6px;">{{ child.school_id|upper }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Verification Wizard -->
+        <div class="card step-card">
+            {% if not otp_sent %}
+                <!-- Step 1: Send OTP -->
+                <h2 style="margin-top: 0;"><i class="fas fa-shield-halved"></i> Step 1: Phone Verification</h2>
+                <p>For your security, we must verify that you have access to the registered phone number <strong>{{ parent_phone }}</strong> before updating the credentials.</p>
+                
+                <div style="text-align: center; margin: 32px 0;">
+                    <a href="{{ url_for('parent_merge_profiles', send_otp='1') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-paper-plane"></i> Send Verification Code (SMS)
+                    </a>
+                </div>
+                
+                <div class="btn-flex-container">
+                    <a href="{{ url_for('parent_dashboard') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Cancel & Back
+                    </a>
+                </div>
+            {% else %}
+                <!-- Step 2: Input OTP & Set New Password -->
+                <h2 style="margin-top: 0;"><i class="fas fa-key"></i> Step 2: Verification & Password Setup</h2>
+                <p>Enter the verification code sent to your phone and choose a new unified password to merge all profiles.</p>
+
+                {% if not sms_enabled %}
+                <div style="background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 14px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem; color: var(--text);">
+                    <i class="fas fa-triangle-exclamation text-warning" style="margin-right: 6px;"></i>
+                    <strong>Development Mode:</strong> SMS sending is disabled. Your verification code is: 
+                    <strong style="font-family: monospace; font-size: 1.2rem; color: #d97706; background: rgba(217, 119, 6, 0.1); padding: 2px 6px; border-radius: 4px;">{{ otp_code_mock }}</strong>
+                </div>
+                {% endif %}
+
+                <form method="POST" id="parent-merge-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                    <div class="form-group" style="text-align: center;">
+                        <label for="otp" style="font-weight: bold; font-size: 1.1rem; display: block; margin-bottom: 8px;">6-Digit Code</label>
+                        <input 
+                            type="text" 
+                            id="otp" 
+                            name="otp" 
+                            class="otp-input-field form-control" 
+                            placeholder="------" 
+                            maxlength="6" 
+                            required 
+                            pattern="[0-9]{6}"
+                            autocomplete="one-time-code"
+                        >
+                    </div>
+
+                    <div class="form-group mt-20">
+                        <label for="new_password"><i class="fas fa-lock"></i> New Unified Password</label>
+                        <div class="password-wrapper" style="position: relative;">
+                            <input 
+                                type="password" 
+                                id="new_password" 
+                                name="new_password" 
+                                placeholder="Min 6 characters" 
+                                required 
+                                minlength="6"
+                                style="width: 100%; padding-right: 40px;"
+                            >
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('new_password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--muted);" aria-label="Toggle password visibility">
+                                <i class="fas fa-eye" id="eye-new_password"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group mt-16">
+                        <label for="confirm_password"><i class="fas fa-check-double"></i> Confirm Password</label>
+                        <div class="password-wrapper" style="position: relative;">
+                            <input 
+                                type="password" 
+                                id="confirm_password" 
+                                name="confirm_password" 
+                                placeholder="Re-enter password" 
+                                required 
+                                minlength="6"
+                                style="width: 100%; padding-right: 40px;"
+                            >
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('confirm_password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--muted);" aria-label="Toggle password visibility">
+                                <i class="fas fa-eye" id="eye-confirm_password"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="btn-flex-container">
+                        <a href="{{ url_for('parent_merge_profiles', send_otp='1') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrows-rotate"></i> Resend Code
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-circle-check"></i> Verify & Merge Accounts
+                        </button>
+                    </div>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function togglePasswordVisibility(fieldId) {
+            const field = document.getElementById(fieldId);
+            const eyeIcon = document.getElementById('eye-' + fieldId);
+            if (field && eyeIcon) {
+                if (field.type === 'password') {
+                    field.type = 'text';
+                    eyeIcon.classList.remove('fa-eye');
+                    eyeIcon.classList.add('fa-eye-slash');
+                } else {
+                    field.type = 'password';
+                    eyeIcon.classList.remove('fa-eye-slash');
+                    eyeIcon.classList.add('fa-eye');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

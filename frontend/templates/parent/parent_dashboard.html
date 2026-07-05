@@ -281,6 +281,21 @@
                     {% endif %}
                 {% endwith %}
 
+                {% if unmerged_count and unmerged_count > 0 %}
+                <div class="flash info" style="background: linear-gradient(135deg, rgba(31, 122, 140, 0.08) 0%, rgba(15, 76, 129, 0.08) 100%); border-left: 4px solid var(--accent); color: var(--text); padding: 18px; border-radius: 8px; margin-top: 16px; margin-bottom: 24px; box-shadow: var(--shadow-sm); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <i class="fas fa-users-rectangle" style="font-size: 1.5rem; color: var(--accent);"></i>
+                        <div>
+                            <strong style="display: block; margin-bottom: 2px;">Multiple Child Profiles Found</strong>
+                            <span style="font-size: 0.9rem; color: var(--muted);">We found {{ unmerged_count }} other child profile(s) associated with your phone number that are using different passwords.</span>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('parent_merge_profiles') }}" class="btn btn-primary" style="background: var(--accent); white-space: nowrap; flex-shrink: 0; padding: 8px 16px; font-size: 0.85rem; border-radius: 6px;">
+                        <i class="fas fa-link"></i> Merge Profiles
+                    </a>
+                </div>
+                {% endif %}
+
                 <div class="parent-shell">
                 <section class="page-hero">
                     <div class="hero-grid">

@@ -5359,7 +5359,7 @@ def _catalog_defaults_for_class(classname_key):
     ss_commercial = ['Financial Accounting', 'Commerce', 'Economics']
     ss_optional = ['Data Processing', 'Agricultural Science', 'French', 'Further Mathematics']
 
-    if key.startswith('NURSERY'):
+    if key.startswith('NURSERY') or key.startswith('KG'):
         return {'core': nursery_core, 'science': [], 'art': [], 'commercial': [], 'optional': []}
     if key.startswith('PRIMARY'):
         return {'core': primary_core, 'science': [], 'art': [], 'commercial': [], 'optional': []}
@@ -5396,6 +5396,7 @@ def _upsert_global_catalog_subject_with_cursor(c, classname_key, bucket, subject
 def _seed_global_subject_catalog_defaults_with_cursor(c):
     classes = [
         'NURSERY1', 'NURSERY2', 'NURSERY3',
+        'KG1', 'KG2', 'KG3',
         'PRIMARY1', 'PRIMARY2', 'PRIMARY3', 'PRIMARY4', 'PRIMARY5', 'PRIMARY6',
         'JSS1', 'JSS2', 'JSS3',
         'SS1', 'SS2', 'SS3',
@@ -15526,6 +15527,7 @@ def update_school_settings_with_cursor(c, school_id, settings):
     db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS score_entry_mode TEXT DEFAULT 'teacher_subject'")
     db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS parent_timetable_show_teacher INTEGER DEFAULT 1")
     db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS leadership_title TEXT DEFAULT 'principal'")
+    db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS third_term_layout_mode TEXT DEFAULT 'term_summary'")
 
     db_execute(
                c,
@@ -15538,7 +15540,7 @@ def update_school_settings_with_cursor(c, school_id, settings):
                 "performance_remark_a = ?, performance_remark_b = ?, performance_remark_c = ?, performance_remark_d = ?, performance_remark_f = ?, "
                 "pass_mark = ?, behaviour_grade_mode = ?, "
                 "show_positions = ?, ss_ranking_mode = ?, class_arm_ranking_mode = ?, "
-                "combine_third_term_results = ?, ss1_stream_mode = ?, ss_arm_mode = ?, parent_timetable_show_teacher = ?, "
+                "combine_third_term_results = ?, third_term_layout_mode = ?, ss1_stream_mode = ?, ss_arm_mode = ?, parent_timetable_show_teacher = ?, "
                 "theme_primary_color = ?, theme_secondary_color = ?, theme_accent_color = ?, leadership_title = ?, score_entry_mode = ?, "
                 "updated_at = CURRENT_TIMESTAMP "
                 "WHERE school_id = ?"),
@@ -15567,6 +15569,7 @@ def update_school_settings_with_cursor(c, school_id, settings):
                 settings.get('ss_ranking_mode', 'together'),
                 settings.get('class_arm_ranking_mode', 'separate'),
                 settings.get('combine_third_term_results', 0),
+                settings.get('third_term_layout_mode', 'term_summary'),
                 settings.get('ss1_stream_mode', 'separate'),
                 settings.get('ss_arm_mode', 'preserve'),
                 settings.get('parent_timetable_show_teacher', 1),
@@ -21658,11 +21661,25 @@ def _combine_student_snapshots(snapshots, school_id):
     for display_subject in all_subjects:
         marks = []
         latest_subject_comment = ''
+        term_marks = {'first_term': '-', 'second_term': '-', 'third_term': '-'}
+        third_term_components = {}
         for s in snapshots:
             scores = s.get('scores', {}) or {}
             ss = get_subject_score_block(scores, display_subject)
             if isinstance(ss, dict):
-                marks.append(subject_overall_mark(ss))
+                overall = subject_overall_mark(ss)
+                marks.append(overall)
+                s_term = (s.get('term') or '').strip().lower()
+                if s_term == 'first term':
+                    term_marks['first_term'] = overall
+                elif s_term == 'second term':
+                    term_marks['second_term'] = overall
+                elif s_term == 'third term':
+                    term_marks['third_term'] = overall
+                    # Keep detailed components for Third Term
+                    for k, v in ss.items():
+                        if k not in {'overall_mark', 'subject_teacher_comment'}:
+                            third_term_components[k] = v
         for s in reversed(snapshots):
             scores = s.get('scores', {}) or {}
             ss = get_subject_score_block(scores, display_subject)
@@ -21672,7 +21689,14 @@ def _combine_student_snapshots(snapshots, school_id):
                     latest_subject_comment = c
                     break
         avg_mark = sum(marks) / len(marks) if marks else 0.0
-        block = {'overall_mark': avg_mark}
+        block = {
+            'overall_mark': avg_mark,
+            'first_term_mark': term_marks['first_term'],
+            'second_term_mark': term_marks['second_term'],
+            'third_term_mark': term_marks['third_term'],
+        }
+        # Merge third term detailed components
+        block.update(third_term_components)
         if latest_subject_comment:
             block['subject_teacher_comment'] = latest_subject_comment
         combined_scores[display_subject] = block
@@ -21807,6 +21831,17 @@ def _build_rich_result_pdf_reportlab(report):
     principal_signature_ref = (report.get('principal_signature') or '').strip()
     leadership_title = normalize_school_leadership_title(report.get('leadership_title', 'principal'))
     leadership_label = get_school_leadership_label(leadership_title)
+    school_type = (report.get('school_type') or 'mixed').strip().lower()
+    class_name_upper = (class_name or '').strip().upper()
+    is_nursery = 'NURSERY' in class_name_upper or 'KINDERGARTEN' in class_name_upper or 'KINDER' in class_name_upper or 'KG' in class_name_upper or 'PRE-PRIMARY' in class_name_upper or 'PRE-SCHOOL' in class_name_upper or 'PRESCHOOL' in class_name_upper or school_type == 'nursery'
+    is_primary = not is_nursery and ('PRIMARY' in class_name_upper or 'PRY' in class_name_upper or school_type == 'primary')
+    
+    if is_nursery:
+        student_label = 'Child'
+    elif is_primary:
+        student_label = 'Pupil'
+    else:
+        student_label = 'Student'
     generated_on = (report.get('generated_on') or '').strip()
     subject_rows = report.get('subject_rows') or []
     show_positions = bool(report.get('show_positions', True))
@@ -21850,7 +21885,7 @@ def _build_rich_result_pdf_reportlab(report):
     story.append(Spacer(1, 6))
 
     meta_data = [
-        ["Student", student_name, "Student ID", student_id],
+        [student_label, student_name, f"{student_label} ID", student_id],
         ["Class", class_name, "Term", term],
         ["Academic Year", year or "-", "Generated", generated_on or "-"],
         ["Average", _format_mark(average), class_average_label, _format_mark(class_average)],
@@ -21895,30 +21930,60 @@ def _build_rich_result_pdf_reportlab(report):
     story.append(meta_table)
     story.append(Spacer(1, 8))
 
-    if show_positions:
-        subject_table_data = [[
-            "Subject", "Total Exam", "Highest", "Lowest", "Total", "Grade", "Position"
-        ]]
-    else:
-        subject_table_data = [[
-            "Subject", "Total Exam", "Highest", "Lowest", "Total", "Grade"
-        ]]
-    for row in subject_rows:
-        table_row = [
-            Paragraph(_pdf_escape(str(row.get('subject') or '')), styles['Normal']),
-            _format_mark(row.get('total_exam')),
-            _format_mark(row.get('highest')),
-            _format_mark(row.get('lowest')),
-            _format_mark(row.get('total')),
-            str(row.get('grade') or '-'),
-        ]
-        if show_positions:
-            table_row.append(str(row.get('position') or '-'))
-        subject_table_data.append(table_row)
-    if len(subject_table_data) == 1:
-        subject_table_data.append(['-', '-', '-', '-', '-', '-', '-'] if show_positions else ['-', '-', '-', '-', '-', '-'])
+    is_third_term_combined = (term or '').strip().lower() == 'third term' and report.get('combine_third_term_results')
+    term_summary_mode = is_third_term_combined and report.get('third_term_layout_mode') == 'term_summary'
 
-    subject_col_widths = [50 * mm, 22 * mm, 22 * mm, 22 * mm, 20 * mm, 16 * mm, 20 * mm] if show_positions else [58 * mm, 24 * mm, 24 * mm, 24 * mm, 24 * mm, 20 * mm]
+    if term_summary_mode:
+        if show_positions:
+            subject_table_data = [[
+                "Subject", "1st Term", "2nd Term", "3rd Term", "Cumulative Avg", "Grade", "Position"
+            ]]
+        else:
+            subject_table_data = [[
+                "Subject", "1st Term", "2nd Term", "3rd Term", "Cumulative Avg", "Grade"
+            ]]
+        for row in subject_rows:
+            table_row = [
+                Paragraph(_pdf_escape(str(row.get('subject') or '')), styles['Normal']),
+                _format_mark(row.get('first_term_mark')),
+                _format_mark(row.get('second_term_mark')),
+                _format_mark(row.get('third_term_mark')),
+                _format_mark(row.get('total')),
+                str(row.get('grade') or '-'),
+            ]
+            if show_positions:
+                table_row.append(str(row.get('position') or '-'))
+            subject_table_data.append(table_row)
+        if show_positions:
+            subject_col_widths = [46 * mm, 22 * mm, 22 * mm, 22 * mm, 30 * mm, 18 * mm, 26 * mm]
+        else:
+            subject_col_widths = [62 * mm, 23 * mm, 23 * mm, 23 * mm, 35 * mm, 20 * mm]
+    else:
+        total_header = "Cumulative\nTotal" if is_third_term_combined else "Total"
+        if show_positions:
+            subject_table_data = [[
+                "Subject", "Total Exam", "Highest", "Lowest", total_header, "Grade", "Position"
+            ]]
+        else:
+            subject_table_data = [[
+                "Subject", "Total Exam", "Highest", "Lowest", total_header, "Grade"
+            ]]
+        for row in subject_rows:
+            table_row = [
+                Paragraph(_pdf_escape(str(row.get('subject') or '')), styles['Normal']),
+                _format_mark(row.get('total_exam')),
+                _format_mark(row.get('highest')),
+                _format_mark(row.get('lowest')),
+                _format_mark(row.get('total')),
+                str(row.get('grade') or '-'),
+            ]
+            if show_positions:
+                table_row.append(str(row.get('position') or '-'))
+            subject_table_data.append(table_row)
+        subject_col_widths = [50 * mm, 22 * mm, 22 * mm, 22 * mm, 20 * mm, 16 * mm, 20 * mm] if show_positions else [58 * mm, 24 * mm, 24 * mm, 24 * mm, 24 * mm, 20 * mm]
+
+    if len(subject_table_data) == 1:
+        subject_table_data.append(['-'] * len(subject_table_data[0]))
     subject_table = Table(
         subject_table_data,
         repeatRows=1,
@@ -31767,6 +31832,13 @@ def login():
                     session.permanent = True
                     session['role'] = 'parent'
                     session['parent_phone'] = parent_phone
+                    
+                    first_primary = normalize_parent_phone(matched[0].get('parent_phone'))
+                    if parent_phone == first_primary:
+                        session['parent_logged_in_password_hash'] = (matched[0].get('parent_password_hash') or '').strip()
+                    else:
+                        session['parent_logged_in_password_hash'] = (matched[0].get('parent_password_hash_2') or '').strip()
+
                     session['school_id'] = _normalize_session_text(matched[0].get('school_id'))
                     session['post_login_welcome_name'] = (matched[0].get('parent_name') or parent_phone).strip()
                     session['parent_student_keys'] = sorted(
@@ -36912,6 +36984,7 @@ def _build_school_settings_form_state(school):
         'ss_ranking_mode': (school.get('ss_ranking_mode') or 'together').strip().lower(),
         'class_arm_ranking_mode': (school.get('class_arm_ranking_mode') or 'separate').strip().lower(),
         'combine_third_term_results': 1 if int(school.get('combine_third_term_results', 0) or 0) else 0,
+        'third_term_layout_mode': (school.get('third_term_layout_mode') or 'term_summary').strip(),
         'ss1_stream_mode': (school.get('ss1_stream_mode') or 'separate').strip().lower(),
         'ss_arm_mode': (school.get('ss_arm_mode') or 'preserve').strip().lower(),
         'parent_timetable_show_teacher': 1 if int(school.get('parent_timetable_show_teacher', 1) or 0) else 0,
@@ -36974,6 +37047,7 @@ def _build_school_settings_form_state_from_request(school, form_data):
         'ss_ranking_mode': (form_data.get('ss_ranking_mode', state.get('ss_ranking_mode', 'together')) or 'together').strip().lower(),
         'class_arm_ranking_mode': (form_data.get('class_arm_ranking_mode', state.get('class_arm_ranking_mode', 'separate')) or 'separate').strip().lower(),
         'combine_third_term_results': 1 if (form_data.get('combine_third_term_results', str(state.get('combine_third_term_results', 0))) or '0').strip() == '1' else 0,
+        'third_term_layout_mode': (form_data.get('third_term_layout_mode', state.get('third_term_layout_mode', 'term_summary')) or 'term_summary').strip(),
         'ss1_stream_mode': (form_data.get('ss1_stream_mode', state.get('ss1_stream_mode', 'separate')) or 'separate').strip().lower(),
         'ss_arm_mode': (form_data.get('ss_arm_mode', state.get('ss_arm_mode', 'preserve')) or 'preserve').strip().lower(),
         'parent_timetable_show_teacher': 1 if (form_data.get('parent_timetable_show_teacher', str(state.get('parent_timetable_show_teacher', 1))) or '0').strip() == '1' else 0,
@@ -37624,6 +37698,7 @@ def school_admin_settings():
             'ss_ranking_mode': ss_ranking_mode,
             'class_arm_ranking_mode': class_arm_ranking_mode,
             'combine_third_term_results': combine_third,
+            'third_term_layout_mode': (request.form.get('third_term_layout_mode', current_school.get('third_term_layout_mode', 'term_summary')) or 'term_summary').strip(),
             'ss1_stream_mode': ss1_stream_mode,
             'ss_arm_mode': ss_arm_mode,
             'parent_timetable_show_teacher': parent_timetable_show_teacher,
@@ -39011,6 +39086,43 @@ def school_admin_promote():
         pass_mark=pass_mark,
         auto_decide=auto_decide,
     )
+
+@app.route('/school-admin/update-pass-mark-ajax', methods=['POST'])
+def update_pass_mark_ajax():
+    if session.get('role') != 'school_admin':
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    school_id = session.get('school_id')
+    if not school_id:
+        return jsonify({'success': False, 'error': 'Session missing'}), 400
+    try:
+        data = request.get_json() or {}
+        new_pass_mark = int(data.get('pass_mark', 50))
+        new_pass_mark = max(0, min(100, new_pass_mark))
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'error': 'Invalid pass mark'}), 400
+
+    school = get_school(school_id) or {}
+    if not school:
+        return jsonify({'success': False, 'error': 'School not found'}), 404
+
+    # Update database
+    with db_connection() as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            "UPDATE schools SET pass_mark = ? WHERE id = ?",
+            (new_pass_mark, school_id),
+        )
+        conn.commit()
+
+    record_admin_action_audit(
+        school_id,
+        'update_pass_mark_ajax',
+        target_scope=f'pass_mark={new_pass_mark}',
+        payload={'pass_mark': new_pass_mark}
+    )
+    invalidate_school_cache(school_id)
+    return jsonify({'success': True, 'pass_mark': new_pass_mark})
 
 @app.route('/school-admin/promotion-audit')
 def school_admin_promotion_audit():
@@ -49831,6 +49943,27 @@ def parent_dashboard():
     )
     unread_parent_messages = sum(1 for row in parent_messages if not row.get('is_read'))
     parent_fee_rows, parent_fee_overview = build_parent_fee_rows(session.get('parent_phone', ''), children)
+
+    # Count unmerged parent profiles
+    unmerged_count = 0
+    if session.get('parent_phone'):
+        try:
+            candidates = get_parent_students_by_phone(session.get('parent_phone'))
+            current_hash = session.get('parent_logged_in_password_hash')
+            has_parent_multi_cols = students_has_parent_multi_access_columns()
+            for row in candidates:
+                primary_phone = normalize_parent_phone(row.get('parent_phone', ''))
+                secondary_phone = normalize_parent_phone(row.get('parent_phone_2', '')) if has_parent_multi_cols else ''
+                pwd_hash = ''
+                if session.get('parent_phone') == primary_phone:
+                    pwd_hash = (row.get('parent_password_hash') or '').strip()
+                elif has_parent_multi_cols and session.get('parent_phone') == secondary_phone:
+                    pwd_hash = (row.get('parent_password_hash_2') or '').strip()
+                if pwd_hash and pwd_hash != current_hash:
+                    unmerged_count += 1
+        except Exception as exc:
+            logging.warning("Error counting unmerged parent profiles: %s", exc)
+
     return render_template(
         'parent/parent_dashboard.html',
         parent_phone=session.get('parent_phone', ''),
@@ -49841,7 +49974,179 @@ def parent_dashboard():
         unread_parent_messages=unread_parent_messages,
         parent_fee_rows=parent_fee_rows,
         parent_fee_overview=parent_fee_overview,
+        unmerged_count=unmerged_count,
     )
+
+
+@app.route('/parent/merge-profiles', methods=['GET', 'POST'])
+@require_roles('parent', redirect_endpoint='login')
+def parent_merge_profiles():
+    if session.get('role') != 'parent':
+        return redirect(url_for('login'))
+        
+    parent_phone = normalize_parent_phone(session.get('parent_phone', ''))
+    if not parent_phone:
+        flash('Parent session expired. Please login again.', 'error')
+        return redirect(url_for('login'))
+
+    # Load all candidate students for this phone number
+    candidates = get_parent_students_by_phone(parent_phone)
+    current_hash = session.get('parent_logged_in_password_hash')
+    
+    unmerged = []
+    has_parent_multi_cols = students_has_parent_multi_access_columns()
+    for row in candidates:
+        primary_phone = normalize_parent_phone(row.get('parent_phone', ''))
+        secondary_phone = normalize_parent_phone(row.get('parent_phone_2', '')) if has_parent_multi_cols else ''
+        pwd_hash = ''
+        if parent_phone == primary_phone:
+            pwd_hash = (row.get('parent_password_hash') or '').strip()
+        elif has_parent_multi_cols and parent_phone == secondary_phone:
+            pwd_hash = (row.get('parent_password_hash_2') or '').strip()
+            
+        if pwd_hash and pwd_hash != current_hash:
+            unmerged.append(row)
+            
+    if not unmerged and request.method == 'GET' and not request.args.get('send_otp'):
+        # If everything is already merged, redirect back
+        flash('All profiles linked to this phone number are already merged.', 'success')
+        return redirect(url_for('parent_dashboard'))
+
+    # Handle OTP send request
+    if request.args.get('send_otp') == '1' or (request.method == 'POST' and not session.get('parent_merge_otp')):
+        import secrets
+        code = f"{secrets.randbelow(900000) + 100000}"
+        expiry = datetime.now() + timedelta(minutes=10)
+        session['parent_merge_otp'] = code
+        session['parent_merge_otp_expires_at'] = expiry.isoformat()
+        
+        # Dispatch SMS
+        if get_sms_sending_enabled():
+            try:
+                _enqueue_sms_delivery(
+                    session.get('school_id'), 
+                    parent_phone, 
+                    f"Your OSARtech SchoolOS verification code is {code}. Use this to merge your parent accounts.", 
+                    audience_role='parent'
+                )
+            except Exception as exc:
+                logging.error("Failed to enqueue merge OTP SMS: %s", exc)
+                
+        flash('Verification code sent successfully.', 'success')
+        return redirect(url_for('parent_merge_profiles'))
+
+    if request.method == 'POST':
+        otp_entered = (request.form.get('otp', '') or '').strip()
+        new_password = (request.form.get('new_password', '') or '').strip()
+        confirm_password = (request.form.get('confirm_password', '') or '').strip()
+        
+        expected_otp = (session.get('parent_merge_otp') or '').strip()
+        expiry_raw = (session.get('parent_merge_otp_expires_at') or '').strip()
+        
+        if not expected_otp or not expiry_raw:
+            flash('Verification code not generated or expired. Please resend code.', 'error')
+            return redirect(url_for('parent_merge_profiles'))
+            
+        try:
+            expiry_time = datetime.fromisoformat(expiry_raw)
+        except Exception:
+            expiry_time = datetime.min
+            
+        if datetime.now() > expiry_time:
+            session.pop('parent_merge_otp', None)
+            session.pop('parent_merge_otp_expires_at', None)
+            flash('Verification code has expired. Please request a new one.', 'error')
+            return redirect(url_for('parent_merge_profiles'))
+            
+        if otp_entered != expected_otp:
+            flash('Invalid verification code.', 'error')
+            return render_template(
+                'parent/parent_merge_profiles.html',
+                unmerged=unmerged,
+                sms_enabled=get_sms_sending_enabled(),
+                otp_sent=True,
+                otp_code_mock=expected_otp
+            )
+            
+        if not new_password or not confirm_password:
+            flash('Password fields are required.', 'error')
+            return render_template(
+                'parent/parent_merge_profiles.html',
+                unmerged=unmerged,
+                sms_enabled=get_sms_sending_enabled(),
+                otp_sent=True,
+                otp_code_mock=expected_otp
+            )
+            
+        if new_password != confirm_password:
+            flash('Passwords do not match.', 'error')
+            return render_template(
+                'parent/parent_merge_profiles.html',
+                unmerged=unmerged,
+                sms_enabled=get_sms_sending_enabled(),
+                otp_sent=True,
+                otp_code_mock=expected_otp
+            )
+            
+        if len(new_password) < 6:
+            flash('New password must be at least 6 characters.', 'error')
+            return render_template(
+                'parent/parent_merge_profiles.html',
+                unmerged=unmerged,
+                sms_enabled=get_sms_sending_enabled(),
+                otp_sent=True,
+                otp_code_mock=expected_otp
+            )
+            
+        # Success! Apply the new password to all matching parent phone numbers
+        new_hash = hash_password(new_password)
+        try:
+            with db_connection(commit=True) as conn:
+                c = conn.cursor()
+                db_execute(
+                    c,
+                    """UPDATE students
+                       SET parent_password_hash = ?
+                       WHERE parent_phone = ?""",
+                    (new_hash, parent_phone),
+                )
+                if has_parent_multi_cols:
+                    db_execute(
+                        c,
+                        """UPDATE students
+                           SET parent_password_hash_2 = ?
+                           WHERE parent_phone_2 = ?""",
+                        (new_hash, parent_phone),
+                    )
+            
+            # Clear merge session state
+            session.pop('parent_merge_otp', None)
+            session.pop('parent_merge_otp_expires_at', None)
+            
+            # Update active session with new hash and refresh linked keys
+            session['parent_logged_in_password_hash'] = new_hash
+            session['parent_student_keys'] = sorted(
+                {f"{row.get('school_id', '')}::{row.get('student_id', '')}" for row in candidates},
+                key=lambda v: v.lower(),
+            )
+            
+            flash('Accounts merged successfully! You can now view all children with your new password.', 'success')
+            return redirect(url_for('parent_dashboard'))
+        except Exception as db_exc:
+            logging.error("Failed to merge parent profiles in DB: %s", db_exc)
+            flash(f"Database error during merging: {db_exc}", 'error')
+            return redirect(url_for('parent_merge_profiles'))
+
+    otp_sent = bool(session.get('parent_merge_otp'))
+    otp_code_mock = (session.get('parent_merge_otp') or '').strip()
+    return render_template(
+        'parent/parent_merge_profiles.html',
+        unmerged=unmerged,
+        sms_enabled=get_sms_sending_enabled(),
+        otp_sent=otp_sent,
+        otp_code_mock=otp_code_mock
+    )
+
 
 @app.route('/school-admin/documents', methods=['GET', 'POST'])
 def school_admin_documents():
@@ -51552,6 +51857,9 @@ def download_result_pdf():
             'total': total_score,
             'grade': grade,
             'position': pos,
+            'first_term_mark': s.get('first_term_mark'),
+            'second_term_mark': s.get('second_term_mark'),
+            'third_term_mark': s.get('third_term_mark'),
         })
         if show_positions:
             lines.append(
@@ -51581,6 +51889,9 @@ def download_result_pdf():
         'generated_on': datetime.now().strftime('%Y-%m-%d %H:%M'),
         'subject_rows': subject_rows,
         'show_positions': show_positions,
+        'combine_third_term_results': bool((school or {}).get('combine_third_term_results', 0)),
+        'third_term_layout_mode': ((school or {}).get('third_term_layout_mode') or 'term_summary').strip(),
+        'school_type': (school or {}).get('school_type', 'mixed'),
     }
     pdf_bytes = _build_rich_result_pdf_reportlab(rich_report) or _build_simple_pdf(lines)
     token_term = re.sub(r'[^A-Za-z0-9_-]+', '_', (target_term or 'term').strip())
@@ -53938,11 +54249,10 @@ def help():
 @app.route('/report_issue', methods=['GET', 'POST'])
 @require_rate_limit('report_issue', RATE_LIMIT_REPORT_ISSUE_PER_MIN, 60, redirect_endpoint='report_issue', methods=('POST',))
 def report_issue():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
+    user_id = session.get('user_id', 'anonymous_pre_login')
+    role = (session.get('role') or 'pre_login').strip().lower()
 
-    role = (session.get('role') or '').strip().lower()
-    fallback_back_url = url_for('menu')
+    fallback_back_url = url_for('login') if 'user_id' not in session else url_for('menu')
     if role == 'super_admin':
         fallback_back_url = url_for('super_admin_dashboard')
     elif role == 'school_admin':
@@ -53976,26 +54286,119 @@ def report_issue():
     if request.method == 'POST':
         description = (request.form.get('description', '') or request.form.get('issue_description', '')).strip()
         source_page = _normalize_source_page(request.form.get('source_page', '') or request.referrer or '')
-        redirect_target = url_for('report_issue', **({'from': source_page} if source_page else {}))
+        
+        # Auto-generate unique professional ticket reference
+        import uuid
+        ticket_ref = f"TKT-{uuid.uuid4().hex[:6].upper()}"
+        structured_desc = f"[Ticket ID: {ticket_ref}] {description}"
+
+        redirect_target = url_for('report_issue', success_ref=ticket_ref, **({'from': source_page} if source_page else {}))
         if not description:
             flash('Please describe the issue before submitting.', 'error')
             return redirect(redirect_target)
-        if len(description) > 2000:
+        if len(structured_desc) > 2000:
             flash('Report is too long. Keep it within 2000 characters.', 'error')
             return redirect(redirect_target)
         save_report(
-            session['user_id'],
-            description,
-            reporter_role=(session.get('role') or ''),
+            user_id,
+            structured_desc,
+            reporter_role=role,
             reporter_school_id=(session.get('school_id') or ''),
             source_page=source_page,
         )
-        flash('Thank you for your observation. We will fix it.', 'success')
+
+        # Async email notification to Super Admin
+        try:
+            import threading
+            super_admin_email = os.environ.get('SUPER_ADMIN_OTP_EMAIL', SUPER_ADMIN_USERNAME).strip()
+            severity = 'Low'
+            if description.startswith('[Category:'):
+                try:
+                    first_line = description.split('\n')[0]
+                    if '[Severity:' in first_line:
+                        severity = first_line.split('[Severity:')[1].split(']')[0].strip()
+                except Exception:
+                    pass
+            subject = f"[Support Ticket: {ticket_ref}] New Issue - Severity: {severity}"
+            body = (
+                f"A new issue has been reported in the Student Score Management System.\n\n"
+                f"Ticket Reference: {ticket_ref}\n"
+                f"Reporter ID: {user_id}\n"
+                f"Reporter Role: {role}\n"
+                f"School ID: {session.get('school_id') or 'N/A'}\n"
+                f"Source Page: {source_page or 'N/A'}\n\n"
+                f"Ticket Details:\n"
+                f"--------------------------------------------------\n"
+                f"{structured_desc}\n"
+                f"--------------------------------------------------\n\n"
+                f"You can view and manage all reports by logging into the admin panel.\n"
+            )
+            threading.Thread(
+                target=send_plain_email_message,
+                args=(subject, body, [super_admin_email]),
+                daemon=True
+            ).start()
+        except Exception as email_exc:
+            logging.error("Failed to trigger support notification email thread: %s", email_exc)
+
+        flash(f'Ticket {ticket_ref} submitted successfully!', 'success')
         return redirect(redirect_target)
     
     source_page = _normalize_source_page(request.args.get('from', '') or request.referrer or '')
     back_url = source_page or fallback_back_url
-    return render_template('shared/report_issue.html', source_page=source_page, back_url=back_url, role=role)
+    
+    # Retrieve past 5 support tickets if logged in
+    past_reports = []
+    if 'user_id' in session:
+        try:
+            with db_connection() as conn:
+                c = conn.cursor()
+                db_execute(c, "SELECT id, description, timestamp, status FROM reports WHERE user_id = ? ORDER BY id DESC LIMIT 5", (user_id,))
+                for r in c.fetchall() or []:
+                    desc = r[1] or ''
+                    tref = 'N/A'
+                    category = 'General'
+                    severity = 'Low'
+                    clean_desc = desc
+                    
+                    if desc.startswith('[Ticket ID:'):
+                        try:
+                            tref = desc.split('[Ticket ID:')[1].split(']')[0].strip()
+                            desc_after_tref = desc.split(']', 1)[1].strip()
+                            clean_desc = desc_after_tref
+                            if desc_after_tref.startswith('[Category:'):
+                                first_line = desc_after_tref.split('\n')[0]
+                                if '[Category:' in first_line:
+                                    category = first_line.split('[Category:')[1].split(']')[0].strip()
+                                if '[Severity:' in first_line:
+                                    severity = first_line.split('[Severity:')[1].split(']')[0].strip()
+                                clean_desc = '\n'.join(desc_after_tref.split('\n')[2:]) if '\n\nDescription:\n' in desc_after_tref else desc_after_tref
+                        except Exception:
+                            pass
+                    
+                    past_reports.append({
+                        'id': r[0],
+                        'ticket_ref': tref,
+                        'category': category,
+                        'severity': severity,
+                        'description': clean_desc,
+                        'timestamp': r[2],
+                        'status': r[3] or 'unread'
+                    })
+        except Exception as exc:
+            logging.warning("Error fetching user support history: %s", exc)
+
+    success_ref = (request.args.get('success_ref') or '').strip()
+    return render_template(
+        'shared/report_issue.html', 
+        source_page=source_page, 
+        back_url=back_url, 
+        role=role,
+        past_reports=past_reports,
+        success_ref=success_ref
+    )
+
+
 
 @app.route('/view-reports')
 def view_reports():

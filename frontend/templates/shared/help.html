@@ -191,6 +191,8 @@
         .faq-answer {
             color: #5a6c7d;
             line-height: 1.6;
+            display: none;
+            margin-top: 10px;
         }
 
         @media (max-width: 768px) {
@@ -218,6 +220,37 @@
             .video-tutorial h2 {
                 font-size: 1.5rem;
             }
+        }
+
+        /* Dark Mode Overrides */
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            color: #e2e8f0;
+        }
+        [data-theme="dark"] .help-header h1 {
+            color: #f1f5f9;
+        }
+        [data-theme="dark"] .help-header p {
+            color: #94a3b8;
+        }
+        [data-theme="dark"] .help-section,
+        [data-theme="dark"] .faq-section {
+            background: #1e293b;
+            border-color: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        [data-theme="dark"] .help-section h2,
+        [data-theme="dark"] .step-content h3,
+        [data-theme="dark"] .faq-question {
+            color: #f1f5f9;
+        }
+        [data-theme="dark"] .help-section p,
+        [data-theme="dark"] .step-content p,
+        [data-theme="dark"] .faq-answer {
+            color: #94a3b8;
+        }
+        [data-theme="dark"] .faq-item {
+            border-bottom-color: rgba(255, 255, 255, 0.05);
         }
     </style>
 </head>
