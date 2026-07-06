@@ -479,9 +479,9 @@
                     </div>
                     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom:12px;">
                         <p class="note" style="margin:0;">Subjects are already listed in the sidebar. This page now focuses on the selected subject only.</p>
-                        {% if selected_score_class and school and school.score_entry_mode == 'subject_sheet' %}
+                        {% if selected_score_class and selected_score_subject %}
                         <a href="{{ url_for('teacher_subject_score_sheet', class=selected_score_class, subject=selected_score_subject) }}" class="btn btn-primary btn-sm">
-                            <i class="fas fa-table-list"></i> Open Subject Sheet
+                            <i class="fas fa-table-list"></i> Switch to Grid (Subject Sheet) View
                         </a>
                         {% endif %}
                     </div>

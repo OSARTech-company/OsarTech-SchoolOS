@@ -53655,14 +53655,17 @@ def _render_subject_score_sheet(role):
         flash('Choose a class and subject first.', 'error')
         return redirect(back_url)
 
+    current_entry_mode = school.get('score_entry_mode', 'teacher_subject')
+    is_mode_supported = current_entry_mode in {'subject_sheet', 'teacher_subject'}
+
     if role == 'school_admin':
-        if not subject_sheet_mode:
-            flash('Subject Sheet Mode must be active before school admin can use the subject roster sheet.', 'info')
+        if not is_mode_supported:
+            flash('Subject Sheet is not available in the current school mode.', 'info')
             return redirect(url_for('school_admin_dashboard'))
         class_access = True
     else:
-        if not subject_sheet_mode:
-            flash('Subject Sheet Mode is not active for your school.', 'info')
+        if not is_mode_supported:
+            flash('Subject Sheet is not active for your school.', 'info')
             return redirect(url_for('teacher_dashboard', tab='score'))
         class_access = teacher_has_class_access(
             school_id,
