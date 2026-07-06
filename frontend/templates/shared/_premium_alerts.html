@@ -1,0 +1,140 @@
+<!-- Premium Alert Notification Handler -->
+<script>
+(function() {
+    document.addEventListener("DOMContentLoaded", function() {
+        // Find all flash messages in the page (standard .flash, flash-success, flash-error etc.)
+        var selector = '.flash, [class^="flash-"], [class*=" flash-"]';
+        var flashes = document.querySelectorAll(selector);
+        if (flashes.length === 0) return;
+        
+        // Append animations styles once
+        if (!document.getElementById('premium-alert-styles')) {
+            var style = document.createElement('style');
+            style.id = 'premium-alert-styles';
+            style.textContent = '\
+                @keyframes premiumFadeIn { from { opacity: 0; } to { opacity: 1; } }\
+                @keyframes premiumSlideUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }\
+                @keyframes premiumBounceIn {\
+                    0% { transform: scale(0.3); opacity: 0; }\
+                    50% { transform: scale(1.05); opacity: 1; }\
+                    70% { transform: scale(0.9); }\
+                    100% { transform: scale(1); }\
+                }\
+                .premium-flash-backdrop {\
+                    position: fixed; inset: 0; \
+                    background: rgba(15, 23, 42, 0.6); \
+                    backdrop-filter: blur(8px); \
+                    display: flex; align-items: center; justify-content: center; \
+                    z-index: 100000; \
+                    animation: premiumFadeIn 0.3s ease forwards;\
+                }\
+                .premium-flash-card {\
+                    background: var(--surface, #ffffff); \
+                    max-width: 420px; width: 90%; \
+                    text-align: center; padding: 32px 24px; \
+                    border-radius: 16px; \
+                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.05); \
+                    border: 1px solid var(--line, #e2e8f0); \
+                    animation: premiumSlideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; \
+                    position: relative; \
+                }\
+                [data-theme="dark"] .premium-flash-card {\
+                    background: #1e293b; border-color: #334155; color: #f8fafc; \
+                }\
+                .premium-flash-card h2 {\
+                    margin-top: 0; color: var(--text, #1e293b); font-size: 1.55rem; font-weight: 700; \
+                }\
+                [data-theme="dark"] .premium-flash-card h2 { color: #f8fafc; }\
+                .premium-flash-card p {\
+                    color: var(--muted, #64748b); line-height: 1.5; margin-bottom: 24px; font-size: 0.95rem; \
+                }\
+                .premium-flash-btn {\
+                    background: linear-gradient(135deg, var(--brand, #0f4c81) 0%, var(--brand-2, #1f7a8c) 100%);\
+                    color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; \
+                    font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: all 0.2s;\
+                }\
+                .premium-flash-btn:hover { opacity: 0.9; transform: translateY(-1px); }\
+                .premium-flash-btn:active { transform: translateY(0); }\
+            ';
+            document.head.appendChild(style);
+        }
+
+        flashes.forEach(function(flash) {
+            // Hide the default flat alert
+            flash.style.display = 'none';
+            
+            // Get content
+            var text = '';
+            var span = flash.querySelector('span');
+            if (span) {
+                text = span.innerHTML;
+            } else {
+                var cloned = flash.cloneNode(true);
+                var icons = cloned.querySelectorAll('i');
+                icons.forEach(function(i) { i.remove(); });
+                text = cloned.innerHTML.trim();
+            }
+            
+            // Determine type settings dynamically by checking class name keywords
+            var classStr = flash.className.toLowerCase();
+            var isSuccess = classStr.indexOf('success') !== -1;
+            var isError = classStr.indexOf('error') !== -1 || classStr.indexOf('danger') !== -1;
+            var isWarning = classStr.indexOf('warning') !== -1;
+            
+            var typeTitle = "Notification";
+            var iconClass = "fa-info-circle";
+            var iconColor = "#3b82f6";
+            
+            if (isSuccess) {
+                typeTitle = "Action Successful";
+                iconClass = "fa-circle-check";
+                iconColor = "#10b981";
+            } else if (isError) {
+                typeTitle = "Action Failed";
+                iconClass = "fa-circle-xmark";
+                iconColor = "#ef4444";
+            } else if (isWarning) {
+                typeTitle = "Attention Needed";
+                iconClass = "fa-triangle-exclamation";
+                iconColor = "#f59e0b";
+            }
+            
+            // Create elements
+            var backdrop = document.createElement('div');
+            backdrop.className = 'premium-flash-backdrop';
+            
+            var card = document.createElement('div');
+            card.className = 'premium-flash-card';
+            
+            var iconDiv = document.createElement('div');
+            iconDiv.style.cssText = 'font-size: 56px; color: ' + iconColor + '; margin-bottom: 18px; animation: premiumBounceIn 0.5s ease;';
+            iconDiv.innerHTML = '<i class="fas ' + iconClass + '"></i>';
+            
+            var title = document.createElement('h2');
+            title.textContent = typeTitle;
+            
+            var desc = document.createElement('p');
+            desc.innerHTML = text;
+            
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'premium-flash-btn';
+            btn.textContent = 'Continue';
+            btn.onclick = function() {
+                backdrop.style.animation = 'premiumFadeIn 0.2s reverse forwards';
+                setTimeout(function() {
+                    backdrop.remove();
+                }, 200);
+            };
+            
+            card.appendChild(iconDiv);
+            card.appendChild(title);
+            card.appendChild(desc);
+            card.appendChild(btn);
+            backdrop.appendChild(card);
+            
+            document.body.appendChild(backdrop);
+        });
+    });
+})();
+</script>

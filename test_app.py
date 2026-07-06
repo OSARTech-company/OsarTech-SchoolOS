@@ -231,6 +231,62 @@ def test_cbt_target_test_slots_prefers_next_slot(app_module):
     assert m._cbt_target_test_slots(3, 3) == [3, 2]
 
 
+def test_cbt_option_shuffling(app_module):
+    m = app_module
+    
+    # 1. Test _get_shuffled_options_map deterministic output
+    attempt_id = "attempt_123"
+    q_no = 1
+    shuffled_list, to_shuffled, to_original = m._get_shuffled_options_map(attempt_id, q_no)
+    
+    assert len(shuffled_list) == 4
+    assert set(shuffled_list) == {"A", "B", "C", "D"}
+    assert len(to_shuffled) == 4
+    assert len(to_original) == 4
+    for orig, shuf in to_shuffled.items():
+        assert to_original[shuf] == orig
+        
+    # 2. Test deterministic behavior with same attempt/q_no
+    shuffled_list2, to_shuffled2, to_original2 = m._get_shuffled_options_map(attempt_id, q_no)
+    assert shuffled_list == shuffled_list2
+    assert to_shuffled == to_shuffled2
+    assert to_original == to_original2
+    
+    # 3. Test different attempt ID gives potentially different order (shuffling happens)
+    different = False
+    for i in range(100):
+        shuf_list_i, _, _ = m._get_shuffled_options_map(f"attempt_{i}", q_no)
+        if shuf_list_i != ["A", "B", "C", "D"]:
+            different = True
+            break
+    assert different, "Option mapping should not always be identical to A, B, C, D"
+
+    # 4. Test _shuffle_question_options_inplace
+    q = {
+        "question_no": 1,
+        "question_text": "What is 1 + 1?",
+        "option_a": "One",
+        "option_b": "Two",
+        "option_c": "Three",
+        "option_d": "Four",
+        "correct_option": "B"
+    }
+    
+    m._shuffle_question_options_inplace(q, attempt_id)
+    
+    orig_options = {
+        "A": "One",
+        "B": "Two",
+        "C": "Three",
+        "D": "Four"
+    }
+    for orig_opt, text in orig_options.items():
+        shuf_opt = to_shuffled[orig_opt]
+        assert q[f"option_{shuf_opt.lower()}"] == text
+        
+    assert q["correct_option"] == to_shuffled["B"]
+
+
 def test_load_published_student_result_combines_three_terms(app_module, monkeypatch):
     m = app_module
     # prepare fake DB connection that returns predetermined rows by term

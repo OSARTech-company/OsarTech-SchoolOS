@@ -89,9 +89,27 @@
         .question-pane.active { display: block; }
         .question-title { font-size: 1.08rem; color: #14365e; margin-bottom: 10px; font-weight: 800; line-height: 1.45; }
         .question-meta { margin-bottom: 10px; }
-        .option-row { display: block; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: #fff; cursor: pointer; }
-        .option-row.correct { border-color: #16a34a; background: #ecfdf5; }
-        .option-row.wrong { border-color: #dc2626; background: #fef2f2; }
+        .option-row {
+            display: block;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: #fff;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .option-row:not(.correct):not(.wrong):hover {
+            border-color: var(--brand);
+            background: #f8fafc;
+            transform: translateX(4px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        .option-row:not(.correct):not(.wrong):active {
+            transform: translateX(2px);
+        }
+        .option-row.correct { border-color: #16a34a; background: #ecfdf5; box-shadow: 0 0 0 1px #16a34a; }
+        .option-row.wrong { border-color: #dc2626; background: #fef2f2; box-shadow: 0 0 0 1px #dc2626; }
         .option-row input { margin-right: 8px; }
         .typed-answer {
             width: 100%;

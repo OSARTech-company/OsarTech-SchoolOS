@@ -10618,6 +10618,60 @@ def _refresh_cbt_attempt_integrity_flag_with_cursor(c, school_id, attempt_id, te
     return flagged, reason_text
 
 
+def _get_shuffled_options_map(attempt_id, question_no):
+    """
+    Returns a tuple of:
+      - shuffled_keys: e.g. ['C', 'D', 'A', 'B'] (where position 0 is A, 1 is B, etc.)
+      - to_shuffled: dict mapping original option -> shuffled option (e.g. {'C': 'A', 'D': 'B', 'A': 'C', 'B': 'D'})
+      - to_original: dict mapping shuffled option -> original option (e.g. {'A': 'C', 'B': 'D', 'C': 'A', 'D': 'B'})
+    """
+    original_keys = ['A', 'B', 'C', 'D']
+    if not attempt_id:
+        return original_keys, {k: k for k in original_keys}, {k: k for k in original_keys}
+    seed_str = f"opt_{attempt_id}_{question_no}"
+    rng = random.Random(seed_str)
+    shuffled_keys = original_keys[:]
+    rng.shuffle(shuffled_keys)
+    
+    to_shuffled = {}
+    to_original = {}
+    for i, orig in enumerate(shuffled_keys):
+        shuffled = original_keys[i]
+        to_shuffled[orig] = shuffled
+        to_original[shuffled] = orig
+        
+    return shuffled_keys, to_shuffled, to_original
+
+def _shuffle_question_options_inplace(q, attempt_id):
+    q_no = safe_int(q.get('question_no', 0), 0)
+    if q_no <= 0 or not attempt_id:
+        return
+    qtype = q.get('question_type', 'mcq4')
+    if qtype not in ('mcq4', 'true_false'):
+        return
+        
+    shuffled_keys, to_shuffled, to_original = _get_shuffled_options_map(attempt_id, q_no)
+    
+    # Store original option texts
+    orig_options = {
+        'A': q.get('option_a', ''),
+        'B': q.get('option_b', ''),
+        'C': q.get('option_c', ''),
+        'D': q.get('option_d', ''),
+    }
+    
+    # Update question options to shuffled values
+    q['option_a'] = orig_options.get(shuffled_keys[0], '')
+    q['option_b'] = orig_options.get(shuffled_keys[1], '')
+    q['option_c'] = orig_options.get(shuffled_keys[2], '')
+    q['option_d'] = orig_options.get(shuffled_keys[3], '')
+    
+    # Map correct option if present
+    orig_correct = (q.get('correct_option') or '').strip().upper()
+    if orig_correct in to_shuffled:
+        q['correct_option'] = to_shuffled[orig_correct]
+
+
 def _ensure_attempt_question_set_with_cursor(c, school_id, test_row, attempt_row, qrows=None):
     """Ensure each attempt has a stable shuffled question set."""
     if qrows is None:
@@ -11298,10 +11352,12 @@ def submit_student_cbt_attempt(school_id, test_row, student_id, answers_map, aut
             point_val = max(0.0, safe_float(q['points'], 0.0))
             total_marks += point_val
             qtype = _normalize_cbt_question_type(q.get('question_type', 'mcq4'))
-            raw_selected = answers_map.get(
-                f"q_{q_no}",
-                answers_map.get(str(q_no), answers_map.get(q_no, draft_answers_map.get(q_no, ''))),
-            )
+            raw_val_shuffled = answers_map.get(f"q_{q_no}", answers_map.get(str(q_no), answers_map.get(q_no, '')))
+            if raw_val_shuffled:
+                _, _, to_original = _get_shuffled_options_map(attempt['attempt_id'], q_no)
+                raw_selected = to_original.get(str(raw_val_shuffled).strip().upper(), raw_val_shuffled)
+            else:
+                raw_selected = draft_answers_map.get(q_no, '')
             selected = ''
             is_correct = 0
             if qtype == 'fill_blank':
@@ -49208,6 +49264,23 @@ def student_cbt_take(test_id):
         answer_map = list_student_cbt_answers(school_id, attempt.get('attempt_id'))
         draft_answer_map = _load_cbt_draft_answers(attempt.get('draft_answers_json', ''))
         answer_map = _merge_attempt_answer_maps(answer_map, draft_answer_map)
+        
+        # Perform option shuffling deterministically per attempt for anti-cheating
+        shuffled_questions = []
+        for q in (selected_questions or []):
+            q_copy = dict(q)
+            _shuffle_question_options_inplace(q_copy, attempt.get('attempt_id'))
+            shuffled_questions.append(q_copy)
+        selected_questions = shuffled_questions
+
+        # Map answer_map selected options from original/canonical to shuffled for correct rendering
+        for q_no, ans in answer_map.items():
+            orig_sel = (ans.get('selected_option') or '').strip().upper()
+            if orig_sel:
+                _, to_shuffled, _ = _get_shuffled_options_map(attempt.get('attempt_id'), q_no)
+                if orig_sel in to_shuffled:
+                    ans['selected_option'] = to_shuffled[orig_sel]
+
         remaining_seconds_saved = max(0, safe_int(attempt.get('remaining_seconds', 0), 0))
 
     is_submitted = bool(attempt and (attempt.get('status') or '').strip().lower() == 'submitted')
@@ -49303,7 +49376,18 @@ def student_cbt_autosave(test_id):
             attempt,
             qrows=question_pool,
         )
-        draft_map = _build_cbt_draft_answers_map(request.form, selected_qrows or [])
+        mapped_form = {}
+        for key, val in request.form.items():
+            if key.startswith('q_'):
+                try:
+                    q_no = int(key[2:])
+                    _, _, to_original = _get_shuffled_options_map(attempt.get('attempt_id'), q_no)
+                    mapped_form[key] = to_original.get(str(val).strip().upper(), val)
+                except Exception:
+                    mapped_form[key] = val
+            else:
+                mapped_form[key] = val
+        draft_map = _build_cbt_draft_answers_map(mapped_form, selected_qrows or [])
         remaining_seconds = max(0, min(24 * 3600, safe_int(request.form.get('remaining_seconds', 0), 0)))
         db_execute(
             c,
