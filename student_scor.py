@@ -38543,7 +38543,6 @@ def school_admin_add_teacher():
     if request.method == 'GET':
         return render_template('school/school_admin_add_teacher.html', school=school)
 
-    fallback_redirect = url_for('school_admin_teachers')
     username = request.form.get('username', '').strip().lower()
     firstname = normalize_person_name(request.form.get('firstname', '').strip())
     lastname = normalize_person_name(request.form.get('lastname', '').strip())
@@ -38552,99 +38551,102 @@ def school_admin_add_teacher():
     send_credentials = (request.form.get('send_credentials', '') or '').strip() in {'1', 'true', 'yes', 'on'}
     password = request.form.get('password', '').strip()
     
-    if username and firstname:
-        try:
-            if not is_valid_email(username):
-                flash('Teacher username must be a valid email address.', 'error')
-                return redirect(fallback_redirect)
-            temp_password = ''
-            manual_password = bool(password)
-            if not password:
-                temp_password = generate_temp_password()
-                password = temp_password
-            if gender not in {'male', 'female', 'other'}:
-                flash('Teacher gender is required.', 'error')
-                return redirect(fallback_redirect)
-            existing_user = get_user(username)
-            if existing_user:
-                existing_role = (existing_user.get('role') or '').strip().lower()
-                existing_school = (existing_user.get('school_id') or '').strip()
-                if not (existing_role == 'teacher' and existing_school == school_id):
-                    flash('This username already belongs to another account/school. Choose a different email.', 'error')
-                    return redirect(fallback_redirect)
-            if not existing_user:
-                try:
-                    ensure_school_plan_capacity(school_id, add_students=0, add_teachers=1)
-                except Exception as exc:
-                    flash(str(exc), 'error')
-                    return redirect(fallback_redirect)
-            password_hash = hash_password(password)
-            upsert_user(username, password_hash, 'teacher', school_id)
-            save_teacher(
-                school_id,
-                username,
-                firstname,
-                lastname,
-                [],
-                phone=phone,
-                gender=gender,
+    if not username or not firstname:
+        flash('Username and First Name are required.', 'error')
+        return render_template('school/school_admin_add_teacher.html', school=school)
+
+    try:
+        if not is_valid_email(username):
+            flash('Teacher username must be a valid email address.', 'error')
+            return render_template('school/school_admin_add_teacher.html', school=school)
+        temp_password = ''
+        manual_password = bool(password)
+        if not password:
+            temp_password = generate_temp_password()
+            password = temp_password
+        if gender not in {'male', 'female', 'other'}:
+            flash('Teacher gender is required.', 'error')
+            return render_template('school/school_admin_add_teacher.html', school=school)
+        existing_user = get_user(username)
+        if existing_user:
+            existing_role = (existing_user.get('role') or '').strip().lower()
+            existing_school = (existing_user.get('school_id') or '').strip()
+            if not (existing_role == 'teacher' and existing_school == school_id):
+                flash('This username already belongs to another account/school. Choose a different email.', 'error')
+                return render_template('school/school_admin_add_teacher.html', school=school)
+        if not existing_user:
+            try:
+                ensure_school_plan_capacity(school_id, add_students=0, add_teachers=1)
+            except Exception as exc:
+                flash(str(exc), 'error')
+                return render_template('school/school_admin_add_teacher.html', school=school)
+        password_hash = hash_password(password)
+        upsert_user(username, password_hash, 'teacher', school_id)
+        save_teacher(
+            school_id,
+            username,
+            firstname,
+            lastname,
+            [],
+            phone=phone,
+            gender=gender,
+        )
+        flash(f'Teacher added successfully. Username: {username}', 'success')
+        if send_credentials and (temp_password or manual_password):
+            school_name = (get_school(school_id) or {}).get('school_name', 'your school')
+            login_url = url_for('login', _external=True)
+            password_label = 'Temporary password' if temp_password else 'Password'
+            subject = f"Teacher Account Created - {school_name}"
+            body = (
+                f"Hello {firstname or 'Teacher'},\n\n"
+                f"Your teacher account has been created for {school_name}.\n"
+                f"Username: {username}\n"
+                f"{password_label}: {password}\n\n"
+                f"Login here: {login_url}\n"
+                "Please log in and change your password immediately.\n\n"
+                "If you did not expect this, contact your school admin."
             )
-            flash(f'Teacher added successfully. Username: {username}', 'success')
-            if send_credentials and (temp_password or manual_password):
-                school_name = (get_school(school_id) or {}).get('school_name', 'your school')
-                login_url = url_for('login', _external=True)
-                password_label = 'Temporary password' if temp_password else 'Password'
-                subject = f"Teacher Account Created - {school_name}"
-                body = (
-                    f"Hello {firstname or 'Teacher'},\n\n"
-                    f"Your teacher account has been created for {school_name}.\n"
+            email_result = send_plain_email_message(subject, body, [username])
+            sms_result = {'sent_sms': 0, 'errors': []}
+            if phone:
+                sms_body = (
+                    f"{school_name} teacher account created.\n"
                     f"Username: {username}\n"
-                    f"{password_label}: {password}\n\n"
-                    f"Login here: {login_url}\n"
-                    "Please log in and change your password immediately.\n\n"
-                    "If you did not expect this, contact your school admin."
+                    f"{password_label}: {password}\n"
+                    f"Login: {login_url}\n"
+                    "Please change your password after login."
                 )
-                email_result = send_plain_email_message(subject, body, [username])
-                sms_result = {'sent_sms': 0, 'errors': []}
-                if phone:
-                    sms_body = (
-                        f"{school_name} teacher account created.\n"
-                        f"Username: {username}\n"
-                        f"{password_label}: {password}\n"
-                        f"Login: {login_url}\n"
-                        "Please change your password after login."
-                    )
-                    sms_result = send_bulk_sms_messages(
-                        [phone],
-                        sms_body,
-                        school_name=school_name,
-                        context='teacher_temp_password',
-                        school_id=school_id,
-                        audience_role='teacher',
-                    )
-                    if sms_result.get('errors'):
-                        flash(f"SMS issue: {sms_result.get('errors')[0]}", 'warning')
-                email_sent = bool(email_result.get('sent'))
-                sms_sent = bool(sms_result.get('sent_sms'))
-                if email_sent:
-                    flash(f'{password_label} emailed to {username}.', 'success')
-                if sms_sent:
-                    flash(f'{password_label} sent by SMS.', 'success')
-                if not email_sent and not sms_sent:
-                    err = (email_result.get('errors') or ['Email send failed.'])[0]
-                    if temp_password:
-                        flash(f'Email failed ({err}). Share this temp password with the teacher: {temp_password}', 'warning')
-                    else:
-                        flash(f'Email failed ({err}). Share the password you set with the teacher.', 'warning')
-            elif not send_credentials:
+                sms_result = send_bulk_sms_messages(
+                    [phone],
+                    sms_body,
+                    school_name=school_name,
+                    context='teacher_temp_password',
+                    school_id=school_id,
+                    audience_role='teacher',
+                )
+                if sms_result.get('errors'):
+                    flash(f"SMS issue: {sms_result.get('errors')[0]}", 'warning')
+            email_sent = bool(email_result.get('sent'))
+            sms_sent = bool(sms_result.get('sent_sms'))
+            if email_sent:
+                flash(f'{password_label} emailed to {username}.', 'success')
+            if sms_sent:
+                flash(f'{password_label} sent by SMS.', 'success')
+            if not email_sent and not sms_sent:
+                err = (email_result.get('errors') or ['Email send failed.'])[0]
                 if temp_password:
-                    flash(f'Credentials not sent. Share this temp password with the teacher: {temp_password}', 'warning')
-                elif manual_password:
-                    flash('Credentials not sent. Remember to share the password you set with the teacher.', 'warning')
-        except Exception as e:
-            flash(f'Error adding teacher: {str(e)}', 'error')
-    
-    return redirect(fallback_redirect)
+                    flash(f'Email failed ({err}). Share this temp password with the teacher: {temp_password}', 'warning')
+                else:
+                    flash(f'Email failed ({err}). Share the password you set with the teacher.', 'warning')
+        elif not send_credentials:
+            if temp_password:
+                flash(f'Credentials not sent. Share this temp password with the teacher: {temp_password}', 'warning')
+            elif manual_password:
+                flash('Credentials not sent. Remember to share the password you set with the teacher.', 'warning')
+        return redirect(url_for('school_admin_teachers'))
+    except Exception as e:
+        flash(f'Error adding teacher: {str(e)}', 'error')
+        return render_template('school/school_admin_add_teacher.html', school=school)
 
 @app.route('/school-admin/add-bursar', methods=['GET', 'POST'])
 def school_admin_add_bursar():
@@ -38660,7 +38662,6 @@ def school_admin_add_bursar():
     if request.method == 'GET':
         return render_template('school/school_admin_add_bursar.html', school=school)
 
-    fallback_redirect = url_for('school_admin_teachers')
     username = request.form.get('username', '').strip().lower()
     firstname = normalize_person_name(request.form.get('firstname', '').strip())
     lastname = normalize_person_name(request.form.get('lastname', '').strip())
@@ -38669,92 +38670,95 @@ def school_admin_add_bursar():
     send_credentials = (request.form.get('send_credentials', '') or '').strip() in {'1', 'true', 'yes', 'on'}
     password = request.form.get('password', '').strip()
 
-    if username and firstname:
-        try:
-            if not is_valid_email(username):
-                flash('Bursar username must be a valid email address.', 'error')
-                return redirect(fallback_redirect)
-            temp_password = ''
-            manual_password = bool(password)
-            if not password:
-                temp_password = generate_temp_password()
-                password = temp_password
-            if gender not in {'male', 'female', 'other'}:
-                flash('Bursar gender is required.', 'error')
-                return redirect(fallback_redirect)
-            existing_user = get_user(username)
-            if existing_user:
-                existing_role = (existing_user.get('role') or '').strip().lower()
-                existing_school = (existing_user.get('school_id') or '').strip()
-                if not (existing_role == 'bursar' and existing_school == school_id):
-                    flash('This username already belongs to another account/school. Choose a different email.', 'error')
-                    return redirect(fallback_redirect)
-            password_hash = hash_password(password)
-            upsert_user(username, password_hash, 'bursar', school_id, overwrite_identity=True)
-            save_bursar(
-                school_id,
-                username,
-                firstname,
-                lastname,
-                phone=phone,
-                gender=gender,
-            )
-            flash(f'Bursar added successfully. Username: {username}', 'success')
-            if send_credentials and (temp_password or manual_password):
-                school_name = (get_school(school_id) or {}).get('school_name', 'your school')
-                login_url = url_for('login', _external=True)
-                password_label = 'Temporary password' if temp_password else 'Password'
-                subject = f'Bursar Account Created - {school_name}'
-                body = (
-                    f"Hello {firstname or 'Bursar'},\n\n"
-                    f"Your bursar account has been created for {school_name}.\n"
-                    f"Username: {username}\n"
-                    f"{password_label}: {password}\n\n"
-                    f"Login here: {login_url}\n"
-                    "Please log in and change your password immediately.\n\n"
-                    "If you did not expect this, contact your school admin."
-                )
-                email_result = send_plain_email_message(subject, body, [username])
-                sms_result = {'sent_sms': 0, 'errors': []}
-                if phone:
-                    sms_body = (
-                        f"{school_name} bursar account created.\n"
-                        f"Username: {username}\n"
-                        f"{password_label}: {password}\n"
-                        f"Login: {login_url}\n"
-                        "Please change your password after login."
-                    )
-                    sms_result = send_bulk_sms_messages(
-                        [phone],
-                        sms_body,
-                        school_name=school_name,
-                        context='bursar_temp_password',
-                        school_id=school_id,
-                        audience_role='bursar',
-                    )
-                    if sms_result.get('errors'):
-                        flash(f"SMS issue: {sms_result.get('errors')[0]}", 'warning')
-                email_sent = bool(email_result.get('sent'))
-                sms_sent = bool(sms_result.get('sent_sms'))
-                if email_sent:
-                    flash(f'{password_label} emailed to {username}.', 'success')
-                if sms_sent:
-                    flash(f'{password_label} sent by SMS.', 'success')
-                if not email_sent and not sms_sent:
-                    err = (email_result.get('errors') or ['Email send failed.'])[0]
-                    if temp_password:
-                        flash(f'Email failed ({err}). Share this temp password with the bursar: {temp_password}', 'warning')
-                    else:
-                        flash(f'Email failed ({err}). Share the password you set with the bursar.', 'warning')
-            elif not send_credentials:
-                if temp_password:
-                    flash(f'Credentials not sent. Share this temp password with the bursar: {temp_password}', 'warning')
-                elif manual_password:
-                    flash('Credentials not sent. Remember to share the password you set with the bursar.', 'warning')
-        except Exception as e:
-            flash(f'Error adding bursar: {str(e)}', 'error')
+    if not username or not firstname:
+        flash('Username and First Name are required.', 'error')
+        return render_template('school/school_admin_add_bursar.html', school=school)
 
-    return redirect(fallback_redirect)
+    try:
+        if not is_valid_email(username):
+            flash('Bursar username must be a valid email address.', 'error')
+            return render_template('school/school_admin_add_bursar.html', school=school)
+        temp_password = ''
+        manual_password = bool(password)
+        if not password:
+            temp_password = generate_temp_password()
+            password = temp_password
+        if gender not in {'male', 'female', 'other'}:
+            flash('Bursar gender is required.', 'error')
+            return render_template('school/school_admin_add_bursar.html', school=school)
+        existing_user = get_user(username)
+        if existing_user:
+            existing_role = (existing_user.get('role') or '').strip().lower()
+            existing_school = (existing_user.get('school_id') or '').strip()
+            if not (existing_role == 'bursar' and existing_school == school_id):
+                flash('This username already belongs to another account/school. Choose a different email.', 'error')
+                return render_template('school/school_admin_add_bursar.html', school=school)
+        password_hash = hash_password(password)
+        upsert_user(username, password_hash, 'bursar', school_id, overwrite_identity=True)
+        save_bursar(
+            school_id,
+            username,
+            firstname,
+            lastname,
+            phone=phone,
+            gender=gender,
+        )
+        flash(f'Bursar added successfully. Username: {username}', 'success')
+        if send_credentials and (temp_password or manual_password):
+            school_name = (get_school(school_id) or {}).get('school_name', 'your school')
+            login_url = url_for('login', _external=True)
+            password_label = 'Temporary password' if temp_password else 'Password'
+            subject = f'Bursar Account Created - {school_name}'
+            body = (
+                f"Hello {firstname or 'Bursar'},\n\n"
+                f"Your bursar account has been created for {school_name}.\n"
+                f"Username: {username}\n"
+                f"{password_label}: {password}\n\n"
+                f"Login here: {login_url}\n"
+                "Please log in and change your password immediately.\n\n"
+                "If you did not expect this, contact your school admin."
+            )
+            email_result = send_plain_email_message(subject, body, [username])
+            sms_result = {'sent_sms': 0, 'errors': []}
+            if phone:
+                sms_body = (
+                    f"{school_name} bursar account created.\n"
+                    f"Username: {username}\n"
+                    f"{password_label}: {password}\n"
+                    f"Login: {login_url}\n"
+                    "Please change your password after login."
+                )
+                sms_result = send_bulk_sms_messages(
+                    [phone],
+                    sms_body,
+                    school_name=school_name,
+                    context='bursar_temp_password',
+                    school_id=school_id,
+                    audience_role='bursar',
+                )
+                if sms_result.get('errors'):
+                    flash(f"SMS issue: {sms_result.get('errors')[0]}", 'warning')
+            email_sent = bool(email_result.get('sent'))
+            sms_sent = bool(sms_result.get('sent_sms'))
+            if email_sent:
+                flash(f'{password_label} emailed to {username}.', 'success')
+            if sms_sent:
+                flash(f'{password_label} sent by SMS.', 'success')
+            if not email_sent and not sms_sent:
+                err = (email_result.get('errors') or ['Email send failed.'])[0]
+                if temp_password:
+                    flash(f'Email failed ({err}). Share this temp password with the bursar: {temp_password}', 'warning')
+                else:
+                    flash(f'Email failed ({err}). Share the password you set with the bursar.', 'warning')
+        elif not send_credentials:
+            if temp_password:
+                flash(f'Credentials not sent. Share this temp password with the bursar: {temp_password}', 'warning')
+            elif manual_password:
+                flash('Credentials not sent. Remember to share the password you set with the bursar.', 'warning')
+        return redirect(url_for('school_admin_teachers'))
+    except Exception as e:
+        flash(f'Error adding bursar: {str(e)}', 'error')
+        return render_template('school/school_admin_add_bursar.html', school=school)
 
 @app.route('/school-admin/add-teachers-by-table', methods=['POST'])
 def school_admin_add_teachers_by_table():
@@ -41213,48 +41217,10 @@ def school_admin_import_target(target):
                         and normalize_student_gender(possible_gender)
                     )
                 classname = canonicalize_classname(student_cell(row, classname_header, '') or fallback_classname)
-                term = (student_cell(row, term_header, '') or '').strip() or default_student_term
-                firstname = normalize_person_name(
-                    student_cell(row, gender_header, '') if legacy_id_shift else student_cell(row, firstname_header, '')
-                )
-                lastname = normalize_person_name(student_cell(row, lastname_header, '')) if not legacy_id_shift else ''
-                full_name = (f'{firstname} {lastname}'.strip() if lastname else firstname).strip()
-                email = (student_cell(row, email_header, '') or '').strip().lower()
-                date_of_birth = (student_cell(row, dob_header, '') or '').strip()
-                gender = (
-                    (student_cell(row, phone_header, '') or '').strip()
-                    if legacy_id_shift
-                    else (student_cell(row, gender_header, '') or '').strip()
-                )
-                student_phone = (
-                    (student_cell(row, resolve_spreadsheet_header(headers, 'options'), '') or '').strip()
-                    if legacy_id_shift
-                    else (student_cell(row, phone_header, '') or '').strip()
-                )
-                if not firstname:
-                    add_error(idx, row, 'student name is required.')
-                    continue
-                if not normalize_student_gender(gender):
-                    add_error(idx, row, 'gender is required and must be male/female/other.')
-                    continue
-                if email and not is_valid_email(email):
-                    add_error(idx, row, 'email must be a valid address (or blank).')
-                    continue
-                if term not in {'First Term', 'Second Term', 'Third Term'}:
-                    add_error(idx, row, 'term must be First Term, Second Term, or Third Term.')
-                    continue
-                if not classname:
-                    add_error(idx, row, 'classname is required.')
-                    continue
-                if not is_supported_classname(classname):
-                    add_error(idx, row, 'classname must be Nursery, Primary, JSS, or SS.')
-                    continue
                 first_year_class = canonicalize_classname(student_cell(row, first_year_class_header, '') or student_cell(row, classname_header, ''))
                 if not first_year_class:
                     first_year_class = classname
-                if not is_supported_classname(first_year_class):
-                    add_error(idx, row, 'first_year_class must be Nursery, Primary, JSS, or SS.')
-                    continue
+
                 sid_raw = (
                     (student_cell(row, firstname_header, '') or '').strip()
                     if legacy_id_shift
@@ -41280,11 +41246,79 @@ def school_admin_import_target(target):
                         candidate = generate_student_id(school_id, next_index, first_year_class)
                     sid = candidate
                     next_index_by_class[first_year_class] = next_index + 1
+
+                # Load existing student for update merge & attribute preservation
+                student = None
+                try:
+                    student = load_student(school_id, sid)
+                except Exception:
+                    student = None
+
+                firstname_csv = normalize_person_name(
+                    student_cell(row, gender_header, '') if legacy_id_shift else student_cell(row, firstname_header, '')
+                )
+                lastname_csv = normalize_person_name(student_cell(row, lastname_header, '')) if not legacy_id_shift else ''
+                full_name_csv = (f'{firstname_csv} {lastname_csv}'.strip() if lastname_csv else firstname_csv).strip()
+
+                email = (student_cell(row, email_header, '') or '').strip().lower()
+                date_of_birth = (student_cell(row, dob_header, '') or '').strip()
+                gender = (
+                    (student_cell(row, phone_header, '') or '').strip()
+                    if legacy_id_shift
+                    else (student_cell(row, gender_header, '') or '').strip()
+                )
+                student_phone = (
+                    (student_cell(row, resolve_spreadsheet_header(headers, 'options'), '') or '').strip()
+                    if legacy_id_shift
+                    else (student_cell(row, phone_header, '') or '').strip()
+                )
+
+                if student:
+                    if not full_name_csv:
+                        full_name = student.get('firstname', '')
+                    else:
+                        full_name = full_name_csv
+                    if not email:
+                        email = student.get('email', '')
+                    if not date_of_birth:
+                        date_of_birth = student.get('date_of_birth', '')
+                    if not gender:
+                        gender = student.get('gender', '')
+                    if not student_phone:
+                        student_phone = student.get('student_phone', '')
+                else:
+                    full_name = full_name_csv
+
+                if not full_name:
+                    add_error(idx, row, 'student name is required.')
+                    continue
+                if not normalize_student_gender(gender):
+                    add_error(idx, row, 'gender is required and must be male/female/other.')
+                    continue
+                if email and not is_valid_email(email):
+                    add_error(idx, row, 'email must be a valid address (or blank).')
+                    continue
+
+                term = (student_cell(row, term_header, '') or '').strip() or default_student_term
+                if term not in {'First Term', 'Second Term', 'Third Term'}:
+                    add_error(idx, row, 'term must be First Term, Second Term, or Third Term.')
+                    continue
+                if not classname:
+                    add_error(idx, row, 'classname is required.')
+                    continue
+                if not is_supported_classname(classname):
+                    add_error(idx, row, 'classname must be Nursery, Primary, JSS, or SS.')
+                    continue
+                if not is_supported_classname(first_year_class):
+                    add_error(idx, row, 'first_year_class must be Nursery, Primary, JSS, or SS.')
+                    continue
+
                 processed += 1
                 if sid.lower() in batch_student_ids:
                     add_error(idx, row, f'student_id "{sid}" is duplicated in this import batch.')
                     continue
                 batch_student_ids.add(sid.lower())
+
                 identity_key = (
                     full_name.strip().lower(),
                     date_of_birth,
@@ -41297,6 +41331,7 @@ def school_admin_import_target(target):
                     add_error(idx, row, f'student "{full_name}" appears more than once in this import batch.')
                     continue
                 batch_student_identity_rows.add(identity_key)
+
                 existing_user = get_user(sid)
                 if existing_user:
                     existing_role = (existing_user.get('role') or '').strip().lower()
@@ -41304,10 +41339,16 @@ def school_admin_import_target(target):
                     if not (existing_role == 'student' and existing_school == school_id):
                         add_error(idx, row, f'student_id "{sid}" already belongs to another account/school.')
                         continue
+
                 promoted_raw = (student_cell(row, promoted_header, '') or '').strip().lower()
                 if promoted_raw not in {'', '0', '1', 'true', 'false', 'yes', 'no'}:
                     add_error(idx, row, 'promoted must be 0/1/true/false/yes/no.')
                     continue
+
+                if promoted_raw != '':
+                    promoted_db_val = normalize_promoted_db_value(promoted_raw in {'1', 'true', 'yes'})
+                else:
+                    promoted_db_val = student.get('promoted', 0) if student else 0
 
                 class_config = class_config_cache.get(classname)
                 if class_config is None:
@@ -41353,6 +41394,15 @@ def school_admin_import_target(target):
                         continue
 
                 subjects = _dedupe_keep_order(subjects or [])
+                if student and student.get('classname') == classname:
+                    subjects = student.get('subjects', [])
+
+                parent_phone = student_cell(row, parent_phone_header, '')
+                if not parent_phone and student:
+                    parent_phone = student.get('parent_phone', '')
+                parent_password_hash = student.get('parent_password_hash', '') if student else ''
+                scores = student.get('scores', {}) if student else {}
+
                 student_data = {
                     'firstname': full_name,
                     'email': email,
@@ -41365,11 +41415,16 @@ def school_admin_import_target(target):
                     'stream': final_stream,
                     'number_of_subject': len(subjects),
                     'subjects': subjects,
-                    'scores': {},
-                    'promoted': normalize_promoted_db_value(promoted_raw in {'1', 'true', 'yes'}),
-                    'parent_phone': student_cell(row, parent_phone_header, ''),
-                    'parent_password_hash': '',
+                    'scores': scores,
+                    'promoted': promoted_db_val,
+                    'parent_phone': parent_phone,
+                    'parent_password_hash': parent_password_hash,
                 }
+                if student:
+                    for k in ['parent_name', 'parent_gender', 'parent_name_2', 'parent_phone_2', 'parent_password_hash_2', 'parent_gender_2']:
+                        if k in student:
+                            student_data[k] = student[k]
+
                 try:
                     if not dry_run:
                         save_student(school_id, sid, student_data)
@@ -41379,6 +41434,11 @@ def school_admin_import_target(target):
                 except Exception as exc:
                     add_error(idx, row, str(exc))
         elif target_key == 'teachers':
+            teachers_map = {}
+            try:
+                teachers_map = get_teachers(school_id)
+            except Exception:
+                teachers_map = {}
             for idx, row in enumerate(rows, start=2):
                 tid = (row.get('user_id', '') or '').strip().lower()
                 if not tid:
@@ -41400,7 +41460,29 @@ def school_admin_import_target(target):
                 if not firstname or not lastname:
                     add_error(idx, row, 'firstname and lastname are required.')
                     continue
+                
+                existing_teacher = (teachers_map or {}).get(tid) if teachers_map else None
+
+                assigned_classes_val = row.get('assigned_classes')
+                if assigned_classes_val is None or str(assigned_classes_val).strip() == '':
+                    assigned_classes_list = existing_teacher.get('assigned_classes', []) if existing_teacher else []
+                else:
+                    assigned_classes_list = _safe_json_rows(assigned_classes_val)
+
+                subjects_taught_val = row.get('subjects_taught')
+                if subjects_taught_val is None or str(subjects_taught_val).strip() == '':
+                    subjects_taught_list = existing_teacher.get('subjects_taught', []) if existing_teacher else []
+                else:
+                    subjects_taught_list = normalize_subjects_list(subjects_taught_val)
+
+                phone_val = row.get('phone', '')
+                if not phone_val and existing_teacher:
+                    phone_val = existing_teacher.get('phone', '')
+
                 gender = normalize_teacher_gender(row.get('gender', ''))
+                if not gender and existing_teacher:
+                    gender = existing_teacher.get('gender', '')
+
                 if not gender:
                     add_error(idx, row, 'gender must be male/female/other.')
                     continue
@@ -41410,9 +41492,9 @@ def school_admin_import_target(target):
                         tid,
                         firstname,
                         lastname,
-                        _safe_json_rows(row.get('assigned_classes')),
-                        subjects_taught=normalize_subjects_list(row.get('subjects_taught', '')),
-                        phone=row.get('phone', ''),
+                        assigned_classes_list,
+                        subjects_taught=subjects_taught_list,
+                        phone=phone_val,
                         gender=gender,
                     )
                     if not get_user(tid):

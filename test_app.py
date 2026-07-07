@@ -2718,6 +2718,77 @@ def test_nursery_primary_report_customization(client, app_module, monkeypatch):
         assert 'Students in Class' in rendered_sec
 
 
+def test_school_admin_add_teacher_post(client, app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"max_tests": 3, "academic_year": "2025-2026"})
+    monkeypatch.setattr(m, "is_valid_email", lambda email: True)
+    monkeypatch.setattr(m, "get_user", lambda username: None)
+    monkeypatch.setattr(m, "ensure_school_plan_capacity", lambda school_id, add_students, add_teachers: None)
+    monkeypatch.setattr(m, "upsert_user", lambda username, pwd_hash, role, school_id: None)
+    monkeypatch.setattr(m, "save_teacher", lambda school_id, username, firstname, lastname, assigned_classes, phone, gender: None)
+    monkeypatch.setattr(m, "send_plain_email_message", lambda subj, body, recips: {"sent": 1})
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "admin1"
+
+    # Test GET
+    resp = client.get("/school-admin/add-teacher")
+    assert resp.status_code == 200
+
+    # Test POST
+    resp = client.post("/school-admin/add-teacher", data={
+        "username": "new.teacher@school.com",
+        "firstname": "John",
+        "lastname": "Doe",
+        "gender": "male",
+        "phone": "123456789",
+        "send_credentials": "1",
+        "password": "some_password"
+    }, follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/school-admin/teachers")
+    with client.session_transaction() as sess:
+        flashes = sess.get("_flashes", [])
+    assert any("Teacher added successfully" in message for _category, message in flashes)
+
+
+def test_school_admin_add_bursar_post(client, app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"max_tests": 3, "academic_year": "2025-2026"})
+    monkeypatch.setattr(m, "is_valid_email", lambda email: True)
+    monkeypatch.setattr(m, "get_user", lambda username: None)
+    monkeypatch.setattr(m, "upsert_user", lambda username, pwd_hash, role, school_id, overwrite_identity=True: None)
+    monkeypatch.setattr(m, "save_bursar", lambda school_id, username, firstname, lastname, phone, gender: None)
+    monkeypatch.setattr(m, "send_plain_email_message", lambda subj, body, recips: {"sent": 1})
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "admin1"
+
+    # Test GET
+    resp = client.get("/school-admin/add-bursar")
+    assert resp.status_code == 200
+
+    # Test POST
+    resp = client.post("/school-admin/add-bursar", data={
+        "username": "new.bursar@school.com",
+        "firstname": "Jane",
+        "lastname": "Smith",
+        "gender": "female",
+        "phone": "987654321",
+        "send_credentials": "1",
+        "password": "some_password"
+    }, follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/school-admin/teachers")
+    with client.session_transaction() as sess:
+        flashes = sess.get("_flashes", [])
+    assert any("Bursar added successfully" in message for _category, message in flashes)
+
+
 
 
 
