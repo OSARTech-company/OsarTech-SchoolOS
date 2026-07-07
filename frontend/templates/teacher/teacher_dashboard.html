@@ -142,52 +142,27 @@
         
         <div class="main-content">
             <div class="container">
-                <div class="premium-header">
+                <div class="header">
                     {% set teacher_initial = ((teacher_name if teacher_name else 'T')[:1] or 'T')|upper %}
-                    <div class="premium-header-content">
-                        <h1>
-                            <span class="teacher-title-row">
-                                {% if teacher_profile_image %}
-                                <img src="{{ teacher_profile_image }}" alt="{{ teacher_name }} Profile Picture" class="teacher-title-avatar" />
-                                {% else %}
-                                <span class="teacher-title-avatar-fallback"><i class="fas fa-user" aria-hidden="true"></i><span>{{ teacher_initial }}</span></span>
-                                {% endif %}
-                                <span><i class="fas fa-chalkboard-teacher"></i> Teacher Dashboard</span>
-                            </span>
-                        </h1>
-                        
-                        <div class="premium-meta-grid">
-                            <div class="meta-item">
-                                <i class="fas fa-school" aria-hidden="true"></i>
-                                <span><strong>School:</strong> {{ school.school_name if school else '-' }}</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-user-circle" aria-hidden="true"></i>
-                                <span><strong>Teacher:</strong> {{ teacher_name }}</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-phone" aria-hidden="true"></i>
-                                <span><strong>Phone:</strong> {{ teacher_phone or 'Not set' }}</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-graduation-cap" aria-hidden="true"></i>
-                                <span><strong>Assigned Classes:</strong> {{ classes|join(', ') if classes else 'None' }}</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-book" aria-hidden="true"></i>
-                                <span><strong>{% if school and school.score_entry_mode == 'dean_led' %}Class Subjects{% else %}Subject Assignments{% endif %}:</strong> {{ subject_assignment_count or 0 }}</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-sliders-h" aria-hidden="true"></i>
-                                <span><strong>Mode:</strong> {% if school and school.score_entry_mode == 'dean_led' %}Simple Mode{% elif school and school.score_entry_mode == 'subject_sheet' %}Subject Sheet Mode{% else %}Advanced Mode{% endif %}</span>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-clock" aria-hidden="true"></i>
-                                <span><strong>Last Login:</strong> {{ last_login_at }}</span>
-                            </div>
-                        </div>
-                    </div>
-
+                    <h1>
+                        <span class="teacher-title-row">
+                            {% if teacher_profile_image %}
+                            <img src="{{ teacher_profile_image }}" alt="{{ teacher_name }} Profile Picture" class="teacher-title-avatar" />
+                            {% else %}
+                            <span class="teacher-title-avatar-fallback"><i class="fas fa-user" aria-hidden="true"></i><span>{{ teacher_initial }}</span></span>
+                            {% endif %}
+                            <span><i class="fas fa-chalkboard-teacher"></i> Teacher Dashboard</span>
+                        </span>
+                    </h1>
+                    <p class="meta-line">
+                        <strong>School:</strong> {{ school.school_name if school else '-' }} |
+                        <strong>Teacher:</strong> {{ teacher_name }} |
+                        <strong>Phone:</strong> {{ teacher_phone or 'Not set' }} |
+                        <strong>Assigned Classes:</strong> {{ classes|join(', ') if classes else 'None' }} |
+                        <strong>{% if school and school.score_entry_mode == 'dean_led' %}Class Subjects{% else %}Subject Assignments{% endif %}:</strong> {{ subject_assignment_count or 0 }} |
+                        <strong>Mode:</strong> {% if school and school.score_entry_mode == 'dean_led' %}Simple Mode{% elif school and school.score_entry_mode == 'subject_sheet' %}Subject Sheet Mode{% else %}Advanced Mode{% endif %} |
+                        <strong>Last Login:</strong> {{ last_login_at }}
+                    </p>
                     {% if school_access_state %}
                     {% set access_status = (school_access_state.effective_status or '') %}
                     {% set access_class = 'is-active' if access_status in ['trial_free', 'active_paid'] else ('is-warning' if access_status == 'pending_payment' else 'is-blocked') %}
@@ -201,7 +176,6 @@
                         {% endif %}
                     </div>
                     {% endif %}
-                    
                     {% set school_initial = ((school.school_name if school and school.school_name else 'S')[:1] or 'S')|upper %}
                     {% if school and school.school_logo %}
                     <img
@@ -273,95 +247,6 @@
                     {% endif %}
                 </div>
 
-                <div class="card" id="assignment-overview-card">
-                    <h2><i class="fas fa-link"></i> Assignment Overview</h2>
-                    <div class="assignment-overview">
-                        <div class="assignment-box">
-                            <h3>Class Teacher Assignment</h3>
-                            <div class="assignment-count">{{ classes|length }}</div>
-                            {% if classes %}
-                            <ul class="assignment-list" style="list-style:none; padding-left:0;">
-                                {% for cls in classes %}
-                                <li style="margin-bottom:6px;">
-                                    {% if school and school.score_entry_mode == 'dean_led' %}
-                                    <a href="{{ url_for('teacher_dashboard', tab='score', score_class=cls) }}" class="btn-badge btn-badge-primary"><i class="fas fa-folder-open"></i> {{ cls }}</a>
-                                    {% else %}
-                                    <a href="{{ url_for('teacher_class_list') }}" class="btn-badge btn-badge-secondary"><i class="fas fa-list"></i> {{ cls }}</a>
-                                    {% endif %}
-                                </li>
-                                {% endfor %}
-                            </ul>
-                            {% else %}
-                                <p class="note">No class assignment yet.</p>
-                            {% endif %}
-                        </div>
-                        {% if not school or school.score_entry_mode != 'dean_led' %}
-                        <div class="assignment-box">
-                            <h3>Subject Teacher Assignment</h3>
-                            <div class="assignment-count">{{ subject_assignment_count or 0 }}</div>
-                            {% if subject_assignment_summary %}
-                            <ul class="assignment-list" style="list-style:none; padding-left:0;">
-                                {% for row in subject_assignment_summary %}
-                                <li style="margin-bottom:12px;">
-                                    <strong>{{ row.classname }}:</strong>
-                                    <div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:4px;">
-                                        {% for subject in row.subjects %}
-                                            {% if school and school.score_entry_mode == 'subject_sheet' %}
-                                            <a href="{{ url_for('teacher_subject_score_sheet', class=row.classname, subject=subject) }}" class="btn-badge btn-badge-primary"><i class="fas fa-pen-to-square"></i> {{ subject }}</a>
-                                            {% else %}
-                                            <a href="{{ url_for('teacher_dashboard', tab='score', score_subject=subject, score_class=row.classname) }}" class="btn-badge btn-badge-primary"><i class="fas fa-pen-to-square"></i> {{ subject }}</a>
-                                            {% endif %}
-                                        {% endfor %}
-                                    </div>
-                                </li>
-                                {% endfor %}
-                            </ul>
-                            {% else %}
-                            <p class="note">No subject assignment yet.</p>
-                            {% endif %}
-                        </div>
-                        {% else %}
-                        <div class="assignment-box">
-                            <h3>Dean-led Score Entry</h3>
-                            <div class="assignment-count"><i class="fas fa-user-shield"></i></div>
-                            <p class="note">This school uses class-based score entry. Teachers can enter all subjects for assigned classes.</p>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% if school and school.score_entry_mode == 'dean_led' %}
-                    <p class="note" style="margin-top:10px;">Subject assignment is hidden for this school mode. Use Score Entry to work from class subjects.</p>
-                    {% endif %}
-                    <div class="assignment-table-wrap">
-                        <table class="enhanced-table">
-                            <thead>
-                                <tr>
-                                    <th>Class</th>
-                                    <th>{% if school and school.score_entry_mode == 'dean_led' %}Class Subjects{% else %}Subjects You Teach{% endif %}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in subject_assignment_summary %}
-                                <tr>
-                                    <td style="font-weight: 750;">{{ row.classname }}</td>
-                                    <td>
-                                        <div style="display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-start;">
-                                            {% for subject in row.subjects %}
-                                                {% if school and school.score_entry_mode == 'subject_sheet' %}
-                                                <a href="{{ url_for('teacher_subject_score_sheet', class=row.classname, subject=subject) }}" class="btn-badge btn-badge-primary"><i class="fas fa-pen-to-square"></i> {{ subject }}</a>
-                                                {% else %}
-                                                <a href="{{ url_for('teacher_dashboard', tab='score', score_subject=subject, score_class=row.classname) }}" class="btn-badge btn-badge-primary"><i class="fas fa-pen-to-square"></i> {{ subject }}</a>
-                                                {% endif %}
-                                            {% endfor %}
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% else %}
-                                <tr><td colspan="2" class="text-center">No subject assignment rows available for {{ current_term }}.</td></tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
 
                 <div class="dash-tabs">
                     <a href="{{ url_for('teacher_dashboard', tab='overview') }}" class="dash-tab {{ 'active' if active_tab == 'overview' else '' }}"><i class="fas fa-compass"></i> Overview</a>
