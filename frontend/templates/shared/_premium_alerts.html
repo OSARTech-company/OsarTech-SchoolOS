@@ -1,233 +1,327 @@
 <!-- Premium Alert Notification Handler -->
 <script>
 (function() {
-    document.addEventListener("DOMContentLoaded", function() {
-        // Find all flash messages in the page (standard .flash, flash-success, flash-error etc.)
-        var selector = '.flash, [class^="flash-"], [class*=" flash-"]';
-        var flashes = document.querySelectorAll(selector);
-        if (flashes.length === 0) return;
-        
-        // Append animations and modal/toast styles once
-        if (!document.getElementById('premium-alert-styles')) {
-            var style = document.createElement('style');
-            style.id = 'premium-alert-styles';
-            style.textContent = `
-                @keyframes premiumFadeIn { from { opacity: 0; } to { opacity: 1; } }
-                @keyframes premiumSlideUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-                @keyframes premiumBounceIn {
-                    0% { transform: scale(0.3); opacity: 0; }
-                    50% { transform: scale(1.05); opacity: 1; }
-                    70% { transform: scale(0.9); }
-                    100% { transform: scale(1); }
-                }
-                .premium-flash-backdrop {
-                    position: fixed; inset: 0; 
-                    background: rgba(15, 23, 42, 0.6); 
-                    backdrop-filter: blur(8px); 
-                    display: flex; align-items: center; justify-content: center; 
-                    z-index: 100000; 
-                    animation: premiumFadeIn 0.3s ease forwards;
-                }
-                .premium-flash-card {
-                    background: var(--surface, #ffffff); 
-                    max-width: 420px; width: 90%; 
-                    text-align: center; padding: 32px 24px; 
-                    border-radius: 16px; 
-                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.05); 
-                    border: 1px solid var(--line, #e2e8f0); 
-                    animation: premiumSlideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; 
-                    position: relative; 
-                }
-                [data-theme="dark"] .premium-flash-card {
-                    background: #1e293b; border-color: #334155; color: #f8fafc; 
-                }
-                .premium-flash-card h2 {
-                    margin-top: 0; color: var(--text, #1e293b); font-size: 1.55rem; font-weight: 700; 
-                }
-                [data-theme="dark"] .premium-flash-card h2 { color: #f8fafc; }
-                .premium-flash-card p {
-                    color: var(--muted, #64748b); line-height: 1.5; margin-bottom: 24px; font-size: 0.95rem; 
-                }
-                .premium-flash-btn {
-                    background: linear-gradient(135deg, var(--brand, #0f4c81) 0%, var(--brand-2, #1f7a8c) 100%);
-                    color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; 
-                    font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: all 0.2s;
-                }
-                .premium-flash-btn:hover { opacity: 0.9; transform: translateY(-1px); }
-                .premium-flash-btn:active { transform: translateY(0); }
-                
-                /* Toast styling */
-                .premium-toast-container {
-                    position: fixed; top: 24px; right: 24px; 
-                    display: flex; flex-direction: column; gap: 12px; 
-                    z-index: 100000; width: min(400px, 90vw); 
-                    pointer-events: none; 
-                }
-                .premium-toast {
-                    pointer-events: auto; background: var(--surface, #ffffff); 
-                    border: 1px solid var(--line, #e2e8f0); border-radius: 12px; 
-                    padding: 16px 16px 16px 20px; 
-                    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); 
-                    display: flex; align-items: flex-start; gap: 12px; 
-                    transform: translateX(120%); 
-                    animation: premiumToastSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; 
-                    position: relative; overflow: hidden; 
-                }
-                [data-theme="dark"] .premium-toast {
-                    background: #1e293b; border-color: #334155; color: #f8fafc; 
-                }
-                .premium-toast::before {
-                    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; 
-                }
-                .premium-toast.error::before { background: #ef4444; }
-                .premium-toast.warning::before { background: #f59e0b; }
-                .premium-toast .toast-icon { font-size: 20px; flex-shrink: 0; }
-                .premium-toast.error .toast-icon { color: #ef4444; }
-                .premium-toast.warning .toast-icon { color: #f59e0b; }
-                .premium-toast .toast-content {
-                    flex-grow: 1; font-size: 0.9rem; line-height: 1.4; color: var(--text, #334155); 
-                }
-                [data-theme="dark"] .premium-toast .toast-content { color: #cbd5e1; }
-                .premium-toast .toast-close {
-                    background: none; border: none; color: var(--muted, #94a3b8); 
-                    cursor: pointer; font-size: 20px; padding: 0; margin-top: -4px;
-                    flex-shrink: 0; line-height: 1; transition: color 0.15s; 
-                }
-                .premium-toast .toast-close:hover { color: var(--text, #334155); }
-                [data-theme="dark"] .premium-toast .toast-close:hover { color: #f8fafc; }
-                
-                @keyframes premiumToastSlideIn { to { transform: translateX(0); } }
-                @keyframes premiumToastSlideOut { to { transform: translateX(120%); opacity: 0; } }
-            `;
-            document.head.appendChild(style);
+    if (window.__premiumAlertsInstalled) {
+        return;
+    }
+    window.__premiumAlertsInstalled = true;
+
+    function ensureStyles() {
+        if (document.getElementById('premium-alert-styles')) {
+            return;
         }
 
-        flashes.forEach(function(flash) {
-            // Hide the default flat alert
-            flash.style.display = 'none';
-            
-            // Get content
-            var text = '';
-            var span = flash.querySelector('span');
-            if (span) {
-                text = span.innerHTML;
-            } else {
-                var cloned = flash.cloneNode(true);
-                var icons = cloned.querySelectorAll('i');
-                icons.forEach(function(i) { i.remove(); });
-                text = cloned.innerHTML.trim();
+        var style = document.createElement('style');
+        style.id = 'premium-alert-styles';
+        style.textContent = `
+            @keyframes premiumFadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes premiumSlideUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+            @keyframes premiumBounceIn {
+                0% { transform: scale(0.3); opacity: 0; }
+                50% { transform: scale(1.05); opacity: 1; }
+                70% { transform: scale(0.9); }
+                100% { transform: scale(1); }
             }
-            
-            // Determine type settings dynamically by checking class name keywords
-            var classStr = flash.className.toLowerCase();
+            .premium-toast-container {
+                position: fixed;
+                top: 24px;
+                right: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                z-index: 100000;
+                width: min(400px, 90vw);
+                pointer-events: none;
+            }
+            .premium-toast {
+                pointer-events: auto;
+                background: var(--surface, #ffffff);
+                border: 1px solid var(--line, #e2e8f0);
+                border-radius: 12px;
+                padding: 16px 16px 16px 20px;
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                transform: translateX(120%);
+                animation: premiumToastSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+                position: relative;
+                overflow: hidden;
+            }
+            [data-theme="dark"] .premium-toast {
+                background: #1e293b;
+                border-color: #334155;
+                color: #f8fafc;
+            }
+            .premium-toast::before {
+                content: "";
+                position: absolute;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                width: 4px;
+            }
+            .premium-toast.error::before { background: #ef4444; }
+            .premium-toast.warning::before { background: #f59e0b; }
+            .premium-toast .toast-icon { font-size: 20px; flex-shrink: 0; }
+            .premium-toast.error .toast-icon { color: #ef4444; }
+            .premium-toast.warning .toast-icon { color: #f59e0b; }
+            .premium-toast .toast-content {
+                flex-grow: 1;
+                font-size: 0.9rem;
+                line-height: 1.4;
+                color: var(--text, #334155);
+            }
+            [data-theme="dark"] .premium-toast .toast-content { color: #cbd5e1; }
+            .premium-toast .toast-close {
+                background: none;
+                border: none;
+                color: var(--muted, #94a3b8);
+                cursor: pointer;
+                font-size: 20px;
+                padding: 0;
+                margin-top: -4px;
+                flex-shrink: 0;
+                line-height: 1;
+                transition: color 0.15s;
+            }
+            .premium-toast .toast-close:hover { color: var(--text, #334155); }
+            [data-theme="dark"] .premium-toast .toast-close:hover { color: #f8fafc; }
+            @keyframes premiumToastSlideIn { to { transform: translateX(0); } }
+            @keyframes premiumToastSlideOut { to { transform: translateX(120%); opacity: 0; } }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function extractFlashText(flash) {
+        var span = flash.querySelector('span');
+        if (span) {
+            return span.innerHTML;
+        }
+
+        var cloned = flash.cloneNode(true);
+        var icons = cloned.querySelectorAll('i');
+        Array.prototype.forEach.call(icons, function(icon) {
+            icon.remove();
+        });
+        return cloned.innerHTML.trim();
+    }
+
+    function buildSuccessModal(text, titleText, iconClass, iconColor) {
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark' || 
+                     (document.documentElement.classList && document.documentElement.classList.contains('dark')) ||
+                     (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.getAttribute('data-theme') !== 'light');
+
+        var bgColor = isDark ? '#1e293b' : '#ffffff';
+        var textColor = isDark ? '#f8fafc' : '#1e293b';
+        var descColor = isDark ? '#cbd5e1' : '#64748b';
+        var borderColor = isDark ? '#334155' : '#e2e8f0';
+
+        var backdrop = document.createElement('div');
+        backdrop.style.cssText = [
+            'position:fixed',
+            'inset:0',
+            'background:rgba(15, 23, 42, 0.6)',
+            'backdrop-filter:blur(8px)',
+            'display:flex',
+            'align-items:center',
+            'justify-content:center',
+            'z-index:100000',
+            'animation:premiumFadeIn 0.3s ease forwards',
+            'padding:24px'
+        ].join(';');
+
+        var card = document.createElement('div');
+        card.style.cssText = [
+            'background:' + bgColor,
+            'max-width:420px',
+            'width:min(90vw, 420px)',
+            'text-align:center',
+            'padding:32px 24px',
+            'border-radius:16px',
+            'box-shadow:0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.05)',
+            'border:1px solid ' + borderColor,
+            'animation:premiumSlideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+            'position:relative',
+            'box-sizing:border-box'
+        ].join(';');
+
+        var iconDiv = document.createElement('div');
+        iconDiv.style.cssText = [
+            'font-size:56px',
+            'color:' + iconColor,
+            'margin-bottom:18px',
+            'animation:premiumBounceIn 0.5s ease',
+            'display:flex',
+            'align-items:center',
+            'justify-content:center'
+        ].join(';');
+        iconDiv.innerHTML = '<i class="fas ' + iconClass + '"></i>';
+
+        var title = document.createElement('h2');
+        title.textContent = titleText;
+        title.style.cssText = [
+            'margin:0 0 12px',
+            'color:' + textColor,
+            'font-size:1.55rem',
+            'font-weight:700'
+        ].join(';');
+
+        var desc = document.createElement('p');
+        desc.innerHTML = text;
+        desc.style.cssText = [
+            'color:' + descColor,
+            'line-height:1.5',
+            'margin:0 0 24px',
+            'font-size:0.95rem'
+        ].join(';');
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = 'Continue';
+        btn.style.cssText = [
+            'background:linear-gradient(135deg, var(--brand, #0f4c81) 0%, var(--brand-2, #1f7a8c) 100%)',
+            'color:#ffffff',
+            'border:none',
+            'width:100%',
+            'padding:12px',
+            'border-radius:8px',
+            'font-weight:700',
+            'font-size:0.95rem',
+            'cursor:pointer',
+            'transition:opacity 0.2s ease, transform 0.2s ease'
+        ].join(';');
+
+        btn.onmouseenter = function() {
+            btn.style.opacity = '0.92';
+            btn.style.transform = 'translateY(-1px)';
+        };
+        btn.onmouseleave = function() {
+            btn.style.opacity = '1';
+            btn.style.transform = 'translateY(0)';
+        };
+        btn.onclick = function() {
+            backdrop.style.animation = 'premiumFadeIn 0.2s reverse forwards';
+            setTimeout(function() {
+                if (backdrop.parentNode) {
+                    backdrop.parentNode.removeChild(backdrop);
+                }
+            }, 200);
+        };
+
+        card.appendChild(iconDiv);
+        card.appendChild(title);
+        card.appendChild(desc);
+        card.appendChild(btn);
+        backdrop.appendChild(card);
+        document.body.appendChild(backdrop);
+    }
+
+    function showToast(text, iconClass, isError, isWarning) {
+        var container = document.getElementById('premium-toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'premium-toast-container';
+            container.className = 'premium-toast-container';
+            document.body.appendChild(container);
+        }
+
+        var toast = document.createElement('div');
+        toast.className = 'premium-toast ' + (isError ? 'error' : 'warning');
+
+        var tIcon = document.createElement('div');
+        tIcon.className = 'toast-icon';
+        tIcon.innerHTML = '<i class="fas ' + iconClass + '"></i>';
+
+        var tContent = document.createElement('div');
+        tContent.className = 'toast-content';
+        tContent.innerHTML = text;
+
+        var tClose = document.createElement('button');
+        tClose.type = 'button';
+        tClose.className = 'toast-close';
+        tClose.innerHTML = '&times;';
+
+        var autoTimer = null;
+
+        function dismissToast() {
+            if (autoTimer) {
+                clearTimeout(autoTimer);
+            }
+            toast.style.animation = 'premiumToastSlideOut 0.3s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards';
+            setTimeout(function() {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+                if (container && container.children.length === 0 && container.parentNode) {
+                    container.parentNode.removeChild(container);
+                }
+            }, 300);
+        }
+
+        tClose.onclick = dismissToast;
+
+        toast.appendChild(tIcon);
+        toast.appendChild(tContent);
+        toast.appendChild(tClose);
+        container.appendChild(toast);
+
+        autoTimer = setTimeout(dismissToast, 7000);
+    }    function processFlashes() {
+        ensureStyles();
+
+        var flashes = document.querySelectorAll('.flash, [class^="flash-"], [class*=" flash-"]');
+        if (!flashes.length) {
+            return;
+        }
+
+        var seenKeys = {};
+        Array.prototype.forEach.call(flashes, function(flash) {
+            if (flash.getAttribute('data-premium-processed') === 'true') {
+                return;
+            }
+            flash.setAttribute('data-premium-processed', 'true');
+            flash.style.display = 'none';
+            flash.setAttribute('aria-hidden', 'true');
+
+            var text = extractFlashText(flash);
+            var classStr = (flash.className || '').toLowerCase();
+            var key = classStr + '|' + text.trim().toLowerCase();
+            if (seenKeys[key]) {
+                return;
+            }
+            seenKeys[key] = true;
+
             var isSuccess = classStr.indexOf('success') !== -1;
             var isError = classStr.indexOf('error') !== -1 || classStr.indexOf('danger') !== -1;
             var isWarning = classStr.indexOf('warning') !== -1;
-            
-            var typeTitle = "Notification";
-            var iconClass = "fa-info-circle";
-            var iconColor = "#3b82f6";
-            
+
+            var typeTitle = 'Notification';
+            var iconClass = 'fa-info-circle';
+            var iconColor = '#3b82f6';
+
             if (isSuccess) {
-                typeTitle = "Action Successful";
-                iconClass = "fa-circle-check";
-                iconColor = "#10b981";
+                typeTitle = 'Action Successful';
+                iconClass = 'fa-circle-check';
+                iconColor = '#10b981';
+                buildSuccessModal(text, typeTitle, iconClass, iconColor);
             } else if (isError) {
-                typeTitle = "Action Failed";
-                iconClass = "fa-circle-xmark";
-                iconColor = "#ef4444";
+                typeTitle = 'Action Failed';
+                iconClass = 'fa-circle-xmark';
+                iconColor = '#ef4444';
+                showToast(text, iconClass, true, false);
             } else if (isWarning) {
-                typeTitle = "Attention Needed";
-                iconClass = "fa-triangle-exclamation";
-                iconColor = "#f59e0b";
-            }
-            
-            if (isSuccess) {
-                // Show modal for Success
-                var backdrop = document.createElement('div');
-                backdrop.className = 'premium-flash-backdrop';
-                
-                var card = document.createElement('div');
-                card.className = 'premium-flash-card';
-                
-                var iconDiv = document.createElement('div');
-                iconDiv.style.cssText = 'font-size: 56px; color: ' + iconColor + '; margin-bottom: 18px; animation: premiumBounceIn 0.5s ease;';
-                iconDiv.innerHTML = '<i class="fas ' + iconClass + '"></i>';
-                
-                var title = document.createElement('h2');
-                title.textContent = typeTitle;
-                
-                var desc = document.createElement('p');
-                desc.innerHTML = text;
-                
-                var btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'premium-flash-btn';
-                btn.textContent = 'Continue';
-                btn.onclick = function() {
-                    backdrop.style.animation = 'premiumFadeIn 0.2s reverse forwards';
-                    setTimeout(function() {
-                        backdrop.remove();
-                    }, 200);
-                };
-                
-                card.appendChild(iconDiv);
-                card.appendChild(title);
-                card.appendChild(desc);
-                card.appendChild(btn);
-                backdrop.appendChild(card);
-                
-                document.body.appendChild(backdrop);
-            } else {
-                // Show floating stackable toast for Error / Warning
-                var container = document.getElementById('premium-toast-container');
-                if (!container) {
-                    container = document.createElement('div');
-                    container.id = 'premium-toast-container';
-                    container.className = 'premium-toast-container';
-                    document.body.appendChild(container);
-                }
-                
-                var toast = document.createElement('div');
-                toast.className = 'premium-toast ' + (isError ? 'error' : 'warning');
-                
-                var tIcon = document.createElement('div');
-                tIcon.className = 'toast-icon';
-                tIcon.innerHTML = '<i class="fas ' + iconClass + '"></i>';
-                
-                var tContent = document.createElement('div');
-                tContent.className = 'toast-content';
-                tContent.innerHTML = text;
-                
-                var tClose = document.createElement('button');
-                tClose.type = 'button';
-                tClose.className = 'toast-close';
-                tClose.innerHTML = '&times;';
-                
-                var autoTimer = null;
-                
-                function dismissToast() {
-                    if (autoTimer) clearTimeout(autoTimer);
-                    toast.style.animation = 'premiumToastSlideOut 0.3s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards';
-                    setTimeout(function() {
-                        toast.remove();
-                        if (container.children.length === 0) {
-                            container.remove();
-                        }
-                    }, 300);
-                }
-                
-                tClose.onclick = dismissToast;
-                
-                toast.appendChild(tIcon);
-                toast.appendChild(tContent);
-                toast.appendChild(tClose);
-                container.appendChild(toast);
-                
-                // Auto dismiss after 7 seconds
-                autoTimer = setTimeout(dismissToast, 7000);
+                typeTitle = 'Attention Needed';
+                iconClass = 'fa-triangle-exclamation';
+                iconColor = '#f59e0b';
+                showToast(text, iconClass, false, true);
             }
         });
-    });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', processFlashes, { once: true });
+    } else {
+        processFlashes();
+    }
 })();
 </script>
