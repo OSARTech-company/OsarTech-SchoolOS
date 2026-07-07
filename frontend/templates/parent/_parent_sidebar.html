@@ -103,15 +103,11 @@
         </details>
         {% endfor %}
 
-        <details class="side-group" {% if request.endpoint in ['help', 'parent_change_password'] or active_page == 'assistant_analytics' %}open{% endif %}>
+        <details class="side-group" {% if request.endpoint in ['help', 'parent_change_password'] %}open{% endif %}>
             <summary class="side-group-toggle">
                 <span>Support</span><i class="fas fa-chevron-down"></i>
             </summary>
             <div class="side-group-links">
-                <a href="{{ url_for('parent_assistant_analytics') }}" class="side-link{% if active_page == 'assistant_analytics' %} active{% endif %}">
-                    <i class="fas fa-robot"></i>
-                    <span>Assistant Analytics</span>
-                </a>
                 <a href="{{ url_for('parent_dashboard') }}#parent-password-card" class="side-link">
                     <i class="fas fa-key"></i>
                     <span>Change Password</span>

@@ -750,7 +750,6 @@
         background: linear-gradient(to right, rgba(52, 211, 153, 0.08) 0%, transparent 100%);
     }
 
-    :root:not([data-theme="light"]) .alert-card.warning {
         border-left-color: var(--warning);
         background: linear-gradient(to right, rgba(251, 191, 36, 0.08) 0%, transparent 100%);
     }
@@ -758,4 +757,260 @@
     :root:not([data-theme="light"]) .alert-content strong {
         color: var(--text);
     }
+}
+
+/* ==========================================================================
+   PREMIUM TEACHER DASHBOARD SPECIFIC STYLES
+   ========================================================================== */
+
+/* Premium Header Card */
+.premium-header {
+    position: relative;
+    border-radius: var(--radius);
+    padding: 32px;
+    margin-bottom: 28px;
+    color: #f8fbff;
+    background: linear-gradient(130deg, var(--brand) 0%, var(--brand-2) 56%, #2f9db0 100%);
+    box-shadow: 0 10px 30px rgba(15, 76, 129, 0.15);
+    overflow: hidden;
+    z-index: 1;
+}
+
+.premium-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+.premium-header-content {
+    max-width: 90%;
+}
+
+/* Metadata Grid */
+.premium-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px 20px;
+    margin-top: 22px;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.07);
+    padding: 8px 14px;
+    border-radius: 8px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 0.9rem;
+}
+
+.meta-item:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.meta-item i {
+    color: #a5f3fc; /* Bright cyan accent */
+    font-size: 1.05rem;
+    flex-shrink: 0;
+}
+
+.meta-item span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Premium Workflow Timeline */
+.premium-workflow-card {
+    padding: 28px !important;
+}
+
+.premium-timeline {
+    display: flex;
+    flex-direction: column;
+    margin-top: 20px;
+}
+
+.timeline-step {
+    position: relative;
+    padding-left: 48px;
+    padding-bottom: 24px;
+}
+
+.timeline-step::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 28px;
+    bottom: 0;
+    width: 2px;
+    border-left: 2px dashed rgba(31, 122, 140, 0.25);
+}
+
+.timeline-step:last-child::before {
+    display: none;
+}
+
+.timeline-step::after {
+    content: attr(data-step);
+    position: absolute;
+    left: 0;
+    top: 2px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+    color: white;
+    font-weight: 800;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(15, 76, 129, 0.25);
+    border: 2px solid white;
+    transition: all 0.2s ease;
+    z-index: 2;
+}
+
+.timeline-step:hover::after {
+    transform: scale(1.1);
+    box-shadow: 0 6px 14px rgba(15, 76, 129, 0.35);
+}
+
+.timeline-step h4 {
+    margin: 0 0 6px;
+    color: #0f4c81;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.timeline-step p {
+    margin: 0;
+    color: #475569;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+/* Info Grid & Tile (Score Entry Metadata) */
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+}
+
+.info-tile {
+    background: linear-gradient(135deg, #f8fbff 0%, #f0f7ff 100%);
+    border: 1px solid rgba(31, 122, 140, 0.15);
+    border-radius: 10px;
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.info-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(31, 122, 140, 0.08);
+    border-color: rgba(31, 122, 140, 0.35);
+}
+
+.info-tile-label {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.info-tile strong {
+    font-size: 1.15rem;
+    color: #0f4c81;
+    font-weight: 700;
+}
+
+/* Enhanced Table Enhancements */
+.enhanced-table th {
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.enhanced-table tbody tr {
+    transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+.enhanced-table tbody tr:hover {
+    background-color: #f1f7fc !important;
+}
+
+/* ==========================================================================
+   DARK THEME COMPATIBILITY OVERRIDES
+   ========================================================================== */
+
+:root[data-theme="dark"] .premium-header {
+    background: linear-gradient(130deg, #1e1b4b 0%, #0f172a 56%, #0f172a 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-theme="dark"] .meta-item {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme="dark"] .meta-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+:root[data-theme="dark"] .meta-item i {
+    color: #38bdf8; /* Brighter sky blue for dark mode */
+}
+
+:root[data-theme="dark"] .timeline-step::before {
+    border-left-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .timeline-step::after {
+    border-color: #1e293b;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme="dark"] .timeline-step h4 {
+    color: #f1f5f9;
+}
+
+:root[data-theme="dark"] .timeline-step p {
+    color: #94a3b8;
+}
+
+:root[data-theme="dark"] .info-tile {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-theme="dark"] .info-tile-label {
+    color: #94a3b8;
+}
+
+:root[data-theme="dark"] .info-tile strong {
+    color: #38bdf8;
+}
+
+:root[data-theme="dark"] .enhanced-table tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.02) !important;
 }

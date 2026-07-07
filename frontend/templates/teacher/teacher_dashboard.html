@@ -142,27 +142,52 @@
         
         <div class="main-content">
             <div class="container">
-                <div class="header">
+                <div class="premium-header">
                     {% set teacher_initial = ((teacher_name if teacher_name else 'T')[:1] or 'T')|upper %}
-                    <h1>
-                        <span class="teacher-title-row">
-                            {% if teacher_profile_image %}
-                            <img src="{{ teacher_profile_image }}" alt="{{ teacher_name }} Profile Picture" class="teacher-title-avatar" />
-                            {% else %}
-                            <span class="teacher-title-avatar-fallback"><i class="fas fa-user" aria-hidden="true"></i><span>{{ teacher_initial }}</span></span>
-                            {% endif %}
-                            <span><i class="fas fa-chalkboard-teacher"></i> Teacher Dashboard</span>
-                        </span>
-                    </h1>
-                    <p class="meta-line">
-                        <strong>School:</strong> {{ school.school_name if school else '-' }} |
-                        <strong>Teacher:</strong> {{ teacher_name }} |
-                        <strong>Phone:</strong> {{ teacher_phone or 'Not set' }} |
-                        <strong>Assigned Classes:</strong> {{ classes|join(', ') if classes else 'None' }} |
-                        <strong>{% if school and school.score_entry_mode == 'dean_led' %}Class Subjects{% else %}Subject Assignments{% endif %}:</strong> {{ subject_assignment_count or 0 }} |
-                        <strong>Mode:</strong> {% if school and school.score_entry_mode == 'dean_led' %}Simple Mode{% elif school and school.score_entry_mode == 'subject_sheet' %}Subject Sheet Mode{% else %}Advanced Mode{% endif %} |
-                        <strong>Last Login:</strong> {{ last_login_at }}
-                    </p>
+                    <div class="premium-header-content">
+                        <h1>
+                            <span class="teacher-title-row">
+                                {% if teacher_profile_image %}
+                                <img src="{{ teacher_profile_image }}" alt="{{ teacher_name }} Profile Picture" class="teacher-title-avatar" />
+                                {% else %}
+                                <span class="teacher-title-avatar-fallback"><i class="fas fa-user" aria-hidden="true"></i><span>{{ teacher_initial }}</span></span>
+                                {% endif %}
+                                <span><i class="fas fa-chalkboard-teacher"></i> Teacher Dashboard</span>
+                            </span>
+                        </h1>
+                        
+                        <div class="premium-meta-grid">
+                            <div class="meta-item">
+                                <i class="fas fa-school" aria-hidden="true"></i>
+                                <span><strong>School:</strong> {{ school.school_name if school else '-' }}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-user-circle" aria-hidden="true"></i>
+                                <span><strong>Teacher:</strong> {{ teacher_name }}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-phone" aria-hidden="true"></i>
+                                <span><strong>Phone:</strong> {{ teacher_phone or 'Not set' }}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-graduation-cap" aria-hidden="true"></i>
+                                <span><strong>Assigned Classes:</strong> {{ classes|join(', ') if classes else 'None' }}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-book" aria-hidden="true"></i>
+                                <span><strong>{% if school and school.score_entry_mode == 'dean_led' %}Class Subjects{% else %}Subject Assignments{% endif %}:</strong> {{ subject_assignment_count or 0 }}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-sliders-h" aria-hidden="true"></i>
+                                <span><strong>Mode:</strong> {% if school and school.score_entry_mode == 'dean_led' %}Simple Mode{% elif school and school.score_entry_mode == 'subject_sheet' %}Subject Sheet Mode{% else %}Advanced Mode{% endif %}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-clock" aria-hidden="true"></i>
+                                <span><strong>Last Login:</strong> {{ last_login_at }}</span>
+                            </div>
+                        </div>
+                    </div>
+
                     {% if school_access_state %}
                     {% set access_status = (school_access_state.effective_status or '') %}
                     {% set access_class = 'is-active' if access_status in ['trial_free', 'active_paid'] else ('is-warning' if access_status == 'pending_payment' else 'is-blocked') %}
@@ -176,6 +201,7 @@
                         {% endif %}
                     </div>
                     {% endif %}
+                    
                     {% set school_initial = ((school.school_name if school and school.school_name else 'S')[:1] or 'S')|upper %}
                     {% if school and school.school_logo %}
                     <img
@@ -217,14 +243,17 @@
         
                 <div class="stats-grid">
                     <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-user-graduate" aria-hidden="true"></i></div>
                         <h3>{{ students|length }}</h3>
                         <p>Total Students</p>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card success">
+                        <div class="stat-icon"><i class="fas fa-chalkboard" aria-hidden="true"></i></div>
                         <h3>{{ classes|length }}</h3>
                         <p>Your Classes</p>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card warning">
+                        <div class="stat-icon"><i class="fas fa-book-reader" aria-hidden="true"></i></div>
                         <h3>{{ subject_assignment_subject_count or 0 }}</h3>
                         <p>{% if school and school.score_entry_mode == 'dean_led' %}Class Subjects{% else %}Assigned Subjects{% endif %}</p>
                     </div>
@@ -303,7 +332,7 @@
                     <p class="note" style="margin-top:10px;">Subject assignment is hidden for this school mode. Use Score Entry to work from class subjects.</p>
                     {% endif %}
                     <div class="assignment-table-wrap">
-                        <table>
+                        <table class="enhanced-table">
                             <thead>
                                 <tr>
                                     <th>Class</th>
@@ -352,7 +381,7 @@
                     <p class="note"><strong>Paused:</strong> {{ teacher_period_notifications_paused_reason }}.</p>
                     <p class="success-note">Period alerts resume automatically when school is open.</p>
                     {% elif teacher_period_notifications %}
-                    <table>
+                    <table class="enhanced-table">
                         <thead>
                             <tr>
                                 <th>Status</th>
@@ -410,23 +439,46 @@
                 </div>
 
         
-                <div class="card">
-                    <h2><i class="fas fa-route"></i> Your Workflow</h2>
-                    {% if school and school.score_entry_mode == 'dean_led' %}
-                    <p class="workflow-step">1. Open Score Entry from the class list.</p>
-                    <p class="workflow-step">2. Enter scores for all subjects offered by the student.</p>
-                    <p class="workflow-step">3. If daily attendance was not marked, open Submission and enter Days Open plus Days Present.</p>
-                    <p class="workflow-step">4. Review and save before class result approval.</p>
-                    {% else %}
-                    <p class="workflow-step">1. Enter your assigned subject scores for students.</p>
-                    <p class="workflow-step">2. Submit completed subjects to the class teacher when your handoff is ready.</p>
-                    <p class="workflow-step">3. Class teacher waits for all subject handoffs, then submits the class result to school admin.</p>
-                    {% endif %}
+                <div class="card premium-workflow-card">
+                    <h2><i class="fas fa-route" aria-hidden="true"></i> Your Workflow</h2>
+                    <div class="premium-timeline">
+                        {% if school and school.score_entry_mode == 'dean_led' %}
+                        <div class="timeline-step" data-step="1">
+                            <h4>Open Score Entry</h4>
+                            <p>Open the Score Entry tab from the class list view.</p>
+                        </div>
+                        <div class="timeline-step" data-step="2">
+                            <h4>Enter Subject Scores</h4>
+                            <p>Fill in scores for all subjects offered by each student.</p>
+                        </div>
+                        <div class="timeline-step" data-step="3">
+                            <h4>Daily Attendance</h4>
+                            <p>If daily attendance was not marked, open Submission and enter Days Open plus Days Present.</p>
+                        </div>
+                        <div class="timeline-step" data-step="4">
+                            <h4>Review & Save</h4>
+                            <p>Review the calculated scores and draft results before submitting to class teacher/admin.</p>
+                        </div>
+                        {% else %}
+                        <div class="timeline-step" data-step="1">
+                            <h4>Enter Subject Scores</h4>
+                            <p>Enter scores for your assigned subjects on students' rosters.</p>
+                        </div>
+                        <div class="timeline-step" data-step="2">
+                            <h4>Submit to Class Teacher</h4>
+                            <p>Submit completed subjects to the class teacher when score entry is completed.</p>
+                        </div>
+                        <div class="timeline-step" data-step="3">
+                            <h4>Class Submission</h4>
+                            <p>Class teacher waits for all subject handoffs, then submits the entire class results package to the administration.</p>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="card">
                     <h2><i class="fas fa-calendar-check"></i> Term Programs (Visible to Teachers)</h2>
                     {% if teacher_term_events %}
-                    <table>
+                    <table class="enhanced-table">
                         <thead>
                             <tr>
                                 <th>Event</th>
@@ -485,7 +537,7 @@
                         </a>
                         {% endif %}
                     </div>
-                    <table>
+                    <table class="enhanced-table">
                         <thead>
                             <tr>
                                 <th>Student ID</th>
@@ -606,7 +658,7 @@
                         <strong>Missing Scores:</strong> {{ subject_rank_summary.missing_scores }}
                         {% endif %}
                     </p>
-                    <table>
+                    <table class="enhanced-table">
                         <thead>
                             <tr>
                                 <th>Position</th>
@@ -663,7 +715,7 @@
                 <div class="card">
                     <h2><i class="fas fa-share-square"></i> Submit Subject Scores To Class Teacher</h2>
                     <p class="note">Submission is now tracked per subject. Use one button per class after all your assigned subject scores for that class are complete.</p>
-                    <table>
+                    <table class="enhanced-table">
                         <thead>
                             <tr>
                                 <th>Class</th>
@@ -721,7 +773,7 @@
                 <div class="card">
                     <h2><i class="fas fa-ranking-star"></i> Submit Results For Approval</h2>
                     <p class="note">Only your assigned class(es) appear here. Subject-only teachers cannot submit class results. If you need manual attendance entry, open the Attendance page for that class.</p>
-                    <table>
+                    <table class="enhanced-table">
                         <thead>
                             <tr>
                                 <th>Class</th>
@@ -795,7 +847,7 @@
                                     <span class="chip chip-warning">Pending Subjects: {{ s.subject_pending_count or 0 }}</span>
                                 {% endif %}
                             </div>
-                            <table>
+                            <table class="enhanced-table">
                                 <thead>
                                     <tr>
                                         <th>Subject</th>

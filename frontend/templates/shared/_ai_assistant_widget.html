@@ -56,7 +56,7 @@
 {% endif %}
 <div class="app-ai-assistant" data-role="{{ (session.get('role') or '')|e }}" data-preferred-mode="{{ assistant_preferred_mode|default('standard', true)|e }}">
     <input type="hidden" class="app-ai-csrf" value="{{ csrf_token() }}">
-    <button type="button" class="app-ai-toggle" aria-expanded="false" aria-controls="app-ai-panel">AI Help</button>
+    <button type="button" class="app-ai-toggle" aria-expanded="false" aria-controls="app-ai-panel"><i class="fas fa-robot"></i> AI Help</button>
     <section id="app-ai-panel" class="app-ai-panel" hidden>
         <header class="app-ai-header">
             <strong>App Assistant</strong>

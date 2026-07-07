@@ -2015,7 +2015,6 @@ def _assistant_nav_links(role, school_id='', teacher_scope=None):
         _add('Help', 'help', role='school_admin')
     elif role == 'teacher':
         _add('Dashboard', 'teacher_dashboard')
-        _add('Assistant Analytics', 'teacher_assistant_analytics')
         _add('Class List', 'teacher_class_list')
         _add('Messages', 'teacher_messages')
         _add('Notifications', 'teacher_notifications')
@@ -2037,7 +2036,6 @@ def _assistant_nav_links(role, school_id='', teacher_scope=None):
         _add('Help', 'help', role='student')
     elif role == 'parent':
         _add('Dashboard', 'parent_dashboard')
-        _add('Assistant Analytics', 'parent_assistant_analytics')
         _add('Messages', 'parent_messages')
         _add('Attendance', 'parent_period_attendance')
         _add('Timetable', 'parent_timetable')
@@ -3388,7 +3386,6 @@ def _assistant_page_guidance(role, source_page=''):
             ('/teacher/subject-comments', 'Subject Teacher Comments', 'Use this page to review subject-teacher comments for students in your assigned scope.', ['Filter by class, subject, term, and year.', 'Review each comment with student details.', 'Use it to follow up or guide score corrections.']),
             ('/teacher/subject-ranks', 'Subject Ranks', 'Use this page to review subject ranking history and export ranked sheets.', ['Choose year, term, class, and subject.', 'Review ranked students and trends.', 'Export rank CSV when needed.']),
             ('/teacher/behaviour-assessment', 'Behaviour Assessment', 'Use this page to score student behaviour attributes in class-teacher scope.', ['Select class context.', 'Enter behaviour values/comments.', 'Save before publishing workflow.']),
-            ('/teacher/assistant-analytics', 'Assistant Analytics', 'Use this page to review your AI helper usage quality and unresolved patterns.', ['Select usage window.', 'Review confidence/unresolved counts.', 'Use top repeated questions to refine team guidance.']),
         ],
         'student': [
             ('/student', 'Student Dashboard', 'Use this page to track your result status and account actions.', ['Check dashboard notices.', 'Open messages and result pages.', 'Use change password for account security.']),
@@ -3404,7 +3401,6 @@ def _assistant_page_guidance(role, source_page=''):
             ('/parent/student-result', 'Child Result View', 'Use this page to see one child published result details.', ['Choose child result link.', 'Select term/year context.', 'Review grades and comments.']),
             ('/parent/compare-results', 'Compare Results', 'Use this page to compare child performance across terms.', ['Open compare page for selected child.', 'Choose terms to compare.', 'Review trend differences by subject and average.']),
             ('/parent/dispute', 'Parent Dispute', 'Use this page to submit result dispute for a child.', ['Select child and term context.', 'Describe issue clearly with details.', 'Submit and monitor messages for updates.']),
-            ('/parent/assistant-analytics', 'Assistant Analytics', 'Use this page to monitor your AI helper quality and common unresolved questions.', ['Select a time window.', 'Review top questions you asked.', 'Use not-helpful patterns to ask clearer follow-up questions.']),
         ],
         'super_admin': [
             ('/super-admin', 'Super Admin Dashboard', 'Use this page to monitor system-wide school operations.', ['Review overview statistics.', 'Go to add/view school workflows.', 'Track reported issues queue.']),
@@ -3460,7 +3456,7 @@ def _assistant_grouped_nav_hint(role, page=''):
             ('Classroom', ('/teacher/class-list', '/view-students', '/teacher/behaviour-assessment', '/teacher/attendance', '/teacher/period-attendance')),
             ('Academics', ('/teacher/enter-scores', '/teacher/enter-subject-scores', '/teacher/upload-csv', '/teacher/timetable', '/teacher/cbt', '/teacher/subject-comments', '/teacher/subject-ranks')),
             ('Communication', ('/teacher/messages', '/teacher/notifications')),
-            ('Support', ('/teacher/assistant-analytics', '/report-issue', '/help', '/change_password')),
+            ('Support', ('/report-issue', '/help', '/change_password')),
         ]
         for group, prefixes in mapping:
             for prefix in prefixes:
@@ -3469,7 +3465,7 @@ def _assistant_grouped_nav_hint(role, page=''):
     if role_name == 'parent':
         mapping = [
             ('Core', ('/parent', '/parent/messages', '/parent/notification-preferences', '/parent/disputes')),
-            ('Support', ('/parent/assistant-analytics', '/help')),
+            ('Support', ('/help',)),
         ]
         for group, prefixes in mapping:
             for prefix in prefixes:
@@ -42906,10 +42902,6 @@ def school_admin_analytics():
     if assistant_days not in {7, 30, 90}:
         assistant_days = 30
     class_pass_rows, subject_rows, attendance_impact_rows = build_school_analytics_data(school_id, selected_term, selected_year)
-    assistant_usage = get_assistant_usage_summary(school_id, days=assistant_days)
-    assistant_feedback = get_assistant_feedback_summary(school_id, days=assistant_days)
-    assistant_quality = get_assistant_quality_summary(school_id, days=assistant_days)
-    assistant_learning_queue = get_assistant_learning_queue(school_id, days=assistant_days, limit=12)
     action_audit = get_admin_action_audit_summary(school_id, days=assistant_days)
     notification_stats = get_notification_delivery_stats(school_id, days=assistant_days)
     backup_health = get_backup_health_summary(school_id, days=assistant_days)
@@ -42922,10 +42914,6 @@ def school_admin_analytics():
         class_pass_rows=class_pass_rows,
         subject_rows=subject_rows,
         attendance_impact_rows=attendance_impact_rows,
-        assistant_usage=assistant_usage,
-        assistant_feedback=assistant_feedback,
-        assistant_quality=assistant_quality,
-        assistant_learning_queue=assistant_learning_queue,
         action_audit=action_audit,
         notification_stats=notification_stats,
         backup_health=backup_health,
@@ -45995,61 +45983,6 @@ def teacher_messages():
         selected_class=(class_set[0] if class_set else ''),
         teacher_messages=teacher_messages,
         unread_teacher_messages=unread_teacher_messages,
-    )
-
-@app.route('/teacher/assistant-analytics')
-def teacher_assistant_analytics():
-    if session.get('role') != 'teacher':
-        return redirect(url_for('login'))
-    school_id = _normalize_school_id_text(session.get('school_id'))
-    if not school_id:
-        flash('School session is missing. Please log in again.', 'error')
-        return redirect(url_for('login'))
-    teacher_id = (session.get('user_id') or '').strip().lower()
-    school = get_school(school_id) or {}
-    teacher = get_teacher(school_id, teacher_id) or {}
-    teacher_name = f"{(teacher.get('firstname') or '').strip()} {(teacher.get('lastname') or '').strip()}".strip() or teacher_id
-    try:
-        assistant_days = int((request.args.get('assistant_days', '') or '30').strip())
-    except Exception:
-        assistant_days = 30
-    if assistant_days not in {7, 30, 90}:
-        assistant_days = 30
-
-    usage_mine = get_assistant_usage_summary_scoped(
-        school_id=school_id,
-        days=assistant_days,
-        role='teacher',
-        user_id=teacher_id,
-    )
-    feedback_mine = get_assistant_feedback_summary_scoped(
-        school_id=school_id,
-        days=assistant_days,
-        role='teacher',
-        user_id=teacher_id,
-    )
-    quality_mine = get_assistant_quality_summary_scoped(
-        school_id=school_id,
-        days=assistant_days,
-        role='teacher',
-        user_id=teacher_id,
-    )
-    usage_role = get_assistant_usage_summary_scoped(
-        school_id=school_id,
-        days=assistant_days,
-        role='teacher',
-    )
-
-    return render_template(
-        'teacher/teacher_assistant_analytics.html',
-        active_page='assistant_analytics',
-        school=school,
-        teacher_name=teacher_name,
-        assistant_days=assistant_days,
-        assistant_usage_mine=usage_mine,
-        assistant_feedback_mine=feedback_mine,
-        assistant_quality_mine=quality_mine,
-        assistant_usage_role=usage_role,
     )
 
 @app.route('/teacher/attendance', methods=['GET', 'POST'])
@@ -50872,62 +50805,6 @@ def parent_messages():
         parent_messages=parent_messages,
         unread_parent_messages=unread_parent_messages,
     )
-
-@app.route('/parent/assistant-analytics')
-def parent_assistant_analytics():
-    if session.get('role') != 'parent':
-        return redirect(url_for('login'))
-    allowed_keys = _parent_allowed_student_keys()
-    if not allowed_keys:
-        flash('Parent session expired. Please login again.', 'error')
-        return redirect(url_for('login'))
-    try:
-        assistant_days = int((request.args.get('assistant_days', '') or '30').strip())
-    except Exception:
-        assistant_days = 30
-    if assistant_days not in {7, 30, 90}:
-        assistant_days = 30
-
-    sidebar_ctx = _build_parent_sidebar_context(limit_per_school=160)
-    school_id = (session.get('school_id') or '').strip()
-    parent_id = normalize_parent_phone(session.get('parent_phone', '')).lower()
-    usage_mine = get_assistant_usage_summary_scoped(
-        school_id=school_id,
-        days=assistant_days,
-        role='parent',
-        user_id=parent_id,
-    )
-    feedback_mine = get_assistant_feedback_summary_scoped(
-        school_id=school_id,
-        days=assistant_days,
-        role='parent',
-        user_id=parent_id,
-    )
-    quality_mine = get_assistant_quality_summary_scoped(
-        school_id=school_id,
-        days=assistant_days,
-        role='parent',
-        user_id=parent_id,
-    )
-    usage_role = get_assistant_usage_summary_scoped(
-        school_id=school_id,
-        days=assistant_days,
-        role='parent',
-    )
-    return render_template(
-        'parent/parent_assistant_analytics.html',
-        active_page='assistant_analytics',
-        parent_phone=session.get('parent_phone', ''),
-        assistant_days=assistant_days,
-        assistant_usage_mine=usage_mine,
-        assistant_feedback_mine=feedback_mine,
-        assistant_quality_mine=quality_mine,
-        assistant_usage_role=usage_role,
-        children=sidebar_ctx.get('children') or [],
-        parent_theme_accent=sidebar_ctx.get('parent_theme_accent') or '#1F7A8C',
-        unread_parent_messages=int(sidebar_ctx.get('unread_parent_messages') or 0),
-    )
-
 
 @app.route('/parent/attendance')
 def parent_period_attendance():
