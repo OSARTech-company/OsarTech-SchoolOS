@@ -333,7 +333,8 @@
                   </span>
                 </label>
               </div>
-            </div>            <div class="actions">
+            </div>
+            <div class="actions">
               <a href="{{ url_for('school_admin_teachers') }}" class="btn btn-secondary">Cancel</a>
               <button type="submit" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Register Teacher
@@ -359,5 +360,6 @@
         }
       }
     </script>
+    {% include 'shared/_premium_alerts.html' %}
   </body>
 </html>
