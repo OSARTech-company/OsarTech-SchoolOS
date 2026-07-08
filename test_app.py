@@ -1979,7 +1979,7 @@ def test_school_admin_settings_results_combined_mode_derives_exam_total_from_tes
     assert saved_settings["grade_label_f"] == "F9"
     assert saved_settings["performance_remark_a"] == "Excellent work"
     assert saved_settings["performance_remark_f"] == "Urgent support needed"
-    assert len(assessment_saves) == 2
+    assert len(assessment_saves) == 4
     assert all(item["exam_score_max"] == 60 for item in assessment_saves)
 
 
@@ -2787,6 +2787,114 @@ def test_school_admin_add_bursar_post(client, app_module, monkeypatch):
     with client.session_transaction() as sess:
         flashes = sess.get("_flashes", [])
     assert any("Bursar added successfully" in message for _category, message in flashes)
+
+
+def test_bursar_dashboard_post_record_payment(client, app_module, monkeypatch):
+    m = app_module
+    recorded_payments = []
+
+    def fake_record_student_fee_payment(school_id, student_id, term, year, fee_label, amount, payment_method, payment_reference, note, recorded_by):
+        recorded_payments.append({
+            'student_id': student_id,
+            'amount': amount,
+            'payment_method': payment_method,
+            'payment_reference': payment_reference,
+            'note': note
+        })
+        return True
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"school_name": "Demo School", "academic_year": "2025-2026"})
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "record_student_fee_payment", fake_record_student_fee_payment)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "bursar"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "bursar1"
+
+    resp = client.post("/bursar/dashboard", data={
+        "action": "record_payment",
+        "student_id": "STU123",
+        "term": "First Term",
+        "fee_label": "School Fee",
+        "amount_paid": "50000",
+        "payment_method": "bank_transfer",
+        "payment_reference": "TRF-987",
+        "note": "Inline quick pay",
+        "student_query": "STU123",
+        "class_filter": ""
+    }, follow_redirects=False)
+
+    assert resp.status_code == 302
+    assert "bursar/dashboard" in resp.headers["Location"]
+    assert "student_query=STU123" in resp.headers["Location"]
+    assert len(recorded_payments) == 1
+    assert recorded_payments[0]["student_id"] == "STU123"
+    assert recorded_payments[0]["amount"] == 50000.0
+    assert recorded_payments[0]["payment_method"] == "bank_transfer"
+    assert recorded_payments[0]["payment_reference"] == "TRF-987"
+    assert recorded_payments[0]["note"] == "Inline quick pay"
+
+
+def test_export_class_word(client, app_module, monkeypatch):
+    m = app_module
+    
+    mock_school = {"school_name": "Imole School", "academic_year": "2025-2026"}
+    mock_students = {
+        "STU001": {
+            "firstname": "Adebayo",
+            "classname": "PRIMARY1",
+            "term": "First Term",
+            "stream": "Blue"
+        }
+    }
+    
+    monkeypatch.setattr(m, "get_school", lambda school_id: mock_school)
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "load_students", lambda school_id, class_filter='', term_filter='', include_archived=False: mock_students)
+    monkeypatch.setattr(m, "load_published_students_for_list", lambda *args, **kwargs: {})
+    
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "admin1"
+        
+    resp = client.get("/view-students/export-word?class=Primary+1&term=First+Term")
+    
+    assert resp.status_code == 200
+    assert resp.mimetype == "application/msword"
+    assert "attachment" in resp.headers["Content-Disposition"]
+    assert "class_list_PRIMARY1.doc" in resp.headers["Content-Disposition"]
+    
+    body = resp.get_data(as_text=True)
+    assert "Adebayo" in body
+    assert "STU001" in body
+    assert "Primary 1" in body
+    assert "Blue" in body
+
+
+def test_school_admin_export_classes(client, app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(m, "get_school_classnames", lambda school_id: ["Primary 1", "JSS 1"])
+    
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "admin1"
+        
+    resp = client.get("/school-admin/export/classes")
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/csv"
+    assert "attachment" in resp.headers["Content-Disposition"]
+    assert "classes_SCH1.csv" in resp.headers["Content-Disposition"]
+    
+    body = resp.get_data(as_text=True)
+    # The header line might have different endings depending on platform, but we can verify the text.
+    assert "class_id,classname" in body
+    assert "PRIMARY1,Primary 1" in body
+    assert "JSS1,JSS 1" in body
+
+
 
 
 

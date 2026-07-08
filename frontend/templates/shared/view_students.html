@@ -625,6 +625,9 @@
                         <a href="{{ url_for(view_students_endpoint) }}" class="btn btn-secondary" style="text-decoration:none; line-height: 1.4; display: inline-flex; align-items: center; justify-content: center;">
                             <i class="fas fa-undo"></i> Reset
                         </a>
+                        <a href="{{ url_for('export_class_word', class=selected_class, term=selected_term) }}" class="btn btn-success" style="text-decoration:none; line-height: 1.4; display: inline-flex; align-items: center; justify-content: center; background-color: #2b7a4d; border-color: #246640;" title="Download as MS Word Document">
+                            <i class="fas fa-file-word"></i> Export Word
+                        </a>
                     </div>
                 </form>
 

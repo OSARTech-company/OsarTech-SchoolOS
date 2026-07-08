@@ -11935,11 +11935,10 @@ def get_assessment_config(school_id, level):
 def get_assessment_config_for_class(school_id, classname):
     """Resolve assessment config using class name."""
     return get_assessment_config(school_id, get_class_level(classname))
-
 def get_all_assessment_configs(school_id):
     """Get assessment configs for all levels with defaults merged."""
     configs = {}
-    for level in ('jss', 'ss'):
+    for level in ('nursery', 'primary', 'jss', 'ss'):
         configs[level] = get_assessment_config(school_id, level)
     return configs
 
@@ -37768,7 +37767,7 @@ def school_admin_settings():
         if saving_score_config_card or saving_exam_structure_card:
             current_assessment_configs = get_all_assessment_configs(school_id)
             derived_exam_score_max = max(0, min(100, 100 - test_score_max))
-            for level in ('jss', 'ss'):
+            for level in ('nursery', 'primary', 'jss', 'ss'):
                 current_cfg = current_assessment_configs.get(level) or get_default_assessment_config(level)
                 mode = request.form.get(f'exam_mode_{level}', current_cfg.get('exam_mode', 'separate')).strip().lower()
                 objective_max = _to_int(
@@ -41068,6 +41067,22 @@ def school_admin_export_target(target):
         return redirect(url_for('login'))
     school_id = session.get('school_id')
     target_key = (target or '').strip().lower()
+    
+    if target_key == 'classes':
+        classnames = get_school_classnames(school_id) or []
+        cols = ['class_id', 'classname']
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(cols)
+        for classname in classnames:
+            class_id = canonicalize_classname(classname)
+            writer.writerow([class_id, classname])
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename=classes_{school_id}.csv'},
+        )
+
     mapping = {
         'students': ('students', ['student_id', 'firstname', 'email', 'date_of_birth', 'gender', 'classname', 'first_year_class', 'term', 'stream', 'number_of_subject', 'subjects', 'scores', 'promoted', 'parent_phone', 'parent_phone_2']),
         'teachers': ('teachers', ['user_id', 'firstname', 'lastname', 'phone', 'gender', 'assigned_classes', 'subjects_taught']),
@@ -50386,7 +50401,7 @@ def school_admin_student_fees():
         return redirect(url_for('login'))
     return _render_fee_workspace(bursar_mode=False)
 
-@app.route('/bursar/dashboard')
+@app.route('/bursar/dashboard', methods=['GET', 'POST'])
 def bursar_dashboard():
     role = (session.get('role') or '').strip().lower()
     if role not in {'bursar', 'school_admin'}:
@@ -50398,6 +50413,53 @@ def bursar_dashboard():
     school = get_school(school_id) or {}
     current_term = get_current_term(school)
     current_year = (school.get('academic_year') or '').strip()
+
+    if request.method == 'POST':
+        action = (request.form.get('action', '') or '').strip().lower()
+        if action == 'record_payment':
+            student_id = (request.form.get('student_id', '') or '').strip()
+            term_name = (request.form.get('term', '') or '').strip() or current_term
+            year_name = current_year
+            fee_name = _normalize_fee_label(request.form.get('fee_label', '') or 'School Fee')
+            try:
+                amount_paid = safe_float(request.form.get('amount_paid', 0), 0.0)
+            except Exception:
+                amount_paid = 0.0
+            payment_method = (request.form.get('payment_method', '') or 'cash').strip() or 'cash'
+            payment_reference = (request.form.get('payment_reference', '') or '').strip()
+            post_note = (request.form.get('note', '') or request.form.get('payment_note', '') or '').strip()
+            
+            if not student_id:
+                flash('Student ID is required to record a payment.', 'error')
+            else:
+                try:
+                    payment_result = record_student_fee_payment(
+                        school_id,
+                        student_id,
+                        term_name,
+                        year_name,
+                        fee_name,
+                        amount_paid,
+                        payment_method=payment_method,
+                        payment_reference=payment_reference,
+                        note=post_note,
+                        recorded_by=session.get('user_id', ''),
+                    )
+                    if payment_result is None:
+                        flash('Payment could not be matched automatically and was queued for review.', 'warning')
+                    else:
+                        flash('Payment recorded successfully.', 'success')
+                except Exception as exc:
+                    logging.exception("Could not record fee payment.")
+                    flash(f'Could not record payment: {exc}', 'error')
+            
+            return redirect(url_for(
+                'bursar_dashboard',
+                student_query=request.form.get('student_query', ''),
+                class_filter=request.form.get('class_filter', ''),
+                queue_status=request.form.get('queue_status', 'pending')
+            ))
+
     student_query = (request.args.get('student_query', '') or '').strip()
     class_filter = canonicalize_classname((request.args.get('class_filter', '') or '').strip())
     queue_status = (request.args.get('queue_status', '') or 'pending').strip().lower() or 'pending'
@@ -53338,6 +53400,180 @@ def view_students():
         per_page=per_page,
         view_students_endpoint=view_students_endpoint
     )
+
+
+@app.route('/view-students/export-word')
+@require_roles('teacher', 'school_admin')
+def export_class_word():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    role = (session.get('role') or '').strip().lower()
+    if role not in {'teacher', 'school_admin'}:
+        return redirect(url_for('menu'))
+    
+    school_id = session.get('school_id')
+    if not school_id:
+        return redirect(url_for('login'))
+    school = get_school(school_id) or {}
+    current_term = get_current_term(school)
+    current_year = (school or {}).get('academic_year', '')
+    
+    selected_class = canonicalize_classname(request.args.get('class', '').strip())
+    selected_term = request.args.get('term', '').strip()
+    
+    if not selected_term and role == 'teacher':
+        selected_term = current_term
+        
+    if role == 'teacher':
+        teacher_id = session.get('user_id')
+        class_owner_set = set(get_teacher_classes(school_id, teacher_id, term=selected_term, academic_year=current_year))
+        class_set = set(class_owner_set)
+        subject_rows = get_teacher_subject_assignments(
+            school_id,
+            teacher_id=teacher_id,
+            term=selected_term,
+            academic_year=current_year,
+        )
+        class_set.update({r.get('classname', '') for r in subject_rows if r.get('classname', '')})
+        if selected_class and selected_class not in class_set:
+            flash('Access Denied to this class.', 'error')
+            return redirect(url_for('teacher_view_students'))
+        
+        students_data = load_students_for_classes(school_id, class_set, term_filter=selected_term)
+    else:
+        students_data = load_students(school_id, class_filter=selected_class, term_filter=selected_term)
+        published_students_data = load_published_students_for_list(
+            school_id,
+            class_filter=selected_class,
+            term_filter=selected_term,
+        ) if selected_term else {}
+        if selected_term and published_students_data and (not students_data or selected_term != current_term):
+            students_data = published_students_data
+        if selected_class and selected_term and not students_data and not published_students_data:
+            class_only_students = load_students(school_id, class_filter=selected_class, term_filter='')
+            if class_only_students:
+                students_data = class_only_students
+                selected_term = ''
+                
+    if selected_class:
+        students_data = {sid: s for sid, s in students_data.items() if (s.get('classname', '') or '').strip() == selected_class}
+    if selected_term:
+        students_data = {sid: s for sid, s in students_data.items() if (s.get('term', '') or '').strip() == selected_term}
+        
+    students = []
+    for student_id, student_data in students_data.items():
+        students.append({
+            'first_name': student_data.get('firstname', ''),
+            'student_id': student_id,
+            'class_name': student_data.get('classname', ''),
+            'stream': student_data.get('stream', ''),
+        })
+        
+    students.sort(
+        key=lambda s: (
+            (s.get('class_name', '') or '').strip().lower(),
+            (s.get('first_name', '') or '').strip().lower(),
+            (s.get('student_id', '') or '').strip().lower(),
+        )
+    )
+    
+    doc_title = f"Class List - {selected_class or 'All Students'}"
+    if selected_term:
+        doc_title += f" ({selected_term})"
+    
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{doc_title}</title>
+    <style>
+        body {{
+            font-family: 'Arial', sans-serif;
+            color: #333333;
+            margin: 20px;
+        }}
+        h2 {{
+            color: #12395f;
+            font-size: 18pt;
+            border-bottom: 2px solid #12395f;
+            padding-bottom: 5px;
+            margin-bottom: 20px;
+        }}
+        .meta-info {{
+            margin-bottom: 20px;
+            font-size: 11pt;
+            line-height: 1.5;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }}
+        th {{
+            background-color: #f1f5f9;
+            color: #1e293b;
+            font-weight: bold;
+            text-align: left;
+            border: 1px solid #cbd5e1;
+            padding: 10px;
+            font-size: 11pt;
+        }}
+        td {{
+            border: 1px solid #cbd5e1;
+            padding: 8px 10px;
+            font-size: 10pt;
+            vertical-align: middle;
+        }}
+        tr:nth-child(even) {{
+            background-color: #f8fafc;
+        }}
+    </style>
+</head>
+<body>
+    <h2>Class List - {selected_class or 'All Classes'}</h2>
+    <div class="meta-info">
+        <strong>School:</strong> {school.get('school_name', '')}<br>
+        <strong>Academic Year:</strong> {current_year or '-'}<br>
+        <strong>Term:</strong> {selected_term or 'All Terms'}<br>
+        <strong>Total Students:</strong> {len(students)}
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 8%;">S/N</th>
+                <th style="width: 32%;">Student Name</th>
+                <th style="width: 25%;">Student ID</th>
+                <th style="width: 20%;">Class</th>
+                <th style="width: 15%;">Stream</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    for idx, s in enumerate(students, 1):
+        html += f"""
+            <tr>
+                <td>{idx}</td>
+                <td><strong>{s['first_name']}</strong></td>
+                <td>{s['student_id']}</td>
+                <td>{s['class_name'] or '-'}</td>
+                <td>{s['stream'] or '-'}</td>
+            </tr>
+        """
+        
+    html += """
+        </tbody>
+    </table>
+</body>
+</html>
+    """
+    
+    filename_clean = f"class_list_{selected_class or 'all'}.doc".replace(" ", "_")
+    return Response(
+        html,
+        mimetype='application/msword',
+        headers={'Content-Disposition': f'attachment; filename={filename_clean}'}
+    )
+
 
 
 def build_subject_score_roster(

@@ -362,7 +362,8 @@
                                             <tr>
                                                 <th>Student</th>
                                                 <th>Class</th>
-                                                <th>Term</th>
+                                                <th>Fee Details</th>
+                                                <th>Status</th>
                                                 <th>Action</th>
                                             </tr>
                                         </thead>
@@ -373,14 +374,70 @@
                                                     <strong>{{ row.student_name or row.student_id }}</strong><br>
                                                     <span class="meta-muted">{{ row.student_id }}</span>
                                                 </td>
-                                                <td>{{ row.classname or 'Not set' }}</td>
-                                                <td>{{ row.term or current_term or '-' }}</td>
                                                 <td>
-                                                    <a class="action-link" href="{{ url_for('bursar_fee_receipt', student_id=row.student_id, term=(row.term or current_term or ''), academic_year=(current_year or ''), fee_label='School Fee') }}">
-                                                        <i class="fas fa-receipt"></i> Open Receipt
-                                                    </a>
+                                                    {{ row.classname or 'Not set' }}
+                                                    {% if row.stream %}<br><span class="meta-muted">Stream: {{ row.stream }}</span>{% endif %}
+                                                </td>
+                                                <td>
+                                                    <span style="font-size: 0.85rem; display: block;">Due: {{ row.currency }} {{ '{:,.2f}'.format(row.amount_due or 0) }}</span>
+                                                    <span style="font-size: 0.85rem; display: block; color: green;">Paid: {{ row.currency }} {{ '{:,.2f}'.format(row.amount_paid or 0) }}</span>
+                                                    <span style="font-size: 0.85rem; display: block; color: #b91c1c; font-weight: bold;">Bal: {{ row.currency }} {{ '{:,.2f}'.format(row.balance_amount or 0) }}</span>
+                                                </td>
+                                                <td>
+                                                    <span class="status-pill is-{{ (row.status or 'pending')|lower|replace(' ', '_') }}">{{ (row.status or 'pending')|replace('_', ' ')|title }}</span>
+                                                </td>
+                                                <td>
+                                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                                        <a class="action-link" href="{{ url_for('bursar_fee_receipt', student_id=row.student_id, term=(row.term or current_term or ''), academic_year=(current_year or ''), fee_label='School Fee') }}" title="Open Receipt">
+                                                            <i class="fas fa-receipt"></i> Receipt
+                                                        </a>
+                                                        {% if row.balance_amount > 0 %}
+                                                        <button type="button" class="action-link" onclick="var f = document.getElementById('pay-row-{{ row.student_id }}'); f.style.display = f.style.display === 'none' ? 'table-row' : 'none'; this.classList.toggle('active');" style="cursor: pointer;">
+                                                            <i class="fas fa-cash-register"></i> Pay
+                                                        </button>
+                                                        {% endif %}
+                                                    </div>
                                                 </td>
                                             </tr>
+                                            {% if row.balance_amount > 0 %}
+                                            <tr id="pay-row-{{ row.student_id }}" style="display: none; background: #f8fafc;">
+                                                <td colspan="5" style="padding: 16px; border-bottom: 2px solid #cbd5e1;">
+                                                    <div style="max-width: 700px; margin: 0 auto;">
+                                                        <h4 style="margin: 0 0 10px 0; color: #1e3b5f; font-size: 0.95rem;"><i class="fas fa-cash-register"></i> Record Quick Payment for {{ row.student_name }}</h4>
+                                                        <form method="post" action="{{ url_for('bursar_dashboard') }}" style="margin: 0;">
+                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                            <input type="hidden" name="action" value="record_payment">
+                                                            <input type="hidden" name="student_id" value="{{ row.student_id }}">
+                                                            <input type="hidden" name="term" value="{{ row.term or current_term }}">
+                                                            <input type="hidden" name="fee_label" value="School Fee">
+                                                            <input type="hidden" name="student_query" value="{{ student_query or '' }}">
+                                                            <input type="hidden" name="class_filter" value="{{ class_filter or '' }}">
+                                                            
+                                                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) auto; gap: 12px; align-items: end;">
+                                                                <div class="form-group" style="margin: 0;">
+                                                                    <label style="font-size: 0.78rem; font-weight: bold; margin-bottom: 4px; display: block;">Amount Paid ({{ row.currency }})</label>
+                                                                    <input type="number" step="0.01" min="0.01" max="{{ row.balance_amount }}" name="amount_paid" value="{{ '%.2f'|format(row.balance_amount or 0) }}" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff;" required>
+                                                                </div>
+                                                                <div class="form-group" style="margin: 0;">
+                                                                    <label style="font-size: 0.78rem; font-weight: bold; margin-bottom: 4px; display: block;">Payment Method</label>
+                                                                    <select name="payment_method" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff;" required>
+                                                                        <option value="cash">Cash</option>
+                                                                        <option value="bank_transfer">Bank Transfer</option>
+                                                                        <option value="pos">POS</option>
+                                                                        <option value="cheque">Cheque</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div class="form-group" style="margin: 0;">
+                                                                    <label style="font-size: 0.78rem; font-weight: bold; margin-bottom: 4px; display: block;">Ref / Note</label>
+                                                                    <input type="text" name="payment_reference" placeholder="Ref (optional)" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff;">
+                                                                </div>
+                                                                <button type="submit" class="action-link" style="padding: 8px 16px; border-radius: 8px; height: 38px; background: #12395f; color: #fff; cursor: pointer; border: 0; font-weight: bold; display: inline-flex; align-items: center; justify-content: center;"><i class="fas fa-save" style="margin-right: 6px;"></i> Save Payment</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endif %}
                                             {% endfor %}
                                         </tbody>
                                     </table>
