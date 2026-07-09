@@ -7262,6 +7262,20 @@ def init_db():
     safe_exec_ignore("ALTER TABLE cbt_attempts ADD COLUMN integrity_flag_reason TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE cbt_attempt_answers ADD COLUMN points_awarded REAL NOT NULL DEFAULT 0")
 
+    db_execute(c, """CREATE TABLE IF NOT EXISTS student_transfers (
+                        id SERIAL PRIMARY KEY,
+                        token TEXT UNIQUE NOT NULL,
+                        student_db_id INTEGER NOT NULL,
+                        source_school_id TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP NOT NULL,
+                        used INTEGER DEFAULT 0,
+                        used_at TIMESTAMP,
+                        target_school_id TEXT
+                    )""")
+    db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_student_transfers_token ON student_transfers(token)')
+    db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_student_transfers_student ON student_transfers(student_db_id)')
+
     # Persist the core schema before any later data-heal statements run.
     # This protects first-time bootstraps on hosts where connection
     # autocommit is not effective during import-time startup.
@@ -45097,8 +45111,29 @@ def teacher_score_entry_select_subject(classname):
     current_year = (school or {}).get('academic_year', '')
     
     subjects = []
+    school_type = (school.get('school_type') or '').lower().strip()
+    is_primary_or_nursery = school_type in {'primary', 'nursery'}
     
     if school_uses_dean_led_score_entry(school):
+        config = get_class_subject_config(school_id, classname) or {}
+        subjects = normalize_subjects_list(
+            (config.get('core_subjects') or [])
+            + (config.get('science_subjects') or [])
+            + (config.get('art_subjects') or [])
+            + (config.get('commercial_subjects') or [])
+            + (config.get('optional_subjects') or [])
+        )
+        if not subjects:
+            defaults = _catalog_defaults_for_class(classname)
+            subjects = normalize_subjects_list(
+                (defaults.get('core') or [])
+                + (defaults.get('science') or [])
+                + (defaults.get('art') or [])
+                + (defaults.get('commercial') or [])
+                + (defaults.get('optional') or [])
+            )
+    elif is_primary_or_nursery:
+        # For primary/nursery schools, class teachers get all class subjects automatically
         config = get_class_subject_config(school_id, classname) or {}
         subjects = normalize_subjects_list(
             (config.get('core_subjects') or [])
@@ -47988,10 +48023,9 @@ def teacher_enter_scores():
         if override_subjects and not score_override_reason:
             listed = ', '.join(override_subjects[:3])
             suffix = '...' if len(override_subjects) > 3 else ''
-            flash(
-                f'Provide reason before changing score(s) entered by subject teacher: {listed}{suffix}.',
-                'error',
-            )
+            error_msg = f'Provide reason before changing score(s) entered by subject teacher: {listed}{suffix}.'
+            flash(error_msg, 'error')
+            logging.warning(f'Score entry blocked for {student_id}: override subjects without reason: {error_msg}')
             return redirect(url_for('teacher_enter_scores', **redirect_kwargs))
 
         student['teacher_comment'] = teacher_comment
@@ -48005,62 +48039,68 @@ def teacher_enter_scores():
             audit_change_reason = compact_reason
         with db_connection(commit=True) as conn:
             c = conn.cursor()
-            db_execute(
-                c,
-                "SELECT term, scores FROM students WHERE school_id = ? AND student_id = ? LIMIT 1",
-                (school_id, student_id),
-            )
-            persisted_row = c.fetchone()
-            persisted_term = ''
-            persisted_scores = {}
-            if persisted_row:
-                persisted_term = (persisted_row[0] or '').strip() if len(persisted_row) > 1 else ''
-                raw_scores = persisted_row[1] if len(persisted_row) > 1 else persisted_row[0]
-                if isinstance(raw_scores, dict):
-                    persisted_scores = raw_scores
-                elif isinstance(raw_scores, str):
-                    try:
-                        loaded_scores = json.loads(raw_scores)
-                        if isinstance(loaded_scores, dict):
-                            persisted_scores = loaded_scores
-                    except Exception:
-                        persisted_scores = {}
-            if not isinstance(persisted_scores, dict):
-                persisted_scores = {}
-            same_term_persisted = persisted_term == (current_term or '').strip()
-            base_scores = persisted_scores if same_term_persisted else {}
-            merged_scores = dict(base_scores)
-            for subject in editable_subjects:
-                merged_scores[subject] = scores.get(subject, {})
-            student['scores'] = merged_scores
-            save_student_with_cursor(c, school_id, student_id, student)
-            if can_edit_behaviour:
-                save_behaviour_assessment_with_cursor(
+            try:
+                db_execute(
                     c,
+                    "SELECT term, scores FROM students WHERE school_id = ? AND student_id = ? LIMIT 1",
+                    (school_id, student_id),
+                )
+                persisted_row = c.fetchone()
+                persisted_term = ''
+                persisted_scores = {}
+                if persisted_row:
+                    persisted_term = (persisted_row[0] or '').strip() if len(persisted_row) > 1 else ''
+                    raw_scores = persisted_row[1] if len(persisted_row) > 1 else persisted_row[0]
+                    if isinstance(raw_scores, dict):
+                        persisted_scores = raw_scores
+                    elif isinstance(raw_scores, str):
+                        try:
+                            loaded_scores = json.loads(raw_scores)
+                            if isinstance(loaded_scores, dict):
+                                persisted_scores = loaded_scores
+                        except Exception:
+                            persisted_scores = {}
+                if not isinstance(persisted_scores, dict):
+                    persisted_scores = {}
+                same_term_persisted = persisted_term == (current_term or '').strip()
+                base_scores = persisted_scores if same_term_persisted else {}
+                merged_scores = dict(base_scores)
+                for subject in editable_subjects:
+                    merged_scores[subject] = scores.get(subject, {})
+                student['scores'] = merged_scores
+                save_student_with_cursor(c, school_id, student_id, student)
+                if can_edit_behaviour:
+                    save_behaviour_assessment_with_cursor(
+                        c,
+                        school_id=school_id,
+                        student_id=student_id,
+                        classname=student.get('classname', ''),
+                        term=current_term,
+                        academic_year=current_year,
+                        behaviour_payload=normalized_behaviour,
+                        updated_by=teacher_id,
+                        school_or_mode=school,
+                    )
+                audit_student_score_changes_with_cursor(
+                    c=c,
                     school_id=school_id,
                     student_id=student_id,
                     classname=student.get('classname', ''),
                     term=current_term,
-                    academic_year=current_year,
-                    behaviour_payload=normalized_behaviour,
-                    updated_by=teacher_id,
-                    school_or_mode=school,
+                    academic_year=current_year or '',
+                    old_scores=base_scores or previous_scores_for_audit,
+                    new_scores=merged_scores,
+                    changed_by=teacher_id,
+                    changed_by_role='teacher',
+                    change_source=audit_change_source,
+                    change_reason=audit_change_reason,
+                    subjects_scope=editable_subjects,
                 )
-            audit_student_score_changes_with_cursor(
-                c=c,
-                school_id=school_id,
-                student_id=student_id,
-                classname=student.get('classname', ''),
-                term=current_term,
-                academic_year=current_year or '',
-                old_scores=base_scores or previous_scores_for_audit,
-                new_scores=merged_scores,
-                changed_by=teacher_id,
-                changed_by_role='teacher',
-                change_source=audit_change_source,
-                change_reason=audit_change_reason,
-                subjects_scope=editable_subjects,
-            )
+                logging.info(f'Successfully saved scores for student {student_id} in class {student.get("classname", "")}')
+            except Exception as e:
+                logging.error(f'Failed to save scores for student {student_id}: {str(e)}')
+                flash(f'Database error while saving scores: {str(e)}', 'error')
+                return redirect(url_for('teacher_enter_scores', **redirect_kwargs))
         if not class_access:
             clear_subject_score_submission(
                 school_id=school_id,
@@ -53242,7 +53282,8 @@ def view_students():
     grade_cfg = get_grade_config(school_id)
     current_term = get_current_term(school)
 
-    selected_class = canonicalize_classname(request.args.get('class', '').strip())
+    raw_class = request.args.get('class', '').strip()
+    selected_class = canonicalize_classname(raw_class)
     selected_term = request.args.get('term', '').strip()
     try:
         per_page = int((request.args.get('per_page', '') or '50').strip())

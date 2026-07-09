@@ -48,5 +48,26 @@
             <a href="{{ url_for('teacher_dashboard') }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
         </div>
     </div>
+    <script>
+        (function() {
+            const errorFlash = document.querySelector('.flash.error');
+            const successFlash = document.querySelector('.flash.success');
+            const warningFlash = document.querySelector('.flash.warning');
+            const infoFlash = document.querySelector('.flash.info');
+            
+            if (errorFlash && errorFlash.textContent.trim()) {
+                alert(errorFlash.textContent.trim());
+            }
+            if (successFlash && successFlash.textContent.trim()) {
+                alert(successFlash.textContent.trim());
+            }
+            if (warningFlash && warningFlash.textContent.trim()) {
+                alert(warningFlash.textContent.trim());
+            }
+            if (infoFlash && infoFlash.textContent.trim()) {
+                alert(infoFlash.textContent.trim());
+            }
+        })();
+    </script>
 </body>
 </html>

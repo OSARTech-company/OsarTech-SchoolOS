@@ -240,6 +240,24 @@
     </div>
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
     <script>
+        // Show flash messages as popups
+        (function() {
+            var errorFlash = document.querySelector('.flash.error');
+            var successFlash = document.querySelector('.flash.success');
+            var warningFlash = document.querySelector('.flash.warning');
+            var infoFlash = document.querySelector('.flash.info');
+            
+            if (errorFlash) {
+              alert(errorFlash.textContent.trim());
+            } else if (successFlash) {
+              alert(successFlash.textContent.trim());
+            } else if (warningFlash) {
+              alert(warningFlash.textContent.trim());
+            } else if (infoFlash) {
+              alert(infoFlash.textContent.trim());
+            }
+        })();
+        
         function buildRowHtml() {
             return `
                 <td><input type="text" name="student_name[]" placeholder="e.g. Student Name"></td>

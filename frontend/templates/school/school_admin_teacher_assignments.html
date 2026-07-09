@@ -350,6 +350,24 @@
       (function () {
         if (window.innerWidth > 600) document.body.classList.add('rail-expanded');
       })();
+      
+      // Show flash messages as popups
+      (function() {
+        var errorFlash = document.querySelector('.flash.error');
+        var successFlash = document.querySelector('.flash.success');
+        var warningFlash = document.querySelector('.flash.warning');
+        var infoFlash = document.querySelector('.flash.info');
+        
+        if (errorFlash) {
+          alert(errorFlash.textContent.trim());
+        } else if (successFlash) {
+          alert(successFlash.textContent.trim());
+        } else if (warningFlash) {
+          alert(warningFlash.textContent.trim());
+        } else if (infoFlash) {
+          alert(infoFlash.textContent.trim());
+        }
+      })();
     </script>
     <script>
       (function () {
