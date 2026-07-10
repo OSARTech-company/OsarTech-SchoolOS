@@ -219,6 +219,16 @@ def test_secondary_class_normalization_accepts_jss_aliases(app_module):
     assert m.is_secondary_classname("JSS3") is True
 
 
+def test_primary_and_nursery_class_normalization_accepts_pry_nur_aliases(app_module):
+    m = app_module
+    assert m.canonicalize_classname("PRY1") == "PRIMARY1"
+    assert m.canonicalize_classname("PRY 2") == "PRIMARY2"
+    assert m.canonicalize_classname("NUR1") == "NURSERY1"
+    assert m.canonicalize_classname("NUR 2") == "NURSERY2"
+    assert m.is_primary_classname("PRY1") is True
+    assert m.is_primary_classname("NUR2") is True
+
+
 def test_cbt_test_score_pair_split_even_and_odd(app_module):
     m = app_module
     assert m._split_cbt_test_score_pair(14) == (7.0, 7.0)
