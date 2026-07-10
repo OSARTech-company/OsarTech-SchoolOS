@@ -352,22 +352,21 @@
       })();
       
       // Show flash messages as popups
-      (function() {
-        var errorFlash = document.querySelector('.flash.error');
-        var successFlash = document.querySelector('.flash.success');
-        var warningFlash = document.querySelector('.flash.warning');
-        var infoFlash = document.querySelector('.flash.info');
-        
-        if (errorFlash) {
-          alert(errorFlash.textContent.trim());
-        } else if (successFlash) {
-          alert(successFlash.textContent.trim());
-        } else if (warningFlash) {
-          alert(warningFlash.textContent.trim());
-        } else if (infoFlash) {
-          alert(infoFlash.textContent.trim());
-        }
-      })();
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+          var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
+          flashes.forEach(function(flash) {
+            var msg = flash.textContent.trim();
+            if (msg) alert(msg);
+          });
+        });
+      } else {
+        var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
+        flashes.forEach(function(flash) {
+          var msg = flash.textContent.trim();
+          if (msg) alert(msg);
+        });
+      }
     </script>
     <script>
       (function () {

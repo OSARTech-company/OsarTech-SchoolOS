@@ -241,22 +241,21 @@
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
     <script>
         // Show flash messages as popups
-        (function() {
-            var errorFlash = document.querySelector('.flash.error');
-            var successFlash = document.querySelector('.flash.success');
-            var warningFlash = document.querySelector('.flash.warning');
-            var infoFlash = document.querySelector('.flash.info');
-            
-            if (errorFlash) {
-              alert(errorFlash.textContent.trim());
-            } else if (successFlash) {
-              alert(successFlash.textContent.trim());
-            } else if (warningFlash) {
-              alert(warningFlash.textContent.trim());
-            } else if (infoFlash) {
-              alert(infoFlash.textContent.trim());
-            }
-        })();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
+                flashes.forEach(function(flash) {
+                    var msg = flash.textContent.trim();
+                    if (msg) alert(msg);
+                });
+            });
+        } else {
+            var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
+            flashes.forEach(function(flash) {
+                var msg = flash.textContent.trim();
+                if (msg) alert(msg);
+            });
+        }
         
         function buildRowHtml() {
             return `
@@ -347,7 +346,7 @@
                     alert(`Row ${i + 1}: Student name is required.`);
                     return;
                 }
-                if (email && !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) {
+                if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
                     e.preventDefault();
                     if (typeof hideLoadingOverlay === 'function') hideLoadingOverlay();
                     alert(`Row ${i + 1}: Invalid email for ${name || 'student'}.`);

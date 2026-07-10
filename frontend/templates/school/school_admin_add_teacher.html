@@ -361,26 +361,23 @@
       }
       
       // Show flash messages as popups
-      (function() {
-        var errorFlash = document.querySelector('.flash.error');
-        var successFlash = document.querySelector('.flash.success');
-        var warningFlash = document.querySelector('.flash.warning');
-        var infoFlash = document.querySelector('.flash.info');
-        
-        if (errorFlash) {
-          var msg = errorFlash.querySelector('span');
-          alert(msg ? msg.textContent.trim() : errorFlash.textContent.trim());
-        } else if (successFlash) {
-          var msg = successFlash.querySelector('span');
-          alert(msg ? msg.textContent.trim() : successFlash.textContent.trim());
-        } else if (warningFlash) {
-          var msg = warningFlash.querySelector('span');
-          alert(msg ? msg.textContent.trim() : warningFlash.textContent.trim());
-        } else if (infoFlash) {
-          var msg = infoFlash.querySelector('span');
-          alert(msg ? msg.textContent.trim() : infoFlash.textContent.trim());
-        }
-      })();
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+          var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
+          flashes.forEach(function(flash) {
+            var span = flash.querySelector('span');
+            var msg = (span ? span.textContent : flash.textContent).trim();
+            if (msg) alert(msg);
+          });
+        });
+      } else {
+        var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
+        flashes.forEach(function(flash) {
+          var span = flash.querySelector('span');
+          var msg = (span ? span.textContent : flash.textContent).trim();
+          if (msg) alert(msg);
+        });
+      }
     </script>
     {% include 'shared/_premium_alerts.html' %}
   </body>

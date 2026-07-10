@@ -806,26 +806,22 @@
                 }
             };
 
-            // Display flash messages as popups
-            (function() {
-                const errorFlash = document.querySelector('.flash.error');
-                const successFlash = document.querySelector('.flash.success');
-                const warningFlash = document.querySelector('.flash.warning');
-                const infoFlash = document.querySelector('.flash.info');
-                
-                if (errorFlash && errorFlash.textContent.trim()) {
-                    alert(errorFlash.textContent.trim());
-                }
-                if (successFlash && successFlash.textContent.trim()) {
-                    alert(successFlash.textContent.trim());
-                }
-                if (warningFlash && warningFlash.textContent.trim()) {
-                    alert(warningFlash.textContent.trim());
-                }
-                if (infoFlash && infoFlash.textContent.trim()) {
-                    alert(infoFlash.textContent.trim());
-                }
-            })();
+            // Display flash messages as popups after DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
+                    flashes.forEach(function(flash) {
+                        var msg = flash.textContent.trim();
+                        if (msg) alert(msg);
+                    });
+                });
+            } else {
+                var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
+                flashes.forEach(function(flash) {
+                    var msg = flash.textContent.trim();
+                    if (msg) alert(msg);
+                });
+            }
 
             recalcAll();
         })();
