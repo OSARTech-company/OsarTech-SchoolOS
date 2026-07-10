@@ -53929,6 +53929,11 @@ def _render_subject_score_sheet(role):
             selected_term = current_term
             back_url = build_subject_sheet_back_link(role, selected_class, selected_subject, selected_term)
 
+    # Sync student subjects to current class config for proper roster building
+    # This is especially important for primary/nursery schools where all students take all subjects
+    for student_id, student in (students_data or {}).items():
+        sync_student_subjects_to_class_config(student, school_id, school=school)
+
     subject_cards, roster_rows = build_subject_score_roster(
         students_data,
         school_id=school_id,
