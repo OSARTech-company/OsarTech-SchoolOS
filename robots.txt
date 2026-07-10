@@ -10,4 +10,4 @@ Disallow: /parent/
 Disallow: /bursar/
 Disallow: /super-admin/
 
-Sitemap: https://report-viewers.onrender.com/sitemap.xml
+Sitemap: https://schoolos.osartech.com.ng/sitemap.xml
