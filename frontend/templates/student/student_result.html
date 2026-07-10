@@ -1859,6 +1859,16 @@
         <p>View your academic performance</p>
     </div>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages" style="max-width: 1040px; margin: 15px auto; padding: 0 15px;">
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
         <div class="report-card">
         {% set student_display_name = student.first_name if student.first_name else (student.firstname if student.firstname else 'Student') %}
         {% set student_initial = ((student_display_name[:1] if student_display_name else 'S') or 'S')|upper %}

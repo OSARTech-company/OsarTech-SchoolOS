@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /school-access-request
+Allow: /cbt-login
+Disallow: /student/
+Disallow: /school-admin/
+Disallow: /teacher/
+Disallow: /parent/
+Disallow: /bursar/
+Disallow: /super-admin/
+
+Sitemap: https://report-viewers.onrender.com/sitemap.xml

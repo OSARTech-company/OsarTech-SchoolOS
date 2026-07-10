@@ -30054,6 +30054,14 @@ def _capture_unhandled_exception(sender, exception, **extra):
 
 # ==================== ROUTES ====================
 
+@app.route('/robots.txt')
+def serve_robots_txt():
+    return send_file('robots.txt', mimetype='text/plain')
+
+@app.route('/sitemap.xml')
+def serve_sitemap_xml():
+    return send_file('sitemap.xml', mimetype='application/xml')
+
 @app.route('/sw.js')
 def service_worker():
     return send_file('static/sw.js', mimetype='application/javascript')

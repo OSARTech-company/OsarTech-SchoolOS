@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OSARtech SchoolOS | School Operations, Results, and CBT</title>
+    <meta name="description" content="OSARtech SchoolOS is a premium school management system. Manage student results, score entry, CBT tests, student portals, and parent access in one secure platform.">
+    <meta name="keywords" content="SchoolOS, OSARtech, School management system, student results portal, CBT school, school software, OSARtech SchoolOS">
+    <meta name="author" content="OSARtech LTD">
+    <meta property="og:title" content="OSARtech SchoolOS | School Operations, Results, and CBT">
+    <meta property="og:description" content="Manage student results, score entry, CBT tests, student portals, and parent access in one secure platform.">
+    <meta property="og:url" content="https://report-viewers.onrender.com/">
+    <meta property="og:type" content="website">
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css', v='20260528d') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -19,6 +26,7 @@
             <div class="home-nav-actions">
                 <a class="home-link" href="{{ url_for('home') }}#features">Features</a>
                 <a class="home-link" href="{{ url_for('home') }}#interactive-preview">Preview</a>
+                <a class="home-link" href="{{ url_for('home') }}#walkthrough">Demo</a>
                 <a class="home-link" href="{{ url_for('home') }}#roles">Roles</a>
                 <a class="home-link" href="{{ url_for('home') }}#tech-stack">Stack</a>
                 <a class="home-link" href="{{ url_for('home') }}#faq">FAQ</a>
@@ -103,6 +111,27 @@
         </section>
 
         <main>
+            <section class="home-section home-video-walkthrough" id="walkthrough">
+                <div class="section-head">
+                    <h2>See SchoolOS in Action</h2>
+                    <p>Watch a walkthrough of OSARtech SchoolOS. See how simple result processing, CBT administration, and academic operations become.</p>
+                </div>
+                <div class="video-container-wrapper">
+                    <div class="mockup-window video-mockup">
+                        <div class="mockup-header">
+                            <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+                            <div class="mockup-url">schoolos.osartech.com/demo-walkthrough</div>
+                        </div>
+                        <div class="mockup-video-body">
+                            <video controls preload="metadata" poster="{{ url_for('static', filename='img/schoolos-branding.png', v='20260411b') }}">
+                                <source src="{{ url_for('static', filename='img/demo_recording.mp4', v='20260710') }}" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section class="home-section" id="features">
                 <div class="section-head">
                     <h2>Built for daily school work</h2>

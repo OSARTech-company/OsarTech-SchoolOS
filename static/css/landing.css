@@ -1824,3 +1824,44 @@ body::before {
     }
 }
 
+/* ==========================================================================
+   VIDEO WALKTHROUGH SECTION STYLING
+   ========================================================================== */
+.home-video-walkthrough {
+    background: transparent;
+}
+
+.video-container-wrapper {
+    max-width: 1000px;
+    margin: 24px auto 0;
+}
+
+.video-mockup {
+    border: 1px solid var(--home-line);
+    border-radius: 24px;
+    overflow: hidden;
+    background: var(--home-bg);
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
+.mockup-video-body {
+    background: #000000;
+    line-height: 0;
+    overflow: hidden;
+}
+
+.mockup-video-body video {
+    width: 100%;
+    height: auto;
+    display: block;
+    border: none;
+    outline: none;
+}
+
+[data-theme="dark"] .video-mockup {
+    border-color: var(--home-line) !important;
+    background: #161e2e !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25) !important;
+}
+
+
