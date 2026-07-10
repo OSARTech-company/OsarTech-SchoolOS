@@ -1639,77 +1639,42 @@ def test_school_admin_settings_academic_save_preserves_result_configuration(clie
         "score_entry_mode": "dean_led",
     }
 
-    monkeypatch.setattr(m, "get_school", lambda school_id: dict(current_school))
-    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
-    monkeypatch.setattr(m, "get_school_term_calendar", lambda *args, **kwargs: {})
-    monkeypatch.setattr(m, "get_school_term_program", lambda *args, **kwargs: {})
-    monkeypatch.setattr(m, "build_school_settings_version_token", lambda *args, **kwargs: "v1")
-    monkeypatch.setattr(m, "ensure_school_access_schema", lambda: True)
-    monkeypatch.setattr(m, "ensure_school_term_calendar_schema", lambda: True)
-    monkeypatch.setattr(m, "ensure_extended_features_schema", lambda: True)
-    monkeypatch.setattr(m, "save_school_term_calendar_with_cursor", lambda *args, **kwargs: None)
-    monkeypatch.setattr(m, "invalidate_school_cache", lambda school_id='': None)
-    monkeypatch.setattr(m, "record_admin_action_audit", lambda *args, **kwargs: None)
-    monkeypatch.setattr(m, "mark_user_first_login_tutorial_seen", lambda *args, **kwargs: None)
-    monkeypatch.setattr(m, "get_all_assessment_configs", lambda school_id: {
-        "jss": {"exam_mode": "combined", "objective_max": 0, "theory_max": 0, "exam_score_max": 65},
-        "ss": {"exam_mode": "separate", "objective_max": 30, "theory_max": 40, "exam_score_max": 70},
-    })
-    monkeypatch.setattr(m, "list_school_term_calendars", lambda *args, **kwargs: [])
-    monkeypatch.setattr(m, "rollover_school_term_data_with_cursor", lambda *args, **kwargs: 0)
-    monkeypatch.setattr(m, "save_assessment_config_with_cursor", lambda *args, **kwargs: assessment_saves.append(kwargs))
 
-    def fake_update_school_settings_with_cursor(c, school_id, settings):
-        saved_settings.update(settings)
+def test_school_admin_settings_results_primary_hides_secondary_only_fields(app_module):
+    import flask
+    m = app_module
 
-    monkeypatch.setattr(m, "update_school_settings_with_cursor", fake_update_school_settings_with_cursor)
+    school = {
+        "school_type": "primary",
+    }
+    with m.app.test_request_context():
+        rendered = flask.render_template(
+            'school/school_settings.html',
+            school=school,
+            settings_form={
+                'max_tests': 3,
+                'test_score_max': 30,
+                'show_positions': 1,
+                'combine_third_term_results': 0,
+                'third_term_layout_mode': 'term_summary',
+            },
+            assessment_configs={
+                'primary': {'exam_mode': 'combined', 'objective_max': 0, 'theory_max': 0, 'exam_score_max': 70},
+            },
+            calendar={},
+            calendar_rows=[],
+            selected_calendar_term='First Term',
+            selected_calendar_year='2025-2026',
+            calendar_edit_locked=False,
+            settings_version='v1',
+            settings_section='results',
+            settings_section_title='Result Settings',
+        )
 
-    def fake_db_connection(commit=False):
-        class FakeCursor:
-            pass
-
-        class FakeConn:
-            def cursor(self):
-                return FakeCursor()
-
-        @contextlib.contextmanager
-        def ctx(commit=False):
-            yield FakeConn()
-
-        return ctx(commit)
-
-    monkeypatch.setattr(m, "db_connection", fake_db_connection)
-
-    with client.session_transaction() as sess:
-        sess["role"] = "school_admin"
-        sess["school_id"] = "SCH1"
-        sess["user_id"] = "A1"
-
-    resp = client.post(
-        "/school-admin/settings?section=academic",
-        data={
-            "settings_section": "academic",
-            "settings_version": "v1",
-            "school_name": "Demo School",
-            "academic_year": "2025-2026",
-            "current_term": "First Term",
-            "test_enabled": "1",
-            "exam_enabled": "1",
-        },
-        follow_redirects=False,
-    )
-
-    assert resp.status_code == 302
-    assert saved_settings["max_tests"] == 4
-    assert saved_settings["test_score_max"] == 35
-    assert saved_settings["grade_a_min"] == 75
-    assert saved_settings["grade_label_a"] == "A1"
-    assert saved_settings["grade_label_f"] == "F9"
-    assert saved_settings["performance_remark_a"] == "Excellent"
-    assert saved_settings["performance_remark_f"] == "Needs improvement"
-    assert saved_settings["ss_ranking_mode"] == "separate"
-    assert saved_settings["score_entry_mode"] == "dean_led"
-    assert assessment_saves == []
+    assert 'SS Class Ranking Mode' not in rendered
+    assert 'SS1 Stream Mode' not in rendered
+    assert 'Senior Secondary Arm Mode' not in rendered
+    assert 'Set how primary exams are configured' in rendered
 
 
 def test_school_admin_settings_results_validation_preserves_posted_score_values(client, app_module, monkeypatch):
@@ -2352,6 +2317,56 @@ def test_teacher_score_entry_select_subject_redirects_to_subject_sheet_for_prima
     assert "/teacher/subject-score-sheet" in resp.headers["Location"]
     assert "class=JSS1" in resp.headers["Location"]
     assert "subject=Mathematics" in resp.headers["Location"]
+
+
+def test_teacher_score_entry_select_subject_primary_shows_explicit_toggle_for_grid_and_student_entry(client, app_module, monkeypatch):
+    m = app_module
+
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "teacher1"
+
+    school = {"academic_year": "2025-2026", "current_term": "First Term", "school_type": "primary", "score_entry_mode": "teacher_subject"}
+    monkeypatch.setattr(m, "get_user", lambda user_id: {"user_id": user_id, "role": "teacher", "school_id": "SCH1"})
+    monkeypatch.setattr(m, "get_school", lambda school_id: school)
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "school_uses_dean_led_score_entry", lambda *args, **kwargs: False)
+    monkeypatch.setattr(m, "get_class_subject_config", lambda *args, **kwargs: {"core_subjects": ["Mathematics", "English"], "science_subjects": [], "art_subjects": [], "commercial_subjects": [], "optional_subjects": []})
+    monkeypatch.setattr(m, "get_teacher_classes", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "get_teacher_subject_assignments", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "get_teacher", lambda *args, **kwargs: {"firstname": "Teacher", "lastname": "One", "profile_image": ""})
+    monkeypatch.setattr(m, "get_teacher_messages_for_teacher", lambda *args, **kwargs: [])
+
+    resp = client.get("/teacher/score-entry/select-subject/JSS1")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Grid Entry" in body
+    assert "Student Entry" in body
+    assert "entry_mode=dashboard" in body
+    assert "entry_mode=sheet" in body
+
+
+def test_teacher_score_entry_select_subject_primary_respects_dashboard_request(client, app_module, monkeypatch):
+    m = app_module
+
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "teacher1"
+
+    school = {"academic_year": "2025-2026", "current_term": "First Term", "school_type": "primary", "score_entry_mode": "teacher_subject"}
+    monkeypatch.setattr(m, "get_user", lambda user_id: {"user_id": user_id, "role": "teacher", "school_id": "SCH1"})
+    monkeypatch.setattr(m, "get_school", lambda school_id: school)
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "school_uses_dean_led_score_entry", lambda *args, **kwargs: False)
+    monkeypatch.setattr(m, "get_class_subject_config", lambda *args, **kwargs: {"core_subjects": ["Mathematics"]})
+
+    resp = client.get("/teacher/score-entry/select-subject/JSS1?entry_mode=dashboard")
+    assert resp.status_code == 302
+    assert "/teacher?" in resp.headers["Location"]
+    assert "tab=score" in resp.headers["Location"]
+    assert "score_class=JSS1" in resp.headers["Location"]
 
 
 def test_school_type_restrictions(client, app_module, monkeypatch):

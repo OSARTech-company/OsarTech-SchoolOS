@@ -45113,7 +45113,12 @@ def teacher_score_entry_select_subject(classname):
     subjects = []
     school_type = (school.get('school_type') or '').lower().strip()
     is_primary_or_nursery = school_type in {'primary', 'nursery'}
+    requested_entry_mode = (request.args.get('entry_mode') or '').strip().lower()
     use_subject_sheet = school_uses_subject_sheet_score_entry(school) or is_primary_or_nursery
+    if requested_entry_mode == 'dashboard':
+        use_subject_sheet = False
+    elif requested_entry_mode == 'sheet':
+        use_subject_sheet = True
     
     if school_uses_dean_led_score_entry(school):
         config = get_class_subject_config(school_id, classname) or {}
@@ -45181,6 +45186,8 @@ def teacher_score_entry_select_subject(classname):
         subjects=subjects,
         school=school,
         use_subject_sheet=use_subject_sheet,
+        allow_toggle=is_primary_or_nursery or school_uses_subject_sheet_score_entry(school),
+        requested_entry_mode=requested_entry_mode,
     )
 
 @app.route('/teacher/reports', endpoint='teacher_reports')

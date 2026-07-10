@@ -36,7 +36,18 @@
                 {% endif %}
             {% endwith %}
 
-             <div class="list-group">
+            {% if allow_toggle %}
+            <div class="toggle-row" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:18px;">
+                <span class="note" style="margin:0;">Choose how you want to enter scores for this class:</span>
+                <a href="{{ url_for('teacher_score_entry_select_subject', classname=classname, entry_mode='sheet') }}" class="btn btn-secondary btn-sm{% if use_subject_sheet %} active{% endif %}">
+                    <i class="fas fa-table-list"></i> Grid Entry
+                </a>
+                <a href="{{ url_for('teacher_score_entry_select_subject', classname=classname, entry_mode='dashboard') }}" class="btn btn-secondary btn-sm{% if not use_subject_sheet %} active{% endif %}">
+                    <i class="fas fa-list-check"></i> Student Entry
+                </a>
+            </div>
+            {% endif %}
+            <div class="list-group">
                 {% for subject in subjects %}
                 {% if use_subject_sheet %}
                 <a href="{{ url_for('teacher_subject_score_sheet', class=classname, subject=subject) }}" class="list-item">
