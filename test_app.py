@@ -1594,6 +1594,52 @@ def test_school_admin_import_teachers_accepts_xlsx(client, app_module, monkeypat
     assert any("Teachers import completed. Imported 1 row(s)." in message for _category, message in flashes)
 
 
+def test_school_admin_import_students_accepts_csv_and_flashes(client, app_module, monkeypatch):
+    m = app_module
+    saved_students = []
+    provisioned_users = []
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"max_tests": 3, "academic_year": "2025-2026", "current_term": "First Term"})
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "get_supported_school_classnames", lambda school_id: ["Primary 1"])
+    monkeypatch.setattr(m, "get_backup_schedule_settings", lambda school_id: None)
+    monkeypatch.setattr(m, "compute_school_storage_usage", lambda school_id: {"used_mb": 0, "quota_mb": 100, "pct": 0})
+    monkeypatch.setattr(m, "get_backup_health_summary", lambda school_id, days=30: None)
+    monkeypatch.setattr(m, "load_student", lambda school_id, student_id: None)
+    monkeypatch.setattr(m, "get_user", lambda user_id: None)
+    monkeypatch.setattr(m, "save_student", lambda school_id, student_id, student_data: saved_students.append({"school_id": school_id, "student_id": student_id, **student_data}))
+    monkeypatch.setattr(m, "upsert_user", lambda user_id, password_hash, role, school_id: provisioned_users.append({"user_id": user_id, "role": role, "school_id": school_id}))
+    monkeypatch.setattr(m, "get_next_student_index_for_class", lambda school_id, classname: 1)
+    monkeypatch.setattr(m, "generate_student_id", lambda school_id, index, first_year_class: f"{school_id}-S{index}")
+    monkeypatch.setattr(m, "get_class_subject_config", lambda school_id, classname: {"core_subjects": ["Mathematics"]})
+    monkeypatch.setattr(m, "build_subjects_from_config", lambda classname, stream, config, selected_optional_subjects, school: (["Mathematics"], "N/A", None))
+    monkeypatch.setattr(m, "class_uses_stream_for_school", lambda *args, **kwargs: False)
+    monkeypatch.setattr(m, "record_admin_action_audit", lambda *args, **kwargs: None)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "admin1"
+
+    csv_data = b"Student Name,Gender,Class,Date of Birth\nJane Doe,female,Primary 1,2010-05-01\n"
+    resp = client.post(
+        "/school-admin/import/students",
+        data={"file": (io.BytesIO(csv_data), "students.csv"), "classname": "Primary 1"},
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+    assert resp.status_code == 302
+    assert "/school-admin/bulk-tools" in resp.headers["Location"]
+    assert len(saved_students) == 1
+    assert saved_students[0]["student_id"] == "SCH1-S1"
+    assert len(provisioned_users) == 1
+    assert provisioned_users[0]["role"] == "student"
+    with client.session_transaction() as sess:
+        flashes = sess.get("_flashes", [])
+    assert any("Students import completed. Imported 1 row(s)." in message for _category, message in flashes)
+
+
 def test_school_admin_settings_academic_save_preserves_result_configuration(client, app_module, monkeypatch):
     m = app_module
     saved_settings = {}
