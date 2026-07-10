@@ -2327,6 +2327,33 @@ def test_teacher_score_entry_select_subject_redirects_for_single_subject(client,
     assert "score_subject=Mathematics" in resp.headers["Location"]
 
 
+def test_teacher_score_entry_select_subject_redirects_to_subject_sheet_for_primary(client, app_module, monkeypatch):
+    m = app_module
+    
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "teacher1"
+        
+    school = {"academic_year": "2025-2026", "current_term": "First Term", "school_type": "primary", "score_entry_mode": "teacher_subject"}
+    monkeypatch.setattr(m, "get_user", lambda user_id: {"user_id": user_id, "role": "teacher", "school_id": "SCH1"})
+    monkeypatch.setattr(m, "get_school", lambda school_id: school)
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "school_uses_dean_led_score_entry", lambda *args, **kwargs: False)
+    monkeypatch.setattr(m, "get_class_subject_config", lambda *args, **kwargs: {"core_subjects": ["Mathematics"]})
+    monkeypatch.setattr(
+        m,
+        "get_teacher_subject_assignments",
+        lambda *args, **kwargs: [{"classname": "JSS1", "subject": "Mathematics"}]
+    )
+    
+    resp = client.get("/teacher/score-entry/select-subject/JSS1")
+    assert resp.status_code == 302
+    assert "/teacher/subject-score-sheet" in resp.headers["Location"]
+    assert "class=JSS1" in resp.headers["Location"]
+    assert "subject=Mathematics" in resp.headers["Location"]
+
+
 def test_school_type_restrictions(client, app_module, monkeypatch):
     m = app_module
     

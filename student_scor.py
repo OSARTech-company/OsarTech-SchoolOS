@@ -45113,6 +45113,7 @@ def teacher_score_entry_select_subject(classname):
     subjects = []
     school_type = (school.get('school_type') or '').lower().strip()
     is_primary_or_nursery = school_type in {'primary', 'nursery'}
+    use_subject_sheet = school_uses_subject_sheet_score_entry(school) or is_primary_or_nursery
     
     if school_uses_dean_led_score_entry(school):
         config = get_class_subject_config(school_id, classname) or {}
@@ -45170,12 +45171,17 @@ def teacher_score_entry_select_subject(classname):
         return redirect(url_for('teacher_score_entry_start'))
         
     if len(subjects) == 1:
-        if school.get('score_entry_mode') == 'subject_sheet':
+        if use_subject_sheet:
             return redirect(url_for('teacher_subject_score_sheet', subject=subjects[0], **{'class': classname}))
-        else:
-            return redirect(url_for('teacher_dashboard', tab='score', score_class=classname, score_subject=subjects[0]))
+        return redirect(url_for('teacher_dashboard', tab='score', score_class=classname, score_subject=subjects[0]))
             
-    return render_template('teacher/score_entry_select_subject.html', classname=classname, subjects=subjects, school=school)
+    return render_template(
+        'teacher/score_entry_select_subject.html',
+        classname=classname,
+        subjects=subjects,
+        school=school,
+        use_subject_sheet=use_subject_sheet,
+    )
 
 @app.route('/teacher/reports', endpoint='teacher_reports')
 def teacher_reports():
