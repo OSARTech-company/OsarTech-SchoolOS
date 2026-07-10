@@ -1569,31 +1569,66 @@
         /* Nursery/Primary Softer Playful Theme overrides */
         .school-primary-nursery {
             font-family: 'Outfit', 'Manrope', system-ui, -apple-system, sans-serif;
-            background-color: #fafbfc;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(240, 249, 255, 0.9) 0%, rgba(245, 243, 255, 0.8) 90%),
+                var(--school-bg);
         }
         .school-primary-nursery .report-card {
-            border-radius: 32px;
-            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.05);
-            border: 4px solid rgba(var(--school-primary-rgb, 30, 60, 114), 0.05);
+            border-radius: 36px;
+            box-shadow: 0 24px 60px rgba(42, 82, 152, 0.08), 0 0 0 1px rgba(42, 82, 152, 0.03);
+            border: 8px solid rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(10px);
+        }
+        .school-primary-nursery .header {
+            background: linear-gradient(135deg, var(--school-primary) 0%, var(--school-secondary) 100%) !important;
+            border-radius: 28px 28px 0 0;
+            border-bottom: none;
+            padding: 35px 30px 30px;
+        }
+        .school-primary-nursery .header::after {
+            content: "✨";
+            position: absolute;
+            right: 40px;
+            top: 20px;
+            font-size: 24px;
+            opacity: 0.25;
+            animation: pulse-sparkle 3s ease-in-out infinite alternate;
+        }
+        @keyframes pulse-sparkle {
+            0% { transform: scale(0.8) rotate(0deg); opacity: 0.15; }
+            100% { transform: scale(1.2) rotate(15deg); opacity: 0.35; }
+        }
+        .school-primary-nursery .header-student-profile {
+            border-radius: 24px;
+        }
+        .school-primary-nursery .header-student-photo,
+        .school-primary-nursery .header-student-fallback {
+            border: 4px solid #ffffff;
+            outline: 3px solid var(--school-accent);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+            transform: rotate(-1.5deg);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .school-primary-nursery .header-student-profile:hover .header-student-photo {
+            transform: rotate(2deg) scale(1.05);
         }
         .school-primary-nursery .subjects-table, 
         .school-primary-nursery .behaviour-panel, 
         .school-primary-nursery .comment-grid > div,
         .school-primary-nursery .student-info > div {
             border-radius: 24px !important;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03) !important;
-            border: 2px solid rgba(139, 143, 148, 0.12) !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.02) !important;
+            border: 2px solid rgba(139, 143, 148, 0.1) !important;
+            background: #ffffff;
             overflow: hidden;
         }
         .school-primary-nursery .table-pill {
             border-radius: 12px;
-            background: rgba(254, 243, 199, 0.8) !important;
+            background: rgba(254, 243, 199, 0.9) !important;
             color: #d97706 !important;
             border: 1.5px dashed #fcd34d !important;
             font-weight: 700;
-        }
-        .school-primary-nursery .header-student-profile {
-            border-radius: 20px;
         }
         .school-primary-nursery .info-group-title,
         .school-primary-nursery .table-title {
@@ -1609,14 +1644,212 @@
             background: linear-gradient(135deg, var(--school-primary) 0%, var(--school-secondary) 100%);
             font-weight: 700;
             letter-spacing: 0.02em;
+            padding: 14px 10px;
+        }
+        .school-primary-nursery .subjects-table {
+            border-radius: 28px !important;
+            padding: 24px;
+        }
+        .school-primary-nursery .subjects-table table {
+            border-spacing: 0 8px;
+            border-collapse: separate;
+        }
+        .school-primary-nursery .subjects-table td {
+            background: #f8fafc;
+            border: none;
+            border-top: 1px solid rgba(0, 0, 0, 0.01);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.01);
+            padding: 12px 10px;
+            font-weight: 600;
+        }
+        .school-primary-nursery .subjects-table tr:hover td {
+            background: #f1f5f9;
+        }
+        .school-primary-nursery .subjects-table td:first-child {
+            border-radius: 14px 0 0 14px;
+            border-left: 1px solid rgba(0, 0, 0, 0.01);
+            font-weight: 700;
+        }
+        .school-primary-nursery .subjects-table td:last-child {
+            border-radius: 0 14px 14px 0;
+            border-right: 1px solid rgba(0, 0, 0, 0.01);
         }
         .school-primary-nursery .hero-ribbon {
-            background: rgba(var(--school-primary-rgb, 30, 60, 114), 0.03);
-            border-radius: 20px;
-            padding: 14px;
+            background: rgba(255, 255, 255, 0.6);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+            border-radius: 0;
+            padding: 16px 24px;
+            gap: 12px;
         }
         .school-primary-nursery .hero-chip {
+            background: #ffffff;
+            border: 2px solid rgba(0, 0, 0, 0.03);
+            border-radius: 20px;
+            padding: 10px 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.01);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .school-primary-nursery .hero-chip:hover {
+            transform: translateY(-3px) scale(1.03);
+            border-color: var(--school-accent);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+        }
+        .school-primary-nursery .student-info {
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            padding: 24px;
+            background: linear-gradient(180deg, rgba(248, 250, 252, 0.5) 0%, rgba(241, 245, 249, 0.5) 100%);
+        }
+        .school-primary-nursery .kpi-strip {
+            background: transparent;
+            border-bottom: none;
+            padding: 24px;
+            gap: 16px;
+        }
+        .school-primary-nursery .kpi-card {
+            border-radius: 24px;
+            border: 2px solid rgba(0, 0, 0, 0.03);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.02);
+            border-top: none;
+            padding: 18px 14px;
+            background: #ffffff;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .school-primary-nursery .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.06);
+        }
+        .school-primary-nursery .kpi-card:nth-child(1) { border-bottom: 5px solid #38bdf8; }
+        .school-primary-nursery .kpi-card:nth-child(2) { border-bottom: 5px solid #fb7185; }
+        .school-primary-nursery .kpi-card:nth-child(3) { border-bottom: 5px solid #facc15; }
+        .school-primary-nursery .kpi-card:nth-child(4) { border-bottom: 5px solid #4ade80; }
+        .school-primary-nursery .kpi-card:nth-child(5) { border-bottom: 5px solid #a78bfa; }
+        
+        .school-primary-nursery .behaviour-grid {
+            gap: 16px;
+        }
+        .school-primary-nursery .behaviour-card {
+            border-radius: 20px;
+            border: 1px solid rgba(0, 0, 0, 0.04);
+            background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+            padding: 16px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.01);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .school-primary-nursery .behaviour-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+        }
+        .school-primary-nursery .behaviour-grade-pill {
+            background: var(--school-accent);
+            color: white;
             border-radius: 12px;
+            font-weight: 800;
+            padding: 6px 12px;
+            box-shadow: 0 4px 10px rgba(31, 122, 140, 0.15);
+        }
+
+        /* Playful stickers/stamps styles for Nursery & Primary */
+        .award-stamp-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            height: 100%;
+            min-height: 180px;
+        }
+        .award-stamp {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+            border-radius: 50%;
+            width: 170px;
+            height: 170px;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
+            border: 3px dashed rgba(255, 255, 255, 0.5);
+            outline: 6px solid transparent;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+        }
+        .award-stamp:hover {
+            transform: scale(1.08) rotate(5deg);
+        }
+        .stamp-icon {
+            font-size: 28px;
+            margin-bottom: 6px;
+            animation: float-icon 3s ease-in-out infinite alternate;
+        }
+        .stamp-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            line-height: 1.2;
+        }
+        .stamp-stars {
+            display: flex;
+            gap: 2px;
+            font-size: 9px;
+            margin-bottom: 6px;
+        }
+        .stamp-desc {
+            font-size: 9.5px;
+            font-weight: 600;
+            opacity: 0.95;
+            line-height: 1.25;
+            max-width: 120px;
+        }
+
+        /* Color palettes for stamps */
+        .stamp-gold {
+            background: radial-gradient(circle, #fef3c7 0%, #fde047 100%);
+            color: #854d0e;
+            outline-color: #fef08a;
+            box-shadow: 0 10px 25px rgba(253, 224, 71, 0.25);
+        }
+        .stamp-gold .stamp-stars i { color: #b45309; }
+
+        .stamp-silver {
+            background: radial-gradient(circle, #f1f5f9 0%, #cbd5e1 100%);
+            color: #334155;
+            outline-color: #e2e8f0;
+            box-shadow: 0 10px 25px rgba(203, 213, 225, 0.2);
+        }
+        .stamp-silver .stamp-stars i { color: #475569; }
+
+        .stamp-bronze {
+            background: radial-gradient(circle, #ffedd5 0%, #fed7aa 100%);
+            color: #7c2d12;
+            outline-color: #ffedd5;
+            box-shadow: 0 10px 25px rgba(254, 215, 170, 0.2);
+        }
+        .stamp-bronze .stamp-stars i { color: #9a3412; }
+
+        .stamp-blue {
+            background: radial-gradient(circle, #f0f9ff 0%, #bae6fd 100%);
+            color: #075985;
+            outline-color: #e0f2fe;
+            box-shadow: 0 10px 25px rgba(186, 230, 253, 0.2);
+        }
+        .stamp-blue .stamp-stars i { color: #0284c7; }
+
+        .stamp-rose {
+            background: radial-gradient(circle, #fff1f2 0%, #fecdd3 100%);
+            color: #9f1239;
+            outline-color: #ffe4e6;
+            box-shadow: 0 10px 25px rgba(254, 205, 211, 0.2);
+        }
+        .stamp-rose .stamp-stars i { color: #e11d48; }
+
+        @keyframes float-icon {
+            0% { transform: translateY(0px) scale(1); }
+            100% { transform: translateY(-4px) scale(1.05); }
         }
     </style>
 </head>
@@ -1792,7 +2025,63 @@
                     <div class="info-value">{{ student.next_term_end if student.next_term_end else 'N/A' }}</div>
                 </div>
             </div>
+
+            {% if is_nursery_primary %}
+            <div class="info-group award-badge-group">
+                <div class="info-group-title"><i class="fas fa-award"></i> Achievement Stamp</div>
+                <div class="award-stamp-container">
+                    {% set avg = student.average_marks or 0 %}
+                    {% if avg >= 90 %}
+                        <div class="award-stamp stamp-gold">
+                            <div class="stamp-icon"><i class="fas fa-crown"></i></div>
+                            <div class="stamp-title">Superstar Student</div>
+                            <div class="stamp-stars">
+                                <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                            </div>
+                            <div class="stamp-desc">Exceptional Academic Performance</div>
+                        </div>
+                    {% elif avg >= 80 %}
+                        <div class="award-stamp stamp-silver">
+                            <div class="stamp-icon"><i class="fas fa-medal"></i></div>
+                            <div class="stamp-title">Outstanding Pupil</div>
+                            <div class="stamp-stars">
+                                <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="far fa-star"></i>
+                            </div>
+                            <div class="stamp-desc">Brilliant Work & Dedication</div>
+                        </div>
+                    {% elif avg >= 70 %}
+                        <div class="award-stamp stamp-bronze">
+                            <div class="stamp-icon"><i class="fas fa-star"></i></div>
+                            <div class="stamp-title">Academic Star</div>
+                            <div class="stamp-stars">
+                                <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="far fa-star"></i><i class="far fa-star"></i>
+                            </div>
+                            <div class="stamp-desc">Great Progress & High Achiever</div>
+                        </div>
+                    {% elif avg >= 50 %}
+                        <div class="award-stamp stamp-blue">
+                            <div class="stamp-icon"><i class="fas fa-thumbs-up"></i></div>
+                            <div class="stamp-title">Great Effort</div>
+                            <div class="stamp-stars">
+                                <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="far fa-star"></i><i class="far fa-star"></i><i class="far fa-star"></i>
+                            </div>
+                            <div class="stamp-desc">Good Attempt, Keep Growing</div>
+                        </div>
+                    {% else %}
+                        <div class="award-stamp stamp-rose">
+                            <div class="stamp-icon"><i class="fas fa-seedling"></i></div>
+                            <div class="stamp-title">Future Star</div>
+                            <div class="stamp-stars">
+                                <i class="fas fa-star"></i><i class="far fa-star"></i><i class="far fa-star"></i><i class="far fa-star"></i><i class="far fa-star"></i>
+                            </div>
+                            <div class="stamp-desc">Keep Trying, You Can Do It!</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
         </div>
+
         <div class="kpi-strip">
             <div class="kpi-card">
                 <div class="kpi-label">Average</div>

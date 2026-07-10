@@ -300,6 +300,7 @@ def inject_teacher_nav_flags():
             'teacher_selected_score_class': '',
             'teacher_unread_notifications': 0,
             'school': {},
+            'classes': [],
         }
     school_id = (session.get('school_id') or '').strip()
     teacher_id = (session.get('user_id') or '').strip()
@@ -313,18 +314,18 @@ def inject_teacher_nav_flags():
             'teacher_selected_score_class': '',
             'teacher_unread_notifications': 0,
             'school': {},
+            'classes': [],
         }
     school = get_school(school_id) or {}
     current_term = get_current_term(school)
     current_year = (school.get('academic_year', '') or '').strip()
-    has_class_assignment = bool(
-        get_teacher_classes(
-            school_id,
-            teacher_id,
-            term=current_term,
-            academic_year=current_year,
-        )
+    classes_assigned = get_teacher_classes(
+        school_id,
+        teacher_id,
+        term=current_term,
+        academic_year=current_year,
     )
+    has_class_assignment = bool(classes_assigned)
     subject_assignment_rows = get_teacher_subject_assignments(
         school_id,
         teacher_id=teacher_id,
@@ -363,14 +364,7 @@ def inject_teacher_nav_flags():
     )
     teacher_subject_set = {normalize_subject_name(row.get('subject', '')) for row in subject_assignment_rows if normalize_subject_name(row.get('subject', ''))}
     teacher_scope_classes = sorted(
-        set(
-            get_teacher_classes(
-                school_id,
-                teacher_id,
-                term=current_term,
-                academic_year=current_year,
-            )
-        )
+        set(classes_assigned)
         | {str(row.get('classname') or '').strip() for row in subject_assignment_rows if (row.get('classname') or '').strip()}
     )
     teacher_notifications = get_teacher_messages_for_teacher(
@@ -390,6 +384,7 @@ def inject_teacher_nav_flags():
         'teacher_selected_score_class': teacher_selected_score_class,
         'teacher_unread_notifications': unread_notifications,
         'school': school,
+        'classes': classes_assigned,
     }
 
 @app.context_processor
@@ -53472,7 +53467,8 @@ def export_class_word():
     current_term = get_current_term(school)
     current_year = (school or {}).get('academic_year', '')
     
-    selected_class = canonicalize_classname(request.args.get('class', '').strip())
+    raw_class = request.args.get('class', '').strip()
+    selected_class = canonicalize_classname(raw_class)
     selected_term = request.args.get('term', '').strip()
     
     if not selected_term and role == 'teacher':
@@ -53531,7 +53527,7 @@ def export_class_word():
         )
     )
     
-    doc_title = f"Class List - {selected_class or 'All Students'}"
+    doc_title = f"Class List - {raw_class or selected_class or 'All Students'}"
     if selected_term:
         doc_title += f" ({selected_term})"
     
@@ -53584,7 +53580,7 @@ def export_class_word():
     </style>
 </head>
 <body>
-    <h2>Class List - {selected_class or 'All Classes'}</h2>
+    <h2>Class List - {raw_class or selected_class or 'All Classes'}</h2>
     <div class="meta-info">
         <strong>School:</strong> {school.get('school_name', '')}<br>
         <strong>Academic Year:</strong> {current_year or '-'}<br>
