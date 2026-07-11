@@ -210,10 +210,14 @@
 
 <script>
     // Show loading overlay on page start
+    let loadingTimeout = null;
     function showLoadingOverlay() {
         const overlay = document.getElementById('loading-overlay');
         if (overlay) {
             overlay.classList.add('show');
+            if (loadingTimeout) clearTimeout(loadingTimeout);
+            // Safety timeout: auto-hide the overlay after 6 seconds in case page does not unload (e.g. file downloads)
+            loadingTimeout = setTimeout(hideLoadingOverlay, 6000);
         }
     }
 
@@ -222,6 +226,10 @@
         const overlay = document.getElementById('loading-overlay');
         if (overlay) {
             overlay.classList.remove('show');
+        }
+        if (loadingTimeout) {
+            clearTimeout(loadingTimeout);
+            loadingTimeout = null;
         }
     }
 
@@ -240,8 +248,14 @@
 
     // Show loading on form submission (for form pages)
     document.addEventListener('submit', function(e) {
-        if (e.target && e.target.getAttribute && e.target.getAttribute('data-async-submit') === '1') {
-            return;
+        if (e.target && e.target.getAttribute) {
+            if (e.target.getAttribute('data-async-submit') === '1' || e.target.getAttribute('data-loading-skip') === '1' || e.target.getAttribute('data-no-loading') === '1') {
+                return;
+            }
+            const action = (e.target.getAttribute('action') || '').toLowerCase();
+            if (action.includes('export') || action.includes('download') || action.includes('print')) {
+                return;
+            }
         }
         if (e.target.method && e.target.method.toLowerCase() === 'post') {
             showLoadingOverlay();
@@ -256,10 +270,13 @@
             const lowerHref = rawHref.toLowerCase();
             const url = new URL(link.href, window.location.href);
             const path = (url.pathname || '').toLowerCase();
-            const skipLoading =
-                (link.dataset && (link.dataset.loadingSkip === '1' || link.dataset.noLoading === '1')) ||
+            const isDownloadOrExport =
                 link.hasAttribute('download') ||
                 path.includes('/download') ||
+                path.includes('download') ||
+                path.includes('/export') ||
+                path.includes('export') ||
+                path.includes('print') ||
                 path.endsWith('.pdf') ||
                 path.endsWith('.csv') ||
                 path.endsWith('.xlsx') ||
@@ -267,6 +284,11 @@
                 path.endsWith('.zip') ||
                 lowerHref.startsWith('blob:') ||
                 lowerHref.startsWith('data:');
+            
+            const skipLoading =
+                (link.dataset && (link.dataset.loadingSkip === '1' || link.dataset.noLoading === '1')) ||
+                isDownloadOrExport;
+            
             if (skipLoading) {
                 return;
             }

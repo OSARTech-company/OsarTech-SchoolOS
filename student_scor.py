@@ -7876,6 +7876,58 @@ def reset_student_passwords_for_class(school_id, classname, default_password, re
         )
     return {'touched': touched, 'skipped': skipped}
 
+def reset_single_student_password(school_id, student_id, default_password, reset_by=''):
+    """Reset single active student login password to default in one school."""
+    scoped_school_id = (school_id or '').strip()
+    sid = (student_id or '').strip()
+    if not scoped_school_id or not sid:
+        raise ValueError('school_id and student_id are required.')
+    if not default_password:
+        raise ValueError('default_password is required.')
+    reset_hash = hash_password(default_password)
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """SELECT student_id
+               FROM students
+               WHERE school_id = ?
+                 AND student_id = ?
+                 AND COALESCE(is_archived, 0) = 0
+               LIMIT 1""",
+            (scoped_school_id, sid),
+        )
+        row = c.fetchone()
+        if not row:
+            return {'success': False, 'message': 'Student not found or archived.'}
+
+        # Check existing user account
+        db_execute(
+            c,
+            """SELECT role, school_id
+               FROM users
+               WHERE LOWER(username) = LOWER(?)
+               LIMIT 1""",
+            (sid,),
+        )
+        existing = c.fetchone()
+        if existing:
+            existing_role = (existing[0] or '').strip().lower()
+            existing_school = _normalize_school_id_text(existing[1])
+            if existing_role != 'student' or existing_school != scoped_school_id:
+                return {'success': False, 'message': 'Username is registered to a non-student or different school.'}
+        
+        upsert_user_with_cursor(c, sid, reset_hash, role='student', school_id=scoped_school_id, overwrite_identity=False)
+        
+    if reset_by:
+        logging.info(
+            "Student password reset by %s school_id=%s student_id=%s",
+            reset_by,
+            scoped_school_id,
+            sid,
+        )
+    return {'success': True, 'message': 'Password reset successfully.'}
+
 if os.environ.get('RESET_STUDENT_PASSWORDS_ON_STARTUP', '').strip().lower() in ('1', 'true', 'yes'):
     reset_school_id = (os.environ.get('RESET_STUDENT_PASSWORDS_SCHOOL_ID', '') or '').strip()
     if not reset_school_id:
@@ -47191,6 +47243,32 @@ def school_admin_relock_term_edit():
     )
     flash(f'Edit lock restored for {classname} ({term}).', 'success')
     return redirect(url_for('school_admin_publish_results'))
+
+@app.route('/school-admin/student/reset-password', methods=['POST'])
+def school_admin_reset_student_password():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    student_id = (request.form.get('student_id', '') or '').strip()
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    if not student_id:
+        flash('Student ID is required.', 'error')
+        return redirect(safe_referrer_or(url_for('school_admin_add_students_by_class')))
+    
+    result = reset_single_student_password(
+        school_id=school_id,
+        student_id=student_id,
+        default_password=DEFAULT_STUDENT_PASSWORD,
+        reset_by=session.get('user_id', '') or '',
+    )
+    if result.get('success'):
+        flash(f"Password reset successfully for student {student_id}.", 'success')
+    else:
+        flash(result.get('message', 'Failed to reset password.'), 'error')
+        
+    return redirect(safe_referrer_or(url_for('school_admin_add_students_by_class')))
 
 @app.route('/school-admin/reset-class-student-passwords', methods=['POST'])
 def school_admin_reset_class_student_passwords():

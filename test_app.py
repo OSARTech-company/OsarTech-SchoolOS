@@ -2993,6 +2993,22 @@ def test_school_admin_export_classes(client, app_module, monkeypatch):
     assert "JSS1,JSS 1" in body
 
 
+def test_school_admin_reset_student_password(client, app_module, monkeypatch):
+    m = app_module
+    mock_student = {"student_id": "STU001", "firstname": "Adebayo", "classname": "PRIMARY1", "is_archived": False}
+    
+    monkeypatch.setattr(m, "load_student", lambda school_id, student_id: mock_student)
+    monkeypatch.setattr(m, "reset_single_student_password", lambda school_id, student_id, default_password, reset_by: {"success": True})
+    
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "admin1"
+        
+    resp = client.post("/school-admin/student/reset-password", data={"student_id": "STU001"})
+    assert resp.status_code == 302
+
+
 
 
 

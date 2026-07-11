@@ -778,6 +778,13 @@
                                                 <i class="fas fa-pen"></i> Correct Result
                                             </a>
                                             {% if not student.is_published_snapshot %}
+                                            <form action="{{ url_for('school_admin_reset_student_password') }}" method="POST" style="display:block; margin:0; padding:0;">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="student_id" value="{{ student.student_id }}">
+                                                <button type="submit" onclick="return confirm('Reset password for {{ student.firstname }} ({{ student.student_id }}) to default student password?');">
+                                                    <i class="fas fa-key"></i> Reset Password
+                                                </button>
+                                            </form>
                                             <button type="button" onclick="this.nextElementSibling.querySelector('.student-photo-input').click()">
                                                 <i class="fas fa-camera"></i> Upload Photo
                                             </button>

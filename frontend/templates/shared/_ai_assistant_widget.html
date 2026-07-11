@@ -81,7 +81,6 @@
             <input type="text" name="question" maxlength="1200" placeholder="Ask about workflows or paste an error message..." required>
             <button type="submit">Ask</button>
         </form>
-        <div class="app-ai-quick" data-default-prompts='{{ (assistant_quick_prompts or [])|tojson|safe }}'></div>
     </section>
 </div>
 {% set show_alert_fab = false %}

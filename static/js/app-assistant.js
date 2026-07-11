@@ -192,25 +192,7 @@
     }
 
     function renderQuickPrompts(container, prompts, onPick) {
-        if (!container) return;
-        while (container.firstChild) container.removeChild(container.firstChild);
-        var rows = Array.isArray(prompts) ? prompts : [];
-        if (!rows.length) return;
-        var label = document.createElement('div');
-        label.className = 'app-ai-quick-label';
-        label.textContent = 'Tap To Ask';
-        container.appendChild(label);
-        rows.slice(0, 8).forEach(function (item) {
-            var text = String(item || '').trim();
-            if (!text) return;
-            var btn = document.createElement('button');
-            btn.type = 'button';
-            btn.textContent = text;
-            btn.addEventListener('click', function () {
-                if (typeof onPick === 'function') onPick(text);
-            });
-            container.appendChild(btn);
-        });
+        // Suggested questions disabled
     }
 
     function parseMaybeJsonResponse(resp) {
