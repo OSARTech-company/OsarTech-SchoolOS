@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draw Signature - OSARtech SchoolOS</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+        body {
+            font-family: "Manrope", "Segoe UI", sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f4f7fb;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        [data-theme="dark"] body {
+            background: #0b0f19;
+            color: #f8fafc;
+        }
+
+        .draw-container {
+            max-width: 600px;
+            width: 100%;
+            background: white;
+            border: 1px solid #d7e0ea;
+            border-radius: 18px;
+            box-shadow: 0 20px 40px rgba(15, 76, 129, 0.08);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        [data-theme="dark"] .draw-container {
+            background: #161e2e;
+            border-color: #243049;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+        }
+
+        .draw-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #edf2f7;
+            padding-bottom: 12px;
+        }
+
+        [data-theme="dark"] .draw-header {
+            border-bottom-color: #243049;
+        }
+
+        .draw-header h1 {
+            font-size: 1.25rem;
+            font-weight: 800;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #0f4c81;
+        }
+
+        [data-theme="dark"] .draw-header h1 {
+            color: #38bdf8;
+        }
+
+        .draw-close {
+            background: none;
+            border: none;
+            font-size: 1.8rem;
+            cursor: pointer;
+            color: #718096;
+            transition: color 0.2s;
+            line-height: 1;
+            text-decoration: none;
+        }
+
+        .draw-close:hover {
+            color: #ef4444;
+        }
+
+        .canvas-area {
+            position: relative;
+            width: 100%;
+            background: #f8fafc;
+            border: 2px dashed #cbd5e0;
+            border-radius: 14px;
+            cursor: crosshair;
+            touch-action: none;
+            overflow: hidden;
+        }
+
+        [data-theme="dark"] .canvas-area {
+            background: #0f172a;
+            border-color: #334155;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 250px;
+        }
+
+        /* Guidelines on canvas to help write straight */
+        .canvas-baseline {
+            position: absolute;
+            left: 5%;
+            right: 5%;
+            bottom: 60px;
+            border-bottom: 1.5px dashed rgba(15, 76, 129, 0.25);
+            pointer-events: none;
+            text-align: center;
+            font-size: 0.75rem;
+            color: rgba(15, 76, 129, 0.4);
+            padding-bottom: 4px;
+        }
+
+        [data-theme="dark"] .canvas-baseline {
+            border-bottom-color: rgba(56, 189, 248, 0.25);
+            color: rgba(56, 189, 248, 0.4);
+        }
+
+        .draw-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .btn-full {
+            flex: 1;
+        }
+    </style>
+</head>
+<body class="{% if is_nursery_primary %} school-primary-nursery{% endif %}" style="--school-primary: {{ school.theme_primary_color if school and school.theme_primary_color else '#1E3C72' }}; --school-secondary: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#2A5298' }}; --school-accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    
+    {% include "shared/_loading_overlay.html" %}
+
+    <div class="draw-container">
+        <div class="draw-header">
+            <h1><i class="fas fa-pen-nib"></i> Draw Your Signature</h1>
+            {% if role == 'school_admin' %}
+                {% set back_url = url_for('school_admin_dashboard') %}
+            {% else %}
+                {% set back_url = url_for('teacher_reports') %}
+            {% endif %}
+            <a href="{{ back_url }}" class="draw-close" title="Go Back">&times;</a>
+        </div>
+
+        <p class="note" style="margin: 0;">Use your mouse, finger, or stylus to draw inside the box below. Keep it clear and centered.</p>
+
+        <div class="canvas-area" id="canvas-area">
+            <canvas id="signature-canvas"></canvas>
+            <div class="canvas-baseline">Sign Above This Line</div>
+        </div>
+
+        <div class="draw-actions">
+            <button type="button" class="btn btn-secondary" id="clear-btn"><i class="fas fa-trash"></i> Clear</button>
+            <button type="button" class="btn btn-primary btn-full" id="save-btn"><i class="fas fa-save"></i> Save Signature</button>
+        </div>
+    </div>
+
+    <!-- Form to submit data URL -->
+    <form id="sig-form" action="{{ url_for('draw_signature') }}" method="POST" style="display:none;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" id="signature-data" name="signature_data" value="">
+    </form>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('signature-canvas');
+            const clearBtn = document.getElementById('clear-btn');
+            const saveBtn = document.getElementById('save-btn');
+            const form = document.getElementById('sig-form');
+            const dataInput = document.getElementById('signature-data');
+            const ctx = canvas.getContext('2d');
+            
+            // Adjust canvas size to match layout
+            function resizeCanvas() {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                canvas.width = canvas.offsetWidth * ratio;
+                canvas.height = canvas.offsetHeight * ratio;
+                ctx.scale(ratio, ratio);
+                
+                // Set context stroke styles
+                ctx.strokeStyle = document.documentElement.getAttribute('data-theme') === 'dark' ? '#38bdf8' : '#0f4c81';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+            }
+            
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            // Track drawing state
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+            let hasDrawn = false;
+
+            function getMousePos(canvasDom, touchOrMouseEvent) {
+                const rect = canvasDom.getBoundingClientRect();
+                const clientX = touchOrMouseEvent.touches ? touchOrMouseEvent.touches[0].clientX : touchOrMouseEvent.clientX;
+                const clientY = touchOrMouseEvent.touches ? touchOrMouseEvent.touches[0].clientY : touchOrMouseEvent.clientY;
+                return {
+                    x: clientX - rect.left,
+                    y: clientY - rect.top
+                };
+            }
+
+            function startDrawing(e) {
+                isDrawing = true;
+                const pos = getMousePos(canvas, e);
+                lastX = pos.x;
+                lastY = pos.y;
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                e.preventDefault();
+                const pos = getMousePos(canvas, e);
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+                lastX = pos.x;
+                lastY = pos.y;
+                hasDrawn = true;
+            }
+
+            function stopDrawing() {
+                isDrawing = false;
+            }
+
+            // Mouse Events
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            window.addEventListener('mouseup', stopDrawing);
+
+            // Touch Events
+            canvas.addEventListener('touchstart', startDrawing);
+            canvas.addEventListener('touchmove', draw);
+            window.addEventListener('touchend', stopDrawing);
+
+            // Clear button
+            clearBtn.addEventListener('click', function() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                hasDrawn = false;
+            });
+
+            // Save button
+            saveBtn.addEventListener('click', function() {
+                if (!hasDrawn) {
+                    alert('Please draw your signature first.');
+                    return;
+                }
+                
+                // Export canvas content as base64 PNG data URL
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width / (window.devicePixelRatio || 1);
+                tempCanvas.height = canvas.height / (window.devicePixelRatio || 1);
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                tempCtx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+                const dataURL = tempCanvas.toDataURL('image/png');
+                
+                dataInput.value = dataURL;
+                form.submit();
+            });
+        });
+    </script>
+</body>
+</html>

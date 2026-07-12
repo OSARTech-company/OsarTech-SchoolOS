@@ -560,6 +560,12 @@
                   </div>
                   <button type="submit" class="btn btn-primary">Save {{ leadership_label }} Signature</button>
                 </form>
+                <div style="margin-top: 15px; text-align: center; border-top: 1px solid var(--school-border-soft, #e2e8f0); padding-top: 12px;">
+                  <span class="note">Or draw it directly on screen:</span><br>
+                  <a href="{{ url_for('draw_signature') }}" class="btn btn-secondary" style="margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none;">
+                    <i class="fas fa-pen-fancy"></i> Draw Signature
+                  </a>
+                </div>
               </div>
 
               <div class="card">
