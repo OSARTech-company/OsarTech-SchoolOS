@@ -150,11 +150,64 @@ PWA_BODY_SNIPPET = """
     // Install banner disabled - skipping display
   });
 
+  function urlBase64ToUint8Array(base64String) {
+    var padding = '='.repeat((4 - base64String.length % 4) % 4);
+    var base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    var rawData = window.atob(base64);
+    var outputArray = new Uint8Array(rawData.length);
+    for (var i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  function initPushNotifications(reg) {
+    if (!('PushManager' in window)) return;
+    fetch('/api/push/vapid-public-key')
+      .then(function (res) {
+        if (!res.ok) throw new Error('Not authenticated');
+        return res.json();
+      })
+      .then(function (data) {
+        var vapidPublicKey = data.public_key;
+        return reg.pushManager.getSubscription()
+          .then(function (subscription) {
+            if (subscription) {
+              return syncSubscription(subscription);
+            }
+            if (Notification.permission === 'denied') return;
+            return reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+            }).then(function (newSubscription) {
+              return syncSubscription(newSubscription);
+            });
+          });
+      })
+      .catch(function (err) {
+        console.log('Push init skipped:', err.message);
+      });
+  }
+
+  function syncSubscription(subscription) {
+    return fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(subscription)
+    });
+  }
+
   if (!('serviceWorker' in navigator)) return;
   var isSecure = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   if (!isSecure) return;
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('/sw.js').catch(function () {});
+    navigator.serviceWorker.register('/sw.js')
+      .then(function (reg) {
+        initPushNotifications(reg);
+      })
+      .catch(function () {});
   });
 })();
 </script>
@@ -9158,6 +9211,81 @@ def load_student_password_reset_requests(school_id, status_filter=''):
         })
     return out
 
+
+
+def create_teacher_password_reset_request(school_id, teacher_id, reason='', requested_by=''):
+    if not ensure_extended_features_schema():
+        return None
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            '''SELECT id FROM teacher_password_reset_requests
+               WHERE school_id = ? AND teacher_id = ? AND status = 'pending'
+               LIMIT 1''',
+            (school_id, teacher_id),
+        )
+        row = c.fetchone()
+        if row:
+            return row[0]
+        db_execute(
+            c,
+            '''INSERT INTO teacher_password_reset_requests
+               (school_id, teacher_id, reason, status, requested_at)
+               VALUES (?, ?, ?, 'pending', CURRENT_TIMESTAMP)''',
+            (school_id, teacher_id, (reason or '').strip()[:800]),
+        )
+        db_execute(c, "SELECT lastval()")
+        new_row = c.fetchone()
+        return new_row[0] if new_row else None
+
+def load_teacher_password_reset_requests(school_id, status_filter=''):
+    if not ensure_extended_features_schema():
+        return []
+    with db_connection() as conn:
+        c = conn.cursor()
+        params = [school_id]
+        where = ['r.school_id = ?']
+        if status_filter:
+            where.append('LOWER(r.status) = LOWER(?)')
+            params.append(status_filter)
+        db_execute(
+            c,
+            f'''SELECT r.id, r.teacher_id, r.reason, r.status, r.requested_at,
+                       r.reviewed_at, r.reviewed_by, r.review_note, t.firstname, t.lastname
+                FROM teacher_password_reset_requests r
+                LEFT JOIN teachers t ON t.school_id = r.school_id AND t.teacher_id = r.teacher_id
+                WHERE {' AND '.join(where)}
+                ORDER BY r.requested_at DESC
+                LIMIT 500''',
+            tuple(params),
+        )
+        out = []
+        for row in c.fetchall():
+            out.append({
+                'id': row[0],
+                'teacher_id': row[1],
+                'reason': row[2],
+                'status': row[3],
+                'requested_at': row[4],
+                'reviewed_at': row[5],
+                'reviewed_by': row[6],
+                'review_note': row[7],
+                'teacher_name': f"{row[8] or ''} {row[9] or ''}".strip() or row[1],
+            })
+        return out
+
+def update_teacher_password_reset_request(school_id, request_id, status, reviewed_by='', review_note=''):
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            '''UPDATE teacher_password_reset_requests
+               SET status = ?, reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?, review_note = ?
+               WHERE school_id = ? AND id = ? AND status = 'pending' ''',
+            (status, reviewed_by, review_note, school_id, request_id),
+        )
+
 def update_student_password_reset_request(school_id, request_id, status, reviewed_by='', review_note=''):
     if not ensure_extended_features_schema():
         return
@@ -17219,6 +17347,37 @@ def ensure_extended_features_schema():
             db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_student_pw_reset_school_status ON student_password_reset_requests(school_id, status, requested_at DESC)')
             db_execute(
                 c,
+                '''CREATE TABLE IF NOT EXISTS teacher_password_reset_requests (
+                       id SERIAL PRIMARY KEY,
+                       school_id TEXT NOT NULL,
+                       teacher_id TEXT NOT NULL,
+                       reason TEXT DEFAULT '',
+                       status TEXT DEFAULT 'pending',
+                       requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       reviewed_at TIMESTAMP,
+                       reviewed_by TEXT DEFAULT '',
+                       review_note TEXT DEFAULT ''
+                   )''',
+            )
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_teacher_pw_reset_school_status ON teacher_password_reset_requests(school_id, status, requested_at DESC)')
+            db_execute(
+                c,
+                '''CREATE TABLE IF NOT EXISTS push_subscriptions (
+                       id SERIAL PRIMARY KEY,
+                       school_id TEXT NOT NULL,
+                       user_id TEXT NOT NULL,
+                       endpoint TEXT NOT NULL,
+                       p256dh TEXT NOT NULL,
+                       auth TEXT NOT NULL,
+                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       UNIQUE(school_id, user_id, endpoint)
+                   )''',
+            )
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_push_subs_school_user ON push_subscriptions(school_id, user_id)')
+
+
+            db_execute(
+                c,
                 """CREATE TABLE IF NOT EXISTS parent_notification_prefs (
                        id SERIAL PRIMARY KEY,
                        school_id TEXT NOT NULL,
@@ -21415,7 +21574,7 @@ def get_class_attendance_publish_readiness(school_id, classname, term, academic_
         'missing_rows': missing_rows,
         'message': '',
         'mode': 'marked',
-        'manual_allowed': False,
+        'manual_allowed': True,
         'manual_map': manual_map,
     }
 
@@ -21450,15 +21609,13 @@ def build_result_term_attendance_data(school_id, student_id, classname, term, ac
         days_open = int(calendar_row.get('days_open', 0) or 0)
     except Exception:
         days_open = 0
-    manual_row = {}
-    if not class_has_attendance_marks(school_id, classname, term, academic_year):
-        manual_row = get_student_manual_result_attendance(
-            school_id=school_id,
-            student_id=student_id,
-            classname=classname,
-            term=term,
-            academic_year=academic_year,
-        )
+    manual_row = get_student_manual_result_attendance(
+        school_id=school_id,
+        student_id=student_id,
+        classname=classname,
+        term=term,
+        academic_year=academic_year,
+    )
     if manual_row:
         try:
             days_open = int(manual_row.get('days_open', days_open) or 0)
@@ -31805,6 +31962,33 @@ def cbt_login():
     return render_template('shared/cbt_login.html', terms_read=terms_read)
 
 
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        username = (request.form.get('username') or '').strip().lower()
+        school_id = (request.form.get('school_id') or '').strip()
+        role = (request.form.get('role') or '').strip().lower()
+        reason = (request.form.get('reason') or '').strip()
+        
+        if not username or not school_id or not role:
+            flash('All fields are required.', 'error')
+            return render_template('shared/forgot_password.html')
+            
+        if role == 'student':
+            create_student_password_reset_request(school_id, username, reason=reason, requested_by=username)
+            flash('Your password reset request has been sent to the School Admin. Please check back later or contact your school.', 'success')
+            return redirect(url_for('login'))
+        elif role == 'teacher':
+            create_teacher_password_reset_request(school_id, username, reason=reason, requested_by=username)
+            flash('Your password reset request has been sent to the School Admin. Please check back later or contact your school.', 'success')
+            return redirect(url_for('login'))
+        else:
+            flash('Invalid role selected.', 'error')
+            return render_template('shared/forgot_password.html')
+            
+    return render_template('shared/forgot_password.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 @safe_auth_route('shared/login.html')
 @require_rate_limit('login', RATE_LIMIT_LOGIN_PER_MIN, 60, redirect_endpoint='login', methods=('POST',))
@@ -40787,6 +40971,51 @@ def school_admin_backup_schedule():
     flash('Backup schedule settings updated.', 'success')
     return redirect(url_for('school_admin_bulk_tools'))
 
+@app.route('/school-admin/teacher-reset-requests')
+def school_admin_teacher_reset_requests():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = session.get('school_id')
+    status_filter = (request.args.get('status', '') or '').strip().lower()
+    requests = load_teacher_password_reset_requests(school_id, status_filter=status_filter)
+    return render_template(
+        'school/school_admin_teacher_reset_requests.html',
+        requests=requests,
+        status_filter=status_filter,
+    )
+
+@app.route('/school-admin/teacher-reset-requests/update', methods=['POST'])
+def school_admin_update_teacher_reset_request():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = session.get('school_id')
+    request_id = int(request.form.get('request_id', 0) or 0)
+    status = (request.form.get('status', '') or '').strip().lower()
+    review_note = (request.form.get('review_note', '') or '').strip()
+    if status not in {'approved', 'denied'}:
+        flash('Select a valid decision.', 'error')
+        return redirect(url_for('school_admin_teacher_reset_requests'))
+    
+    requests = load_teacher_password_reset_requests(school_id)
+    match = next((r for r in requests if int(r.get('id') or 0) == request_id), None)
+    if not match:
+        flash('Reset request not found.', 'error')
+        return redirect(url_for('school_admin_teacher_reset_requests'))
+    
+    teacher_id = (match.get('teacher_id') or '').strip()
+    if status == 'approved' and teacher_id:
+        upsert_user(teacher_id, hash_password(DEFAULT_TEACHER_PASSWORD), 'teacher', school_id)
+    
+    update_teacher_password_reset_request(
+        school_id,
+        request_id,
+        status,
+        reviewed_by=session.get('user_id'),
+        review_note=review_note,
+    )
+    flash(f"Teacher password reset request {status}.", 'success')
+    return redirect(url_for('school_admin_teacher_reset_requests'))
+
 @app.route('/school-admin/student-reset-requests')
 def school_admin_student_reset_requests():
     if session.get('role') != 'school_admin':
@@ -43999,6 +44228,22 @@ def school_admin_send_student_message():
             created_by=admin_user_id,
         )
         process_notification_queue_inline(school_id, max_jobs=10)
+
+        # Dispatch Web Push Notifications
+        try:
+            students_to_push = []
+            for _sid, st in (students_pool or {}).items():
+                student_id = (st.get('student_id') or _sid or '').strip()
+                if target_classname and (st.get('classname') or '').strip() != target_classname:
+                    continue
+                if target_stream and (st.get('stream') or '').strip() != target_stream:
+                    continue
+                students_to_push.append(student_id)
+            for sid in students_to_push:
+                send_push_notification(school_id, sid, title, message, url='/student/messages')
+        except Exception as push_exc:
+            logging.error("Failed to send student push notifications: %s", push_exc)
+
         record_admin_action_audit(
             school_id,
             'send_student_message',
@@ -44225,6 +44470,14 @@ def school_admin_send_teacher_message():
             created_by=admin_user_id,
         )
         process_notification_queue_inline(school_id, max_jobs=10)
+
+        # Dispatch Web Push Notifications
+        try:
+            for tid in (teacher_ids or []):
+                send_push_notification(school_id, tid, title, message, url='/teacher/messages')
+        except Exception as push_exc:
+            logging.error("Failed to send teacher push notifications: %s", push_exc)
+
         record_admin_action_audit(
             school_id,
             'send_teacher_message',
@@ -46137,6 +46390,17 @@ def teacher_send_student_message():
             created_by=f'teacher:{teacher_id}',
         )
         process_notification_queue_inline(school_id, max_jobs=10)
+
+        # Dispatch Web Push Notifications
+        try:
+            for _sid, st in (class_students or {}).items():
+                student_id = (st.get('student_id') or _sid or '').strip()
+                offered = {x.lower() for x in normalize_subjects_list(st.get('subjects', []))}
+                if subject.lower() in offered:
+                    send_push_notification(school_id, student_id, title, body, url='/student/messages')
+        except Exception as push_exc:
+            logging.error("Failed to send student push notifications from teacher: %s", push_exc)
+
         flash(f'{message_kind.title()} sent to {classname} students successfully.', 'success')
     except Exception as exc:
         flash(f'Failed to send {message_kind}: {exc}', 'error')
@@ -46805,9 +47069,9 @@ def teacher_manual_attendance_summary():
     if not teacher_has_class_access(school_id, teacher_id, classname, term=current_term, academic_year=current_year):
         flash('You are not assigned to this class for the current term/year.', 'error')
         return redirect(url_for('teacher_attendance', classname=classname))
-    if class_has_attendance_marks(school_id, classname, current_term, current_year):
-        flash('Daily attendance already exists for this class. Use Attendance instead of manual summary.', 'error')
-        return redirect(url_for('teacher_attendance', classname=classname))
+    # if class_has_attendance_marks(school_id, classname, current_term, current_year):
+    #     flash('Daily attendance already exists for this class. Use Attendance instead of manual summary.', 'error')
+    #     return redirect(url_for('teacher_attendance', classname=classname))
     if not ensure_result_attendance_manual_schema():
         flash('Manual attendance summary table is unavailable. Run the database migration and retry.', 'error')
         return redirect(url_for('teacher_attendance', classname=classname))
@@ -55575,6 +55839,120 @@ try:
 except Exception as _worker_boot_exc:
     logging.warning("Background worker did not start: %s", _worker_boot_exc)
 atexit.register(stop_background_worker)
+
+# ==========================================
+# WEB PUSH NOTIFICATION BACKEND SERVICES
+# ==========================================
+
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', 'BJpnnZVT_o11aQT0b1AsPqZQyTm4i3Mv5bb62dhA0XHo48U8rhan4v62qS7WP2yoSa1Xc3SfVH6-EZER51PgyMo').strip()
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', 'suzszNwfZRC2YsM_qYzKp6OHdvOhYSpb5ChvRp52iE4').strip()
+VAPID_CLAIM_EMAIL = os.environ.get('VAPID_CLAIM_EMAIL', 'mailto:admin@osartech.com.ng').strip()
+
+try:
+    from pywebpush import webpush, WebPushException
+    HAS_WEBPUSH = True
+except ImportError:
+    HAS_WEBPUSH = False
+    logging.warning("pywebpush is not installed. Push notifications will be logged to stdout/file instead of sent.")
+
+@app.route('/api/push/vapid-public-key')
+def api_push_vapid_public_key():
+    return jsonify({'public_key': VAPID_PUBLIC_KEY})
+
+@app.route('/api/push/subscribe', methods=['POST'])
+def api_push_subscribe():
+    # Allow authenticated users to subscribe (Students, Teachers, Admins, etc.)
+    user_id = session.get('user_id')
+    school_id = session.get('school_id')
+    if not user_id or not school_id:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json or {}
+    endpoint = (data.get('endpoint') or '').strip()
+    keys = data.get('keys') or {}
+    p256dh = (keys.get('p256dh') or '').strip()
+    auth = (keys.get('auth') or '').strip()
+    
+    if not endpoint or not p256dh or not auth:
+        return jsonify({'error': 'Missing subscription data'}), 400
+        
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        # Clean existing duplicate endpoints for safety
+        db_execute(c, "DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
+        db_execute(
+            c,
+            """INSERT INTO push_subscriptions (school_id, user_id, endpoint, p256dh, auth)
+               VALUES (?, ?, ?, ?, ?)""",
+            (school_id, user_id, endpoint, p256dh, auth)
+        )
+    return jsonify({'success': True})
+
+@app.route('/api/push/unsubscribe', methods=['POST'])
+def api_push_unsubscribe():
+    data = request.json or {}
+    endpoint = (data.get('endpoint') or '').strip()
+    if not endpoint:
+        return jsonify({'error': 'Missing endpoint'}), 400
+        
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        db_execute(c, "DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
+    return jsonify({'success': True})
+
+def send_push_notification(school_id, user_id, title, message, url=None):
+    with db_connection() as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE school_id = ? AND user_id = ?",
+            (school_id, user_id)
+        )
+        subscriptions = c.fetchall()
+        
+    if not subscriptions:
+        logging.info("No push subscriptions found for user_id=%s in school_id=%s", user_id, school_id)
+        return False
+        
+    payload = json.dumps({
+        'title': title,
+        'body': message,
+        'url': url or '/'
+    })
+    
+    success = False
+    for endpoint, p256dh, auth in subscriptions:
+        subscription_info = {
+            'endpoint': endpoint,
+            'keys': {
+                'p256dh': p256dh,
+                'auth': auth
+            }
+        }
+        if HAS_WEBPUSH:
+            try:
+                webpush(
+                    subscription_info=subscription_info,
+                    data=payload,
+                    vapid_private_key=VAPID_PRIVATE_KEY,
+                    vapid_claims={"sub": VAPID_CLAIM_EMAIL},
+                    ttl=86400
+                )
+                success = True
+            except WebPushException as ex:
+                logging.error("WebPush failed: %s", ex)
+                # If subscription has expired or is invalid, remove it
+                if ex.response is not None and ex.response.status_code in (404, 410):
+                    with db_connection(commit=True) as conn:
+                        c2 = conn.cursor()
+                        db_execute(c2, "DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
+            except Exception as ex:
+                logging.error("Unexpected error sending push: %s", ex)
+        else:
+            logging.info("[MOCK PUSH] Sent to %s: %s", user_id, payload)
+            success = True
+            
+    return success
 
 if __name__ == '__main__':
     # Enforce production env guards at process startup entrypoint.

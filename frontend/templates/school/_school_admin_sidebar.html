@@ -140,6 +140,10 @@
                     <i class="fas fa-user-gear"></i>
                     <span>Teacher Workload</span>
                 </a>
+                <a href="{{ url_for('school_admin_teacher_reset_requests') }}" class="side-link{% if active_page == 'teacher_reset_requests' %} active{% endif %}">
+                    <i class="fas fa-unlock-alt"></i>
+                    <span>Reset Requests</span>
+                </a>
             </div>
         </details>
 
