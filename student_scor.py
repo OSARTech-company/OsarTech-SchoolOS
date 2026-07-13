@@ -4664,7 +4664,7 @@ def _assistant_call_gemini(role, question, links, knowledge_context='', response
         f'Question: {question}\n'
         f'Known app context:\n{(knowledge_context or "No extra context.")}\n\n'
         f'Useful links:\n{links_text}\n\n'
-        'Return JSON with keys: answer (string), steps (array of up to 6 short strings). '
+        'Return JSON with keys: answer (string), steps (array of up to 6 short strings), smart_links (array of up to 3 objects with url and label based on Useful links if applicable). '
         'Prefer concrete app actions, exact menu names, and short examples when helpful. '
         'If response mode is ultra_simple, use very short words and max 2 short steps. '
         'If response mode is simple, use very plain language. '
@@ -4710,11 +4710,14 @@ def _assistant_call_gemini(role, question, links, knowledge_context='', response
             parsed = json.loads(text)
             answer = str(parsed.get('answer') or '').strip()
             steps = parsed.get('steps') or []
+            smart_links = parsed.get('smart_links') or []
             if not isinstance(steps, list):
                 steps = []
             steps = [str(s).strip() for s in steps if str(s).strip()][:4]
+            if not isinstance(smart_links, list):
+                smart_links = []
             if answer:
-                return {'answer': answer, 'steps': steps}
+                return {'answer': answer, 'steps': steps, 'smart_links': smart_links}
         except Exception as exc:
             _log_suppressed_exception('_assistant_call_gemini', exc)
         return {'answer': text[:700].strip(), 'steps': []}
@@ -54854,6 +54857,7 @@ def assistant_guide():
         if llm_payload:
             payload['answer'] = _assistant_enforce_guide_only_text(llm_payload.get('answer') or payload.get('answer', ''))
             payload['steps'] = llm_payload.get('steps') or payload.get('steps', [])
+            payload['smart_links'] = llm_payload.get('smart_links') or payload.get('smart_links', [])
             payload['used_llm'] = True
         else:
             payload['used_llm'] = False
