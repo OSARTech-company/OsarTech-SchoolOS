@@ -547,14 +547,7 @@
 </head>
 <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
     {% include "shared/_loading_overlay.html" %}
-    <div class="app-shell topbar-layout">
-        {% if session.get('role') == 'school_admin' %}
-            {% include 'school/_school_admin_sidebar.html' %}
-        {% elif session.get('role') == 'teacher' %}
-            {% include 'teacher/_teacher_sidebar.html' %}
-        {% endif %}
-        <div class="main-content">
-            <div class="container fade-in">
+    <div class="container fade-in">
         <div class="page-header-block">
             <h1><i class="fas fa-users"></i> View Students</h1>
             <div class="page-subtitle">Browse student records, scores, and class performance.</div>
@@ -780,7 +773,7 @@
                                             <form action="{{ url_for('school_admin_reset_student_password') }}" method="POST" style="display:block; margin:0; padding:0;">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <input type="hidden" name="student_id" value="{{ student.student_id }}">
-                                                <button type="submit" onclick="return confirm('Reset password for {{ student.firstname }} ({{ student.student_id }}) to default student password?');">
+                                                <button type="submit" onclick="return confirm('Reset password for {{ student.first_name }} ({{ student.student_id }}) to default student password?');">
                                                     <i class="fas fa-key"></i> Reset Password
                                                 </button>
                                             </form>
@@ -1043,8 +1036,5 @@
             }
         });
     </script>
-            </div>
-        </div>
-    </div>
 </body>
 </html>
