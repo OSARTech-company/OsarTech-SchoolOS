@@ -757,6 +757,7 @@
     :root:not([data-theme="light"]) .alert-content strong {
         color: var(--text);
     }
+
 }
 
 /* ==========================================================================

@@ -4628,8 +4628,8 @@ def _assistant_build_response(role, question, teacher_scope=None, source_page=''
         next_question='Can you tell me the page name or paste the URL you are on?'
     )
 
-def _assistant_call_gemini(role, question, links, knowledge_context='', response_mode='standard'):
-    api_key = (os.environ.get('GEMINI_API_KEY', '') or '').strip()
+def _assistant_call_groq(role, question, links, knowledge_context='', response_mode='standard'):
+    api_key = (os.environ.get('GROQ_API_KEY', '') or '').strip()
     if not api_key:
         return None
 
@@ -4665,7 +4665,7 @@ def _assistant_call_gemini(role, question, links, knowledge_context='', response
         f'Question: {question}\n'
         f'Known app context:\n{(knowledge_context or "No extra context.")}\n\n'
         f'Useful links:\n{links_text}\n\n'
-        'Return JSON with keys: answer (string), steps (array of up to 6 short strings), smart_links (array of up to 3 objects with url and label based on Useful links if applicable). '
+        'Return a JSON object with exactly these keys: "answer" (string), "steps" (array of up to 6 short strings), "smart_links" (array of up to 3 objects with url and label based on Useful links if applicable). '
         'Prefer concrete app actions, exact menu names, and short examples when helpful. '
         'If response mode is ultra_simple, use very short words and max 2 short steps. '
         'If response mode is simple, use very plain language. '
@@ -4676,17 +4676,21 @@ def _assistant_call_gemini(role, question, links, knowledge_context='', response
     )
     
     req_body = {
-        "contents": [{"parts": [{"text": user_prompt}]}],
-        "systemInstruction": {"parts": [{"text": system_prompt}]},
-        "generationConfig": {"response_mime_type": "application/json"}
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "response_format": {"type": "json_object"}
     }
 
     try:
         req = urllib.request.Request(
-            f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}',
+            'https://api.groq.com/openai/v1/chat/completions',
             data=json.dumps(req_body).encode('utf-8'),
             headers={
                 'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}'
             },
             method='POST',
         )
@@ -4696,11 +4700,10 @@ def _assistant_call_gemini(role, question, links, knowledge_context='', response
         
         text = ""
         try:
-            candidates = data.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                if parts:
-                    text = parts[0].get("text", "")
+            choices = data.get("choices", [])
+            if choices:
+                message = choices[0].get("message", {})
+                text = message.get("content", "")
         except Exception:
             text = ""
             
@@ -4720,16 +4723,17 @@ def _assistant_call_gemini(role, question, links, knowledge_context='', response
             if answer:
                 return {'answer': answer, 'steps': steps, 'smart_links': smart_links}
         except Exception as exc:
-            _log_suppressed_exception('_assistant_call_gemini_parse', exc)
+            _log_suppressed_exception('_assistant_call_groq_parse', exc)
         return {'answer': text[:700].strip(), 'steps': []}
     except Exception as exc:
-        _log_suppressed_exception('_assistant_call_gemini_network', exc)
+        _log_suppressed_exception('_assistant_call_groq_network', exc)
         if hasattr(exc, 'read'):
             try:
-                _log_suppressed_exception('_assistant_call_gemini_network_body', exc.read().decode('utf-8'))
+                _log_suppressed_exception('_assistant_call_groq_network_body', exc.read().decode('utf-8'))
             except:
                 pass
         return None
+
 
 def enforce_role_access(allowed_roles, redirect_endpoint='login', message='You are not allowed to access this page.'):
     role = _current_role()
@@ -54848,13 +54852,13 @@ def assistant_guide():
             if len(merged_prompts) >= 6:
                 break
         payload['quick_prompts'] = merged_prompts
-    llm_available = bool((os.environ.get('GEMINI_API_KEY', '') or '').strip())
+    llm_available = bool((os.environ.get('GROQ_API_KEY', '') or '').strip())
     should_try_llm = APP_ASSISTANT_ENABLE_OPENAI and llm_available and not payload.get('action_blocked')
     if should_try_llm:
         llm_prompt_question = question
         if page_context:
             llm_prompt_question = f"{question}\n\nPage context: {page_context}"
-        llm_payload = _assistant_call_gemini(
+        llm_payload = _assistant_call_groq(
             role,
             llm_prompt_question,
             payload.get('links') or [],
