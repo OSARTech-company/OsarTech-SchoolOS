@@ -54982,7 +54982,7 @@ def assistant_health():
         'answer_version': APP_ASSISTANT_ANSWER_VERSION,
         'checks': checks,
         'transformer': transformer_info,
-        'openai_enabled': bool(APP_ASSISTANT_ENABLE_OPENAI and (os.environ.get('GEMINI_API_KEY', '') or '').strip()),
+        'openai_enabled': bool(APP_ASSISTANT_ENABLE_OPENAI and (os.environ.get('GROQ_API_KEY', '') or '').strip()),
         'notes': notes,
     }
     return Response(json.dumps(body), status=(200 if status_ok else 503), mimetype='application/json')
