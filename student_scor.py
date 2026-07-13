@@ -9260,7 +9260,7 @@ def load_teacher_password_reset_requests(school_id, status_filter=''):
             f'''SELECT r.id, r.teacher_id, r.reason, r.status, r.requested_at,
                        r.reviewed_at, r.reviewed_by, r.review_note, t.firstname, t.lastname
                 FROM teacher_password_reset_requests r
-                LEFT JOIN teachers t ON t.school_id = r.school_id AND t.teacher_id = r.teacher_id
+                LEFT JOIN teachers t ON t.school_id = r.school_id AND t.user_id = r.teacher_id
                 WHERE {' AND '.join(where)}
                 ORDER BY r.requested_at DESC
                 LIMIT 500''',
@@ -54721,8 +54721,8 @@ def teacher_subject_score_sheet():
 
 @app.route('/assistant/guide', methods=['POST'])
 def assistant_guide():
-    role = _current_role()
-    if role not in {'super_admin', 'school_admin', 'teacher', 'student', 'parent'}:
+    role = _current_role() or 'guest'
+    if role not in {'super_admin', 'school_admin', 'teacher', 'student', 'parent', 'guest'}:
         body = {'ok': False, 'error': 'unauthorized'}
         return Response(json.dumps(body), status=403, mimetype='application/json')
 
@@ -54862,6 +54862,8 @@ def assistant_guide():
         payload['quick_prompts'] = merged_prompts
     llm_available = bool((os.environ.get('GROQ_API_KEY', '') or '').strip())
     should_try_llm = APP_ASSISTANT_ENABLE_OPENAI and llm_available and not payload.get('action_blocked')
+    import logging
+    logging.error(f"DEBUG AI: APP_ASSISTANT_ENABLE_OPENAI={APP_ASSISTANT_ENABLE_OPENAI} llm_available={llm_available} should_try_llm={should_try_llm}")
     if should_try_llm:
         llm_prompt_question = question
         if page_context:
