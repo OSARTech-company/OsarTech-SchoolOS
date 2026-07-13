@@ -4725,12 +4725,19 @@ def _assistant_call_groq(role, question, links, knowledge_context='', response_m
                 return {'answer': answer, 'steps': steps, 'smart_links': smart_links}
         except Exception as exc:
             _log_suppressed_exception('_assistant_call_groq_parse', exc)
+            with open('groq_debug.txt', 'a') as f:
+                f.write(f"Parse Error: {exc}\n")
         return {'answer': text[:700].strip(), 'steps': []}
     except Exception as exc:
         _log_suppressed_exception('_assistant_call_groq_network', exc)
+        with open('groq_debug.txt', 'a') as f:
+            f.write(f"Network Error: {exc}\n")
         if hasattr(exc, 'read'):
             try:
-                _log_suppressed_exception('_assistant_call_groq_network_body', exc.read().decode('utf-8'))
+                body = exc.read().decode('utf-8')
+                _log_suppressed_exception('_assistant_call_groq_network_body', body)
+                with open('groq_debug.txt', 'a') as f:
+                    f.write(f"Response Body: {body}\n")
             except:
                 pass
         return None
