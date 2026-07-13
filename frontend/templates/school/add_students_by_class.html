@@ -124,7 +124,7 @@
                                         <button type="submit" class="btn btn-success btn-sm">Restore</button>
                                     </form>
                                     {% else %}
-                                    <form method="POST" action="{{ url_for('school_admin_reset_student_password') }}" style="display:inline;" onsubmit="return confirm('Reset password for {{ s.firstname }} ({{ s.student_id }}) to default student password?');">
+                                    <form method="POST" action="{{ url_for('school_admin_reset_student_password') }}" style="display:inline;" data-confirm-message="Reset password for {{ s.firstname }} ({{ s.student_id }}) to default student password?" onsubmit="return confirm(this.dataset.confirmMessage);">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                         <input type="hidden" name="student_id" value="{{ s.student_id }}"/>
                                         <button type="submit" class="btn btn-warning btn-sm">Reset Password</button>

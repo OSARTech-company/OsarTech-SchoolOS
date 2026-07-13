@@ -553,7 +553,25 @@
             <div class="page-subtitle">Browse student records, scores, and class performance.</div>
         </div>
 
-        {% if students %}
+        {% if show_class_list %}
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; padding: 10px 0 30px;">
+                {% for class_name in available_classes %}
+                <a href="{{ url_for('school_admin_view_students', **{'class': class_name}) }}" style="text-decoration: none; color: inherit; display: block;">
+                    <div style="background: #ffffff; border: 1px solid #d8e0ea; border-radius: 14px; padding: 24px; text-align: center; box-shadow: 0 4px 10px rgba(15, 23, 42, 0.03); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer;" onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 12px 28px rgba(15, 23, 42, 0.08)'; this.style.borderColor='var(--brand, #0f4c81)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 10px rgba(15, 23, 42, 0.03)'; this.style.borderColor='#d8e0ea';">
+                        <i class="fas fa-chalkboard" style="font-size: 2.5rem; margin-bottom: 16px; color: var(--brand, #0f4c81); display: block;"></i>
+                        <h3 style="margin: 0 0 8px 0; font-size: 1.4rem; color: #0f172a;">{{ class_name }}</h3>
+                        <p style="margin: 0; color: #64748b; font-size: 0.95rem; font-weight: 500;">View Students <i class="fas fa-arrow-right" style="font-size:0.8rem; margin-left:4px;"></i></p>
+                    </div>
+                </a>
+                {% else %}
+                <div class="empty-state-card" style="grid-column: 1 / -1;">
+                    <i class="fas fa-folder-open empty-state-hero"></i>
+                    <h3>No Classes Found</h3>
+                    <p style="color: #64748b;">There are currently no classes available in the system.</p>
+                </div>
+                {% endfor %}
+            </div>
+        {% elif students %}
             <!-- Statistics Overview -->
             <div class="stats-overview">
                 <div class="stat-card">
@@ -773,7 +791,7 @@
                                             <form action="{{ url_for('school_admin_reset_student_password') }}" method="POST" style="display:block; margin:0; padding:0;">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <input type="hidden" name="student_id" value="{{ student.student_id }}">
-                                                <button type="submit" onclick="return confirm('Reset password for {{ student.first_name }} ({{ student.student_id }}) to default student password?');">
+                                                <button type="submit" data-confirm-message="Reset password for {{ student.first_name }} ({{ student.student_id }}) to default student password?" onclick="return confirm(this.dataset.confirmMessage);">
                                                     <i class="fas fa-key"></i> Reset Password
                                                 </button>
                                             </form>

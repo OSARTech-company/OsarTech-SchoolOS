@@ -279,11 +279,7 @@
                 path.includes('/export') ||
                 path.includes('export') ||
                 path.includes('print') ||
-                path.endsWith('.pdf') ||
-                path.endsWith('.csv') ||
-                path.endsWith('.xlsx') ||
-                path.endsWith('.xls') ||
-                path.endsWith('.zip') ||
+                /\.(pdf|csv|xlsx?|xls|zip|doc|docx|ppt|pptx|rtf|txt)($|\?|#)/i.test(lowerHref) ||
                 lowerHref.startsWith('blob:') ||
                 lowerHref.startsWith('data:');
             

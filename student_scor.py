@@ -4628,33 +4628,8 @@ def _assistant_build_response(role, question, teacher_scope=None, source_page=''
         next_question='Can you tell me the page name or paste the URL you are on?'
     )
 
-def _assistant_extract_openai_text(payload):
-    try:
-        if isinstance(payload.get('output_text'), str) and payload.get('output_text').strip():
-            return payload.get('output_text').strip()
-        output = payload.get('output') or []
-        for item in output:
-            if not isinstance(item, dict):
-                continue
-            content = item.get('content') or []
-            for block in content:
-                if not isinstance(block, dict):
-                    continue
-                if block.get('type') in {'output_text', 'text'}:
-                    text_val = block.get('text')
-                    if isinstance(text_val, str) and text_val.strip():
-                        return text_val.strip()
-                text_obj = block.get('text')
-                if isinstance(text_obj, dict):
-                    val = text_obj.get('value')
-                    if isinstance(val, str) and val.strip():
-                        return val.strip()
-    except Exception:
-        return ''
-    return ''
-
-def _assistant_call_openai(role, question, links, knowledge_context='', response_mode='standard'):
-    api_key = (os.environ.get('OPENAI_API_KEY', '') or '').strip()
+def _assistant_call_gemini(role, question, links, knowledge_context='', response_mode='standard'):
+    api_key = (os.environ.get('GEMINI_API_KEY', '') or '').strip()
     if not api_key:
         return None
 
@@ -4698,20 +4673,18 @@ def _assistant_call_openai(role, question, links, knowledge_context='', response
         'If local or pidgin, use easy Nigerian-style plain phrasing without slang excess. '
         'Keep answer under 120 words.'
     )
+    
     req_body = {
-        'model': APP_ASSISTANT_OPENAI_MODEL,
-        'input': [
-            {'role': 'system', 'content': system_prompt},
-            {'role': 'user', 'content': user_prompt},
-        ],
+        "contents": [{"parts": [{"text": user_prompt}]}],
+        "systemInstruction": {"parts": [{"text": system_prompt}]},
+        "generationConfig": {"response_mime_type": "application/json"}
     }
 
     try:
         req = urllib.request.Request(
-            'https://api.openai.com/v1/responses',
+            f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}',
             data=json.dumps(req_body).encode('utf-8'),
             headers={
-                'Authorization': f'Bearer {api_key}',
                 'Content-Type': 'application/json',
             },
             method='POST',
@@ -4719,9 +4692,20 @@ def _assistant_call_openai(role, question, links, knowledge_context='', response
         with urllib.request.urlopen(req, timeout=APP_ASSISTANT_OPENAI_TIMEOUT_SECONDS) as resp:
             raw = (resp.read() or b'').decode('utf-8', errors='ignore')
         data = json.loads(raw or '{}')
-        text = _assistant_extract_openai_text(data)
+        
+        text = ""
+        try:
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if parts:
+                    text = parts[0].get("text", "")
+        except Exception:
+            text = ""
+            
         if not text:
             return None
+            
         try:
             parsed = json.loads(text)
             answer = str(parsed.get('answer') or '').strip()
@@ -4732,7 +4716,7 @@ def _assistant_call_openai(role, question, links, knowledge_context='', response
             if answer:
                 return {'answer': answer, 'steps': steps}
         except Exception as exc:
-            _log_suppressed_exception('_assistant_call_openai', exc)
+            _log_suppressed_exception('_assistant_call_gemini', exc)
         return {'answer': text[:700].strip(), 'steps': []}
     except Exception:
         return None
@@ -53728,6 +53712,7 @@ def view_students():
         )
         class_set.update({r.get('classname', '') for r in subject_rows if r.get('classname', '')})
         available_classes, available_terms = get_student_filter_options(school_id, classnames=class_set)
+        show_class_list = False
         if selected_class and selected_class not in set(available_classes):
             selected_class = ''
         if selected_term and selected_term not in set(available_terms):
@@ -53754,12 +53739,19 @@ def view_students():
             selected_class = ''
         if selected_term and selected_term not in set(available_terms):
             selected_term = ''
-        students_data = load_students(school_id, class_filter=selected_class, term_filter=selected_term)
+            
+        show_class_list = False
+        if not selected_class:
+            show_class_list = True
+            students_data = {}
+        else:
+            students_data = load_students(school_id, class_filter=selected_class, term_filter=selected_term)
+            
         published_students_data = load_published_students_for_list(
             school_id,
             class_filter=selected_class,
             term_filter=selected_term,
-        ) if selected_term else {}
+        ) if selected_term and selected_class else {}
         if selected_term and published_students_data and (not students_data or selected_term != current_term):
             students_data = published_students_data
         # School admin usability fallback: if a class is selected but no rows match the selected term,
@@ -53841,6 +53833,7 @@ def view_students():
 
     return render_template(
         'shared/view_students.html',
+        show_class_list=show_class_list,
         students=page_students,
         positions=positions,
         total_students=total_students,
@@ -54845,13 +54838,13 @@ def assistant_guide():
             if len(merged_prompts) >= 6:
                 break
         payload['quick_prompts'] = merged_prompts
-    llm_available = bool((os.environ.get('OPENAI_API_KEY', '') or '').strip())
+    llm_available = bool((os.environ.get('GEMINI_API_KEY', '') or '').strip())
     should_try_llm = APP_ASSISTANT_ENABLE_OPENAI and llm_available and not payload.get('action_blocked')
     if should_try_llm:
         llm_prompt_question = question
         if page_context:
             llm_prompt_question = f"{question}\n\nPage context: {page_context}"
-        llm_payload = _assistant_call_openai(
+        llm_payload = _assistant_call_gemini(
             role,
             llm_prompt_question,
             payload.get('links') or [],
@@ -54973,7 +54966,7 @@ def assistant_health():
         'answer_version': APP_ASSISTANT_ANSWER_VERSION,
         'checks': checks,
         'transformer': transformer_info,
-        'openai_enabled': bool(APP_ASSISTANT_ENABLE_OPENAI and (os.environ.get('OPENAI_API_KEY', '') or '').strip()),
+        'openai_enabled': bool(APP_ASSISTANT_ENABLE_OPENAI and (os.environ.get('GEMINI_API_KEY', '') or '').strip()),
         'notes': notes,
     }
     return Response(json.dumps(body), status=(200 if status_ok else 503), mimetype='application/json')
