@@ -547,7 +547,14 @@
 </head>
 <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
     {% include "shared/_loading_overlay.html" %}
-    <div class="container fade-in">
+    <div class="app-shell topbar-layout">
+        {% if session.get('role') == 'school_admin' %}
+            {% include 'school/_school_admin_sidebar.html' %}
+        {% elif session.get('role') == 'teacher' %}
+            {% include 'teacher/_teacher_sidebar.html' %}
+        {% endif %}
+        <div class="main-content">
+            <div class="container fade-in">
         <div class="page-header-block">
             <h1><i class="fas fa-users"></i> View Students</h1>
             <div class="page-subtitle">Browse student records, scores, and class performance.</div>
@@ -684,7 +691,7 @@
                             <th>Student</th>
                             <th>Class</th>
                             <th>Position</th>
-                            <th>Subjects</th>
+
                             <th>Average Score</th>
                             <th>Grade</th>
                             <th>Status</th>
@@ -724,15 +731,7 @@
                                     -
                                 {% endif %}
                             </td>
-                            <td class="cell-subjects" data-label="Subjects">
-                                <div class="subjects-list">
-                                    {% if student.subjects %}
-                                        {% for subject in student.subjects.keys() %}
-                                            <span class="subject-tag">{{ subject }}</span>
-                                        {% endfor %}
-                                    {% endif %}
-                                </div>
-                            </td>
+
                             <td class="cell-average" data-label="Average"><strong>{{ "%.1f"|format(student.average_marks) }}%</strong></td>
                             <td class="cell-grade" data-label="Grade"><span class="grade-badge {{ grade_css_class_from_grade(student.Grade, school) }}">{{ display_grade_label(student.Grade, school) }}</span></td>
                             <td class="cell-status" data-label="Status"><span class="status-badge status-{{ student.Status|lower }}">{{ student.Status }}</span></td>
@@ -1044,5 +1043,8 @@
             }
         });
     </script>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

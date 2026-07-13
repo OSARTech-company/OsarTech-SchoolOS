@@ -1,5 +1,10 @@
 {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
+        <noscript>
+            <style>
+                .flash-messages-global { display: block !important; }
+            </style>
+        </noscript>
         <div class="flash-messages-global" style="display: none;">
             {% for category, message in messages %}
                 <div class="flash {{ category }}">{{ message }}</div>
@@ -73,9 +78,11 @@
             }
             .premium-toast.error::before { background: #ef4444; }
             .premium-toast.warning::before { background: #f59e0b; }
+            .premium-toast.info::before { background: #3b82f6; }
             .premium-toast .toast-icon { font-size: 20px; flex-shrink: 0; }
             .premium-toast.error .toast-icon { color: #ef4444; }
             .premium-toast.warning .toast-icon { color: #f59e0b; }
+            .premium-toast.info .toast-icon { color: #3b82f6; }
             .premium-toast .toast-content {
                 flex-grow: 1;
                 font-size: 0.9rem;
@@ -237,7 +244,7 @@
         }
 
         var toast = document.createElement('div');
-        toast.className = 'premium-toast ' + (isError ? 'error' : 'warning');
+        toast.className = 'premium-toast ' + (isError ? 'error' : (isWarning ? 'warning' : 'info'));
 
         var tIcon = document.createElement('div');
         tIcon.className = 'toast-icon';
@@ -325,6 +332,11 @@
                 iconClass = 'fa-triangle-exclamation';
                 iconColor = '#f59e0b';
                 showToast(text, iconClass, false, true);
+            } else {
+                typeTitle = 'Notification';
+                iconClass = 'fa-info-circle';
+                iconColor = '#3b82f6';
+                showToast(text, iconClass, false, false);
             }
         });
     }
