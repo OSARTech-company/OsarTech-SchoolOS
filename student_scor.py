@@ -4653,8 +4653,9 @@ def _assistant_call_gemini(role, question, links, knowledge_context='', response
         'Use the provided knowledge context and page guidance as the primary source of truth. '
         'Interpret misspelled or unclear prompts when reasonable. '
         'When the user asks how to do something, answer with the exact page name, the relevant fields/buttons, and the shortest correct workflow. '
+        'If the user pastes an error message or describes an issue, explain what the error means in simple terms and provide steps to resolve it. '
         'You MUST NOT claim to execute actions, update data, publish results, send messages, or change settings. '
-        'You only explain steps users should perform in the app UI. '
+        'You only explain steps users should perform in the app UI or explain what went wrong. '
         'If the request is missing key context, ask one short clarifying question instead of guessing. '
         'If unsure, state uncertainty and direct the user to Help or Report Issue.'
     )
@@ -4719,9 +4720,15 @@ def _assistant_call_gemini(role, question, links, knowledge_context='', response
             if answer:
                 return {'answer': answer, 'steps': steps, 'smart_links': smart_links}
         except Exception as exc:
-            _log_suppressed_exception('_assistant_call_gemini', exc)
+            _log_suppressed_exception('_assistant_call_gemini_parse', exc)
         return {'answer': text[:700].strip(), 'steps': []}
-    except Exception:
+    except Exception as exc:
+        _log_suppressed_exception('_assistant_call_gemini_network', exc)
+        if hasattr(exc, 'read'):
+            try:
+                _log_suppressed_exception('_assistant_call_gemini_network_body', exc.read().decode('utf-8'))
+            except:
+                pass
         return None
 
 def enforce_role_access(allowed_roles, redirect_endpoint='login', message='You are not allowed to access this page.'):
