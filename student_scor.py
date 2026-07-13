@@ -44734,9 +44734,12 @@ def teacher_dashboard():
             selected_score_class = score_nav_tree[0]['classes'][0]
 
     if selected_score_subject:
-        valid_classes_for_subject = set(score_subject_nav_map.get(selected_score_subject, set()))
+        valid_classes_for_subject = list(score_subject_nav_map.get(selected_score_subject, set()))
         if selected_score_class not in valid_classes_for_subject:
-            selected_score_class = ''
+            if len(valid_classes_for_subject) == 1:
+                selected_score_class = valid_classes_for_subject[0]
+            else:
+                selected_score_class = ''
     elif selected_score_class:
         valid_classes_global = {cls for values in score_subject_nav_map.values() for cls in values}
         if selected_score_class not in valid_classes_global:

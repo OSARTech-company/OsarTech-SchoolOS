@@ -420,6 +420,19 @@
                         <a href="{{ url_for('teacher_subject_score_sheet', class=selected_score_class, subject=selected_score_subject) }}" class="btn btn-primary btn-sm">
                             <i class="fas fa-table-list"></i> Switch to Grid (Subject Sheet) View
                         </a>
+                        {% elif selected_score_subject and score_nav_tree %}
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <span class="note" style="margin:0; font-weight:bold;">Open Grid View for:</span>
+                            {% for node in score_nav_tree %}
+                                {% if node.subject == selected_score_subject %}
+                                    {% for cls in node.classes %}
+                                    <a href="{{ url_for('teacher_subject_score_sheet', class=cls, subject=selected_score_subject) }}" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-table-list"></i> {{ cls }}
+                                    </a>
+                                    {% endfor %}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
                         {% endif %}
                     </div>
                     <table class="enhanced-table">
