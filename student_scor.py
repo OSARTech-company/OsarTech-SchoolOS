@@ -4690,7 +4690,8 @@ def _assistant_call_groq(role, question, links, knowledge_context='', response_m
             data=json.dumps(req_body).encode('utf-8'),
             headers={
                 'Content-Type': 'application/json',
-                'Authorization': f'Bearer {api_key}'
+                'Authorization': f'Bearer {api_key}',
+                'User-Agent': 'SchoolOS/1.0 (Windows NT 10.0; Win64; x64)'
             },
             method='POST',
         )
