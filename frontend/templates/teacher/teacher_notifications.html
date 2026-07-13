@@ -100,13 +100,17 @@
                                     <td>{{ alert.pending_students }}</td>
                                     <td>{{ alert.message }}</td>
                                     <td>
-                                        {% if alert.subject %}
+                                        {% if alert.subject == 'Behaviour Assessment' %}
+                                        <a href="{{ url_for('teacher_behaviour_assessment', classname=alert.classname, arm_mode=(request.args.get('arm_mode') or '')) }}" class="btn btn-primary btn-xs">
+                                            Go to Behaviour Assessment
+                                        </a>
+                                        {% elif alert.subject %}
                                         <a href="{{ url_for('teacher_dashboard', tab='score', score_class=alert.classname, score_subject=alert.subject, arm_mode=(request.args.get('arm_mode') or '')) }}" class="btn btn-primary btn-xs">
                                             Go to Score Entry
                                         </a>
                                         {% else %}
-                                        <a href="{{ url_for('teacher_dashboard', tab='score', score_class=alert.classname, arm_mode=(request.args.get('arm_mode') or '')) }}" class="btn btn-primary btn-xs">
-                                            Go to Score Entry
+                                        <a href="{{ url_for('teacher_dashboard', tab='submission', submit_class=alert.classname, arm_mode=(request.args.get('arm_mode') or '')) }}" class="btn btn-primary btn-xs">
+                                            Go to Submission
                                         </a>
                                         {% endif %}
                                     </td>

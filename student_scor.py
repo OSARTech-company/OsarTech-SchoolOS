@@ -45046,11 +45046,7 @@ def teacher_dashboard():
             'scope': 'class_owner',
             'classname': classname,
             'subject': '',
-            'pending_students': sum(
-                int(row.get('pending_students', 0) or 0)
-                for row in (s.get('subject_progress') or [])
-                if int(row.get('pending_students', 0) or 0) > 0
-            ),
+            'pending_students': max(0, int(s.get('total', 0) or 0) - int(s.get('completed', 0) or 0)),
             'message': f'{classname}: pending subjects - {", ".join(pending_subject_names[:6])}' + ('...' if len(pending_subject_names) > 6 else ''),
         })
     for classname in classes:
@@ -45889,7 +45885,11 @@ def teacher_notifications():
             class_students_data={idx: s for idx, s in enumerate(class_students)},
         )
         subject_pending_count = sum(1 for row in subject_progress.get('rows', []) if int(row.get('pending_students', 0)) > 0)
+        total = len(class_students)
+        completed = sum(1 for s in class_students if is_student_score_complete(s, school, current_term))
         class_publish_status[classname] = {
+            'total': total,
+            'completed': completed,
             'subject_progress': subject_progress.get('rows', []),
             'subject_pending_count': subject_pending_count,
             'behaviour_missing_count': int(behaviour_progress.get('missing_count', 0) or 0),
@@ -45909,11 +45909,7 @@ def teacher_notifications():
             'scope': 'class_owner',
             'classname': classname,
             'subject': '',
-            'pending_students': sum(
-                int(row.get('pending_students', 0) or 0)
-                for row in (status_row.get('subject_progress') or [])
-                if int(row.get('pending_students', 0) or 0) > 0
-            ),
+            'pending_students': max(0, int(status_row.get('total', 0) or 0) - int(status_row.get('completed', 0) or 0)),
             'message': f'{classname}: pending subjects - {", ".join(pending_subject_names[:6])}' + ('...' if len(pending_subject_names) > 6 else ''),
         })
 
