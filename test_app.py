@@ -2276,6 +2276,30 @@ def test_grade_from_score_uses_custom_grade_scale_json(app_module):
     assert m.normalize_grade_band("B", school) == "D"
 
 
+def test_teacher_scope_stays_exact_for_arm_assignments(app_module, monkeypatch):
+    m = app_module
+
+    class FakeCursor:
+        def execute(self, *args, **kwargs):
+            return None
+
+        def fetchall(self):
+            return [("JSS1A",)]
+
+    @contextlib.contextmanager
+    def fake_db_connection(*args, **kwargs):
+        yield type("FakeConn", (), {"cursor": lambda self: FakeCursor()})()
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "get_teacher_subject_assignments", lambda *args, **kwargs: [])
+
+    scope_classes = m.get_teacher_scope_classes("SCH1", "T1", term="First Term", academic_year="2025-2026")
+
+    assert scope_classes == ["JSS1A"]
+    assert not m.teacher_has_class_access("SCH1", "T1", "JSS1B", term="First Term", academic_year="2025-2026")
+
+
 def test_teacher_score_entry_start_redirects_for_single_class(client, app_module, monkeypatch):
     m = app_module
     

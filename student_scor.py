@@ -1953,7 +1953,7 @@ def _assistant_get_teacher_scope():
     class_assignments = sorted(
         {
             (item or '').strip()
-            for item in get_teacher_classes(
+            for item in get_teacher_scope_classes(
                 school_id,
                 teacher_id,
                 term=current_term,
@@ -29229,8 +29229,8 @@ def get_class_assignments(school_id):
         })
     return assignments
 
-def get_teacher_classes(school_id, teacher_id, term='', academic_year=''):
-    """Get classes assigned to a teacher."""
+def get_teacher_scope_classes(school_id, teacher_id, term='', academic_year=''):
+    """Return the exact class/arm assignments for a teacher without expanding to related arms."""
     with db_connection() as conn:
         c = conn.cursor()
         where = ['school_id = ?', 'teacher_id = ?']
@@ -29253,14 +29253,20 @@ def get_teacher_classes(school_id, teacher_id, term='', academic_year=''):
                 out.append(cls)
         return out
 
+
+def get_teacher_classes(school_id, teacher_id, term='', academic_year=''):
+    """Backward-compatible alias for teacher class assignments."""
+    return get_teacher_scope_classes(school_id, teacher_id, term=term, academic_year=academic_year)
+
+
 def teacher_has_class_access(school_id, teacher_id, classname, term='', academic_year=''):
-    """Check whether teacher is assigned to a class."""
+    """Check whether teacher is assigned to a class, using exact class/arm scope only."""
     if not classname:
         return False
     target = canonicalize_classname(classname).lower()
     classes = {
         canonicalize_classname(c).lower()
-        for c in get_teacher_classes(school_id, teacher_id, term=term, academic_year=academic_year)
+        for c in get_teacher_scope_classes(school_id, teacher_id, term=term, academic_year=academic_year)
     }
     return target in classes
 
