@@ -44639,22 +44639,15 @@ def teacher_dashboard():
     if arm_mode_override in {'together', 'separate'}:
         arm_mode = arm_mode_override
     term_students_all = None
-    if arm_mode == 'together':
-        term_students_all = load_students(school_id, term_filter=current_term)
-        term_students_all = {
-            sid: row for sid, row in (term_students_all or {}).items()
-            if (row.get('academic_year') or current_year) == current_year
-        }
 
     def _class_match(student_classname, target_classname):
+        # Always use exact matching for class assignment visibility.
+        # The 'together' mode should only affect RANKING logic, not which students
+        # are visible to teachers. Teachers assigned to 6A should only see 6A students,
+        # not 6B students, even if they rank together.
         if not student_classname or not target_classname:
             return False
-        if arm_mode != 'together':
-            return student_classname.strip().lower() == target_classname.strip().lower()
-        return (
-            class_arm_ranking_group(student_classname, mode='together')
-            == class_arm_ranking_group(target_classname, mode='together')
-        )
+        return student_classname.strip().lower() == target_classname.strip().lower()
     subject_assignment_rows = get_teacher_subject_assignments(
         school_id,
         teacher_id=teacher_id,
@@ -45855,22 +45848,24 @@ def teacher_notifications():
     if arm_mode_override in {'together', 'separate'}:
         arm_mode = arm_mode_override
     term_students_all = None
-    if arm_mode == 'together':
-        term_students_all = load_students(school_id, term_filter=current_term)
-        term_students_all = {
-            sid: row for sid, row in (term_students_all or {}).items()
-            if (row.get('academic_year') or current_year) == current_year
-        }
 
     def _class_match(student_classname, target_classname):
+        # Always use exact matching for class assignment visibility.
+        # The 'together' mode should only affect RANKING logic, not which students
+        # are visible to teachers. Teachers assigned to 6A should only see 6A students,
+        # not 6B students, even if they rank together.
         if not student_classname or not target_classname:
             return False
-        if arm_mode != 'together':
-            return student_classname.strip().lower() == target_classname.strip().lower()
-        return (
-            class_arm_ranking_group(student_classname, mode='together')
-            == class_arm_ranking_group(target_classname, mode='together')
-        )
+        return student_classname.strip().lower() == target_classname.strip().lower()
+
+    def _class_match(student_classname, target_classname):
+        # Always use exact matching for class assignment visibility.
+        # The 'together' mode should only affect RANKING logic, not which students
+        # are visible to teachers. Teachers assigned to 6A should only see 6A students,
+        # not 6B students, even if they rank together.
+        if not student_classname or not target_classname:
+            return False
+        return student_classname.strip().lower() == target_classname.strip().lower()
 
     class_publish_status = {}
     for classname in classes:
