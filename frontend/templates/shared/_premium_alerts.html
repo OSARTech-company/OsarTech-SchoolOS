@@ -1,10 +1,5 @@
 {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-        <noscript>
-            <style>
-                .flash-messages-global { display: block !important; }
-            </style>
-        </noscript>
         <div class="flash-messages-global" style="display: none;">
             {% for category, message in messages %}
                 <div class="flash {{ category }}">{{ message }}</div>

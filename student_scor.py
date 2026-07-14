@@ -48224,6 +48224,8 @@ def teacher_enter_scores():
         protected_subjects = set()
         for row in class_subject_assignments:
             assigned_teacher = (row.get('teacher_id') or '').strip()
+            other_teacher_classname = canonicalize_classname(row.get('classname', ''))
+            current_teacher_classname = canonicalize_classname(class_name)
             subject_name = normalize_subject_name(row.get('subject', ''))
             if not subject_name:
                 continue
@@ -48234,7 +48236,10 @@ def teacher_enter_scores():
                 current_year,
                 subject_name=subject_name,
             )
-            if assigned_teacher and assigned_teacher != teacher_id and assigned_teacher not in submitted_teacher_ids:
+            # Only block if: (1) another teacher is assigned, (2) they're on the SAME class arm (not different arm),
+            # and (3) they haven't submitted yet. This allows teachers on different arms (e.g., 6A vs 6B) to submit independently.
+            if (assigned_teacher and assigned_teacher != teacher_id and assigned_teacher not in submitted_teacher_ids
+                and other_teacher_classname == current_teacher_classname):
                 # Handover-safe: if inherited subject scores are already complete,
                 # do not lock editing just because teacher assignment changed.
                 target = (subject_name or '').strip().lower()
@@ -54142,6 +54147,7 @@ def is_teacher_subject_sheet_locked(school_id, teacher_id, classname, subject_na
     )
     for row in (assignment_rows or []):
         assigned_teacher = (row.get('teacher_id') or '').strip()
+        other_teacher_classname = canonicalize_classname(row.get('classname', ''))
         normalized_subject = normalize_subject_name(row.get('subject', ''))
         if normalized_subject != subject_name:
             continue
@@ -54152,7 +54158,9 @@ def is_teacher_subject_sheet_locked(school_id, teacher_id, classname, subject_na
             academic_year,
             subject_name=normalized_subject,
         )
-        if assigned_teacher and assigned_teacher != teacher_id and assigned_teacher not in submitted_teacher_ids:
+        # Only block if: (1) another teacher is assigned, (2) they're on the SAME class arm (not different arm),
+        # and (3) they haven't submitted yet. This allows teachers on different arms (e.g., 6A vs 6B) to submit independently.
+        if assigned_teacher and assigned_teacher != teacher_id and assigned_teacher not in submitted_teacher_ids and other_teacher_classname == classname:
             pending_count = 0
             target = normalized_subject.lower()
             for _sid, st_now in (class_students or {}).items():

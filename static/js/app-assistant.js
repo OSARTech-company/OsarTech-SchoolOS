@@ -346,6 +346,7 @@
                     return;
                 }
                 var lines = [data.answer || 'I could not find a direct answer.'];
+                var detailsLines = [];
                 if (data.role_scope) {
                     lines.push(String(data.role_scope));
                 }
@@ -367,24 +368,41 @@
                     lines.push('Useful pages: ' + data.links.map(function (item) { return item.label; }).join(', '));
                 }
                 if (Array.isArray(data.source_hints) && data.source_hints.length) {
-                    lines.push('Relevant pages: ' + data.source_hints.join(', '));
+                    detailsLines.push('Relevant pages: ' + data.source_hints.join(', '));
                 }
                 if (typeof data.confidence === 'number') {
-                    lines.push('Confidence: ' + Math.round(Math.max(0, Math.min(1, data.confidence)) * 100) + '%');
+                    detailsLines.push('Confidence: ' + Math.round(Math.max(0, Math.min(1, data.confidence)) * 100) + '%');
                 }
                 if (data.safety_note) {
-                    lines.push('Safety: ' + data.safety_note);
+                    detailsLines.push('Safety: ' + data.safety_note);
                 }
                 if (data.next_question) {
                     lines.push('Next: ' + data.next_question);
                 }
                 if (data.answer_version) {
-                    lines.push('Answer version: ' + String(data.answer_version));
+                    detailsLines.push('Answer version: ' + String(data.answer_version));
                 }
                 var answerText = lines.join('\n');
                 createStreamedBotMessage(messages, answerText, function (botNode) {
                     history.push({ role: 'assistant', text: answerText });
                     history = history.slice(-8);
+                    if (detailsLines.length > 0) {
+                        var detailsWrap = document.createElement('details');
+                        detailsWrap.className = 'app-ai-details';
+                        detailsWrap.style.marginTop = '8px';
+                        detailsWrap.style.fontSize = '0.85em';
+                        detailsWrap.style.opacity = '0.8';
+                        var summary = document.createElement('summary');
+                        summary.textContent = 'System Details';
+                        summary.style.cursor = 'pointer';
+                        detailsWrap.appendChild(summary);
+                        var detailsPre = document.createElement('div');
+                        detailsPre.style.whiteSpace = 'pre-wrap';
+                        detailsPre.style.marginTop = '4px';
+                        detailsPre.textContent = detailsLines.join('\n');
+                        detailsWrap.appendChild(detailsPre);
+                        botNode.appendChild(detailsWrap);
+                    }
                     renderFeedbackControls(csrfToken, botNode, text, answerText);
                     renderSmartLinks(botNode, data.smart_links || []);
                     renderFixSnippet(botNode, data.fix_snippet || '');
