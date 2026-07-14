@@ -23500,6 +23500,134 @@ def submit_result_approval_request(school_id, classname, term, academic_year, te
                 (school_id, classname, term, academic_year or '', teacher_id, resolved_teacher_name, resolved_principal_name),
             )
 
+def notify_students_result_published(school_id, classname, term, academic_year=''):
+    """
+    Notify all students when their class results are published.
+    Creates an in-app notification and queues email/SMS if configured.
+    """
+    try:
+        classname = (classname or '').strip()
+        term = (term or '').strip()
+        if not classname or not term or not school_id:
+            return False
+        
+        # Load class students to count recipients
+        class_students = load_students(school_id, class_filter=classname, term_filter=term)
+        if not class_students:
+            return False
+        
+        recipient_count = len(class_students)
+        school_name = (get_school(school_id) or {}).get('school_name', 'School')
+        
+        # Create in-app notification
+        title = f'Results Published - {classname}'
+        body = f'Your academic results for {term} ({classname}) are now available. Visit your profile to view.'
+        
+        # Queue notification for all students in this class
+        enqueue_notification_job(
+            school_id=school_id,
+            audience_role='student',
+            title=title,
+            body=body,
+            target_scope=f'class:{classname}:term:{term}',
+            recipients_estimate=recipient_count,
+            channel='in_app',
+            created_by='system_result_publication'
+        )
+        
+        return True
+    except Exception as exc:
+        logging.error(f"Failed to notify students of result publication: {exc}")
+        return False
+
+def notify_recipients_new_message(school_id, message_id, recipient_role, recipient_count=0, message_title='', sender_name=''):
+    """
+    Notify recipients when a new message is sent to them.
+    Creates an in-app notification for message recipients.
+    """
+    try:
+        if not school_id or not message_id or not recipient_role:
+            return False
+        
+        title = f'New message from {sender_name}' if sender_name else 'You have a new message'
+        body = message_title[:180] if message_title else f'You received a new message. Check your inbox.'
+        
+        # Queue notification for recipients
+        enqueue_notification_job(
+            school_id=school_id,
+            audience_role=recipient_role,
+            title=title,
+            body=body,
+            target_scope=f'message:{message_id}',
+            recipients_estimate=max(1, recipient_count),
+            channel='in_app',
+            created_by='system_message_sent'
+        )
+        
+        return True
+    except Exception as exc:
+        logging.error(f"Failed to notify recipients of new message: {exc}")
+        return False
+
+def notify_teachers_term_deadline_approaching(school_id, term, days_until_deadline=0):
+    """
+    Send reminders to teachers about upcoming term deadlines for score submission.
+    Called daily to remind teachers with incomplete score submissions.
+    """
+    try:
+        if not school_id or not term or days_until_deadline <= 0:
+            return False
+        
+        # Get all teachers with incomplete score submissions for this term
+        with db_connection() as conn:
+            c = conn.cursor()
+            db_execute(
+                c,
+                """SELECT DISTINCT ca.teacher_id
+                   FROM class_assignments ca
+                   WHERE ca.school_id = ?
+                     AND ca.term = ?
+                     AND ca.teacher_id NOT IN (
+                       SELECT DISTINCT rp.teacher_id
+                       FROM result_publications rp
+                       WHERE rp.school_id = ? AND rp.term = ? AND rp.is_published = 1
+                     )""",
+                (school_id, term, school_id, term)
+            )
+            teacher_rows = c.fetchall() or []
+        
+        if not teacher_rows:
+            return False
+        
+        teacher_count = len(teacher_rows)
+        
+        if days_until_deadline == 1:
+            title = f'URGENT: Score submission closes TODAY'
+            body = f'This is your final reminder. Submit scores for {term} before end of day.'
+        elif days_until_deadline <= 3:
+            title = f'Reminder: {days_until_deadline} days left to submit scores'
+            body = f'Please submit your scores for {term} within the next {days_until_deadline} days.'
+        else:
+            title = f'Reminder: Submit scores for {term}'
+            body = f'You have {days_until_deadline} days remaining to submit scores.'
+        
+        # Queue notification for teachers
+        enqueue_notification_job(
+            school_id=school_id,
+            audience_role='teacher',
+            title=title,
+            body=body,
+            target_scope=f'term_deadline:{term}',
+            recipients_estimate=teacher_count,
+            channel='in_app',
+            created_by='system_term_deadline_reminder'
+        )
+        
+        return True
+    except Exception as exc:
+        logging.error(f"Failed to send term deadline reminders: {exc}")
+        return False
+
 def publish_results_for_class_atomic(school_id, classname, term, teacher_id, academic_year='', reviewed_by='', review_note='', attendance_gate=None):
     """Publish class results in a single transaction (snapshot + publish flag)."""
     ensure_result_publication_approval_columns()
@@ -23675,6 +23803,9 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
             )
         except Exception as exc:
             logging.warning("Failed to enforce term edit lock on publish: %s", exc)
+    
+    # Notify students that their results have been published
+    notify_students_result_published(school_id, classname, term, publish_year)
 
 def review_result_approval_request(school_id, classname, term, academic_year, admin_user_id, approve, review_note=''):
     ensure_result_publication_approval_columns()
