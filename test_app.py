@@ -508,6 +508,67 @@ def test_build_subjects_from_config_stream_accepts_multiple_optional_without_lim
     assert "Agricultural Science" in subjects
 
 
+def test_get_class_attendance_publish_readiness_matches_canonicalized_class_names(app_module, monkeypatch):
+    m = app_module
+
+    class FakeCursor:
+        def __init__(self):
+            self.query = ''
+            self.params = None
+
+        def execute(self, query, params=None):
+            self.query = query
+            self.params = params
+
+        def fetchall(self):
+            if 'FROM student_attendance' in self.query:
+                return [('ST1', '2025-01-02', 'Primary 6A')]
+            return []
+
+        def fetchone(self):
+            if 'information_schema.columns' in self.query:
+                return None
+            return None
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    def fake_db_execute(cursor, query, params=None):
+        cursor.execute(query, params)
+
+    monkeypatch.setattr(m, 'ensure_student_attendance_schema', lambda: True)
+    monkeypatch.setattr(
+        m,
+        'get_term_instructional_dates',
+        lambda school_id, academic_year, term: {
+            'valid_dates': [datetime(2025, 1, 2).date()],
+            'valid_iso_set': {'2025-01-02'},
+            'open_date': datetime(2025, 1, 2).date(),
+            'close_date': datetime(2025, 1, 2).date(),
+            'message': '',
+        },
+    )
+    monkeypatch.setattr(m, 'get_manual_result_attendance_map', lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, 'db_connection', fake_db_connection)
+    monkeypatch.setattr(m, 'db_execute', fake_db_execute)
+
+    readiness = m.get_class_attendance_publish_readiness(
+        school_id='SCH1',
+        classname='PRIMARY6A',
+        term='First Term',
+        academic_year='2025-2026',
+        class_students_data={'ST1': {'firstname': 'Ada', 'classname': 'PRIMARY6A', 'term': 'First Term'}},
+    )
+
+    assert readiness['ready'] is True
+    assert readiness['missing_rows'] == []
+
+
 def test_review_result_approval_request_approve_path(app_module, monkeypatch):
     m = app_module
     called = {}
