@@ -1,0 +1,80 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Alumni Network</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+<div class="app-shell topbar-layout">
+    {% set active_page = 'alumni' %}
+    {% include 'school/_school_admin_sidebar.html' %}
+    <div class="main-content">
+<div class="container">
+    <div class="header">
+        <h1>Alumni Directory <i class="fas fa-user-graduate"></i></h1>
+        <p><a class="btn" href="{{ url_for('school_admin_dashboard') }}">Back to Dashboard</a></p>
+    </div>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <h2><i class="fas fa-graduation-cap"></i> Graduate a Student</h2>
+        <form method="post" action="{{ url_for('school_admin_make_alumni') }}" class="toolbar">
+            <div>
+                <label>Student ID</label>
+                <input type="text" name="student_id" placeholder="e.g. 26/001/JSS1" required>
+            </div>
+            <div>
+                <label>Alumni/Graduation Year</label>
+                <input type="text" name="alumni_year" value="{{ current_year }}" required>
+            </div>
+            <button class="btn btn-primary" type="submit"><i class="fas fa-award"></i> Make Alumni</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Alumni Network Directory</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Student ID</th>
+                    <th>Name</th>
+                    <th>Last Class</th>
+                    <th>Graduation Year</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in alumni %}
+            <tr>
+                <td>{{ row.student_id }}</td>
+                <td>{{ row.name }}</td>
+                <td>{{ row.last_class }}</td>
+                <td>{{ row.alumni_year }}</td>
+                <td>{{ row.phone or '-' }}</td>
+                <td>{{ row.email or '-' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">No alumni recorded yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>

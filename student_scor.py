@@ -152,7 +152,7 @@ PWA_BODY_SNIPPET = """
 
   function urlBase64ToUint8Array(base64String) {
     var padding = '='.repeat((4 - base64String.length % 4) % 4);
-    var base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    var base64 = (base64String + padding).replace(/\\-/g, '+').replace(/_/g, '/');
     var rawData = window.atob(base64);
     var outputArray = new Uint8Array(rawData.length);
     for (var i = 0; i < rawData.length; ++i) {
@@ -6641,6 +6641,8 @@ def init_db():
     safe_exec_ignore("ALTER TABLE students ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     safe_exec_ignore("ALTER TABLE students ADD COLUMN is_archived INTEGER DEFAULT 0")
     safe_exec_ignore("ALTER TABLE students ADD COLUMN archived_at TIMESTAMP")
+    safe_exec_ignore("ALTER TABLE students ADD COLUMN is_alumni INTEGER DEFAULT 0")
+    safe_exec_ignore("ALTER TABLE students ADD COLUMN alumni_year TEXT DEFAULT ''")
     
     # Teachers table
     db_execute(c, """CREATE TABLE IF NOT EXISTS teachers (
@@ -22938,11 +22940,11 @@ def compute_class_subject_completion(school_id, classname, term, academic_year='
 
     if class_students_data is None:
         class_students_data = load_students(school_id, class_filter=classname, term_filter=term)
-    target_class = classname.strip().lower()
+    target_class = canonicalize_classname(classname)
     target_term = term.strip().lower()
     students = [
         s for s in class_students_data.values()
-        if (s.get('classname') or '').strip().lower() == target_class
+        if canonicalize_classname(s.get('classname') or '') == target_class
         and (s.get('term') or '').strip().lower() == target_term
     ]
     total_students = len(students)
@@ -23012,10 +23014,11 @@ def compute_class_subject_completion(school_id, classname, term, academic_year='
             'eligible_students': eligible_students,
             'completed_students': completed_students,
             'pending_students': pending_students,
-            'ready': eligible_students > 0 and pending_students == 0,
+            'ready': eligible_students == 0 or pending_students == 0,
         })
 
-    ready = bool(progress_rows) and all((row.get('eligible_students', 0) > 0 and row.get('pending_students', 0) == 0) for row in progress_rows)
+    has_eligible = any(row.get('eligible_students', 0) > 0 for row in progress_rows)
+    ready = bool(progress_rows) and has_eligible and all(row.get('pending_students', 0) == 0 for row in progress_rows if row.get('eligible_students', 0) > 0)
     return {
         'rows': progress_rows,
         'ready': ready,
@@ -34256,6 +34259,58 @@ def school_admin_dashboard():
     current_year = (school or {}).get('academic_year', '')
     term_calendar = get_school_term_calendar(school_id, current_year, current_term)
     term_program_for_progress = get_school_term_program(school_id, current_year, current_term)
+
+@app.route('/school-admin/alumni', methods=['GET'])
+@require_roles('school_admin')
+def school_admin_alumni():
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('''SELECT student_id, firstname, lastname, classname, alumni_year, student_phone, email 
+                 FROM students 
+                 WHERE school_id = %s AND is_alumni = 1
+                 ORDER BY alumni_year DESC, firstname ASC''', (school_id,))
+    alumni_list = c.fetchall()
+    conn.close()
+    
+    alumni_data = []
+    for row in alumni_list:
+        alumni_data.append({
+            'student_id': row[0],
+            'name': f"{row[1]} {row[2] or ''}".strip(),
+            'last_class': row[3],
+            'alumni_year': row[4],
+            'phone': row[5],
+            'email': row[6]
+        })
+        
+    return render_template('school/school_admin_alumni.html', alumni=alumni_data, current_year=get_school(school_id).get('academic_year', ''))
+
+@app.route('/school-admin/make-alumni', methods=['POST'])
+@require_roles('school_admin')
+def school_admin_make_alumni():
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    student_id = request.form.get('student_id', '').strip()
+    alumni_year = request.form.get('alumni_year', '').strip()
+    
+    if not student_id or not alumni_year:
+        flash("Student ID and Alumni Year are required.", "error")
+        return redirect(request.referrer or url_for('school_admin_dashboard'))
+        
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('UPDATE students SET is_alumni = 1, alumni_year = %s, is_archived = 1 WHERE school_id = %s AND student_id = %s', 
+              (alumni_year, school_id, student_id))
+    affected = c.rowcount
+    conn.commit()
+    conn.close()
+    
+    if affected > 0:
+        flash(f"Student {student_id} successfully graduated to Alumni for year {alumni_year}.", "success")
+    else:
+        flash("Student not found.", "error")
+        
+    return redirect(request.referrer or url_for('school_admin_alumni'))
     term_open_progress = build_term_open_progress(term_calendar, term_program_for_progress)
     dashboard_term_events = build_term_program_events(term_program_for_progress)
     dashboard_term_events_payload = []
@@ -44784,7 +44839,7 @@ def teacher_dashboard():
         # not 6B students, even if they rank together.
         if not student_classname or not target_classname:
             return False
-        return student_classname.strip().lower() == target_classname.strip().lower()
+        return canonicalize_classname(student_classname) == canonicalize_classname(target_classname)
     subject_assignment_rows = get_teacher_subject_assignments(
         school_id,
         teacher_id=teacher_id,
@@ -46002,7 +46057,7 @@ def teacher_notifications():
         # not 6B students, even if they rank together.
         if not student_classname or not target_classname:
             return False
-        return student_classname.strip().lower() == target_classname.strip().lower()
+        return canonicalize_classname(student_classname) == canonicalize_classname(target_classname)
 
     class_publish_status = {}
     for classname in classes:
@@ -54862,7 +54917,7 @@ def teacher_subject_score_sheet():
 @app.route('/assistant/guide', methods=['POST'])
 def assistant_guide():
     role = _current_role() or 'guest'
-    if role not in {'super_admin', 'school_admin', 'teacher', 'student', 'parent', 'guest'}:
+    if role not in {'super_admin', 'school_admin', 'teacher', 'student', 'parent'}:
         body = {'ok': False, 'error': 'unauthorized'}
         return Response(json.dumps(body), status=403, mimetype='application/json')
 

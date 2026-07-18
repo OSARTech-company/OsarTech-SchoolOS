@@ -84,6 +84,10 @@
                     <i class="fas fa-users"></i>
                     <span>View Students</span>
                 </a>
+                <a href="{{ url_for('school_admin_alumni') }}" class="side-link{% if active_page == 'alumni' %} active{% endif %}">
+                    <i class="fas fa-award"></i>
+                    <span>Alumni Directory</span>
+                </a>
                 <a href="{{ url_for('school_admin_add_students_by_class') }}" class="side-link{% if active_page == 'add_students' %} active{% endif %}">
                     <i class="fas fa-user-plus"></i>
                     <span>Add Students</span>
