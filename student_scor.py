@@ -34245,21 +34245,6 @@ def super_admin_toggle_school_operations():
 
 # ==================== SCHOOL ADMIN ROUTES ====================
 
-@app.route('/school-admin')
-def school_admin_dashboard():
-    if session.get('role') != 'school_admin':
-        return redirect(url_for('login'))
-    
-    school_id = _normalize_school_id_text(session.get('school_id'))
-    if not school_id:
-        flash('School session is missing. Please log in again.', 'error')
-        return redirect(url_for('login'))
-    school = get_school(school_id)
-    current_term = get_current_term(school)
-    current_year = (school or {}).get('academic_year', '')
-    term_calendar = get_school_term_calendar(school_id, current_year, current_term)
-    term_program_for_progress = get_school_term_program(school_id, current_year, current_term)
-
 @app.route('/school-admin/alumni', methods=['GET'])
 @require_roles('school_admin')
 def school_admin_alumni():
@@ -34311,6 +34296,21 @@ def school_admin_make_alumni():
         flash("Student not found.", "error")
         
     return redirect(request.referrer or url_for('school_admin_alumni'))
+
+@app.route('/school-admin')
+def school_admin_dashboard():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    school = get_school(school_id)
+    current_term = get_current_term(school)
+    current_year = (school or {}).get('academic_year', '')
+    term_calendar = get_school_term_calendar(school_id, current_year, current_term)
+    term_program_for_progress = get_school_term_program(school_id, current_year, current_term)
     term_open_progress = build_term_open_progress(term_calendar, term_program_for_progress)
     dashboard_term_events = build_term_program_events(term_program_for_progress)
     dashboard_term_events_payload = []
