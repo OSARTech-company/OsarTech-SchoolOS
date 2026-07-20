@@ -48077,7 +48077,7 @@ def teacher_allocate_stream():
     success_redirect = (
         url_for('school_admin_view_students', **{'class': classname})
         if role == 'school_admin'
-        else url_for('teacher_dashboard')
+        else url_for('teacher_class_list')
     )
     if role == 'teacher' and not teacher_has_class_access(school_id, teacher_id, classname, term=current_term, academic_year=current_year):
         message = 'You are not assigned to this class.'
