@@ -15,12 +15,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Older production databases were created before class-arm publication
-    # support was added to the runtime schema.
     op.execute("ALTER TABLE result_publications ADD COLUMN IF NOT EXISTS arm TEXT DEFAULT ''")
     op.execute("UPDATE result_publications SET arm = '' WHERE arm IS NULL")
 
-    # Permit separate publication records for separate arms of one class.
     op.execute(
         "ALTER TABLE result_publications "
         "DROP CONSTRAINT IF EXISTS result_publications_school_id_classname_term_academic_yea_key"
