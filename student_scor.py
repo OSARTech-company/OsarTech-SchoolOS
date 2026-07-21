@@ -34303,27 +34303,36 @@ def super_admin_toggle_school_operations():
 @require_roles('school_admin')
 def school_admin_alumni():
     school_id = _normalize_school_id_text(session.get('school_id'))
+    current_year = ''
+    school = get_school(school_id)
+    if school:
+        current_year = school.get('academic_year', '')
+
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute('''SELECT student_id, firstname, lastname, classname, alumni_year, student_phone, email 
-                 FROM students 
-                 WHERE school_id = %s AND is_alumni = 1
-                 ORDER BY alumni_year DESC, firstname ASC''', (school_id,))
-    alumni_list = c.fetchall()
-    conn.close()
-    
     alumni_data = []
-    for row in alumni_list:
-        alumni_data.append({
-            'student_id': row[0],
-            'name': f"{row[1]} {row[2] or ''}".strip(),
-            'last_class': row[3],
-            'alumni_year': row[4],
-            'phone': row[5],
-            'email': row[6]
-        })
-        
-    return render_template('school/school_admin_alumni.html', alumni=alumni_data, current_year=get_school(school_id).get('academic_year', ''))
+    try:
+        c.execute('''SELECT student_id, firstname, lastname, classname, alumni_year, student_phone, email 
+                     FROM students 
+                     WHERE school_id = %s AND is_alumni = 1
+                     ORDER BY alumni_year DESC, firstname ASC''', (school_id,))
+        alumni_list = c.fetchall()
+        for row in alumni_list:
+            alumni_data.append({
+                'student_id': row[0],
+                'name': f"{row[1]} {row[2] or ''}".strip(),
+                'last_class': row[3],
+                'alumni_year': row[4] or '',
+                'phone': row[5] or '',
+                'email': row[6] or ''
+            })
+    except Exception as exc:
+        logging.exception("Failed to load alumni directory for school %s", school_id)
+        flash("Unable to load the alumni directory. Please try again or contact support.", "error")
+    finally:
+        conn.close()
+
+    return render_template('school/school_admin_alumni.html', alumni=alumni_data, current_year=current_year)
 
 @app.route('/school-admin/make-alumni', methods=['POST'])
 @require_roles('school_admin')
