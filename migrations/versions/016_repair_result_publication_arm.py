@@ -1,6 +1,6 @@
 """Repair result publication arm support when revision 015 was recorded early.
 
-Revision ID: 016_repair_result_publication_arm
+Revision ID: 016_repair_arm
 Revises: 015_result_publication_arm
 Create Date: 2026-07-21 00:00:00.000000
 
@@ -8,7 +8,7 @@ Create Date: 2026-07-21 00:00:00.000000
 from alembic import op
 
 
-revision = '016_repair_result_publication_arm'
+revision = '016_repair_arm'
 down_revision = '015_result_publication_arm'
 branch_labels = None
 depends_on = None
