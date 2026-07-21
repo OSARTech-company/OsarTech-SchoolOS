@@ -21602,6 +21602,11 @@ def get_class_attendance_publish_readiness(school_id, classname, term, academic_
         'manual_map': manual_map,
     }
 
+def manual_attendance_session_multiplier():
+    """Return the session multiplier for manual attendance counts."""
+    return 2
+
+
 def get_student_absent_days(school_id, student_id, classname, term='', academic_year=''):
     if not ensure_student_attendance_schema():
         return 0
@@ -41460,6 +41465,12 @@ def school_admin_attendance_summary():
         excused = int(status_counts.get('excused', 0) or 0)
         total = int(summary.get('total_marked', 0) or 0)
         other = max(0, total - (present + absent + late + excused))
+        manual_map = get_manual_result_attendance_map(school_id, cls, selected_term, selected_year)
+        manual_days_open = None
+        if manual_map:
+            values = {int((row.get('days_open', 0) or 0)) for row in manual_map.values()}
+            if len(values) == 1:
+                manual_days_open = values.pop()
         rows.append({
             'classname': cls,
             'total': total,
@@ -41469,6 +41480,7 @@ def school_admin_attendance_summary():
             'excused': excused,
             'other': other,
             'latest_date': summary.get('latest_date', ''),
+            'manual_days_open': manual_days_open,
         })
     rows.sort(key=lambda r: str(r.get('classname') or '').lower())
     return render_template(
@@ -41478,6 +41490,96 @@ def school_admin_attendance_summary():
         selected_term=selected_term,
         selected_year=selected_year,
         rows=rows,
+    )
+
+@app.route('/school-admin/manual-attendance-days-open', methods=['GET', 'POST'])
+def school_admin_manual_attendance_days_open():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = session.get('school_id')
+    school = get_school(school_id) or {}
+    selected_term = (request.values.get('term', '') or '').strip() or get_current_term(school)
+    selected_year = (request.values.get('academic_year', '') or '').strip() or (school.get('academic_year', '') or '')
+    classname = canonicalize_classname((request.values.get('classname', '') or '').strip())
+    if not classname:
+        flash('Class is required.', 'error')
+        return redirect(url_for('school_admin_attendance_summary', term=selected_term, academic_year=selected_year))
+
+    class_students = load_students(school_id, class_filter=classname, term_filter=selected_term)
+    if not class_students:
+        flash(f'No students found for {classname}.', 'error')
+        return redirect(url_for('school_admin_attendance_summary', term=selected_term, academic_year=selected_year))
+
+    manual_map = get_manual_result_attendance_map(school_id, classname, selected_term, selected_year)
+    manual_days_open = None
+    if manual_map:
+        values = {int((row.get('days_open', 0) or 0)) for row in manual_map.values()}
+        if len(values) == 1:
+            manual_days_open = values.pop()
+
+    if request.method == 'POST':
+        days_open_raw = (request.form.get('days_open', '') or '').strip()
+        try:
+            days_open = int(days_open_raw)
+        except Exception:
+            flash('Enter a valid number of days open.', 'error')
+            return redirect(url_for('school_admin_manual_attendance_days_open', classname=classname, term=selected_term, academic_year=selected_year))
+        if days_open <= 0:
+            flash('Days open must be greater than 0.', 'error')
+            return redirect(url_for('school_admin_manual_attendance_days_open', classname=classname, term=selected_term, academic_year=selected_year))
+        session_multiplier = manual_attendance_session_multiplier()
+        session_count = days_open * session_multiplier
+        with db_connection(commit=True) as conn:
+            c = conn.cursor()
+            for sid in class_students.keys():
+                existing = manual_map.get(str(sid or '').strip(), {})
+                days_present = int(existing.get('days_present', 0) or 0)
+                db_execute(
+                    c,
+                    """INSERT INTO result_attendance_manual
+                       (school_id, student_id, classname, term, academic_year, days_open, days_present, updated_by, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                       ON CONFLICT(school_id, student_id, term, academic_year) DO UPDATE SET
+                           classname = excluded.classname,
+                           days_open = excluded.days_open,
+                           days_present = excluded.days_present,
+                           updated_by = excluded.updated_by,
+                           updated_at = CURRENT_TIMESTAMP""",
+                    (
+                        school_id,
+                        sid,
+                        classname,
+                        selected_term,
+                        selected_year or '',
+                        session_count,
+                        days_present,
+                        session.get('user_id', '') or '',
+                    ),
+                )
+        flash(f'Days open updated for {classname}.', 'success')
+        return redirect(url_for('school_admin_attendance_summary', term=selected_term, academic_year=selected_year))
+
+    students = sorted(
+        [
+            {
+                'student_id': sid,
+                'student_name': (student.get('firstname', '') or sid or '').strip(),
+                'days_open': int((manual_map.get(str(sid or '').strip(), {}).get('days_open', 0) or 0)),
+                'days_present': int((manual_map.get(str(sid or '').strip(), {}).get('days_present', 0) or 0)),
+            }
+            for sid, student in class_students.items()
+        ],
+        key=lambda row: ((row.get('student_name', '') or '').lower(), (row.get('student_id', '') or '').lower()),
+    )
+
+    return render_template(
+        'school/school_admin_manual_attendance_days_open.html',
+        school=school,
+        classname=classname,
+        selected_term=selected_term,
+        selected_year=selected_year,
+        manual_days_open=manual_days_open,
+        students=students,
     )
 
 @app.route('/school-admin/timetable-coverage')
@@ -47321,15 +47423,25 @@ def teacher_manual_attendance_summary():
         flash(f'No students found in {classname}.', 'error')
         return redirect(url_for('teacher_attendance', classname=classname))
 
+    manual_map = get_manual_result_attendance_map(school_id, classname, current_term, current_year)
+    attendance_gate = get_class_attendance_publish_readiness(
+        school_id=school_id,
+        classname=classname,
+        term=current_term,
+        academic_year=current_year,
+        class_students_data=class_students,
+    )
     saved_count = 0
     pending_count = 0
     with db_connection(commit=True) as conn:
         c = conn.cursor()
         for sid, student in class_students.items():
             student_name = (student.get('firstname') or sid or '').strip()
-            days_open_raw = (request.form.get(f'days_open_{sid}', '') or '').strip()
+            manual_row = manual_map.get(str(sid or '').strip(), {})
+            days_open = int(manual_row.get('days_open', attendance_gate.get('days_open', 0)) or 0)
             days_present_raw = (request.form.get(f'days_present_{sid}', '') or '').strip()
-            if not days_open_raw and not days_present_raw:
+            days_absent_raw = (request.form.get(f'days_absent_{sid}', '') or '').strip()
+            if not days_present_raw and not days_absent_raw:
                 db_execute(
                     c,
                     """DELETE FROM result_attendance_manual
@@ -47341,20 +47453,34 @@ def teacher_manual_attendance_summary():
                 )
                 pending_count += 1
                 continue
-            try:
-                days_open = int(days_open_raw)
-                days_present = int(days_present_raw)
-            except Exception:
-                flash(f'Enter valid whole numbers for {student_name}.', 'error')
-                return redirect(url_for('teacher_attendance', classname=classname))
             if days_open <= 0:
-                flash(f'Days open must be greater than 0 for {student_name}.', 'error')
+                flash(f'Days open is not configured for {student_name}. Ask admin to set Days Open for this class.', 'error')
                 return redirect(url_for('teacher_attendance', classname=classname))
+            try:
+                days_present = int(days_present_raw) if days_present_raw else None
+            except Exception:
+                flash(f'Enter a valid Days Present for {student_name}.', 'error')
+                return redirect(url_for('teacher_attendance', classname=classname))
+            try:
+                days_absent = int(days_absent_raw) if days_absent_raw else None
+            except Exception:
+                flash(f'Enter a valid Days Absent for {student_name}.', 'error')
+                return redirect(url_for('teacher_attendance', classname=classname))
+            if days_present is None and days_absent is None:
+                flash(f'Days present or days absent is required for {student_name}.', 'error')
+                return redirect(url_for('teacher_attendance', classname=classname))
+            if days_present is None:
+                days_present = max(0, days_open - (days_absent or 0))
+            if days_absent is None:
+                days_absent = max(0, days_open - (days_present or 0))
             if days_present < 0:
                 flash(f'Days present cannot be negative for {student_name}.', 'error')
                 return redirect(url_for('teacher_attendance', classname=classname))
-            if days_present > days_open:
-                flash(f'Days present cannot be greater than days open for {student_name}.', 'error')
+            if days_absent < 0:
+                flash(f'Days absent cannot be negative for {student_name}.', 'error')
+                return redirect(url_for('teacher_attendance', classname=classname))
+            if days_present + days_absent != days_open:
+                flash(f'Days present plus days absent must equal Days Open for {student_name}.', 'error')
                 return redirect(url_for('teacher_attendance', classname=classname))
             db_execute(
                 c,

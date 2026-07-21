@@ -1,0 +1,113 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manual Attendance Days Open - School Admin</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+      .container { width: min(1200px, 100%); margin: 0 auto; padding: 24px; }
+      .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .header h1 { margin: 0; font-size: 1.8rem; }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
+      .toolbar label { display: block; font-size: 0.9rem; margin-bottom: 4px; color: #475569; }
+      .toolbar input, .toolbar select { min-width: 220px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
+      .table-scroll { width: 100%; overflow-x: auto; border: 1px solid #dde5f0; border-radius: 10px; }
+      .assignment-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+      .assignment-table th, .assignment-table td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: middle; }
+      .assignment-table th { background: #f8fbff; color: #1f3b5c; font-weight: 700; }
+      .muted { color: #64748b; font-size: 0.92rem; }
+      .form-section { border: 1px solid #dbe4ef; border-radius: 12px; padding: 18px; background: #fff; }
+      .form-section h2 { margin-top: 0; }
+      .field-row { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 16px; }
+      .field-row label { display: block; margin-bottom: 6px; font-weight: 600; }
+      .field-row input { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; }
+    </style>
+  </head>
+  <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    <div class="app-shell topbar-layout">
+      {% include 'school/_school_admin_sidebar.html' %}
+      <div class="main-content">
+        <div class="container">
+          <div class="header">
+            <h1><i class="fas fa-calendar-day"></i> Manual Attendance Days Open</h1>
+            <div>
+              <a href="{{ url_for('school_admin_attendance_summary', term=selected_term, academic_year=selected_year) }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Attendance Summary</a>
+            </div>
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          <div class="card form-section">
+            <div class="field-row">
+              <div>
+                <label>Class</label>
+                <input type="text" value="{{ classname }}" readonly>
+              </div>
+              <div>
+                <label>Term</label>
+                <input type="text" value="{{ selected_term }}" readonly>
+              </div>
+              <div>
+                <label>Academic Year</label>
+                <input type="text" value="{{ selected_year or '-' }}" readonly>
+              </div>
+              <div>
+                <label>Manual Days Open</label>
+                <input type="number" min="1" name="days_open" form="daysOpenForm" value="{{ (manual_days_open // 2) if manual_days_open is not none else '' }}" required>
+              </div>
+            </div>
+            <p class="muted">Enter the number of instructional days open. The system stores this as session counts (morning + afternoon) by multiplying by 2.</p>
+          </div>
+
+          <div class="card">
+            <form id="daysOpenForm" method="post" action="{{ url_for('school_admin_manual_attendance_days_open') }}">
+              <input type="hidden" name="classname" value="{{ classname }}">
+              <input type="hidden" name="term" value="{{ selected_term }}">
+              <input type="hidden" name="academic_year" value="{{ selected_year }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="toolbar" style="justify-content: flex-start;">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Days Open</button>
+              </div>
+            </form>
+
+            <div class="table-scroll" style="margin-top: 18px;">
+              <table class="assignment-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Student ID</th>
+                    <th>Configured Days Open</th>
+                    <th>Days Present</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for student in students %}
+                  <tr>
+                    <td>{{ student.student_name }}</td>
+                    <td>{{ student.student_id }}</td>
+                    <td>{{ student.days_open or '-' }}</td>
+                    <td>{{ student.days_present or '-' }}</td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4" class="text-center muted">No student records found for this class.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+  </body>
+</html>

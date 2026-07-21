@@ -59,7 +59,8 @@
                     <th>Absent</th>
                     <th>Late</th>
                     <th>Excused</th>
-                    <th>Other</th>
+                    <th>Manual Days Open (sessions)</th>
+                    <th>Action</th>
                     <th>Latest Date</th>
                   </tr>
                 </thead>
@@ -72,7 +73,12 @@
                     <td>{{ row.absent }}</td>
                     <td>{{ row.late }}</td>
                     <td>{{ row.excused }}</td>
-                    <td>{{ row.other }}</td>
+                    <td>{{ row.manual_days_open if row.manual_days_open is not none else '-' }}</td>
+                    <td>
+                      <a class="btn btn-secondary btn-sm" href="{{ url_for('school_admin_manual_attendance_days_open', classname=row.classname, term=selected_term, academic_year=selected_year) }}">
+                        Edit Open Days
+                      </a>
+                    </td>
                     <td class="muted">{{ row.latest_date or '-' }}</td>
                   </tr>
                   {% endfor %}
