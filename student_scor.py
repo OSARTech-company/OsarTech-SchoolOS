@@ -23323,6 +23323,66 @@ def result_publication_has_approval_columns():
     except Exception:
         return False
 
+_STUDENT_ALUMNI_COLUMNS = (
+    'is_alumni',
+    'alumni_year',
+)
+_STUDENT_ALUMNI_SCHEMA_STATE = None
+_STUDENT_ALUMNI_SCHEMA_WARNED = False
+
+def student_alumni_has_columns():
+    global _STUDENT_ALUMNI_SCHEMA_STATE
+    if _STUDENT_ALUMNI_SCHEMA_STATE is True:
+        return True
+    if _STUDENT_ALUMNI_SCHEMA_STATE is False:
+        return False
+    try:
+        with db_connection() as conn:
+            c = conn.cursor()
+            db_execute(
+                c,
+                """SELECT column_name
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'students'
+                     AND column_name = ANY(%s)""",
+                (list(_STUDENT_ALUMNI_COLUMNS),),
+            )
+            present = {str(row[0]) for row in c.fetchall() if row and row[0]}
+            has_all = all(col in present for col in _STUDENT_ALUMNI_COLUMNS)
+            if has_all:
+                _STUDENT_ALUMNI_SCHEMA_STATE = True
+            return has_all
+    except Exception:
+        return False
+
+
+def ensure_student_alumni_columns():
+    global _STUDENT_ALUMNI_SCHEMA_STATE, _STUDENT_ALUMNI_SCHEMA_WARNED
+    if _STUDENT_ALUMNI_SCHEMA_STATE is True:
+        return True
+    allow_runtime_heal = _runtime_schema_heal_allowed()
+    if not allow_runtime_heal:
+        present = student_alumni_has_columns()
+        _STUDENT_ALUMNI_SCHEMA_STATE = True if present else False
+        if not present and not _STUDENT_ALUMNI_SCHEMA_WARNED:
+            logging.warning(
+                "Alumni columns missing on students table. Run migrations (python migrate.py) or use explicit admin DB fix command."
+            )
+            _STUDENT_ALUMNI_SCHEMA_WARNED = True
+        return present
+    try:
+        with db_connection(commit=True) as conn:
+            c = conn.cursor()
+            db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS is_alumni INTEGER DEFAULT 0")
+            db_execute(c, "ALTER TABLE students ADD COLUMN IF NOT EXISTS alumni_year TEXT DEFAULT ''")
+        _STUDENT_ALUMNI_SCHEMA_STATE = True
+        return True
+    except Exception as exc:
+        logging.warning("Alumni schema auto-heal failed: %s", exc)
+        _STUDENT_ALUMNI_SCHEMA_STATE = False
+        return False
+
 _SCORE_AUDIT_SCHEMA_STATE = None
 _SCORE_AUDIT_SCHEMA_WARNED = False
 
@@ -34307,6 +34367,13 @@ def school_admin_alumni():
     school = get_school(school_id)
     if school:
         current_year = school.get('academic_year', '')
+
+    if not ensure_student_alumni_columns():
+        flash(
+            "Unable to load the alumni directory because the alumni fields are not available in the student database. "
+            "Please run migrations or contact support.",
+            "error",
+        )
 
     conn = get_db_connection()
     c = conn.cursor()
