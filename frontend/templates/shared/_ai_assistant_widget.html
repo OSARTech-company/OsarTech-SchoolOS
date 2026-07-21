@@ -16,23 +16,6 @@
 {% endif %}
 {% set footer_term_label = current_term if current_term else '' %}
 {% set footer_year_label = current_year if current_year else '' %}
-<footer class="app-global-footer" role="contentinfo">
-    <div class="app-global-footer-left">
-        <span class="app-global-footer-brand">{{ footer_school_name }}</span>
-        {% if footer_term_label or footer_year_label %}
-        <span class="app-global-footer-sep">|</span>
-        <span>{{ footer_term_label }}{% if footer_year_label %} {{ footer_year_label }}{% endif %}</span>
-        {% endif %}
-        <span class="app-global-footer-sep">|</span>
-        <span>By Osartech LTD</span>
-    </div>
-    <div class="app-global-footer-right">
-        <a href="{{ url_for('help') }}">Help</a>
-        <a href="{{ url_for('report_issue') }}">Report Issue</a>
-        <a href="{{ url_for('privacy_request') }}">Data Request</a>
-        <a href="{{ url_for('terms_privacy') }}">Privacy</a>
-    </div>
-</footer>
 {% if post_login_welcome_name %}
 <div class="app-welcome-toast" role="status" aria-live="polite">
     Welcome, {{ post_login_welcome_name }}.
@@ -108,4 +91,21 @@
     {% endif %}
 </a>
 {% endif %}
+<footer class="app-global-footer" role="contentinfo">
+    <div class="app-global-footer-left">
+        <span class="app-global-footer-brand">{{ footer_school_name }}</span>
+        {% if footer_term_label or footer_year_label %}
+        <span class="app-global-footer-sep">|</span>
+        <span>{{ footer_term_label }}{% if footer_year_label %} {{ footer_year_label }}{% endif %}</span>
+        {% endif %}
+        <span class="app-global-footer-sep">|</span>
+        <span>By Osartech LTD</span>
+    </div>
+    <div class="app-global-footer-right">
+        <a href="{{ url_for('help') }}">Help</a>
+        <a href="{{ url_for('report_issue') }}">Report Issue</a>
+        <a href="{{ url_for('privacy_request') }}">Data Request</a>
+        <a href="{{ url_for('terms_privacy') }}">Privacy</a>
+    </div>
+</footer>
 <script src="{{ url_for('static', filename='js/app-assistant.js', v='20260328d') }}" defer></script>

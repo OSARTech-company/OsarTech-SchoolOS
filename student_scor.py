@@ -6728,6 +6728,7 @@ def init_db():
                         id SERIAL PRIMARY KEY,
                         school_id TEXT NOT NULL,
                         classname TEXT NOT NULL,
+                        arm TEXT DEFAULT '',
                         term TEXT NOT NULL,
                         academic_year TEXT DEFAULT '',
                         teacher_id TEXT NOT NULL,
@@ -6737,8 +6738,11 @@ def init_db():
                         published_at TIMESTAMP,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE(school_id, classname, term, academic_year)
+                        UNIQUE(school_id, classname, arm, term, academic_year)
                     )""")
+    safe_exec_ignore("ALTER TABLE result_publications ADD COLUMN arm TEXT DEFAULT ''")
+    safe_exec_ignore("ALTER TABLE result_publications DROP CONSTRAINT result_publications_school_id_classname_term_academic_yea_key")
+    safe_exec_ignore("ALTER TABLE result_publications ADD CONSTRAINT result_publications_unique UNIQUE(school_id, classname, arm, term, academic_year)")
     safe_exec_ignore("ALTER TABLE result_publications ADD COLUMN academic_year TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE result_publications ADD COLUMN teacher_name TEXT DEFAULT ''")
     safe_exec_ignore("ALTER TABLE result_publications ADD COLUMN principal_name TEXT DEFAULT ''")
@@ -7066,6 +7070,7 @@ def init_db():
                         id SERIAL PRIMARY KEY,
                         school_id TEXT NOT NULL,
                         classname TEXT NOT NULL,
+                        arm TEXT DEFAULT '',
                         term TEXT NOT NULL,
                         academic_year TEXT DEFAULT '',
                         is_locked INTEGER NOT NULL DEFAULT 1,
@@ -7073,8 +7078,11 @@ def init_db():
                         unlock_reason TEXT DEFAULT '',
                         unlocked_by TEXT DEFAULT '',
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE(school_id, classname, term, academic_year)
+                        UNIQUE(school_id, classname, arm, term, academic_year)
                     )""")
+    safe_exec_ignore("ALTER TABLE term_edit_locks ADD COLUMN arm TEXT DEFAULT ''")
+    safe_exec_ignore("ALTER TABLE term_edit_locks DROP CONSTRAINT term_edit_locks_school_id_classname_term_academic_year_key")
+    safe_exec_ignore("ALTER TABLE term_edit_locks ADD CONSTRAINT term_edit_locks_unique UNIQUE(school_id, classname, arm, term, academic_year)")
     safe_exec_ignore("ALTER TABLE period_attendance ADD COLUMN subject TEXT DEFAULT ''")
     db_execute(c, """CREATE TABLE IF NOT EXISTS promotion_audit_logs (
                         id SERIAL PRIMARY KEY,
@@ -23378,7 +23386,7 @@ def ensure_score_audit_schema():
         _SCORE_AUDIT_SCHEMA_STATE = False
         return False
 
-def get_result_publication_row(school_id, classname, term, academic_year=''):
+def get_result_publication_row(school_id, classname, term, academic_year='', arm=''):
     ensure_result_publication_approval_columns()
     has_approval_cols = result_publication_has_approval_columns()
     with db_connection() as conn:
@@ -23388,21 +23396,21 @@ def get_result_publication_row(school_id, classname, term, academic_year=''):
                 c,
                 """SELECT school_id, classname, term, COALESCE(academic_year, ''), teacher_id, teacher_name, principal_name,
                           is_published, published_at, COALESCE(approval_status, 'not_submitted'),
-                          submitted_at, submitted_by, reviewed_at, reviewed_by, review_note
+                          submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, arm
                    FROM result_publications
-                   WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')
+                   WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '') AND COALESCE(arm, '') = COALESCE(?, '')
                    LIMIT 1""",
-                (school_id, classname, term, academic_year or ''),
+                (school_id, classname, term, academic_year or '', arm or ''),
             )
         else:
             db_execute(
                 c,
                 """SELECT school_id, classname, term, COALESCE(academic_year, ''), teacher_id, teacher_name, principal_name,
-                          is_published, published_at
+                          is_published, published_at, arm
                    FROM result_publications
-                   WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')
+                   WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '') AND COALESCE(arm, '') = COALESCE(?, '')
                    LIMIT 1""",
-                (school_id, classname, term, academic_year or ''),
+                (school_id, classname, term, academic_year or '', arm or ''),
             )
         row = c.fetchone()
     if not row:
@@ -23424,6 +23432,7 @@ def get_result_publication_row(school_id, classname, term, academic_year=''):
             'reviewed_at': '',
             'reviewed_by': '',
             'review_note': '',
+            'arm': row[9] or '',
         }
     return {
         'school_id': row[0] or '',
@@ -23441,9 +23450,10 @@ def get_result_publication_row(school_id, classname, term, academic_year=''):
         'reviewed_at': row[12] or '',
         'reviewed_by': row[13] or '',
         'review_note': row[14] or '',
+        'arm': row[15] or '',
     }
 
-def submit_result_approval_request(school_id, classname, term, academic_year, teacher_id):
+def submit_result_approval_request(school_id, classname, term, academic_year, teacher_id, arm=''):
     ensure_result_publication_approval_columns()
     school = get_school(school_id) or {}
     resolved_principal_name = (school.get('principal_name', '') or '').strip()
@@ -23459,10 +23469,10 @@ def submit_result_approval_request(school_id, classname, term, academic_year, te
             db_execute(
                 c,
                 """INSERT INTO result_publications
-                   (school_id, classname, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at,
+                   (school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at,
                     approval_status, submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, 'pending', ?, ?, NULL, NULL, NULL, CURRENT_TIMESTAMP)
-                   ON CONFLICT(school_id, classname, term, academic_year) DO UPDATE SET
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 'pending', ?, ?, NULL, NULL, NULL, CURRENT_TIMESTAMP)
+                   ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET
                      teacher_id = excluded.teacher_id,
                      teacher_name = excluded.teacher_name,
                      principal_name = excluded.principal_name,
@@ -23478,6 +23488,7 @@ def submit_result_approval_request(school_id, classname, term, academic_year, te
                 (
                     school_id,
                     classname,
+                    arm or '',
                     term,
                     academic_year or '',
                     teacher_id,
@@ -23491,16 +23502,16 @@ def submit_result_approval_request(school_id, classname, term, academic_year, te
             db_execute(
                 c,
                 """INSERT INTO result_publications
-                   (school_id, classname, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, CURRENT_TIMESTAMP)
-                   ON CONFLICT(school_id, classname, term, academic_year) DO UPDATE SET
+                   (school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, CURRENT_TIMESTAMP)
+                   ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET
                      teacher_id = excluded.teacher_id,
                      teacher_name = excluded.teacher_name,
                      principal_name = excluded.principal_name,
                      is_published = 0,
                      published_at = NULL,
                      updated_at = CURRENT_TIMESTAMP""",
-                (school_id, classname, term, academic_year or '', teacher_id, resolved_teacher_name, resolved_principal_name),
+                (school_id, classname, arm or '', term, academic_year or '', teacher_id, resolved_teacher_name, resolved_principal_name),
             )
 
 def notify_students_result_published(school_id, classname, term, academic_year=''):
@@ -23631,7 +23642,7 @@ def notify_teachers_term_deadline_approaching(school_id, term, days_until_deadli
         logging.error(f"Failed to send term deadline reminders: {exc}")
         return False
 
-def publish_results_for_class_atomic(school_id, classname, term, teacher_id, academic_year='', reviewed_by='', review_note='', attendance_gate=None):
+def publish_results_for_class_atomic(school_id, classname, term, teacher_id, academic_year='', reviewed_by='', review_note='', attendance_gate=None, arm=''):
     """Publish class results in a single transaction (snapshot + publish flag)."""
     ensure_result_publication_approval_columns()
     has_approval_cols = result_publication_has_approval_columns()
@@ -23644,6 +23655,9 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
     teacher_profile = teachers.get(teacher_key, {})
     teacher_name = f"{teacher_profile.get('firstname', '')} {teacher_profile.get('lastname', '')}".strip() or str(teacher_id)
     class_students = load_students(school_id, class_filter=classname, term_filter=term)
+    if arm:
+        arm_upper = arm.strip().upper()
+        class_students = {sid: s for sid, s in class_students.items() if (s.get('classname') or '').strip().upper().endswith(arm_upper) or (s.get('arm') or '').strip().upper() == arm_upper}
     attendance_gate = attendance_gate if isinstance(attendance_gate, dict) else get_class_attendance_publish_readiness(
         school_id=school_id,
         classname=classname,
@@ -23738,10 +23752,10 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
             db_execute(
                 c,
                 """INSERT INTO result_publications
-                   (school_id, classname, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at,
+                   (school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at,
                     approval_status, reviewed_at, reviewed_by, review_note, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?, CURRENT_TIMESTAMP)
-                   ON CONFLICT(school_id, classname, term, academic_year) DO UPDATE SET
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?, CURRENT_TIMESTAMP)
+                   ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET
                      teacher_id = excluded.teacher_id,
                      teacher_name = excluded.teacher_name,
                      principal_name = excluded.principal_name,
@@ -23755,6 +23769,7 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                 (
                     school_id,
                     classname,
+                    arm,
                     term,
                     publish_year,
                     teacher_id,
@@ -23771,9 +23786,9 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
             db_execute(
                 c,
                 """INSERT INTO result_publications
-                   (school_id, classname, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                   ON CONFLICT(school_id, classname, term, academic_year) DO UPDATE SET
+                   (school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                   ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET
                      teacher_id = excluded.teacher_id,
                      teacher_name = excluded.teacher_name,
                      principal_name = excluded.principal_name,
@@ -23783,6 +23798,7 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                 (
                     school_id,
                     classname,
+                    arm,
                     term,
                     publish_year,
                     teacher_id,
@@ -23796,13 +23812,13 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
             db_execute(
                 c,
                 """INSERT INTO term_edit_locks
-                   (school_id, classname, term, academic_year, is_locked, unlocked_until, unlock_reason, unlocked_by, updated_at)
-                   VALUES (?, ?, ?, ?, 1, NULL, '', ?, CURRENT_TIMESTAMP)
-                   ON CONFLICT(school_id, classname, term, academic_year) DO UPDATE SET
+                   (school_id, classname, arm, term, academic_year, is_locked, unlocked_until, unlock_reason, unlocked_by, updated_at)
+                   VALUES (?, ?, ?, ?, ?, 1, NULL, '', ?, CURRENT_TIMESTAMP)
+                   ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET
                      is_locked = 1,
                      unlocked_until = NULL,
                      updated_at = CURRENT_TIMESTAMP""",
-                (school_id, classname, term, publish_year, reviewed_by or teacher_id or ''),
+                (school_id, classname, arm, term, publish_year, reviewed_by or teacher_id or ''),
             )
         except Exception as exc:
             logging.warning("Failed to enforce term edit lock on publish: %s", exc)
@@ -23810,11 +23826,11 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
     # Notify students that their results have been published
     notify_students_result_published(school_id, classname, term, publish_year)
 
-def review_result_approval_request(school_id, classname, term, academic_year, admin_user_id, approve, review_note=''):
+def review_result_approval_request(school_id, classname, term, academic_year, admin_user_id, approve, review_note='', arm=''):
     ensure_result_publication_approval_columns()
     clean_note = (review_note or '').strip()
     try:
-        row = get_result_publication_row(school_id, classname, term, academic_year)
+        row = get_result_publication_row(school_id, classname, term, academic_year, arm=arm)
     except Exception as exc:
         logging.exception(
             "Failed to load publication row for approval review. school_id=%s class=%s term=%s year=%s",
@@ -23873,6 +23889,7 @@ def review_result_approval_request(school_id, classname, term, academic_year, ad
                 reviewed_by=admin_user_id,
                 review_note=clean_note,
                 attendance_gate=gate,
+                arm=arm,
             )
         except Exception as exc:
             if _is_transient_db_transport_error(exc):
@@ -23897,7 +23914,7 @@ def review_result_approval_request(school_id, classname, term, academic_year, ad
                    reviewed_by = ?,
                    review_note = ?,
                    updated_at = CURRENT_TIMESTAMP
-               WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+               WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '') AND COALESCE(arm, '') = COALESCE(?, '')""",
             (
                 datetime.now().isoformat(),
                 admin_user_id,
@@ -24532,13 +24549,16 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
                 c,
                 """SELECT classname, teacher_id, teacher_name, is_published, published_at,
                           COALESCE(approval_status, 'not_submitted'),
-                          submitted_at, submitted_by, reviewed_at, reviewed_by, review_note
+                          submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, arm
                    FROM result_publications
                    WHERE school_id = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')""",
                 (school_id, term, academic_year or ''),
             )
             for row in c.fetchall():
-                publication_rows[row[0]] = {
+                cname = row[0]
+                arm_val = row[11] or ''
+                key = (cname, arm_val)
+                publication_rows[key] = {
                     'teacher_id': row[1],
                     'teacher_name': row[2] or '',
                     'is_published': bool(int(row[3] or 0)),
@@ -24549,17 +24569,21 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
                     'reviewed_at': row[8] or '',
                     'reviewed_by': row[9] or '',
                     'review_note': row[10] or '',
+                    'arm': arm_val,
                 }
         else:
             db_execute(
                 c,
-                """SELECT classname, teacher_id, teacher_name, is_published, published_at
+                """SELECT classname, teacher_id, teacher_name, is_published, published_at, arm
                    FROM result_publications
                    WHERE school_id = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')""",
                 (school_id, term, academic_year or ''),
             )
             for row in c.fetchall():
-                publication_rows[row[0]] = {
+                cname = row[0]
+                arm_val = row[5] or ''
+                key = (cname, arm_val)
+                publication_rows[key] = {
                     'teacher_id': row[1],
                     'teacher_name': row[2] or '',
                     'is_published': bool(int(row[3] or 0)),
@@ -24570,6 +24594,7 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
                     'reviewed_at': '',
                     'reviewed_by': '',
                     'review_note': '',
+                    'arm': arm_val,
                 }
     all_classes = filter_supported_classnames(
         {c for c in classes if c} | {c for c in publication_rows.keys() if c}
@@ -47127,6 +47152,7 @@ def teacher_publish_results():
         flash('School session is missing. Please log in again.', 'error')
         return redirect(url_for('login'))
     classname = canonicalize_classname(request.form.get('classname', '').strip())
+    arm = (request.form.get('arm', '') or '').strip()
     if not classname:
         flash('Select a class to submit for approval.', 'error')
         return redirect(url_for('teacher_dashboard'))
@@ -47147,10 +47173,10 @@ def teacher_publish_results():
         leadership_label = get_school_leadership_label((school or {}).get('leadership_title', 'principal'))
         flash(f'{leadership_label} signature is required before approval. Ask school admin to upload it with admin password.', 'error')
         return redirect(url_for('teacher_dashboard'))
-    if is_result_published(school_id, classname, current_term, current_year):
-        flash(f'{classname} ({current_term}) is already published. Republish is not allowed.', 'error')
+    if is_result_published(school_id, classname, current_term, current_year, arm=arm):
+        flash(f'{classname} {arm} ({current_term}) is already published. Republish is not allowed.', 'error')
         return redirect(url_for('teacher_dashboard'))
-    existing_pub = get_result_publication_row(school_id, classname, current_term, current_year)
+    existing_pub = get_result_publication_row(school_id, classname, current_term, current_year, arm=arm)
     if (existing_pub.get('approval_status') or '') == 'pending':
         flash(f'{classname} ({current_term}) is already submitted and pending admin review.', 'error')
         return redirect(url_for('teacher_dashboard'))
@@ -47232,14 +47258,14 @@ def teacher_publish_results():
             return redirect(url_for('teacher_attendance', classname=classname))
         return redirect(url_for('teacher_attendance', classname=classname))
 
-    submit_result_approval_request(school_id, classname, current_term, current_year, teacher_lookup_id)
+    submit_result_approval_request(school_id, classname, current_term, current_year, teacher_lookup_id, arm=arm)
     record_admin_action_audit(
         school_id,
         'teacher_submit_results_for_approval',
         target_scope=classname,
         payload={'term': current_term, 'academic_year': current_year, 'teacher_id': teacher_id},
     )
-    flash(f'Results submitted for admin approval: {classname} ({current_term}).', 'success')
+    flash(f'Results submitted for admin approval: {classname} {arm} ({current_term}).', 'success')
     return redirect(url_for('teacher_dashboard'))
 
 @app.route('/teacher/manual-attendance-summary', methods=['POST'])
@@ -47435,6 +47461,7 @@ def school_admin_approve_results():
     school_id = session.get('school_id')
     admin_user_id = _display_session_user_id(session.get('user_id'))
     classname = canonicalize_classname(request.form.get('classname', '').strip())
+    arm = (request.form.get('arm', '') or '').strip()
     term = (request.form.get('term', '') or '').strip()
     academic_year = (request.form.get('academic_year', '') or '').strip()
     if not classname:
@@ -47456,6 +47483,7 @@ def school_admin_approve_results():
                 admin_user_id=admin_user_id,
                 approve=True,
                 review_note=review_note,
+                arm=arm,
             )
             break
         except Exception as exc:
@@ -47637,6 +47665,7 @@ def school_admin_reject_results():
     school_id = session.get('school_id')
     admin_user_id = _display_session_user_id(session.get('user_id'))
     classname = canonicalize_classname(request.form.get('classname', '').strip())
+    arm = (request.form.get('arm', '') or '').strip()
     term = (request.form.get('term', '') or '').strip()
     academic_year = (request.form.get('academic_year', '') or '').strip()
     if not classname:
@@ -47661,6 +47690,7 @@ def school_admin_reject_results():
                 admin_user_id=admin_user_id,
                 approve=False,
                 review_note=review_note,
+                arm=arm,
             )
             break
         except Exception as exc:
