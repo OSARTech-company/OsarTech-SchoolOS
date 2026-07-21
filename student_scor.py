@@ -24580,7 +24580,8 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
             )
             for row in c.fetchall():
                 cname = row[0]
-                arm_val = row[11] or ''
+                arm_val = row[11] if len(row) > 11 else ''
+                arm_val = arm_val or ''
                 key = (cname, arm_val)
                 publication_rows[key] = {
                     'teacher_id': row[1],
@@ -24605,7 +24606,8 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
             )
             for row in c.fetchall():
                 cname = row[0]
-                arm_val = row[5] or ''
+                arm_val = row[5] if len(row) > 5 else ''
+                arm_val = arm_val or ''
                 key = (cname, arm_val)
                 publication_rows[key] = {
                     'teacher_id': row[1],
