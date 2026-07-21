@@ -944,6 +944,7 @@
                         <form action="{{ url_for('school_admin_publish_results_direct') }}" method="POST" class="action-form">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                           <input type="hidden" name="classname" value="{{ p.classname }}" />
+                          <input type="hidden" name="arm" value="{{ p.arm or '' }}" />
                           <input type="hidden" name="term" value="{{ p.term }}" />
                           <input type="hidden" name="academic_year" value="{{ p.academic_year }}" />
                           <button type="submit" class="btn btn-success btn-sm">Publish Now</button>
@@ -965,6 +966,7 @@
                         <form action="{{ url_for('school_admin_approve_results') }}" method="POST" class="action-form">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                           <input type="hidden" name="classname" value="{{ p.classname }}" />
+                          <input type="hidden" name="arm" value="{{ p.arm or '' }}" />
                           <input type="hidden" name="term" value="{{ p.term }}" />
                           <input type="hidden" name="academic_year" value="{{ p.academic_year }}" />
                           <button type="submit" class="btn btn-success btn-sm">Approve</button>
@@ -976,6 +978,7 @@
                             <form action="{{ url_for('school_admin_reject_results') }}" method="POST" class="menu-form">
                               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                               <input type="hidden" name="classname" value="{{ p.classname }}" />
+                              <input type="hidden" name="arm" value="{{ p.arm or '' }}" />
                               <input type="hidden" name="term" value="{{ p.term }}" />
                               <input type="hidden" name="academic_year" value="{{ p.academic_year }}" />
                               <input type="text" name="review_note" placeholder="Reason (required)" required class="review-note-input" />
@@ -1007,6 +1010,7 @@
                             <form action="{{ url_for('school_admin_unlock_term_edit') }}" method="POST" class="menu-form">
                               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                               <input type="hidden" name="classname" value="{{ p.classname }}" />
+                              <input type="hidden" name="arm" value="{{ p.arm or '' }}" />
                               <input type="hidden" name="term" value="{{ p.term }}" />
                               <input type="hidden" name="academic_year" value="{{ p.academic_year }}" />
                               <input id="unlock_minutes_{{ loop.index0 }}" type="number" name="unlock_minutes" min="5" max="240" value="30" class="unlock-minutes-input" title="Unlock Duration (minutes)" />
@@ -1017,6 +1021,7 @@
                             <form action="{{ url_for('school_admin_relock_term_edit') }}" method="POST" class="menu-form">
                               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                               <input type="hidden" name="classname" value="{{ p.classname }}" />
+                              <input type="hidden" name="arm" value="{{ p.arm or '' }}" />
                               <input type="hidden" name="term" value="{{ p.term }}" />
                               <input type="hidden" name="academic_year" value="{{ p.academic_year }}" />
                               <button type="submit" class="btn btn-warning btn-sm">Re-Lock Edit</button>
@@ -1025,6 +1030,7 @@
                             <form action="{{ url_for('school_admin_unpublish_results') }}" method="POST" class="menu-form">
                               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                               <input type="hidden" name="classname" value="{{ p.classname }}" />
+                              <input type="hidden" name="arm" value="{{ p.arm or '' }}" />
                               <input type="hidden" name="term_token" value="{{ p.academic_year }}::{{ p.term }}" />
                               <input type="password" name="admin_password" placeholder="Admin password" required class="admin-pass-input" data-password-toggle />
                               <button type="submit" class="btn btn-danger btn-sm">Unpublish</button>

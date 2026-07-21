@@ -716,6 +716,7 @@
                                         <form method="POST" action="{{ url_for('teacher_publish_results') }}" class="inline-form">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                             <input type="hidden" name="classname" value="{{ classname }}"/>
+                                            <input type="hidden" name="arm" value="{{ arm or '' }}"/>
                                             <button type="submit" class="btn btn-success btn-xs" {% if not s.ready or s.published or s.approval_status == 'pending' %}disabled{% endif %}>
                                                 Submit
                                             </button>

@@ -9618,6 +9618,14 @@ def _split_class_level_number_arm(classname):
     arm = m.group(3) or ''
     return level, number, arm
 
+
+def _derive_arm_from_classname(classname, arm=''):
+    if arm and str(arm).strip():
+        return (arm or '').strip()
+    _, _, arm_suffix = _split_class_level_number_arm(classname or '')
+    return (arm_suffix or '').strip()
+
+
 def _entry_year_for_first_level(current_year, first_year_class):
     """
     Compute the year student entered first level class.
@@ -23043,6 +23051,7 @@ def _set_result_published_with_cursor(
     is_published,
     teacher_name='',
     principal_name='',
+    arm='',
 ):
     """Write result_publications row using caller-owned transaction."""
     ensure_result_publication_approval_columns()
@@ -23061,15 +23070,16 @@ def _set_result_published_with_cursor(
             resolved_teacher_name = f"{row[0] or ''} {row[1] or ''}".strip() or str(teacher_id)
         else:
             resolved_teacher_name = str(teacher_id)
+    arm = _derive_arm_from_classname(classname, arm)
     if has_approval_cols:
         db_execute(
             c,
             (
                 "INSERT INTO result_publications "
-                "(school_id, classname, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, "
+                "(school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, "
                 "approval_status, submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) "
-                "ON CONFLICT(school_id, classname, term, academic_year) DO UPDATE SET "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) "
+                "ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET "
                 "teacher_id = excluded.teacher_id, "
                 "teacher_name = excluded.teacher_name, "
                 "principal_name = excluded.principal_name, "
@@ -23086,6 +23096,7 @@ def _set_result_published_with_cursor(
             (
                 school_id,
                 classname,
+                arm,
                 term,
                 academic_year or '',
                 teacher_id,
@@ -23106,9 +23117,9 @@ def _set_result_published_with_cursor(
             c,
             (
                 "INSERT INTO result_publications "
-                "(school_id, classname, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) "
-                "ON CONFLICT(school_id, classname, term, academic_year) DO UPDATE SET "
+                "(school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) "
+                "ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET "
                 "teacher_id = excluded.teacher_id, "
                 "teacher_name = excluded.teacher_name, "
                 "principal_name = excluded.principal_name, "
@@ -23119,6 +23130,7 @@ def _set_result_published_with_cursor(
             (
                 school_id,
                 classname,
+                arm,
                 term,
                 academic_year or '',
                 teacher_id,
@@ -23129,7 +23141,7 @@ def _set_result_published_with_cursor(
             ),
         )
 
-def set_result_published(school_id, classname, term, academic_year, teacher_id, is_published, teacher_name='', principal_name=''):
+def set_result_published(school_id, classname, term, academic_year, teacher_id, is_published, teacher_name='', principal_name='', arm=''):
     """Publish/unpublish a class result for a term."""
     with db_connection(commit=True) as conn:
         c = conn.cursor()
@@ -23143,23 +23155,26 @@ def set_result_published(school_id, classname, term, academic_year, teacher_id, 
             is_published=is_published,
             teacher_name=teacher_name,
             principal_name=principal_name,
+            arm=arm,
         )
 
-def is_result_published(school_id, classname, term, academic_year=''):
+def is_result_published(school_id, classname, term, academic_year='', arm=''):
+    arm = _derive_arm_from_classname(classname, arm)
     with db_connection() as conn:
         c = conn.cursor()
         db_execute(
             c,
             """SELECT is_published FROM result_publications
-               WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')
+               WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '') AND COALESCE(arm, '') = COALESCE(?, '')
                LIMIT 1""",
-            (school_id, classname, term, academic_year or ''),
+            (school_id, classname, term, academic_year or '', arm or ''),
         )
         row = c.fetchone()
         return bool(row and int(row[0]) == 1)
 
-def set_term_edit_lock(school_id, classname, term, academic_year='', is_locked=True, unlocked_minutes=0, unlock_reason='', unlocked_by=''):
+def set_term_edit_lock(school_id, classname, term, academic_year='', is_locked=True, unlocked_minutes=0, unlock_reason='', unlocked_by='', arm=''):
     """Set or temporarily relax edit lock for one published class-term."""
+    arm = _derive_arm_from_classname(classname, arm)
     with db_connection(commit=True) as conn:
         c = conn.cursor()
         unlock_until = None
@@ -23169,9 +23184,9 @@ def set_term_edit_lock(school_id, classname, term, academic_year='', is_locked=T
             db_execute(
                 c,
                 """INSERT INTO term_edit_locks
-                   (school_id, classname, term, academic_year, is_locked, unlocked_until, unlock_reason, unlocked_by, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                   ON CONFLICT(school_id, classname, term, academic_year) DO UPDATE SET
+                   (school_id, classname, arm, term, academic_year, is_locked, unlocked_until, unlock_reason, unlocked_by, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                   ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET
                      is_locked = excluded.is_locked,
                      unlocked_until = excluded.unlocked_until,
                      unlock_reason = excluded.unlock_reason,
@@ -23180,6 +23195,7 @@ def set_term_edit_lock(school_id, classname, term, academic_year='', is_locked=T
                 (
                     school_id,
                     classname,
+                    arm or '',
                     term,
                     academic_year or '',
                     1 if is_locked else 0,
@@ -23193,9 +23209,10 @@ def set_term_edit_lock(school_id, classname, term, academic_year='', is_locked=T
                 raise ValueError('Term edit lock schema is unavailable. Run migration/startup DDL and retry.')
             raise
 
-def get_term_edit_lock_status(school_id, classname, term, academic_year=''):
+def get_term_edit_lock_status(school_id, classname, term, academic_year='', arm=''):
     """Return lock status for a published class-term."""
-    if not is_result_published(school_id, classname, term, academic_year):
+    arm = _derive_arm_from_classname(classname, arm)
+    if not is_result_published(school_id, classname, term, academic_year, arm=arm):
         return {'locked': False, 'reason': '', 'unlocked_until': None}
     try:
         with db_connection() as conn:
@@ -23204,10 +23221,10 @@ def get_term_edit_lock_status(school_id, classname, term, academic_year=''):
                 c,
                 """SELECT is_locked, unlocked_until, unlock_reason
                    FROM term_edit_locks
-                   WHERE school_id = ? AND classname = ? AND term = ?
+                   WHERE school_id = ? AND classname = ? AND arm = ? AND term = ?
                      AND COALESCE(academic_year, '') = COALESCE(?, '')
                    LIMIT 1""",
-                (school_id, classname, term, academic_year or ''),
+                (school_id, classname, arm or '', term, academic_year or ''),
             )
             row = c.fetchone()
     except Exception as exc:
@@ -23221,7 +23238,7 @@ def get_term_edit_lock_status(school_id, classname, term, academic_year=''):
     if not lock_flag and unlocked_until:
         if unlocked_until > datetime.now():
             return {'locked': False, 'reason': row[2] or '', 'unlocked_until': unlocked_until}
-        set_term_edit_lock(school_id, classname, term, academic_year, is_locked=True)
+        set_term_edit_lock(school_id, classname, term, academic_year, is_locked=True, arm=arm)
         return {'locked': True, 'reason': 'Temporary unlock expired.', 'unlocked_until': None}
     if not lock_flag and not unlocked_until:
         return {'locked': False, 'reason': row[2] or '', 'unlocked_until': None}
@@ -23387,6 +23404,7 @@ def ensure_score_audit_schema():
         return False
 
 def get_result_publication_row(school_id, classname, term, academic_year='', arm=''):
+    arm = _derive_arm_from_classname(classname, arm)
     ensure_result_publication_approval_columns()
     has_approval_cols = result_publication_has_approval_columns()
     with db_connection() as conn:
@@ -23923,6 +23941,7 @@ def review_result_approval_request(school_id, classname, term, academic_year, ad
                 classname,
                 term,
                 academic_year or '',
+                arm or '',
             ),
         )
     return True, 'Submission rejected. Teacher can update and resubmit.'
@@ -24597,20 +24616,21 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
                     'arm': arm_val,
                 }
     all_classes = filter_supported_classnames(
-        {c for c in classes if c} | {c for c in publication_rows.keys() if c}
+        {c for c in classes if c} | {cname for cname, _arm in publication_rows.keys()}
     )
     counts_by_class = get_class_published_view_counts(school_id, term, academic_year, all_classes)
 
     out = []
-    seen_classes = set()
+    seen_keys = set()
     for a in assignments:
         classname = a.get('classname', '')
         if not is_supported_classname(classname):
             continue
-        pub = publication_rows.get(classname, {})
+        arm = _split_class_level_number_arm(classname)[2]
+        pub = publication_rows.get((classname, arm), {})
         cnt = counts_by_class.get(classname, {})
-        lock_status = get_term_edit_lock_status(school_id, classname, term, academic_year or '')
-        seen_classes.add(classname)
+        lock_status = get_term_edit_lock_status(school_id, classname, term, academic_year or '', arm=arm)
+        seen_keys.add((classname, arm))
         out.append({
             'classname': classname,
             'teacher_name': a.get('teacher_name', '') or pub.get('teacher_name', ''),
@@ -24630,14 +24650,15 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
             'term_locked': bool(lock_status.get('locked', False)),
             'term_unlock_reason': lock_status.get('reason', ''),
             'term_unlocked_until': lock_status.get('unlocked_until'),
+            'arm': arm,
         })
-    for classname, pub in publication_rows.items():
-        if not classname or classname in seen_classes:
+    for (classname, arm), pub in publication_rows.items():
+        if not classname or (classname, arm) in seen_keys:
             continue
         if not is_supported_classname(classname):
             continue
         cnt = counts_by_class.get(classname, {})
-        lock_status = get_term_edit_lock_status(school_id, classname, term, academic_year or '')
+        lock_status = get_term_edit_lock_status(school_id, classname, term, academic_year or '', arm=arm)
         out.append({
             'classname': classname,
             'teacher_name': pub.get('teacher_name', ''),
@@ -24657,6 +24678,7 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
             'term_locked': bool(lock_status.get('locked', False)),
             'term_unlock_reason': lock_status.get('reason', ''),
             'term_unlocked_until': lock_status.get('unlocked_until'),
+            'arm': arm,
         })
     out.sort(key=lambda x: (x.get('classname', ''), x.get('teacher_name', '')))
     return out
@@ -47539,13 +47561,14 @@ def school_admin_publish_results_direct():
         flash('Direct school-admin publishing is available only in Simple Mode.', 'error')
         return redirect(url_for('school_admin_publish_results'))
 
+    arm = (request.form.get('arm', '') or '').strip()
     current_term = term or get_current_term(school)
     current_year = academic_year or (school.get('academic_year', '') or '').strip()
-    if is_result_published(school_id, classname, current_term, current_year):
-        flash(f'{classname} ({current_term}) is already published.', 'info')
+    if is_result_published(school_id, classname, current_term, current_year, arm=arm):
+        flash(f'{classname} {arm} ({current_term}) is already published.', 'info')
         return redirect(url_for('school_admin_publish_results', term=current_term, academic_year=current_year))
 
-    existing_pub = get_result_publication_row(school_id, classname, current_term, current_year) or {}
+    existing_pub = get_result_publication_row(school_id, classname, current_term, current_year, arm=arm) or {}
     if (existing_pub.get('approval_status') or '').strip().lower() == 'pending':
         flash(f'{classname} ({current_term}) is already pending review. Use approve or reject instead.', 'info')
         return redirect(url_for('school_admin_publish_results', term=current_term, academic_year=current_year))
@@ -47642,6 +47665,7 @@ def school_admin_publish_results_direct():
             reviewed_by=admin_user_id or '',
             review_note='Direct publish in Simple Mode',
             attendance_gate=attendance_gate,
+            arm=arm,
         )
     except Exception as exc:
         flash(f'Could not publish {classname} ({current_term}): {exc}', 'error')
@@ -47747,7 +47771,8 @@ def school_admin_unlock_term_edit():
     if not reason:
         flash('Unlock reason is required.', 'error')
         return redirect(url_for('school_admin_publish_results'))
-    if not is_result_published(school_id, classname, term, academic_year):
+    arm = (request.form.get('arm', '') or '').strip()
+    if not is_result_published(school_id, classname, term, academic_year, arm=arm):
         flash('This class-term is not published, so lock override is not needed.', 'info')
         return redirect(url_for('school_admin_publish_results'))
     set_term_edit_lock(
@@ -47759,6 +47784,7 @@ def school_admin_unlock_term_edit():
         unlocked_minutes=minutes,
         unlock_reason=reason,
         unlocked_by=admin_user_id,
+        arm=arm,
     )
     flash(f'Edit lock unlocked for {classname} ({term}) for {minutes} minute(s).', 'success')
     return redirect(url_for('school_admin_publish_results'))
@@ -47776,6 +47802,7 @@ def school_admin_relock_term_edit():
     if not classname or not term:
         flash('Class and term are required.', 'error')
         return redirect(url_for('school_admin_publish_results'))
+    arm = (request.form.get('arm', '') or '').strip()
     set_term_edit_lock(
         school_id=school_id,
         classname=classname,
@@ -47785,6 +47812,7 @@ def school_admin_relock_term_edit():
         unlocked_minutes=0,
         unlock_reason='',
         unlocked_by=admin_user_id,
+        arm=arm,
     )
     flash(f'Edit lock restored for {classname} ({term}).', 'success')
     return redirect(url_for('school_admin_publish_results'))
@@ -53521,6 +53549,7 @@ def school_admin_unpublish_results():
     school_id = session.get('school_id')
     sid = (request.form.get('student_id', '') or '').strip()
     classname = canonicalize_classname((request.form.get('classname', '') or '').strip())
+    arm = (request.form.get('arm', '') or '').strip()
     term_token = (request.form.get('term_token', '') or '').strip()
     admin_password = (request.form.get('admin_password', '') or '').strip()
     client_ip = get_client_ip()
@@ -53561,11 +53590,11 @@ def school_admin_unpublish_results():
         flash('Invalid term selected for unpublish.', 'error')
         return redirect(fallback)
 
-    if not is_result_published(school_id, classname, target_term, target_year):
+    if not is_result_published(school_id, classname, target_term, target_year, arm=arm):
         flash(f'{classname} ({target_term}) is already not published.', 'error')
         return redirect(fallback)
 
-    pub_row = get_result_publication_row(school_id, classname, target_term, target_year) or {}
+    pub_row = get_result_publication_row(school_id, classname, target_term, target_year, arm=arm) or {}
     try:
         with db_connection(commit=True) as conn:
             c = conn.cursor()
@@ -53579,6 +53608,7 @@ def school_admin_unpublish_results():
                 is_published=False,
                 teacher_name=pub_row.get('teacher_name', '') or '',
                 principal_name=pub_row.get('principal_name', '') or '',
+                arm=arm,
             )
             db_execute(
                 c,
@@ -53591,15 +53621,15 @@ def school_admin_unpublish_results():
                 db_execute(
                     c,
                     """INSERT INTO term_edit_locks
-                       (school_id, classname, term, academic_year, is_locked, unlocked_until, unlock_reason, unlocked_by, updated_at)
-                       VALUES (?, ?, ?, ?, 0, NULL, 'Unpublished', ?, CURRENT_TIMESTAMP)
-                       ON CONFLICT(school_id, classname, term, academic_year) DO UPDATE SET
+                       (school_id, classname, arm, term, academic_year, is_locked, unlocked_until, unlock_reason, unlocked_by, updated_at)
+                       VALUES (?, ?, ?, ?, ?, 0, NULL, 'Unpublished', ?, CURRENT_TIMESTAMP)
+                       ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET
                          is_locked = 0,
                          unlocked_until = NULL,
                          unlock_reason = 'Unpublished',
                          unlocked_by = excluded.unlocked_by,
                          updated_at = CURRENT_TIMESTAMP""",
-                    (school_id, classname, target_term, target_year or '', session.get('user_id', '') or ''),
+                    (school_id, classname, arm or '', target_term, target_year or '', session.get('user_id', '') or ''),
                 )
             except Exception as lock_exc:
                 logging.warning("Failed to update term_edit_locks during unpublish: %s", lock_exc)
