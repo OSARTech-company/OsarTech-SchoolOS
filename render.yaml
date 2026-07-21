@@ -6,8 +6,7 @@ services:
     region: oregon
     autoDeployTrigger: commit
     buildCommand: pip install -r requirements.txt
-    preDeployCommand: python migrate.py
-    startCommand: gunicorn --workers=${WEB_CONCURRENCY:-1} --threads=${GUNICORN_THREADS:-2} --timeout=${GUNICORN_TIMEOUT:-120} --graceful-timeout=${GUNICORN_GRACEFUL_TIMEOUT:-30} --max-requests=${GUNICORN_MAX_REQUESTS:-500} --max-requests-jitter=${GUNICORN_MAX_REQUESTS_JITTER:-50} student_scor:app
+    startCommand: bash start.sh
     healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION

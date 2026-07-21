@@ -1,1 +1,1 @@
-web: gunicorn --workers=${WEB_CONCURRENCY:-1} --threads=${GUNICORN_THREADS:-2} --timeout=${GUNICORN_TIMEOUT:-120} --graceful-timeout=${GUNICORN_GRACEFUL_TIMEOUT:-30} --max-requests=${GUNICORN_MAX_REQUESTS:-500} --max-requests-jitter=${GUNICORN_MAX_REQUESTS_JITTER:-50} student_scor:app
+web: bash start.sh
