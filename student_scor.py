@@ -46997,6 +46997,72 @@ def teacher_attendance():
                 'days_absent': days_absent_value,
             })
 
+    # Compute per-class blocking reasons so teachers see exactly what's preventing submission
+    class_blocking_reasons = {}
+    teachers = get_teachers(school_id) or {}
+    for cls in dashboard_classes:
+        reasons = []
+        class_students = {
+            sid: row for sid, row in (students or {}).items()
+            if canonicalize_classname((row.get('classname') or '')) == canonicalize_classname(cls)
+        }
+        # Subject completion
+        subj_progress = compute_class_subject_completion(
+            school_id=school_id,
+            classname=cls,
+            term=current_term,
+            academic_year=current_year,
+            class_students_data=class_students,
+            school=school,
+        )
+        if subj_progress and isinstance(subj_progress, dict) and subj_progress.get('rows') and not subj_progress.get('ready', False):
+            pending = [r.get('subject', '') for r in subj_progress.get('rows', []) if int(r.get('pending_students', 0) or 0) > 0]
+            if pending:
+                reasons.append(f"Pending subject scores: {', '.join(pending[:6])}" + ('...' if len(pending) > 6 else ''))
+
+        # Per-student completeness
+        incomplete_students = [s.get('firstname', sid) or sid for sid, s in class_students.items() if not is_student_score_complete(s, school, current_term)]
+        if incomplete_students:
+            reasons.append(f"Incomplete scores for {len(incomplete_students)} student(s): {', '.join(incomplete_students[:6])}" + ('...' if len(incomplete_students) > 6 else ''))
+
+        # Behaviour
+        behaviour_check = class_behaviour_completion(
+            school_id=school_id,
+            classname=cls,
+            term=current_term,
+            academic_year=current_year,
+            student_ids=[sid for sid in class_students.keys()],
+            school_or_mode=school,
+        )
+        if not behaviour_check.get('ready', False):
+            reasons.append(f"Behaviour incomplete: {int(behaviour_check.get('missing_count', 0) or 0)} pending")
+
+        # Attendance
+        att_gate = get_class_attendance_publish_readiness(
+            school_id=school_id,
+            classname=cls,
+            term=current_term,
+            academic_year=current_year,
+            class_students_data=class_students,
+        )
+        if not att_gate.get('ready', False):
+            gate_msg = (att_gate.get('message') or '').strip()
+            if gate_msg:
+                reasons.append(gate_msg)
+            else:
+                rows = att_gate.get('missing_rows', []) or []
+                sample = ', '.join(f"{r.get('student_name', r.get('student_id',''))} ({int(r.get('marked_days',0))}/{int(att_gate.get('days_open',0) or 0)})" for r in rows[:6])
+                reasons.append(f"Attendance incomplete: Missing: {sample}" + ('...' if len(rows) > 6 else ''))
+
+        # Signatures
+        teacher_profile = teachers.get(teacher_id, {})
+        if not (teacher_profile.get('signature_image') or '').strip():
+            reasons.append('Upload your signature before submitting this class result.')
+        if not ((school or {}).get('principal_signature_image') or '').strip():
+            reasons.append('Principal signature is required before approval. Ask admin to upload it.')
+
+        class_blocking_reasons[cls] = reasons
+
     return render_template(
         'teacher/teacher_attendance.html',
         school=school,
@@ -47020,6 +47086,7 @@ def teacher_attendance():
         manual_attendance_days_open=int(attendance_gate.get('days_open', 0) or 0),
         manual_attendance_message=(attendance_gate.get('message') or '').strip(),
         manual_attendance_missing_count=len(attendance_gate.get('missing_rows', []) or []),
+        class_blocking_reasons=class_blocking_reasons,
     )
 
 @app.route('/teacher/behaviour-assessment', methods=['GET', 'POST'])
