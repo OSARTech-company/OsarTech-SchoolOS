@@ -45527,6 +45527,53 @@ def teacher_dashboard():
         term=current_term,
         audience='teachers',
     )
+    # Compute per-class blocking reasons so class teachers see exactly what remains
+    class_blocking_reasons = {}
+    for classname in classes:
+        s = class_publish_status.get(classname, {})
+        reasons = []
+        # Already published or submitted state
+        if bool(s.get('published')):
+            reasons.append('Results already published')
+        if (s.get('approval_status') or '') == 'pending':
+            reasons.append('Already submitted and pending admin review')
+
+        # Subject score related
+        pending_subjects = [
+            row.get('subject', '')
+            for row in (s.get('subject_progress') or [])
+            if int(row.get('pending_students', 0) or 0) > 0
+        ]
+        if pending_subjects:
+            reasons.append('Pending subject scores: ' + ', '.join(pending_subjects[:6]) + ('...' if len(pending_subjects) > 6 else ''))
+
+        # Student-level completeness
+        total = int(s.get('total') or 0)
+        completed = int(s.get('completed') or 0)
+        if total > 0 and completed < total:
+            reasons.append(f'{total - completed} student(s) without complete scores')
+
+        # Behaviour
+        if int(s.get('behaviour_missing_count', 0) or 0) > 0:
+            reasons.append(f'Behaviour assessment missing for {int(s.get("behaviour_missing_count", 0) or 0)} student(s)')
+
+        # Attendance
+        if not bool(s.get('attendance_ready')):
+            amsg = (s.get('attendance_message') or '').strip()
+            if amsg:
+                reasons.append('Attendance: ' + amsg)
+            else:
+                reasons.append(f'Attendance incomplete: {int(s.get("attendance_missing_count", 0) or 0)} student rows missing')
+
+        # Signatures
+        has_teacher_sig = bool((teacher_profile.get('signature_image') or '').strip())
+        if teacher_has_class_access(school_id, teacher_id, classname, term=current_term, academic_year=current_year) and not has_teacher_sig:
+            reasons.append('Upload your class teacher signature')
+        if not ((school or {}).get('principal_signature_image') or '').strip():
+            leadership_label = get_school_leadership_label((school or {}).get('leadership_title', 'principal'))
+            reasons.append(f"{leadership_label} signature is required before approval")
+
+        class_blocking_reasons[classname] = reasons
     subject_submit_rows = []
     submitted_subject_map = get_subject_score_submission_subject_map(school_id, teacher_id, current_term, current_year)
     subject_submit_students = load_students_for_classes(
@@ -46421,6 +46468,7 @@ def teacher_notifications():
         teacher_selected_score_subject='',
         teacher_selected_score_class='',
         teacher_has_class_assignment_nav=bool(classes),
+        class_blocking_reasons=class_blocking_reasons,
     )
 
 

@@ -78,6 +78,37 @@
                         <span class="summary-chip"><i class="fas fa-users"></i> Pending Entries: {{ total_pending_entries }}</span>
                         <span class="summary-chip"><i class="fas fa-calendar-alt"></i> {{ current_term }} {{ current_year }}</span>
                     </div>
+                    <div class="card">
+                        <h2>Class Submission Checklist</h2>
+                        {% if class_blocking_reasons %}
+                            {% for cls, reasons in class_blocking_reasons.items() %}
+                            <div style="margin-bottom:12px;padding:8px;border:1px solid #e6eef8;border-radius:8px;">
+                                <strong>{{ cls }}</strong>
+                                {% if reasons %}
+                                    <ul style="margin:6px 0 6px 18px;padding:0;">
+                                        {% for r in reasons %}
+                                        <li>{{ r }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                    <form method="post" action="{{ url_for('teacher_publish_results') }}" style="display:inline">
+                                        <input type="hidden" name="classname" value="{{ cls }}">
+                                        <input type="hidden" name="arm" value="{{ request.args.get('arm', '') }}">
+                                        <button class="btn btn-primary btn-xs" type="submit">Attempt Submit to Admin</button>
+                                    </form>
+                                {% else %}
+                                    <span class="summary-chip">Ready to submit</span>
+                                    <form method="post" action="{{ url_for('teacher_publish_results') }}" style="display:inline;margin-left:8px;">
+                                        <input type="hidden" name="classname" value="{{ cls }}">
+                                        <input type="hidden" name="arm" value="{{ request.args.get('arm', '') }}">
+                                        <button class="btn btn-success btn-xs" type="submit">Submit to Admin</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p>No classes assigned.</p>
+                        {% endif %}
+                    </div>
                     {% if teacher_missing_score_alerts %}
                     <div class="table-wrap">
                         <table>
