@@ -47127,6 +47127,9 @@ def teacher_attendance():
     # Compute per-class blocking reasons so teachers see exactly what's preventing submission
     class_blocking_reasons = {}
     teachers = get_teachers(school_id) or {}
+    # Ensure dashboard_classes and students are available (used below)
+    dashboard_classes = sorted(set(classes))
+    students = load_students_for_classes(school_id, dashboard_classes, term_filter=current_term) if dashboard_classes else {}
     for cls in dashboard_classes:
         reasons = []
         class_students = {
