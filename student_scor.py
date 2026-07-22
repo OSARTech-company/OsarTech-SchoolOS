@@ -49134,54 +49134,79 @@ def teacher_enter_scores():
                 logging.error(f'Failed to save scores for student {student_id}: {str(e)}')
                 flash(f'Database error while saving scores: {str(e)}', 'error')
                 return redirect(url_for('teacher_enter_scores', **redirect_kwargs))
-        if not class_access:
-            clear_subject_score_submission(
-                school_id=school_id,
-                teacher_id=teacher_id,
-                classname=student.get('classname', ''),
-                term=current_term,
-                academic_year=current_year,
-                subjects=editable_subjects,
-            )
-        # Any edit requires re-publish for this class/term.
+        post_save_warning = None
         class_name = (student.get('classname', '') or '').strip()
-        set_result_published(school_id, class_name, current_term, current_year, teacher_id, False)
+        try:
+            if not class_access:
+                clear_subject_score_submission(
+                    school_id=school_id,
+                    teacher_id=teacher_id,
+                    classname=student.get('classname', ''),
+                    term=current_term,
+                    academic_year=current_year,
+                    subjects=editable_subjects,
+                )
+            # Any edit requires re-publish for this class/term.
+            set_result_published(school_id, class_name, current_term, current_year, teacher_id, False)
+        except Exception as e:
+            post_save_warning = f'Post-save update failed: {str(e)}'
+            logging.error(
+                'Post-save update failed for student %s in class %s: %s',
+                student_id,
+                class_name,
+                str(e),
+                exc_info=True,
+            )
         if can_edit_behaviour:
             flash('Shared draft saved successfully. Scores, class comment, and behaviour are now visible to other Simple Mode editors immediately.', 'success')
         else:
             flash('Shared draft saved successfully. Scores and class comment are now visible to other Simple Mode editors immediately.', 'success')
-        if not class_access:
-            assigned_subjects_for_class = get_teacher_subjects_for_class_term(
-                school_id,
-                teacher_id,
-                class_name,
-                term=current_term,
-                academic_year=current_year,
+        if post_save_warning:
+            flash(
+                'Scores were saved, but a follow-up update failed. Refresh the page to verify the latest status.',
+                'warning',
             )
-            class_students_now = load_students(school_id, class_filter=class_name, term_filter=current_term)
-            pending_by_subject = []
-            for subj in assigned_subjects_for_class:
-                eligible = 0
-                completed = 0
-                target = (subj or '').strip().lower()
-                for _sid, st_now in class_students_now.items():
-                    offered = get_student_offered_subjects_for_class(st_now, school_id, school=school)
-                    offered_map = {x.lower(): x for x in offered}
-                    offered_key = offered_map.get(target, '')
-                    if not offered_key:
-                        continue
-                    eligible += 1
-                    score_block = get_subject_score_block((st_now.get('scores') or {}), offered_key)
-                    if is_score_complete_for_subject(score_block, school) and is_score_entry_confirmed(score_block, school):
-                        completed += 1
-                pending = max(0, eligible - completed)
-                if pending > 0:
-                    pending_by_subject.append(f'{subj}: {pending}')
-            if pending_by_subject:
-                flash(
-                    'Still pending for your assigned subjects in '
-                    f'{class_name}: ' + ', '.join(pending_by_subject[:5]) + ('...' if len(pending_by_subject) > 5 else ''),
-                    'info',
+        if not class_access:
+            try:
+                assigned_subjects_for_class = get_teacher_subjects_for_class_term(
+                    school_id,
+                    teacher_id,
+                    class_name,
+                    term=current_term,
+                    academic_year=current_year,
+                )
+                class_students_now = load_students(school_id, class_filter=class_name, term_filter=current_term)
+                pending_by_subject = []
+                for subj in assigned_subjects_for_class:
+                    eligible = 0
+                    completed = 0
+                    target = (subj or '').strip().lower()
+                    for _sid, st_now in class_students_now.items():
+                        offered = get_student_offered_subjects_for_class(st_now, school_id, school=school)
+                        offered_map = {x.lower(): x for x in offered}
+                        offered_key = offered_map.get(target, '')
+                        if not offered_key:
+                            continue
+                        eligible += 1
+                        score_block = get_subject_score_block((st_now.get('scores') or {}), offered_key)
+                        if is_score_complete_for_subject(score_block, school) and is_score_entry_confirmed(score_block, school):
+                            completed += 1
+                    pending = max(0, eligible - completed)
+                    if pending > 0:
+                        pending_by_subject.append(f'{subj}: {pending}')
+                if pending_by_subject:
+                    flash(
+                        'Still pending for your assigned subjects in '
+                        f'{class_name}: ' + ', '.join(pending_by_subject[:5]) + ('...' if len(pending_by_subject) > 5 else ''),
+                        'info',
+                    )
+            except Exception as e:
+                logging.error(
+                    'Post-save status check failed for student %s in class %s: %s',
+                    student_id,
+                    class_name,
+                    str(e),
+                    exc_info=True,
                 )
         return redirect(url_for('teacher_enter_scores', **redirect_kwargs))
     
