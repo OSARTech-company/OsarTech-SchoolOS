@@ -21534,8 +21534,9 @@ def get_class_attendance_publish_readiness(school_id, classname, term, academic_
             created_at_by_student = {}
 
     has_attendance_marks = any(bool(v) for v in marked_date_sets.values())
-    if not has_attendance_marks:
-        missing_rows = []
+    manual_missing_rows = []
+    manual_ready = False
+    if manual_map:
         for sid, student in student_items:
             manual_row = manual_map.get(str(sid or '').strip(), {})
             try:
@@ -21547,19 +21548,31 @@ def get_class_attendance_publish_readiness(school_id, classname, term, academic_
             except Exception:
                 manual_days_present = 0
             if manual_days_open <= 0 or manual_days_present < 0 or manual_days_present > manual_days_open:
-                missing_rows.append({
+                manual_missing_rows.append({
                     'student_id': sid,
                     'student_name': (student or {}).get('firstname', sid) or sid,
                     'marked_days': manual_days_present,
                     'expected_days': manual_days_open or days_open,
                     'missing_days': max(0, manual_days_open - manual_days_present) if manual_days_open > 0 else days_open,
                 })
-        ready = len(missing_rows) == 0 and len(manual_map) >= len(student_items)
+        manual_ready = len(manual_missing_rows) == 0 and len(manual_map) >= len(student_items)
+    if manual_ready:
         return {
-            'ready': ready,
+            'ready': True,
+            'days_open': days_open,
+            'missing_rows': [],
+            'message': '',
+            'mode': 'manual',
+            'manual_allowed': True,
+            'manual_map': manual_map,
+        }
+    if not has_attendance_marks:
+        missing_rows = manual_missing_rows
+        return {
+            'ready': len(missing_rows) == 0 and len(manual_map) >= len(student_items),
             'days_open': days_open,
             'missing_rows': missing_rows,
-            'message': '' if ready else (
+            'message': '' if len(missing_rows) == 0 and len(manual_map) >= len(student_items) else (
                 f'No daily attendance has been marked for {classname}. '
                 'Enter Days Open and Days Present for each student in the Teacher Dashboard before submitting.'
             ),
