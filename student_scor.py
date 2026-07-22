@@ -46281,6 +46281,9 @@ def teacher_notifications():
     teacher_profile_image = (teacher_profile.get('profile_image') or '').strip()
     last_login_at = format_timestamp(get_last_login_at(session.get('user_id')))
 
+    # Default empty reasons; detailed reasons computed later when possible
+    class_blocking_reasons = {}
+
     classes = get_teacher_classes(school_id, teacher_id, term=current_term, academic_year=current_year)
     class_students_data = load_students_for_classes(school_id, classes, term_filter=current_term)
     class_students_data = {
