@@ -45563,12 +45563,18 @@ def teacher_dashboard():
             if amsg:
                 reasons.append('Attendance: ' + amsg)
             else:
-                reasons.append(f'Attendance incomplete: {int(s.get("attendance_missing_count", 0) or 0)} student rows missing')
+                missing_count = int(s.get('attendance_missing_count', 0) or 0)
+                if missing_count > 0:
+                    reasons.append(f'Attendance incomplete: {missing_count} student rows missing')
+                elif bool(s.get('attendance_manual_allowed')):
+                    reasons.append('Attendance requires manual summary entry or has invalid manual values.')
+                else:
+                    reasons.append('Attendance incomplete: daily marks are missing.')
 
         # Signatures
         has_teacher_sig = bool((teacher_profile.get('signature_image') or '').strip())
-        if teacher_has_class_access(school_id, teacher_id, classname, term=current_term, academic_year=current_year) and not has_teacher_sig:
-            reasons.append('Upload your class teacher signature')
+        if not has_teacher_sig:
+            reasons.append('Upload your class teacher signature before submission.')
         if not ((school or {}).get('principal_signature_image') or '').strip():
             leadership_label = get_school_leadership_label((school or {}).get('leadership_title', 'principal'))
             reasons.append(f"{leadership_label} signature is required before approval")
@@ -46357,6 +46363,13 @@ def teacher_notifications():
             school=school,
             class_students_data={idx: s for idx, s in enumerate(class_students)},
         )
+        attendance_gate = get_class_attendance_publish_readiness(
+            school_id=school_id,
+            classname=classname,
+            term=current_term,
+            academic_year=current_year,
+            class_students_data={sid: s for sid, s in source_students.items() if _class_match(s.get('classname', ''), classname) and s.get('term') == current_term},
+        )
         subject_pending_count = sum(1 for row in subject_progress.get('rows', []) if int(row.get('pending_students', 0)) > 0)
         total = len(class_students)
         completed = sum(1 for s in class_students if is_student_score_complete(s, school, current_term))
@@ -46366,6 +46379,12 @@ def teacher_notifications():
             'subject_progress': subject_progress.get('rows', []),
             'subject_pending_count': subject_pending_count,
             'behaviour_missing_count': int(behaviour_progress.get('missing_count', 0) or 0),
+            'attendance_ready': bool(attendance_gate.get('ready', False)),
+            'attendance_message': attendance_gate.get('message', ''),
+            'attendance_missing_count': len(attendance_gate.get('missing_rows', []) or []),
+            'attendance_manual_allowed': bool(attendance_gate.get('manual_allowed', False)),
+            'attendance_mode': attendance_gate.get('mode', ''),
+            'attendance_gate': attendance_gate,
         }
 
     teacher_missing_score_alerts = []
