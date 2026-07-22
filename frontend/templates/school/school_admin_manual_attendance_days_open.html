@@ -61,11 +61,11 @@
                 <input type="text" value="{{ selected_year or '-' }}" readonly>
               </div>
               <div>
-                <label>Manual Days Open</label>
+                <label>Whole Days Open</label>
                 <input type="number" min="1" name="days_open" form="daysOpenForm" value="{{ (manual_days_open // 2) if manual_days_open is not none else '' }}" required>
               </div>
             </div>
-            <p class="muted">Enter the number of instructional days open. The system stores this as session counts (morning + afternoon) by multiplying by 2.</p>
+            <p class="muted">Enter whole days open once. The system converts this to session counts by multiplying by 2 (morning + evening), while days present remain entered separately.</p>
           </div>
 
           <div class="card">
