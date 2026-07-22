@@ -119,7 +119,11 @@
                                     Morning and afternoon sessions are counted separately, and the system uses those totals internally.
                                 </p>
                             </div>
+                            {% if manual_attendance_ready %}
+                            <span class="pill pill-success">Manual attendance saved{% if manual_attendance_missing_count %} ({{ manual_attendance_missing_count }}){% endif %}</span>
+                            {% else %}
                             <span class="pill pill-late">Pending manual attendance{% if manual_attendance_missing_count %} ({{ manual_attendance_missing_count }}){% endif %}</span>
+                            {% endif %}
                         </div>
                         {% if manual_attendance_message %}
                         <p class="muted" style="margin-bottom:12px;">{{ manual_attendance_message }}</p>

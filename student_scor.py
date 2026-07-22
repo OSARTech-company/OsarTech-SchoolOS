@@ -47137,6 +47137,8 @@ def teacher_attendance():
         class_students_data=class_students,
     )
     manual_attendance_allowed = bool(attendance_gate.get('manual_allowed', False))
+    manual_attendance_ready = bool(attendance_gate.get('ready', False)) and attendance_gate.get('mode') == 'manual'
+    manual_attendance_mode = attendance_gate.get('mode', '')
     manual_attendance_rows = []
     if manual_attendance_allowed:
         manual_map = attendance_gate.get('manual_map', {}) if isinstance(attendance_gate, dict) else {}
@@ -47244,6 +47246,8 @@ def teacher_attendance():
         attendance_max_date=(valid_date_list[-1].isoformat() if valid_date_list else ''),
         valid_attendance_dates=sorted(list(valid_iso_set)),
         manual_attendance_allowed=manual_attendance_allowed,
+        manual_attendance_ready=manual_attendance_ready,
+        manual_attendance_mode=manual_attendance_mode,
         manual_attendance_rows=manual_attendance_rows,
         manual_attendance_days_open=int(attendance_gate.get('days_open', 0) or 0),
         manual_attendance_message=(attendance_gate.get('message') or '').strip(),
