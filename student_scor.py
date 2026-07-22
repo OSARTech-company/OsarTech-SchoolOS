@@ -5545,6 +5545,8 @@ _STUDENTS_HAS_EMAIL_COL = None
 _STUDENTS_HAS_ARCHIVE_COLS = None
 _STUDENTS_HAS_PHONE_COL = None
 _STUDENTS_HAS_PROFILE_IMAGE_COL = None
+_STUDENTS_HAS_TEACHER_COMMENT_COL = None
+_STUDENTS_HAS_PRINCIPAL_COMMENT_COL = None
 _TEACHERS_HAS_ARCHIVE_COLS = None
 _USERS_HAS_PASSWORD_CHANGED_AT = None
 _USERS_HAS_TUTORIAL_SEEN_AT = None
@@ -5729,6 +5731,74 @@ def students_has_profile_image_column():
     except Exception:
         _STUDENTS_HAS_PROFILE_IMAGE_COL = False
     return _STUDENTS_HAS_PROFILE_IMAGE_COL
+
+def students_has_teacher_comment_column():
+    """Detect whether students.teacher_comment exists."""
+    global _STUDENTS_HAS_TEACHER_COMMENT_COL
+    if _STUDENTS_HAS_TEACHER_COMMENT_COL is not None:
+        return _STUDENTS_HAS_TEACHER_COMMENT_COL
+    try:
+        with db_connection() as conn:
+            c = conn.cursor()
+            db_execute(
+                c,
+                """SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'students'
+                     AND column_name = 'teacher_comment'
+                   LIMIT 1""",
+                None,
+            )
+            _STUDENTS_HAS_TEACHER_COMMENT_COL = bool(c.fetchone())
+            if not _STUDENTS_HAS_TEACHER_COMMENT_COL:
+                try:
+                    with db_connection(commit=True) as heal_conn:
+                        heal_cursor = heal_conn.cursor()
+                        db_execute(
+                            heal_cursor,
+                            "ALTER TABLE students ADD COLUMN IF NOT EXISTS teacher_comment TEXT DEFAULT ''",
+                        )
+                    _STUDENTS_HAS_TEACHER_COMMENT_COL = True
+                except Exception:
+                    _STUDENTS_HAS_TEACHER_COMMENT_COL = False
+    except Exception:
+        _STUDENTS_HAS_TEACHER_COMMENT_COL = False
+    return _STUDENTS_HAS_TEACHER_COMMENT_COL
+
+def students_has_principal_comment_column():
+    """Detect whether students.principal_comment exists."""
+    global _STUDENTS_HAS_PRINCIPAL_COMMENT_COL
+    if _STUDENTS_HAS_PRINCIPAL_COMMENT_COL is not None:
+        return _STUDENTS_HAS_PRINCIPAL_COMMENT_COL
+    try:
+        with db_connection() as conn:
+            c = conn.cursor()
+            db_execute(
+                c,
+                """SELECT 1
+                   FROM information_schema.columns
+                   WHERE table_schema = 'public'
+                     AND table_name = 'students'
+                     AND column_name = 'principal_comment'
+                   LIMIT 1""",
+                None,
+            )
+            _STUDENTS_HAS_PRINCIPAL_COMMENT_COL = bool(c.fetchone())
+            if not _STUDENTS_HAS_PRINCIPAL_COMMENT_COL:
+                try:
+                    with db_connection(commit=True) as heal_conn:
+                        heal_cursor = heal_conn.cursor()
+                        db_execute(
+                            heal_cursor,
+                            "ALTER TABLE students ADD COLUMN IF NOT EXISTS principal_comment TEXT DEFAULT ''",
+                        )
+                    _STUDENTS_HAS_PRINCIPAL_COMMENT_COL = True
+                except Exception:
+                    _STUDENTS_HAS_PRINCIPAL_COMMENT_COL = False
+    except Exception:
+        _STUDENTS_HAS_PRINCIPAL_COMMENT_COL = False
+    return _STUDENTS_HAS_PRINCIPAL_COMMENT_COL
 
 def students_has_archive_columns():
     """Detect whether students.is_archived + students.archived_at exist."""
@@ -8431,14 +8501,24 @@ def save_student_with_cursor(c, school_id, student_id, student_data, school_for_
     has_parent_cols = students_has_parent_access_columns()
     has_parent_multi_cols = students_has_parent_multi_access_columns()
     has_email_col = students_has_email_column()
+    has_teacher_comment_col = students_has_teacher_comment_column()
+    has_principal_comment_col = students_has_principal_comment_column()
     promoted_value = normalize_promoted_db_value(student_data.get('promoted', 0))
     has_phone_col = students_has_phone_column()
+    teacher_comment = (student_data.get('teacher_comment', '') or '').strip()
+    principal_comment = (student_data.get('principal_comment', '') or '').strip()
     email_insert_col = ", email" if has_email_col else ""
     email_update_col = " email = excluded.email," if has_email_col else ""
     email_value = [email] if has_email_col else []
     phone_insert_col = ", student_phone" if has_phone_col else ""
     phone_update_col = " student_phone = excluded.student_phone," if has_phone_col else ""
     phone_value = [student_phone] if has_phone_col else []
+    teacher_comment_insert_col = ", teacher_comment" if has_teacher_comment_col else ""
+    teacher_comment_update_col = " teacher_comment = excluded.teacher_comment," if has_teacher_comment_col else ""
+    teacher_comment_value = [teacher_comment] if has_teacher_comment_col else []
+    principal_comment_insert_col = ", principal_comment" if has_principal_comment_col else ""
+    principal_comment_update_col = " principal_comment = excluded.principal_comment," if has_principal_comment_col else ""
+    principal_comment_value = [principal_comment] if has_principal_comment_col else []
     if has_parent_cols:
         if has_parent_multi_cols:
             parent_insert_cols = ", parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2"
@@ -8483,12 +8563,14 @@ def save_student_with_cursor(c, school_id, student_id, student_data, school_for_
         db_execute(
             c,
             f"""INSERT INTO students
-                   (user_id, school_id, student_id, firstname{email_insert_col}, date_of_birth, gender, classname, first_year_class, term, stream,
+                   (user_id, school_id, student_id, firstname{email_insert_col}{teacher_comment_insert_col}{principal_comment_insert_col}, date_of_birth, gender, classname, first_year_class, term, stream,
                     number_of_subject, subjects, scores, promoted{phone_insert_col}{parent_insert_cols})
-                   VALUES (?, ?, ?, ?{', ?' if has_email_col else ''}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{phone_insert_col and ', ?' or ''}{parent_placeholders})
+                   VALUES (?, ?, ?, ?{', ?' if has_email_col else ''}{', ?' if has_teacher_comment_col else ''}{', ?' if has_principal_comment_col else ''}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{phone_insert_col and ', ?' or ''}{parent_placeholders})
                    ON CONFLICT(school_id, student_id) DO UPDATE SET
                      firstname = excluded.firstname,
                      {email_update_col}
+                     {teacher_comment_update_col}
+                     {principal_comment_update_col}
                      {phone_update_col}
                      date_of_birth = excluded.date_of_birth,
                      gender = excluded.gender,
@@ -8506,7 +8588,7 @@ def save_student_with_cursor(c, school_id, student_id, student_data, school_for_
                 school_id,
                 student_id,
                 firstname,
-            ] + email_value + [
+            ] + email_value + teacher_comment_value + principal_comment_value + [
                 date_of_birth,
                 gender,
                 student_data['classname'],
@@ -8523,12 +8605,14 @@ def save_student_with_cursor(c, school_id, student_id, student_data, school_for_
         db_execute(
             c,
             f"""INSERT INTO students
-                   (school_id, student_id, firstname{email_insert_col}, date_of_birth, gender, classname, first_year_class, term, stream,
+                   (school_id, student_id, firstname{email_insert_col}{teacher_comment_insert_col}{principal_comment_insert_col}, date_of_birth, gender, classname, first_year_class, term, stream,
                     number_of_subject, subjects, scores, promoted{phone_insert_col}{parent_insert_cols})
-                   VALUES (?, ?, ?{', ?' if has_email_col else ''}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{phone_insert_col and ', ?' or ''}{parent_placeholders})
+                   VALUES (?, ?, ?{', ?' if has_email_col else ''}{', ?' if has_teacher_comment_col else ''}{', ?' if has_principal_comment_col else ''}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{phone_insert_col and ', ?' or ''}{parent_placeholders})
                    ON CONFLICT(school_id, student_id) DO UPDATE SET
                      firstname = excluded.firstname,
                      {email_update_col}
+                     {teacher_comment_update_col}
+                     {principal_comment_update_col}
                      {phone_update_col}
                      date_of_birth = excluded.date_of_birth,
                      gender = excluded.gender,
@@ -8544,7 +8628,7 @@ def save_student_with_cursor(c, school_id, student_id, student_data, school_for_
                 school_id,
                 student_id,
                 firstname,
-            ] + email_value + [
+            ] + email_value + teacher_comment_value + principal_comment_value + [
                 date_of_birth,
                 gender,
                 student_data['classname'],
@@ -25428,9 +25512,13 @@ def load_student(school_id, student_id, include_archived=False):
     has_archive_cols = students_has_archive_columns()
     has_phone_col = students_has_phone_column()
     has_profile_image_col = students_has_profile_image_column()
+    has_teacher_comment_col = students_has_teacher_comment_column()
+    has_principal_comment_col = students_has_principal_comment_column()
     lastname_col = ', lastname' if has_lastname_col else ", '' AS lastname"
     email_col = 'email' if has_email_col else "'' AS email"
     profile_col = ', profile_image' if has_profile_image_col else ''
+    teacher_comment_col = ', teacher_comment' if has_teacher_comment_col else ", '' AS teacher_comment"
+    principal_comment_col = ', principal_comment' if has_principal_comment_col else ", '' AS principal_comment"
     with db_connection() as conn:
         c = conn.cursor()
         if has_parent_cols:
@@ -25440,12 +25528,12 @@ def load_student(school_id, student_id, include_archived=False):
             if has_parent_multi_cols:
                 db_execute(c, f"""SELECT student_id, firstname{lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream,
                                number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash, parent_name, parent_gender,
-                               parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2{archive_col}{phone_col}{profile_col} FROM students
+                               parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2{archive_col}{phone_col}{teacher_comment_col}{principal_comment_col}{profile_col} FROM students
                                WHERE school_id = ? AND student_id = ?{archived_sql}""",
                            (school_id, student_id))
             else:
                 db_execute(c, f"""SELECT student_id, firstname{lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream,
-                               number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash{archive_col}{phone_col}{profile_col} FROM students
+                               number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash{archive_col}{phone_col}{teacher_comment_col}{principal_comment_col}{profile_col} FROM students
                                WHERE school_id = ? AND student_id = ?{archived_sql}""",
                            (school_id, student_id))
         else:
@@ -25453,7 +25541,7 @@ def load_student(school_id, student_id, include_archived=False):
             archive_col = ', COALESCE(is_archived, 0)' if has_archive_cols else ''
             phone_col = ', student_phone' if has_phone_col else ''
             db_execute(c, f"""SELECT student_id, firstname{lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, 
-                           number_of_subject, subjects, scores, promoted{archive_col}{phone_col}{profile_col} FROM students 
+                           number_of_subject, subjects, scores, promoted{archive_col}{phone_col}{teacher_comment_col}{principal_comment_col}{profile_col} FROM students 
                            WHERE school_id = ? AND student_id = ?{archived_sql}""",
                        (school_id, student_id))
         row = c.fetchone()
@@ -25469,8 +25557,7 @@ def load_student(school_id, student_id, include_archived=False):
                 parent_phone_2 = (row[19] or '').strip()
                 parent_password_hash_2 = (row[20] or '').strip()
                 parent_gender_2 = (row[21] or '').strip()
-                archived_idx = 22 if has_archive_cols else None
-                phone_idx = (23 if has_archive_cols else 22) if has_phone_col else None
+                base_comment_idx = 22
             else:
                 parent_name = ''
                 parent_gender = ''
@@ -25478,8 +25565,11 @@ def load_student(school_id, student_id, include_archived=False):
                 parent_phone_2 = ''
                 parent_password_hash_2 = ''
                 parent_gender_2 = ''
-                archived_idx = 16 if has_archive_cols else None
-                phone_idx = (17 if has_archive_cols else 16) if has_phone_col else None
+                base_comment_idx = 16
+            archived_idx = base_comment_idx if has_archive_cols else None
+            phone_idx = base_comment_idx + int(has_archive_cols) if has_phone_col else None
+            teacher_comment_idx = base_comment_idx + int(has_archive_cols) + int(has_phone_col) if has_teacher_comment_col else None
+            principal_comment_idx = teacher_comment_idx + 1 if has_principal_comment_col else None
         else:
             parent_phone = ''
             parent_password_hash = ''
@@ -25489,8 +25579,11 @@ def load_student(school_id, student_id, include_archived=False):
             parent_phone_2 = ''
             parent_password_hash_2 = ''
             parent_gender_2 = ''
-            archived_idx = 14 if has_archive_cols else None
-            phone_idx = (15 if has_archive_cols else 14) if has_phone_col else None
+            base_comment_idx = 14
+            archived_idx = base_comment_idx if has_archive_cols else None
+            phone_idx = base_comment_idx + int(has_archive_cols) if has_phone_col else None
+            teacher_comment_idx = base_comment_idx + int(has_archive_cols) + int(has_phone_col) if has_teacher_comment_col else None
+            principal_comment_idx = teacher_comment_idx + 1 if has_principal_comment_col else None
         student_phone = (row[phone_idx] or '').strip() if phone_idx is not None else ''
         profile_image = normalize_optional_image_src(row[-1] if has_profile_image_col else '')
         return {
@@ -25518,6 +25611,8 @@ def load_student(school_id, student_id, include_archived=False):
             'parent_phone_2': parent_phone_2,
             'parent_password_hash_2': parent_password_hash_2,
             'parent_gender_2': parent_gender_2,
+            'teacher_comment': (row[teacher_comment_idx] or '').strip() if teacher_comment_idx is not None else '',
+            'principal_comment': (row[principal_comment_idx] or '').strip() if principal_comment_idx is not None else '',
             'is_archived': int(row[archived_idx] or 0) if archived_idx is not None else 0,
         }
 

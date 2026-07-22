@@ -1094,6 +1094,78 @@ def test_teacher_enter_scores_does_not_carry_previous_term_scores(client, app_mo
     assert "Old Subject" not in (saved.get("scores") or {})
 
 
+def test_teacher_enter_scores_persists_teacher_comment(client, app_module, monkeypatch):
+    m = app_module
+    saved_rows = []
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: {
+        "academic_year": "2025-2026",
+        "current_term": "First Term",
+        "test_enabled": 1,
+        "exam_enabled": 0,
+        "max_tests": 1,
+        "test_score_max": 10,
+    })
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "load_student", lambda school_id, student_id: {
+        "student_id": "ST1",
+        "firstname": "Aka",
+        "classname": "JSS1",
+        "term": "First Term",
+        "subjects": ["Mathematics"],
+        "scores": {},
+        "teacher_comment": "",
+        "stream": "S",
+        "number_of_subject": 1,
+    })
+    monkeypatch.setattr(m, "teacher_has_class_access", lambda *args, **kwargs: True)
+    monkeypatch.setattr(m, "get_teacher_subjects_for_class_term", lambda *args, **kwargs: ["Mathematics"])
+    monkeypatch.setattr(m, "class_uses_stream_for_school", lambda *args, **kwargs: False)
+    monkeypatch.setattr(m, "sync_student_subjects_to_class_config", lambda *args, **kwargs: (False, None))
+    monkeypatch.setattr(m, "is_result_published", lambda *args, **kwargs: False)
+    monkeypatch.setattr(m, "get_assessment_config_for_class", lambda *args, **kwargs: {"exam_mode": "combined", "exam_score_max": 70})
+    monkeypatch.setattr(m, "get_latest_score_audit_map_for_student", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "get_teachers", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "get_teacher_subject_assignments", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "get_subject_submission_teacher_ids_for_class", lambda *args, **kwargs: set())
+    monkeypatch.setattr(m, "audit_student_score_changes_with_cursor", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "set_result_published", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "save_student_with_cursor", lambda c, school_id, student_id, student_data: saved_rows.append(json.loads(json.dumps(student_data))))
+
+    def fake_db_connection(commit=False):
+        class FakeCursor:
+            def execute(self, query, params=None):
+                return None
+            def fetchone(self):
+                return ("First Term", json.dumps({}))
+        class FakeConn:
+            def cursor(self):
+                return FakeCursor()
+        @contextlib.contextmanager
+        def ctx(commit=False):
+            yield FakeConn()
+        return ctx(commit)
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "teacher"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "T1"
+
+    resp = client.post(
+        "/teacher/enter-scores?student_id=ST1",
+        data={"test_1_mathematics": "8", "subject_comment_mathematics": "", "teacher_comment": "Nice effort"},
+        follow_redirects=False,
+    )
+
+    assert resp.status_code in (302, 303)
+    assert saved_rows, "Expected score save to be called"
+    saved = saved_rows[-1]
+    assert saved.get("teacher_comment") == "Nice effort"
+    assert "Mathematics" in (saved.get("scores") or {})
+
+
 def test_publish_results_behaviour_uses_publish_year(app_module, monkeypatch):
     m = app_module
     captured = {}
