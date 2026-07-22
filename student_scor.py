@@ -23090,74 +23090,114 @@ def _set_result_published_with_cursor(
             resolved_teacher_name = str(teacher_id)
     arm = _derive_arm_from_classname(classname, arm)
     if has_approval_cols:
-        db_execute(
-            c,
-            (
-                "INSERT INTO result_publications "
-                "(school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, "
-                "approval_status, submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) "
-                "ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET "
-                "teacher_id = excluded.teacher_id, "
-                "teacher_name = excluded.teacher_name, "
-                "principal_name = excluded.principal_name, "
-                "is_published = excluded.is_published, "
-                "published_at = excluded.published_at, "
-                "approval_status = excluded.approval_status, "
-                "submitted_at = excluded.submitted_at, "
-                "submitted_by = excluded.submitted_by, "
-                "reviewed_at = excluded.reviewed_at, "
-                "reviewed_by = excluded.reviewed_by, "
-                "review_note = excluded.review_note, "
-                "updated_at = CURRENT_TIMESTAMP"
-            ),
-            (
-                school_id,
-                classname,
-                arm,
-                term,
-                academic_year or '',
-                teacher_id,
-                resolved_teacher_name,
-                resolved_principal_name,
-                1 if is_published else 0,
-                datetime.now().isoformat() if is_published else None,
-                'approved' if is_published else 'not_submitted',
-                None,
-                None,
-                None,
-                None,
-                None,
-            ),
+        update_sql = (
+            "UPDATE result_publications SET "
+            "teacher_id = ?, "
+            "teacher_name = ?, "
+            "principal_name = ?, "
+            "is_published = ?, "
+            "published_at = ?, "
+            "approval_status = ?, "
+            "submitted_at = ?, "
+            "submitted_by = ?, "
+            "reviewed_at = ?, "
+            "reviewed_by = ?, "
+            "review_note = ?, "
+            "updated_at = CURRENT_TIMESTAMP "
+            "WHERE school_id = ? AND classname = ? AND arm = ? AND term = ? AND academic_year = ?"
         )
+        insert_sql = (
+            "INSERT INTO result_publications "
+            "(school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, "
+            "approval_status, submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
+        )
+        params = (
+            resolved_teacher_name,
+            resolved_principal_name,
+            1 if is_published else 0,
+            datetime.now().isoformat() if is_published else None,
+            'approved' if is_published else 'not_submitted',
+            None,
+            None,
+            None,
+            None,
+            None,
+            school_id,
+            classname,
+            arm,
+            term,
+            academic_year or '',
+        )
+        db_execute(c, update_sql, params)
+        if c.rowcount == 0:
+            db_execute(
+                c,
+                insert_sql,
+                (
+                    school_id,
+                    classname,
+                    arm,
+                    term,
+                    academic_year or '',
+                    teacher_id,
+                    resolved_teacher_name,
+                    resolved_principal_name,
+                    1 if is_published else 0,
+                    datetime.now().isoformat() if is_published else None,
+                    'approved' if is_published else 'not_submitted',
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            )
     else:
-        db_execute(
-            c,
-            (
-                "INSERT INTO result_publications "
-                "(school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) "
-                "ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET "
-                "teacher_id = excluded.teacher_id, "
-                "teacher_name = excluded.teacher_name, "
-                "principal_name = excluded.principal_name, "
-                "is_published = excluded.is_published, "
-                "published_at = excluded.published_at, "
-                "updated_at = CURRENT_TIMESTAMP"
-            ),
-            (
-                school_id,
-                classname,
-                arm,
-                term,
-                academic_year or '',
-                teacher_id,
-                resolved_teacher_name,
-                resolved_principal_name,
-                1 if is_published else 0,
-                datetime.now().isoformat() if is_published else None,
-            ),
+        update_sql = (
+            "UPDATE result_publications SET "
+            "teacher_id = ?, "
+            "teacher_name = ?, "
+            "principal_name = ?, "
+            "is_published = ?, "
+            "published_at = ?, "
+            "updated_at = CURRENT_TIMESTAMP "
+            "WHERE school_id = ? AND classname = ? AND arm = ? AND term = ? AND academic_year = ?"
         )
+        insert_sql = (
+            "INSERT INTO result_publications "
+            "(school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
+        )
+        params = (
+            resolved_teacher_name,
+            resolved_principal_name,
+            1 if is_published else 0,
+            datetime.now().isoformat() if is_published else None,
+            school_id,
+            classname,
+            arm,
+            term,
+            academic_year or '',
+        )
+        db_execute(c, update_sql, params)
+        if c.rowcount == 0:
+            db_execute(
+                c,
+                insert_sql,
+                (
+                    school_id,
+                    classname,
+                    arm,
+                    term,
+                    academic_year or '',
+                    teacher_id,
+                    resolved_teacher_name,
+                    resolved_principal_name,
+                    1 if is_published else 0,
+                    datetime.now().isoformat() if is_published else None,
+                ),
+            )
 
 def set_result_published(school_id, classname, term, academic_year, teacher_id, is_published, teacher_name='', principal_name='', arm=''):
     """Publish/unpublish a class result for a term."""
