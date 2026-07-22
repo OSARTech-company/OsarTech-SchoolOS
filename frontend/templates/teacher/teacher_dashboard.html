@@ -683,10 +683,12 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for classname in classes %}
-                                {% set s = class_publish_status.get(classname, {}) %}
+                            {% for row in class_publish_rows %}
+                                {% set classname = row.classname %}
+                                {% set arm = row.arm %}
+                                {% set s = row.status %}
                                 <tr>
-                                    <td>{{ classname }}</td>
+                                    <td>{{ row.display_name }}</td>
                                     <td>{{ current_term }}</td>
                                     <td>{{ s.completed or 0 }}/{{ s.total or 0 }}</td>
                                     <td>{{ s.viewed_students or 0 }}/{{ s.published_students or 0 }}</td>
@@ -711,12 +713,12 @@
                                         {% if school and school.score_entry_mode == 'dean_led' %}
                                         <a href="{{ url_for('teacher_dashboard', tab='score') }}" class="btn btn-primary btn-xs">Open Shared Draft</a>
                                         {% else %}
-                                        <a href="{{ url_for('teacher_behaviour_assessment', classname=classname) }}" class="btn btn-primary btn-xs">Behaviour</a>
+                                        <a href="{{ url_for('teacher_behaviour_assessment', classname=classname, arm=arm) }}" class="btn btn-primary btn-xs">Behaviour</a>
                                         {% endif %}
                                         <form method="POST" action="{{ url_for('teacher_publish_results') }}" class="inline-form">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                             <input type="hidden" name="classname" value="{{ classname }}"/>
-                                            <input type="hidden" name="arm" value="{{ arm or '' }}"/>
+                                            <input type="hidden" name="arm" value="{{ arm }}"/>
                                             <button type="submit" class="btn btn-success btn-xs" {% if not s.ready or s.published or s.approval_status == 'pending' %}disabled{% endif %}>
                                                 Submit
                                             </button>

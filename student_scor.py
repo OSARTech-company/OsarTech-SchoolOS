@@ -7628,7 +7628,7 @@ def init_db():
     safe_exec_ignore('ALTER TABLE result_publications DROP CONSTRAINT IF EXISTS result_publications_school_id_classname_term_key')
     safe_exec_ignore('DROP INDEX IF EXISTS result_publications_school_id_classname_term_key')
     safe_exec_ignore('DROP INDEX IF EXISTS uq_result_publications')
-    db_execute(c, 'CREATE UNIQUE INDEX IF NOT EXISTS uq_result_publications ON result_publications(school_id, classname, term, academic_year)')
+    db_execute(c, 'CREATE UNIQUE INDEX IF NOT EXISTS uq_result_publications ON result_publications(school_id, classname, COALESCE(arm, \'\'), term, COALESCE(academic_year, \'\'))')
     # Auto-heal legacy/orphan school references before adding FK guards.
     # This preserves rows by creating placeholder school records when needed.
     _ensure_schools_table()
@@ -44313,12 +44313,32 @@ def school_admin_edit_student(student_id):
             flash('Please enter a valid email address.', 'error')
             return _edit_redirect()
 
+        parent_phone = (request.form.get('parent_phone') or '').strip()
+        if parent_phone:
+            parent_phone = normalize_parent_phone(parent_phone)
+            if not is_valid_parent_phone(parent_phone):
+                flash('Please enter a valid parent phone number.', 'error')
+                return _edit_redirect()
+        else:
+            parent_phone = ''
+
+        parent_phone_2 = (request.form.get('parent_phone_2') or '').strip()
+        if parent_phone_2:
+            parent_phone_2 = normalize_parent_phone(parent_phone_2)
+            if not is_valid_parent_phone(parent_phone_2):
+                flash('Please enter a valid second parent phone number.', 'error')
+                return _edit_redirect()
+        else:
+            parent_phone_2 = ''
+
         updated_student = dict(student or {})
         updated_student.update({
             'firstname': firstname,
             'email': email,
             'date_of_birth': date_of_birth,
             'gender': gender,
+            'parent_phone': parent_phone,
+            'parent_phone_2': parent_phone_2,
         })
 
         try:
@@ -45601,6 +45621,62 @@ def teacher_dashboard():
             'published_students': int(class_views.get('published_count', 0)),
             'viewed_students': int(class_views.get('viewed_count', 0)),
         }
+    
+    class_publish_rows = []
+    if arm_mode == 'separate':
+        for classname in classes:
+            source_students = term_students_all if term_students_all is not None else class_students_data
+            class_students_list = [s for s in source_students.values() if _class_match(s.get('classname', ''), classname) and s.get('term') == current_term]
+            arms = sorted({s.get('stream', '').strip() for s in class_students_list})
+            if not arms:
+                arms = ['']
+            for arm in arms:
+                arm_students = [s for s in class_students_list if s.get('stream', '').strip().lower() == arm.lower()]
+                if not arm_students and arm:
+                    continue
+                arm_student_ids = [sid for sid, s in source_students.items() if _class_match(s.get('classname', ''), classname) and s.get('term') == current_term and s.get('stream', '').strip().lower() == arm.lower()]
+                attendance_gate_arm = get_class_attendance_publish_readiness(
+                    school_id=school_id, classname=classname, term=current_term, academic_year=current_year,
+                    class_students_data={sid: s for sid, s in zip(arm_student_ids, arm_students)},
+                )
+                total_arm = len(arm_students)
+                completed_arm = sum(1 for s in arm_students if is_student_score_complete(s, school, current_term))
+                behaviour_progress_arm = class_behaviour_completion(
+                    school_id, classname, current_term, current_year, arm_student_ids, school_or_mode=school,
+                )
+                subject_progress_arm = compute_class_subject_completion(
+                    school_id=school_id, classname=classname, term=current_term, academic_year=current_year, school=school,
+                    class_students_data={idx: s for idx, s in enumerate(arm_students)},
+                )
+                pub_arm = get_result_publication_row(school_id, classname, current_term, current_year, arm=arm)
+                status = {
+                    'total': total_arm,
+                    'completed': completed_arm,
+                    'ready': total_arm > 0 and completed_arm == total_arm and bool(subject_progress_arm.get('ready', False)) and bool(behaviour_progress_arm.get('ready', False)) and bool(attendance_gate_arm.get('ready', False)),
+                    'published': bool(pub_arm.get('is_published', False)),
+                    'approval_status': pub_arm.get('approval_status', 'not_submitted'),
+                    'review_note': pub_arm.get('review_note', ''),
+                    'attendance_ready': bool(attendance_gate_arm.get('ready', False)),
+                    'behaviour_ready': bool(behaviour_progress_arm.get('ready', False)),
+                    'behaviour_missing_count': int(behaviour_progress_arm.get('missing_count', 0) or 0),
+                    'viewed_students': 0,
+                    'published_students': 0,
+                }
+                class_publish_rows.append({
+                    'classname': classname,
+                    'arm': arm,
+                    'display_name': f"{classname} {arm}".strip(),
+                    'status': status
+                })
+    else:
+        for classname in classes:
+            class_publish_rows.append({
+                'classname': classname,
+                'arm': '',
+                'display_name': classname,
+                'status': class_publish_status.get(classname, {})
+            })
+
     teacher_missing_score_alerts = []
     for classname in classes:
         s = class_publish_status.get(classname, {})
@@ -45932,6 +46008,7 @@ def teacher_dashboard():
                          has_teacher_signature=has_teacher_signature,
                          score_complete_students=score_complete_students,
                          class_publish_status=class_publish_status,
+                         class_publish_rows=class_publish_rows,
                          teacher_missing_score_alerts=teacher_missing_score_alerts,
                          teacher_messages=teacher_messages,
                          unread_teacher_messages=unread_teacher_messages,
@@ -47675,6 +47752,8 @@ def teacher_publish_results():
         flash(f'{classname} ({current_term}) is already submitted and pending admin review.', 'error')
         return redirect(url_for('teacher_dashboard'))
     class_students = load_students(school_id, class_filter=classname, term_filter=current_term)
+    if arm:
+        class_students = {sid: st for sid, st in class_students.items() if (st.get('stream') or '').strip().lower() == arm.lower()}
     student_list = list(class_students.values())
     if not student_list:
         flash(f'No students found in {classname}.', 'error')
@@ -51497,6 +51576,138 @@ def parent_merge_profiles():
         otp_sent=otp_sent,
         otp_code_mock=otp_code_mock
     )
+
+
+@app.route('/parent/first-login', methods=['GET', 'POST'])
+def parent_first_login():
+    """First-time parent login: enter phone to receive OTP."""
+    if request.method == 'POST':
+        parent_phone = normalize_parent_phone((request.form.get('parent_phone') or '').strip())
+        if not parent_phone:
+            flash('Enter a valid parent phone number.', 'error')
+            return render_template_string(PARENT_FIRST_LOGIN_HTML)
+
+        # Find candidate student rows for this phone
+        candidates = get_parent_students_by_phone(parent_phone)
+        # Always generate OTP but keep messaging generic to avoid enumeration
+        import secrets
+        code = f"{secrets.randbelow(900000) + 100000}"
+        expiry = datetime.now() + timedelta(minutes=10)
+        session['parent_first_login_otp'] = code
+        session['parent_first_login_otp_expires_at'] = expiry.isoformat()
+        session['parent_first_login_phone'] = parent_phone
+        session['parent_first_login_candidates'] = [f"{r.get('school_id','')}::{r.get('student_id','')}" for r in (candidates or [])]
+
+        if get_sms_sending_enabled():
+            try:
+                _enqueue_sms_delivery(None, parent_phone, f"Your verification code is {code}", audience_role='parent')
+            except Exception:
+                logging.exception('Failed to enqueue parent first-login OTP')
+
+        flash('If this phone number is linked to a student record, a verification code has been sent.', 'success')
+        return redirect(url_for('parent_first_login_verify'))
+    return render_template_string(PARENT_FIRST_LOGIN_HTML)
+
+
+@app.route('/parent/first-login-verify', methods=['GET', 'POST'])
+def parent_first_login_verify():
+    """Verify OTP and let parent set password for first-time access."""
+    phone = (session.get('parent_first_login_phone') or '').strip()
+    expected = (session.get('parent_first_login_otp') or '').strip()
+    expiry_raw = (session.get('parent_first_login_otp_expires_at') or '').strip()
+    if request.method == 'POST':
+        otp_entered = (request.form.get('otp') or '').strip()
+        new_password = (request.form.get('new_password') or '').strip()
+        confirm_password = (request.form.get('confirm_password') or '').strip()
+        if not phone or not expected or not expiry_raw:
+            flash('Verification session expired. Start again.', 'error')
+            return redirect(url_for('parent_first_login'))
+        try:
+            expiry_time = datetime.fromisoformat(expiry_raw)
+        except Exception:
+            expiry_time = datetime.min
+        if datetime.now() > expiry_time:
+            session.pop('parent_first_login_otp', None)
+            session.pop('parent_first_login_otp_expires_at', None)
+            session.pop('parent_first_login_phone', None)
+            flash('Verification code expired. Request a new code.', 'error')
+            return redirect(url_for('parent_first_login'))
+        if otp_entered != expected:
+            flash('Invalid verification code.', 'error')
+            return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+        if not new_password or not confirm_password:
+            flash('Password fields are required.', 'error')
+            return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+        if new_password != confirm_password:
+            flash('Passwords do not match.', 'error')
+            return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+        if len(new_password) < 6:
+            flash('Password must be at least 6 characters.', 'error')
+            return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+
+        # Apply new password hash to all students with this parent phone
+        new_hash = hash_password(new_password)
+        try:
+            with db_connection(commit=True) as conn:
+                c = conn.cursor()
+                db_execute(c, """UPDATE students SET parent_password_hash = ? WHERE parent_phone = ?""", (new_hash, phone))
+                if students_has_parent_multi_access_columns():
+                    db_execute(c, """UPDATE students SET parent_password_hash_2 = ? WHERE parent_phone_2 = ?""", (new_hash, phone))
+        except Exception as exc:
+            logging.exception('Failed to set parent password during first-login')
+            flash('Could not set password. Please try again later.', 'error')
+            return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+
+        # Establish parent session
+        session.clear()
+        session.permanent = True
+        session['role'] = 'parent'
+        session['parent_phone'] = phone
+        session['parent_logged_in_password_hash'] = new_hash
+        # load linked students into session keys
+        candidates = session.get('parent_first_login_candidates') or []
+        session['parent_student_keys'] = sorted(candidates, key=lambda v: v.lower())
+
+        # Clear OTP state
+        session.pop('parent_first_login_otp', None)
+        session.pop('parent_first_login_otp_expires_at', None)
+        session.pop('parent_first_login_phone', None)
+        session.pop('parent_first_login_candidates', None)
+
+        flash('Password set. You are now logged in.', 'success')
+        return redirect(url_for('parent_dashboard'))
+
+    # GET
+    if not phone:
+        return redirect(url_for('parent_first_login'))
+    return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+
+
+# Inline simple templates to avoid adding new files
+from flask import render_template_string
+
+PARENT_FIRST_LOGIN_HTML = '''
+<h2>Parent First Login</h2>
+<form method="post">
+  <label>Parent Phone</label>
+  <input name="parent_phone" required />
+  <button type="submit">Send Verification Code</button>
+</form>
+'''
+
+PARENT_FIRST_VERIFY_HTML = '''
+<h2>Verify Code & Set Password</h2>
+<p>Phone: {{ phone }}</p>
+<form method="post">
+  <label>6-digit code</label>
+  <input name="otp" pattern="[0-9]{6}" required />
+  <label>New Password</label>
+  <input name="new_password" type="password" required minlength="6" />
+  <label>Confirm Password</label>
+  <input name="confirm_password" type="password" required minlength="6" />
+  <button type="submit">Set Password & Login</button>
+</form>
+'''
 
 
 @app.route('/school-admin/documents', methods=['GET', 'POST'])

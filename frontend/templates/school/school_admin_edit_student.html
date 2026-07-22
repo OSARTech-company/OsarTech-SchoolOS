@@ -103,6 +103,16 @@
                                 <input type="email" id="email" name="email" value="{{ student.email or '' }}" placeholder="e.g. student@example.com">
                             </div>
                             <div class="form-group">
+                                <label for="parent_phone">Parent Phone</label>
+                                <input type="text" id="parent_phone" name="parent_phone" value="{{ student.parent_phone or '' }}" placeholder="e.g. 08012345678">
+                                <p class="form-help">This phone number is used for parent login and notifications.</p>
+                            </div>
+                            <div class="form-group">
+                                <label for="parent_phone_2">Second Parent Phone</label>
+                                <input type="text" id="parent_phone_2" name="parent_phone_2" value="{{ student.parent_phone_2 or '' }}" placeholder="e.g. 08123456789">
+                                <p class="form-help">Optional second parent phone number for a second contact or alternate login.</p>
+                            </div>
+                            <div class="form-group">
                                 <label for="date_of_birth">Date of Birth</label>
                                 <input type="date" id="date_of_birth" name="date_of_birth" value="{{ student.date_of_birth or '' }}">
                             </div>
