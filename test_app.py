@@ -3133,6 +3133,140 @@ def test_nursery_primary_report_customization(client, app_module, monkeypatch):
             exam_config={'exam_mode': 'separate'}
         )
         assert 'class="report-page school-primary-nursery"' not in rendered_sec
+
+
+def test_published_result_backfills_behaviour_assessment(app_module, monkeypatch):
+    m = app_module
+
+    behaviour_payload = {
+        "honesty": "A",
+        "punctuality": "B",
+        "neatness": "A",
+        "politeness": "C",
+        "teamwork": "B",
+    }
+
+    def fake_db_connection(commit=False):
+        class FakeCursor:
+            def __init__(self):
+                self._rows = []
+                self.rowcount = 0
+
+            def execute(self, query, params=None):
+                if "FROM published_student_results" in query:
+                    self._rows = [(
+                        "Ada",
+                        "Primary 2B",
+                        "2025-2026",
+                        "First Term",
+                        "A",
+                        5,
+                        '["Math", "English"]',
+                        '{"Math": {"overall_mark": 90}, "English": {"overall_mark": 80}}',
+                        "{}",
+                        "Well done",
+                        "Keep it up",
+                        85.0,
+                        "A",
+                        "Pass",
+                        "2026-07-01T10:00:00",
+                    )]
+                elif "FROM behaviour_assessments" in query:
+                    self._rows = [(
+                        json.dumps(behaviour_payload),
+                    )]
+                else:
+                    self._rows = []
+
+            def fetchone(self):
+                return self._rows[0] if self._rows else None
+
+            def fetchall(self):
+                return list(self._rows)
+
+        class FakeConn:
+            def cursor(self):
+                return FakeCursor()
+
+            def commit(self):
+                pass
+
+        @contextlib.contextmanager
+        def ctx(commit=False):
+            yield FakeConn()
+
+        return ctx(commit)
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "get_school", lambda sid: {"school_id": sid, "school_type": "primary"})
+    monkeypatch.setattr(m, "get_behaviour_grade_scale", lambda school_or_mode=None: {"A": "Excellent", "B": "Good", "C": "Fair"})
+    monkeypatch.setattr(m, "get_student_behaviour_assessment", lambda *args, **kwargs: behaviour_payload)
+    monkeypatch.setattr(m, "build_ordered_subject_score_map", lambda scores, subjects: scores)
+    monkeypatch.setattr(m, "record_result_view", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "get_assessment_config_for_class", lambda *args, **kwargs: {"exam_mode": "combined"})
+    monkeypatch.setattr(m, "load_published_class_results", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "build_class_average_from_published_results", lambda *args, **kwargs: {"average": 0, "size": 0, "is_stream_separate": False})
+    monkeypatch.setattr(m, "build_positions_from_published_results", lambda *args, **kwargs: (None, {}))
+    monkeypatch.setattr(m, "get_result_promotion_status", lambda *args, **kwargs: "Pass")
+    monkeypatch.setattr(m, "get_result_signoff_details", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "build_result_verification_context", lambda *args, **kwargs: {})
+    monkeypatch.setattr(m, "build_result_term_attendance_data", lambda **kwargs: {})
+    monkeypatch.setattr(m, "filter_visible_terms_for_student", lambda school, terms: terms)
+    monkeypatch.setattr(m, "get_published_terms_for_student", lambda *args, **kwargs: [{"term": "First Term", "token": "first-term", "academic_year": "2025-2026", "classname": "Primary 2B"}])
+    monkeypatch.setattr(m, "resolve_requested_published_term", lambda *args, **kwargs: {"term": "First Term", "token": "first-term", "academic_year": "2025-2026", "classname": "Primary 2B"})
+    monkeypatch.setattr(m, "pick_default_published_term", lambda terms, *args, **kwargs: terms[0])
+
+    snapshot = m.load_published_student_result("SCH1", "STU1", "First Term", "2025-2026", classname="Primary 2B")
+    assert snapshot["behaviour_assessment"] == behaviour_payload
+
+    with m.app.test_request_context():
+        student_view = {
+            "first_name": snapshot.get("firstname", ""),
+            "student_id": "STU1",
+            "class_name": snapshot.get("classname", ""),
+            "class_size": 1,
+            "class_average": 0,
+            "class_average_size": 0,
+            "class_average_is_stream": False,
+            "term": snapshot.get("term", ""),
+            "academic_year": snapshot.get("academic_year", ""),
+            "number_of_subject": 2,
+            "subjects": snapshot.get("scores", {}),
+            "behaviour_assessment": snapshot.get("behaviour_assessment", {}),
+            "teacher_comment": snapshot.get("teacher_comment", ""),
+            "principal_comment": snapshot.get("principal_comment", ""),
+            "average_marks": snapshot.get("average_marks", 0),
+            "total_score": 170,
+            "Grade": snapshot.get("Grade", "A"),
+            "Status": snapshot.get("Status", "Pass"),
+            "promotion_status": "Pass",
+        }
+        rendered = flask.render_template(
+            "student/student_result.html",
+            student=student_view,
+            school={"school_name": "Demo School", "school_type": "primary", "show_positions": 1, "max_tests": 3, "test_score_max": 30},
+            position=None,
+            subject_positions={},
+            published_terms=[],
+            current_term_token="first-term",
+            available_result_classes=[],
+            selected_result_class="",
+            term_notice="",
+            term_view_endpoint="student_view_result",
+            student_key="",
+            prev_term=None,
+            next_term=None,
+            behaviour_grade_scale={"A": "Excellent", "B": "Good", "C": "Fair"},
+            teacher_signature=None,
+            teacher_name="Teacher",
+            principal_name="Principal",
+            principal_signature=None,
+            result_max_tests=3,
+            exam_config={"exam_mode": "combined"},
+        )
+        assert "Behaviour Assessment (Affective Domain)" in rendered
+        assert "Excellent" in rendered
+        assert "Good" in rendered
         assert 'Student Details' in rendered_sec
         assert 'Student Name' in rendered_sec
         assert 'Students in Class' in rendered_sec

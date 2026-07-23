@@ -21903,8 +21903,7 @@ def sync_published_result_behaviour_with_cursor(c, school_id, student_id, classn
     db_execute(
         c,
         """UPDATE published_student_results
-           SET behaviour_json = ?,
-               updated_at = CURRENT_TIMESTAMP
+           SET behaviour_json = ?
            WHERE school_id = ? AND student_id = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')""",
         (
             json.dumps(normalize_behaviour_assessment(behaviour_payload, mode_source)),
