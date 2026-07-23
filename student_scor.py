@@ -9217,6 +9217,39 @@ def _rename_teacher_identifier_across_tables(school_id, old_teacher_id, new_teac
         if c.rowcount <= 0:
             raise ValueError('Could not update teacher login.')
 
+        db_execute(
+            c,
+            """SELECT firstname, lastname, phone, gender, signature_image, profile_image, assigned_classes, subjects_taught
+               FROM teachers
+               WHERE school_id = ? AND LOWER(user_id) = LOWER(?) LIMIT 1""",
+            (sid, old_id),
+        )
+        teacher_row = c.fetchone()
+        if teacher_row:
+            db_execute(
+                c,
+                """INSERT INTO teachers
+                   (school_id, user_id, firstname, lastname, phone, gender, signature_image, profile_image, assigned_classes, subjects_taught)
+                   SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                   WHERE NOT EXISTS (
+                       SELECT 1 FROM teachers WHERE school_id = ? AND LOWER(user_id) = LOWER(?)
+                   )""",
+                (
+                    sid,
+                    new_id,
+                    teacher_row[0],
+                    teacher_row[1],
+                    teacher_row[2],
+                    teacher_row[3],
+                    teacher_row[4],
+                    teacher_row[5],
+                    teacher_row[6],
+                    teacher_row[7],
+                    sid,
+                    new_id,
+                ),
+            )
+
         def exec_optional(sql, params):
             savepoint_created = False
             try:
@@ -9248,10 +9281,15 @@ def _rename_teacher_identifier_across_tables(school_id, old_teacher_id, new_teac
             ("UPDATE class_timetables SET teacher_id = ? WHERE school_id = ? AND LOWER(teacher_id) = LOWER(?)", (new_id, sid, old_id)),
             ("UPDATE teacher_messages SET created_by = ? WHERE school_id = ? AND LOWER(created_by) = LOWER(?)", (new_id, sid, old_id)),
             ("UPDATE student_messages SET created_by = ? WHERE school_id = ? AND LOWER(created_by) = LOWER(?)", (new_id, sid, old_id)),
-            ("UPDATE teachers SET user_id = ? WHERE school_id = ? AND LOWER(user_id) = LOWER(?)", (new_id, sid, old_id)),
         ]
         for sql, params in updates:
             exec_optional(sql, params)
+
+        db_execute(
+            c,
+            "DELETE FROM teachers WHERE school_id = ? AND LOWER(user_id) = LOWER(?)",
+            (sid, old_id),
+        )
 
 def parent_pref_allows(prefs, context):
     ctx = (context or '').strip().lower()
