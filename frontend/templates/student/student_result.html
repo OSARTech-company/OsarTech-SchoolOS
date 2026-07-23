@@ -1858,12 +1858,92 @@
             0% { transform: translateY(0px) scale(1); }
             100% { transform: translateY(-4px) scale(1.05); }
         }
+        /* Primary-focused overlay */
+        .school-primary-nursery {
+            background:
+                radial-gradient(circle at 10% 18%, rgba(255, 244, 196, 0.9) 0%, rgba(255, 244, 196, 0.2) 20%, transparent 40%),
+                radial-gradient(circle at 88% 10%, rgba(255, 214, 165, 0.24) 0%, transparent 26%),
+                linear-gradient(180deg, #f8fbff 0%, #f5f9ff 100%);
+        }
+        .school-primary-nursery .portal-header {
+            border-radius: 22px 22px 0 0;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 55%, #60a5fa 100%);
+            box-shadow: 0 12px 30px rgba(37, 99, 235, 0.18);
+        }
+        .school-primary-nursery .header {
+            background:
+                radial-gradient(circle at 15% 25%, rgba(255,255,255,0.18), transparent 18%),
+                radial-gradient(circle at 85% 20%, rgba(255,255,255,0.14), transparent 16%),
+                linear-gradient(135deg, #1d4ed8 0%, #2563eb 52%, #60a5fa 100%) !important;
+        }
+        .school-primary-nursery .hero-ribbon,
+        .school-primary-nursery .kpi-strip {
+            border-radius: 22px;
+            margin-left: 18px;
+            margin-right: 18px;
+        }
+        .school-primary-nursery .hero-chip {
+            border-radius: 999px;
+            background: #ffffff;
+        }
+        .school-primary-nursery .student-info > div,
+        .school-primary-nursery .subjects-table,
+        .school-primary-nursery .behaviour-panel,
+        .school-primary-nursery .comment-grid > div {
+            border-radius: 24px !important;
+            border: 2px solid rgba(37, 99, 235, 0.08) !important;
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.06) !important;
+        }
+        .school-primary-nursery .info-group-title,
+        .school-primary-nursery .table-title {
+            font-size: 15px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .school-primary-nursery .table-pill {
+            background: #fff7cc !important;
+            color: #92400e !important;
+            border-color: #f59e0b !important;
+        }
+        .school-primary-nursery .subjects-table th {
+            background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+        }
+        .school-primary-nursery .subjects-table td {
+            background: #f8fbff;
+        }
+        .school-primary-nursery .kpi-card:nth-child(1) { border-bottom: 5px solid #38bdf8; }
+        .school-primary-nursery .kpi-card:nth-child(2) { border-bottom: 5px solid #fb7185; }
+        .school-primary-nursery .kpi-card:nth-child(3) { border-bottom: 5px solid #facc15; }
+        .school-primary-nursery .kpi-card:nth-child(4) { border-bottom: 5px solid #4ade80; }
+        .school-primary-nursery .kpi-card:nth-child(5) { border-bottom: 5px solid #a78bfa; }
+        .school-primary-nursery .award-stamp {
+            width: 176px;
+            height: 176px;
+        }
+        .school-primary-nursery .stamp-title {
+            font-size: 14px;
+        }
+        .primary-pupil-note {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255, 243, 205, 0.9);
+            color: #92400e;
+            font-size: 12px;
+            font-weight: 800;
+        }
+        .primary-pupil-note i {
+            color: #f59e0b;
+        }
     </style>
 </head>
 <body class="report-page{% if is_nursery_primary %} school-primary-nursery{% endif %}" style="--school-primary: {{ school.theme_primary_color if school and school.theme_primary_color else '#1E3C72' }}; --school-secondary: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#2A5298' }}; --school-accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
     <div class="portal-header">
         <h1><i class="fas {{ portal_icon }}"></i> {{ student_label }} Result Portal</h1>
-        <p>View your academic performance</p>
+        <p>{% if is_nursery_primary %}A colorful progress report made for young learners{% else %}View your academic performance{% endif %}</p>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -1916,6 +1996,9 @@
                     <span>{{ student.number_of_subject if student.number_of_subject is not none else 0 }} Subjects</span>
                     <span>{{ student.Status if student.Status else 'Status Pending' }}</span>
                 </div>
+                {% if is_nursery_primary %}
+                <div class="primary-pupil-note"><i class="fas fa-star"></i> Bright colors, friendly labels, and simple progress at a glance</div>
+                {% endif %}
             </div>
             <div class="header-qr-side">
                 <div class="header-right-cluster">
