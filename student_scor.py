@@ -9239,7 +9239,6 @@ def _rename_teacher_identifier_across_tables(school_id, old_teacher_id, new_teac
                         pass
 
         updates = [
-            ("UPDATE teachers SET user_id = ? WHERE school_id = ? AND LOWER(user_id) = LOWER(?)", (new_id, sid, old_id)),
             ("UPDATE class_assignments SET teacher_id = ? WHERE school_id = ? AND LOWER(teacher_id) = LOWER(?)", (new_id, sid, old_id)),
             ("UPDATE teacher_subject_assignments SET teacher_id = ? WHERE school_id = ? AND LOWER(teacher_id) = LOWER(?)", (new_id, sid, old_id)),
             ("UPDATE result_publications SET teacher_id = ? WHERE school_id = ? AND LOWER(teacher_id) = LOWER(?)", (new_id, sid, old_id)),
@@ -9249,6 +9248,7 @@ def _rename_teacher_identifier_across_tables(school_id, old_teacher_id, new_teac
             ("UPDATE class_timetables SET teacher_id = ? WHERE school_id = ? AND LOWER(teacher_id) = LOWER(?)", (new_id, sid, old_id)),
             ("UPDATE teacher_messages SET created_by = ? WHERE school_id = ? AND LOWER(created_by) = LOWER(?)", (new_id, sid, old_id)),
             ("UPDATE student_messages SET created_by = ? WHERE school_id = ? AND LOWER(created_by) = LOWER(?)", (new_id, sid, old_id)),
+            ("UPDATE teachers SET user_id = ? WHERE school_id = ? AND LOWER(user_id) = LOWER(?)", (new_id, sid, old_id)),
         ]
         for sql, params in updates:
             exec_optional(sql, params)

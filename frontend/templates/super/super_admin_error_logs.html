@@ -35,7 +35,7 @@
                     </div>
                     <div>
                         <label>Endpoint</label>
-                        <input type="text" name="endpoint" value="{{ endpoint_filter or '' }}" placeholder="assistant_guide">
+                        <input type="text" name="endpoint_filter" value="{{ endpoint_filter or '' }}" placeholder="assistant_guide">
                     </div>
                     <div>
                         <label>Search</label>
@@ -114,11 +114,11 @@
                 {% if total_pages > 1 %}
                 <div class="pagination-bar" style="margin-top:14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                     {% if page > 1 %}
-                    <a class="btn btn-sm" href="{{ url_for('super_admin_error_logs', role=role_filter, endpoint=endpoint_filter, q=text_filter, per_page=per_page, page=page-1) }}">Previous</a>
+                    <a class="btn btn-sm" href="{{ url_for('super_admin_error_logs', role=role_filter, endpoint_filter=endpoint_filter, q=text_filter, per_page=per_page, page=page-1) }}">Previous</a>
                     {% endif %}
                     <span>Page {{ page }} / {{ total_pages }}</span>
                     {% if page < total_pages %}
-                    <a class="btn btn-sm" href="{{ url_for('super_admin_error_logs', role=role_filter, endpoint=endpoint_filter, q=text_filter, per_page=per_page, page=page+1) }}">Next</a>
+                    <a class="btn btn-sm" href="{{ url_for('super_admin_error_logs', role=role_filter, endpoint_filter=endpoint_filter, q=text_filter, per_page=per_page, page=page+1) }}">Next</a>
                     {% endif %}
                 </div>
                 {% endif %}
@@ -129,4 +129,3 @@
 <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 </body>
 </html>
-
