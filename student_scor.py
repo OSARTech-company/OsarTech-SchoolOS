@@ -25640,6 +25640,14 @@ def find_student_school_id(student_id):
         return None
 
 
+def is_parent_phone_first_time_login(parent_phone):
+    """Return True when the phone exists on a student record but no parent password is set."""
+    candidates = get_parent_students_by_phone(parent_phone)
+    if not candidates:
+        return False
+    return not any((row.get('parent_password_hash') or '').strip() for row in candidates)
+
+
 def get_parent_students_by_phone(parent_phone):
     """Return student rows linked to one parent phone."""
     if not students_has_parent_access_columns():
@@ -32431,7 +32439,18 @@ def login():
         agreed_terms = request.form.get('agree_terms') == 'on'
         terms_read = terms_read or agreed_terms
 
-        if not username or not password:
+        parent_phone = normalize_parent_phone(username)
+        parent_candidates = get_parent_students_by_phone(parent_phone) if parent_phone else []
+        parent_phone_has_password = any((row.get('parent_password_hash') or '').strip() for row in parent_candidates)
+
+        if not username:
+            flash('Please enter username and password.', 'error')
+            return render_template('shared/login.html', terms_read=terms_read)
+
+        if not password:
+            if parent_phone and parent_candidates and not parent_phone_has_password:
+                session['parent_login_precheck_phone'] = parent_phone
+                return redirect(url_for('parent_first_login'))
             flash('Please enter username and password.', 'error')
             return render_template('shared/login.html', terms_read=terms_read)
         client_ip = get_client_ip()
@@ -32553,7 +32572,11 @@ def login():
             # parents enter parent phone in the username field.
             parent_phone = normalize_parent_phone(username)
             if parent_phone:
-                candidates = get_parent_students_by_phone(parent_phone)
+                if parent_candidates and not parent_phone_has_password:
+                    flash('First-time parent login detected. Please verify your phone to set your password.', 'error')
+                    session['parent_login_precheck_phone'] = parent_phone
+                    return redirect(url_for('parent_first_login'))
+                candidates = parent_candidates
                 matched = []
                 blocked_parent_message = ''
                 blocked_parent_state = None
@@ -51604,10 +51627,12 @@ def parent_merge_profiles():
 def parent_first_login():
     """First-time parent login: enter phone to receive OTP."""
     if request.method == 'POST':
-        parent_phone = normalize_parent_phone((request.form.get('parent_phone') or '').strip())
+        parent_phone = normalize_parent_phone(
+            (request.form.get('parent_phone') or session.get('parent_login_precheck_phone', '')).strip()
+        )
         if not parent_phone:
             flash('Enter a valid parent phone number.', 'error')
-            return render_template_string(PARENT_FIRST_LOGIN_HTML)
+            return render_template_string(PARENT_FIRST_LOGIN_HTML, parent_phone=session.get('parent_login_precheck_phone', ''))
 
         # Find candidate student rows for this phone
         candidates = get_parent_students_by_phone(parent_phone)
@@ -51628,7 +51653,8 @@ def parent_first_login():
 
         flash('If this phone number is linked to a student record, a verification code has been sent.', 'success')
         return redirect(url_for('parent_first_login_verify'))
-    return render_template_string(PARENT_FIRST_LOGIN_HTML)
+    parent_phone = session.get('parent_login_precheck_phone', '')
+    return render_template_string(PARENT_FIRST_LOGIN_HTML, parent_phone=parent_phone)
 
 
 @app.route('/parent/first-login-verify', methods=['GET', 'POST'])
@@ -51712,7 +51738,7 @@ PARENT_FIRST_LOGIN_HTML = '''
 <h2>Parent First Login</h2>
 <form method="post">
   <label>Parent Phone</label>
-  <input name="parent_phone" required />
+  <input name="parent_phone" required value="{{ parent_phone or '' }}" />
   <button type="submit">Send Verification Code</button>
 </form>
 '''

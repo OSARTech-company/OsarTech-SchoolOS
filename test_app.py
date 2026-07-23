@@ -1032,6 +1032,24 @@ def test_school_admin_login_skips_setup_wizard_when_setup_is_complete(client, ap
     assert marked.get("school_id") == "SCH1"
 
 
+def test_parent_login_with_phone_only_redirects_to_first_login(client, app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(m, "RATE_LIMIT_ENABLED", False)
+    monkeypatch.setattr(m, "get_client_ip", lambda: "127.0.0.1")
+    monkeypatch.setattr(m, "is_login_blocked", lambda *args, **kwargs: (False, 0))
+    monkeypatch.setattr(m, "get_user", lambda username: None)
+    monkeypatch.setattr(m, "get_parent_students_by_phone", lambda phone: [{
+        "school_id": "SCH1",
+        "student_id": "STU1",
+        "parent_phone": phone,
+        "parent_password_hash": "",
+    }])
+
+    resp = client.post("/login", data={"username": "08012345678", "password": ""})
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/parent/first-login")
+
+
 def test_school_admin_login_still_opens_setup_wizard_when_setup_incomplete(client, app_module, monkeypatch):
     m = app_module
     marked = []
