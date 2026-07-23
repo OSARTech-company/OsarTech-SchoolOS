@@ -23176,116 +23176,209 @@ def _set_result_published_with_cursor(
         else:
             resolved_teacher_name = str(teacher_id)
     arm = _derive_arm_from_classname(classname, arm)
-    if has_approval_cols:
-        update_sql = (
-            "UPDATE result_publications SET "
-            "teacher_id = ?, "
-            "teacher_name = ?, "
-            "principal_name = ?, "
-            "is_published = ?, "
-            "published_at = ?, "
-            "approval_status = ?, "
-            "submitted_at = ?, "
-            "submitted_by = ?, "
-            "reviewed_at = ?, "
-            "reviewed_by = ?, "
-            "review_note = ?, "
-            "updated_at = CURRENT_TIMESTAMP "
-            "WHERE school_id = ? AND classname = ? AND arm = ? AND term = ? AND academic_year = ?"
-        )
-        insert_sql = (
-            "INSERT INTO result_publications "
-            "(school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, "
-            "approval_status, submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
-        )
-        params = (
-            teacher_id,
-            resolved_teacher_name,
-            resolved_principal_name,
-            1 if is_published else 0,
-            datetime.now().isoformat() if is_published else None,
-            'approved' if is_published else 'not_submitted',
-            None,
-            None,
-            None,
-            None,
-            None,
-            school_id,
-            classname,
-            arm,
-            term,
-            academic_year or '',
-        )
-        db_execute(c, update_sql, params)
-        if c.rowcount == 0:
+    legacy_update_where = "WHERE school_id = ? AND classname = ? AND term = ? AND academic_year = ?"
+    try:
+        if has_approval_cols:
+            update_sql = (
+                "UPDATE result_publications SET "
+                "teacher_id = ?, "
+                "teacher_name = ?, "
+                "principal_name = ?, "
+                "is_published = ?, "
+                "published_at = ?, "
+                "approval_status = ?, "
+                "submitted_at = ?, "
+                "submitted_by = ?, "
+                "reviewed_at = ?, "
+                "reviewed_by = ?, "
+                "review_note = ?, "
+                "updated_at = CURRENT_TIMESTAMP "
+                "WHERE school_id = ? AND classname = ? AND arm = ? AND term = ? AND academic_year = ?"
+            )
+            legacy_update_sql = (
+                "UPDATE result_publications SET "
+                "teacher_id = ?, "
+                "teacher_name = ?, "
+                "principal_name = ?, "
+                "is_published = ?, "
+                "published_at = ?, "
+                "approval_status = ?, "
+                "submitted_at = ?, "
+                "submitted_by = ?, "
+                "reviewed_at = ?, "
+                "reviewed_by = ?, "
+                "review_note = ?, "
+                "updated_at = CURRENT_TIMESTAMP "
+                f"{legacy_update_where}"
+            )
+            insert_sql = (
+                "INSERT INTO result_publications "
+                "(school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, "
+                "approval_status, submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
+            )
+            params = (
+                teacher_id,
+                resolved_teacher_name,
+                resolved_principal_name,
+                1 if is_published else 0,
+                datetime.now().isoformat() if is_published else None,
+                'approved' if is_published else 'not_submitted',
+                None,
+                None,
+                None,
+                None,
+                None,
+                school_id,
+                classname,
+                arm,
+                term,
+                academic_year or '',
+            )
+            db_execute(c, update_sql, params)
+            if c.rowcount == 0:
+                db_execute(
+                    c,
+                    legacy_update_sql,
+                    (
+                        teacher_id,
+                        resolved_teacher_name,
+                        resolved_principal_name,
+                        1 if is_published else 0,
+                        datetime.now().isoformat() if is_published else None,
+                        'approved' if is_published else 'not_submitted',
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        school_id,
+                        classname,
+                        term,
+                        academic_year or '',
+                    ),
+                )
+            if c.rowcount == 0:
+                db_execute(
+                    c,
+                    insert_sql,
+                    (
+                        school_id,
+                        classname,
+                        arm,
+                        term,
+                        academic_year or '',
+                        teacher_id,
+                        resolved_teacher_name,
+                        resolved_principal_name,
+                        1 if is_published else 0,
+                        datetime.now().isoformat() if is_published else None,
+                        'approved' if is_published else 'not_submitted',
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                )
+        else:
+            update_sql = (
+                "UPDATE result_publications SET "
+                "teacher_id = ?, "
+                "teacher_name = ?, "
+                "principal_name = ?, "
+                "is_published = ?, "
+                "published_at = ?, "
+                "updated_at = CURRENT_TIMESTAMP "
+                "WHERE school_id = ? AND classname = ? AND arm = ? AND term = ? AND academic_year = ?"
+            )
+            legacy_update_sql = (
+                "UPDATE result_publications SET "
+                "teacher_id = ?, "
+                "teacher_name = ?, "
+                "principal_name = ?, "
+                "is_published = ?, "
+                "published_at = ?, "
+                "updated_at = CURRENT_TIMESTAMP "
+                f"{legacy_update_where}"
+            )
+            insert_sql = (
+                "INSERT INTO result_publications "
+                "(school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
+            )
+            params = (
+                resolved_teacher_name,
+                resolved_principal_name,
+                1 if is_published else 0,
+                datetime.now().isoformat() if is_published else None,
+                school_id,
+                classname,
+                arm,
+                term,
+                academic_year or '',
+            )
+            db_execute(c, update_sql, params)
+            if c.rowcount == 0:
+                db_execute(
+                    c,
+                    legacy_update_sql,
+                    (
+                        resolved_teacher_name,
+                        resolved_principal_name,
+                        1 if is_published else 0,
+                        datetime.now().isoformat() if is_published else None,
+                        school_id,
+                        classname,
+                        term,
+                        academic_year or '',
+                    ),
+                )
+            if c.rowcount == 0:
+                db_execute(
+                    c,
+                    insert_sql,
+                    (
+                        school_id,
+                        classname,
+                        arm,
+                        term,
+                        academic_year or '',
+                        resolved_teacher_name,
+                        resolved_principal_name,
+                        1 if is_published else 0,
+                        datetime.now().isoformat() if is_published else None,
+                    ),
+                )
+    except Exception as exc:
+        if 'duplicate key value violates unique constraint' in str(exc):
+            fallback_update_sql = (
+                "UPDATE result_publications SET "
+                "teacher_id = ?, "
+                "teacher_name = ?, "
+                "principal_name = ?, "
+                "is_published = ?, "
+                "published_at = ?, "
+                "updated_at = CURRENT_TIMESTAMP "
+                f"{legacy_update_where}"
+            )
             db_execute(
                 c,
-                insert_sql,
+                fallback_update_sql,
                 (
-                    school_id,
-                    classname,
-                    arm,
-                    term,
-                    academic_year or '',
                     teacher_id,
                     resolved_teacher_name,
                     resolved_principal_name,
                     1 if is_published else 0,
                     datetime.now().isoformat() if is_published else None,
-                    'approved' if is_published else 'not_submitted',
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
-            )
-    else:
-        update_sql = (
-            "UPDATE result_publications SET "
-            "teacher_id = ?, "
-            "teacher_name = ?, "
-            "principal_name = ?, "
-            "is_published = ?, "
-            "published_at = ?, "
-            "updated_at = CURRENT_TIMESTAMP "
-            "WHERE school_id = ? AND classname = ? AND arm = ? AND term = ? AND academic_year = ?"
-        )
-        insert_sql = (
-            "INSERT INTO result_publications "
-            "(school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
-        )
-        params = (
-            resolved_teacher_name,
-            resolved_principal_name,
-            1 if is_published else 0,
-            datetime.now().isoformat() if is_published else None,
-            school_id,
-            classname,
-            arm,
-            term,
-            academic_year or '',
-        )
-        db_execute(c, update_sql, params)
-        if c.rowcount == 0:
-            db_execute(
-                c,
-                insert_sql,
-                (
                     school_id,
                     classname,
-                    arm,
                     term,
                     academic_year or '',
-                    teacher_id,
-                    resolved_teacher_name,
-                    resolved_principal_name,
-                    1 if is_published else 0,
-                    datetime.now().isoformat() if is_published else None,
                 ),
             )
+        else:
+            raise
 
 def set_result_published(school_id, classname, term, academic_year, teacher_id, is_published, teacher_name='', principal_name='', arm=''):
     """Publish/unpublish a class result for a term."""
