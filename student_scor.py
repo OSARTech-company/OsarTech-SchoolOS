@@ -9218,15 +9218,25 @@ def _rename_teacher_identifier_across_tables(school_id, old_teacher_id, new_teac
             raise ValueError('Could not update teacher login.')
 
         def exec_optional(sql, params):
-            db_execute(c, 'SAVEPOINT sp_teacher_rename')
+            savepoint_created = False
             try:
+                db_execute(c, 'SAVEPOINT sp_teacher_rename')
+                savepoint_created = True
                 db_execute(c, sql, params)
             except Exception as exc:
-                db_execute(c, 'ROLLBACK TO SAVEPOINT sp_teacher_rename')
+                if savepoint_created:
+                    try:
+                        db_execute(c, 'ROLLBACK TO SAVEPOINT sp_teacher_rename')
+                    except Exception:
+                        pass
                 if not _is_missing_table_or_column_error(exc):
                     raise
             finally:
-                db_execute(c, 'RELEASE SAVEPOINT sp_teacher_rename')
+                if savepoint_created:
+                    try:
+                        db_execute(c, 'RELEASE SAVEPOINT sp_teacher_rename')
+                    except Exception:
+                        pass
 
         updates = [
             ("UPDATE teachers SET user_id = ? WHERE school_id = ? AND LOWER(user_id) = LOWER(?)", (new_id, sid, old_id)),
