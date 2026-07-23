@@ -24764,7 +24764,7 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
         row_year = (a.get('academic_year') or '').strip()
         if row_term == term_key and row_year == year_key:
             assignments.append(a)
-    classes = [a.get('classname', '') for a in assignments if a.get('classname')]
+    classes = [canonicalize_classname(a.get('classname', '')) for a in assignments if a.get('classname')]
 
     publication_rows = {}
     with db_connection() as conn:
@@ -24780,9 +24780,11 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
                 (school_id, term, academic_year or ''),
             )
             for row in c.fetchall():
-                cname = row[0]
+                cname = canonicalize_classname(row[0])
+                if not cname:
+                    continue
                 arm_val = row[11] if len(row) > 11 else ''
-                arm_val = arm_val or ''
+                arm_val = arm_val or _split_class_level_number_arm(cname)[2]
                 key = (cname, arm_val)
                 publication_rows[key] = {
                     'teacher_id': row[1],
@@ -24806,9 +24808,11 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
                 (school_id, term, academic_year or ''),
             )
             for row in c.fetchall():
-                cname = row[0]
+                cname = canonicalize_classname(row[0])
+                if not cname:
+                    continue
                 arm_val = row[5] if len(row) > 5 else ''
-                arm_val = arm_val or ''
+                arm_val = arm_val or _split_class_level_number_arm(cname)[2]
                 key = (cname, arm_val)
                 publication_rows[key] = {
                     'teacher_id': row[1],
@@ -24828,12 +24832,27 @@ def get_school_publication_statuses(school_id, term, academic_year='', assignmen
     )
     counts_by_class = get_class_published_view_counts(school_id, term, academic_year, all_classes)
 
+    unique_assignments = []
+    seen_assignments = set()
+    for a in assignments:
+        classname = canonicalize_classname(a.get('classname', ''))
+        if not classname or not is_supported_classname(classname):
+            continue
+        arm = _split_class_level_number_arm(classname)[2]
+        key = (classname, arm)
+        if key in seen_assignments:
+            continue
+        seen_assignments.add(key)
+        unique_assignments.append({
+            'classname': classname,
+            'teacher_name': a.get('teacher_name', ''),
+            'teacher_id': a.get('teacher_id', ''),
+        })
+
     out = []
     seen_keys = set()
-    for a in assignments:
-        classname = a.get('classname', '')
-        if not is_supported_classname(classname):
-            continue
+    for a in unique_assignments:
+        classname = a['classname']
         arm = _split_class_level_number_arm(classname)[2]
         pub = publication_rows.get((classname, arm), {})
         cnt = counts_by_class.get(classname, {})

@@ -806,6 +806,43 @@ def test_get_school_publication_statuses_fallback_when_approval_columns_missing(
     assert rows[0]["is_published"] is False
 
 
+def test_get_school_publication_statuses_dedupes_assignments(app_module, monkeypatch):
+    m = app_module
+
+    class FakeCursor:
+        def fetchall(self):
+            return [("JSS1 A", "T1", "Ms A", 0, "", "A")]
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    monkeypatch.setattr(m, "ensure_result_publication_approval_columns", lambda: None)
+    monkeypatch.setattr(m, "result_publication_has_approval_columns", lambda: False)
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "get_term_edit_lock_status", lambda *args, **kwargs: {"enabled": True, "locked": False})
+    monkeypatch.setattr(
+        m,
+        "get_class_published_view_counts",
+        lambda *args, **kwargs: {"JSS1A": {"published_count": 10, "viewed_count": 2}},
+    )
+
+    assignments = [
+        {"classname": "JSS1A", "teacher_name": "Ms A", "teacher_id": "T1", "term": "First Term", "academic_year": "2025-2026"},
+        {"classname": "JSS1 A", "teacher_name": "Ms A", "teacher_id": "T1", "term": "First Term", "academic_year": "2025-2026"},
+    ]
+    rows = m.get_school_publication_statuses("SCH1", "First Term", "2025-2026", assignments=assignments)
+    assert len(rows) == 1
+    assert rows[0]["classname"] == "JSS1A"
+    assert rows[0]["published_count"] == 10
+    assert rows[0]["viewed_count"] == 2
+
+
 def test_set_result_published_with_approval_columns_update_params(app_module, monkeypatch):
     m = app_module
     calls = []
