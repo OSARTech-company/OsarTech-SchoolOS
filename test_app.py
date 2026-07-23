@@ -1050,6 +1050,71 @@ def test_parent_login_with_phone_only_redirects_to_first_login(client, app_modul
     assert resp.headers["Location"].endswith("/parent/first-login")
 
 
+def test_parent_first_login_otp_flow_sets_password(client, app_module, monkeypatch):
+    m = app_module
+    sent_updates = []
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        class DummyCursor:
+            def execute(self, query, params=None):
+                if query.strip().startswith("UPDATE students"):
+                    sent_updates.append((query, params))
+            def fetchall(self):
+                return []
+        class DummyConn:
+            def cursor(self):
+                return DummyCursor()
+            def commit(self):
+                pass
+        yield DummyConn()
+
+    monkeypatch.setattr(m, "RATE_LIMIT_ENABLED", False)
+    monkeypatch.setattr(m, "get_client_ip", lambda: "127.0.0.1")
+    monkeypatch.setattr(m, "is_login_blocked", lambda *args, **kwargs: (False, 0))
+    monkeypatch.setattr(m, "get_user", lambda username: None)
+    monkeypatch.setattr(m, "get_parent_students_by_phone", lambda phone: [{
+        "school_id": "SCH1",
+        "student_id": "STU1",
+        "parent_phone": phone,
+        "parent_password_hash": "",
+    }])
+    monkeypatch.setattr(m, "get_sms_sending_enabled", lambda: False)
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "students_has_parent_multi_access_columns", lambda: False)
+
+    # Trigger the login redirect
+    resp = client.post("/login", data={"username": "08012345678", "password": ""})
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/parent/first-login")
+
+    # Submit the phone to generate OTP and redirect to verify
+    resp = client.post("/parent/first-login", data={"parent_phone": "08012345678"})
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/parent/first-login-verify")
+
+    with client.session_transaction() as sess:
+        assert sess.get("parent_first_login_phone") == "08012345678"
+        assert "parent_first_login_otp" in sess
+        otp_code = sess.get("parent_first_login_otp")
+
+    # Complete verification and set parent password
+    resp = client.post("/parent/first-login-verify", data={
+        "otp": otp_code,
+        "new_password": "strongpass1",
+        "confirm_password": "strongpass1",
+    })
+    assert resp.status_code == 302
+    assert "/parent" in resp.headers["Location"]
+
+    with client.session_transaction() as sess:
+        assert sess.get("role") == "parent"
+        assert sess.get("parent_phone") == "08012345678"
+
+    assert len(sent_updates) == 1
+    assert sent_updates[0][0].strip().startswith("UPDATE students")
+
+
 def test_school_admin_login_still_opens_setup_wizard_when_setup_incomplete(client, app_module, monkeypatch):
     m = app_module
     marked = []

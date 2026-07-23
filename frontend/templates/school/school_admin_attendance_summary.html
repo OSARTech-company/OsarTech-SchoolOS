@@ -45,6 +45,21 @@
               <button class="btn btn-secondary" type="submit">Filter</button>
               <a class="btn" href="{{ url_for('school_admin_reports_export', kind='attendance_summary', term=selected_term, academic_year=selected_year) }}">Export CSV</a>
             </form>
+
+            <form method="get" action="{{ url_for('school_admin_manual_attendance_days_open') }}" class="toolbar" style="margin-top: 12px;">
+              <div>
+                <label>Set whole class days open</label>
+                <select name="classname" required>
+                  <option value="" disabled selected>Select class</option>
+                  {% for cls in classnames %}
+                  <option value="{{ cls }}">{{ cls }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <input type="hidden" name="term" value="{{ selected_term }}">
+              <input type="hidden" name="academic_year" value="{{ selected_year }}">
+              <button class="btn btn-primary" type="submit">Open Class Form</button>
+            </form>
           </div>
 
           <div class="card">
@@ -76,7 +91,7 @@
                     <td>{{ row.manual_days_open if row.manual_days_open is not none else '-' }}</td>
                     <td>
                       <a class="btn btn-secondary btn-sm" href="{{ url_for('school_admin_manual_attendance_days_open', classname=row.classname, term=selected_term, academic_year=selected_year) }}">
-                        Edit Open Days
+                        Set Class Open Days
                       </a>
                     </td>
                     <td class="muted">{{ row.latest_date or '-' }}</td>

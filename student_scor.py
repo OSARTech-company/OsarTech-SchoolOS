@@ -7,6 +7,7 @@ including multi-school support, role-based access, and advanced features.
 Author: OSondu Stanley
 Version: 2.1.0
 """
+#07074243172
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, Response, jsonify, g, has_request_context
 from flask import got_request_exception
@@ -31899,6 +31900,10 @@ def enforce_role_namespace_and_session_binding():
             'assistant_memory_clear',
             'assistant_health',
         }
+        or path in {
+            '/parent/first-login',
+            '/parent/first-login-verify',
+        }
         or path.startswith('/static/')
         or path in {'/manifest.webmanifest', '/sw.js'}
     ):
@@ -41761,6 +41766,7 @@ def school_admin_attendance_summary():
         selected_term=selected_term,
         selected_year=selected_year,
         rows=rows,
+        classnames=classnames,
     )
 
 @app.route('/school-admin/manual-attendance-days-open', methods=['GET', 'POST'])
