@@ -24399,6 +24399,15 @@ def load_published_student_result(school_id, student_id, term, academic_year='',
         'Status': status_value,
         'published_at': published_at,
     }
+    live_behaviour = get_student_behaviour_assessment(
+        school_id,
+        student_id,
+        term,
+        academic_year or '',
+        school_or_mode=school,
+    )
+    if isinstance(live_behaviour, dict) and any((value or '').strip() for value in live_behaviour.values()):
+        snapshot['behaviour_assessment'] = live_behaviour
     snapshot['scores'] = build_ordered_subject_score_map(snapshot.get('scores', {}), snapshot.get('subjects', []))
     snapshot['subjects'] = list(snapshot['scores'].keys())
     snapshot['number_of_subject'] = len(snapshot['subjects'])
@@ -51157,6 +51166,15 @@ def student_view_result():
         'Status': snapshot.get('Status', 'Fail'),
         'promotion_status': get_result_promotion_status(live_student, target_term),
     }
+    live_behaviour = get_student_behaviour_assessment(
+        school_id,
+        student_id,
+        target_term,
+        target_year,
+        school_or_mode=school,
+    )
+    if isinstance(live_behaviour, dict) and any((value or '').strip() for value in live_behaviour.values()):
+        student_view['behaviour_assessment'] = live_behaviour
     student_view.update(
         build_result_term_attendance_data(
             school_id=school_id,
