@@ -575,7 +575,7 @@
             <section class="auth-card">
                 <div class="auth-kicker"><i class="fas fa-bolt"></i> Welcome back to SchoolOS</div>
                 <h2 class="auth-title"><i class="fas fa-user-shield"></i> Sign In</h2>
-                <p class="auth-subtitle">Sign in with your assigned username and password, or parent phone and password. Everything you need starts here.</p>
+                <p class="auth-subtitle">Sign in with your assigned username and password. Parents can also start with a phone number and use OTP for first-time setup.</p>
 
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
@@ -597,10 +597,11 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-grid">
                         <label for="username">Username / Parent Phone</label>
-                        <input class="input" type="text" id="username" name="username" autocomplete="username" required>
+                        <input class="input" type="text" id="username" name="username" autocomplete="username" required placeholder="Parent phone or username">
+                        <p class="auth-hint" style="margin-top:-2px;">First-time parent login? Enter the phone number and choose <strong>Continue with OTP</strong>.</p>
                         <label for="password">Password</label>
                         <div class="password-wrapper">
-                            <input class="input" type="password" id="password" name="password" autocomplete="current-password" required>
+                            <input class="input" type="password" id="password" name="password" autocomplete="current-password" placeholder="Leave blank for first-time parent setup">
                             <button
                                 type="button"
                                 class="password-toggle"
@@ -623,6 +624,7 @@
 
                     <div class="auth-actions">
                         <button type="submit" class="btn-main"><i class="fas fa-sign-in-alt"></i> Sign In</button>
+                        <button type="submit" name="action" value="parent_first_login" class="btn-alt"><i class="fas fa-mobile-alt"></i> Continue with OTP</button>
                         <button type="button" class="btn-alt" id="install-app-btn"><i class="fas fa-download"></i> Install App</button>
                     </div>
                 </form>

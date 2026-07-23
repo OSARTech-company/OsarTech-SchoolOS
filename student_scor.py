@@ -32460,12 +32460,20 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip().lower()
         password = request.form.get('password', '')
+        login_action = (request.form.get('action') or 'login').strip().lower()
         agreed_terms = request.form.get('agree_terms') == 'on'
         terms_read = terms_read or agreed_terms
 
         parent_phone = normalize_parent_phone(username)
         parent_candidates = get_parent_students_by_phone(parent_phone) if parent_phone else []
         parent_phone_has_password = any((row.get('parent_password_hash') or '').strip() for row in parent_candidates)
+
+        if login_action == 'parent_first_login':
+            if not parent_phone:
+                flash('Enter the parent phone number first.', 'error')
+                return render_template('shared/login.html', terms_read=terms_read)
+            session['parent_login_precheck_phone'] = parent_phone
+            return redirect(url_for('parent_first_login'))
 
         if not username:
             flash('Please enter username and password.', 'error')
@@ -51686,9 +51694,27 @@ def parent_first_login():
 def parent_first_login_verify():
     """Verify OTP and let parent set password for first-time access."""
     phone = (session.get('parent_first_login_phone') or '').strip()
-    expected = (session.get('parent_first_login_otp') or '').strip()
     expiry_raw = (session.get('parent_first_login_otp_expires_at') or '').strip()
     if request.method == 'POST':
+        action = (request.form.get('action') or 'verify').strip().lower()
+        if action == 'resend':
+            if not phone:
+                flash('Verification session expired. Start again.', 'error')
+                return redirect(url_for('parent_first_login'))
+            import secrets
+            code = f"{secrets.randbelow(900000) + 100000}"
+            expiry = datetime.now() + timedelta(minutes=10)
+            session['parent_first_login_otp'] = code
+            session['parent_first_login_otp_expires_at'] = expiry.isoformat()
+            if get_sms_sending_enabled():
+                try:
+                    _enqueue_sms_delivery(None, phone, f"Your verification code is {code}", audience_role='parent')
+                except Exception:
+                    logging.exception('Failed to resend parent first-login OTP')
+            flash('A fresh verification code has been sent.', 'success')
+            return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+
+        expected = (session.get('parent_first_login_otp') or '').strip()
         otp_entered = (request.form.get('otp') or '').strip()
         new_password = (request.form.get('new_password') or '').strip()
         confirm_password = (request.form.get('confirm_password') or '').strip()
@@ -51760,26 +51786,189 @@ def parent_first_login_verify():
 from flask import render_template_string
 
 PARENT_FIRST_LOGIN_HTML = '''
-<h2>Parent First Login</h2>
-<form method="post">
-  <label>Parent Phone</label>
-  <input name="parent_phone" required value="{{ parent_phone or '' }}" />
-  <button type="submit">Send Verification Code</button>
-</form>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parent First Login</title>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260309a') }}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 14px;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#f3f6fa,#eef5fb);color:#0f172a}
+    .card{width:min(860px,100%);background:#fff;border:1px solid rgba(148,163,184,.25);border-radius:22px;box-shadow:0 24px 58px rgba(15,23,42,.14);overflow:hidden;display:grid;grid-template-columns:minmax(280px,.9fr) minmax(320px,1.1fr)}
+    .hero{padding:28px;background:linear-gradient(155deg,#0a2c57 0%,#0f5f89 100%);color:#eff6ff}
+    .hero h1{margin:14px 0 8px;font-size:clamp(1.5rem,2.6vw,2rem);line-height:1.2}
+    .hero p,.note{line-height:1.5;font-size:.92rem;color:rgba(239,246,255,.9)}
+    .hero ul{padding-left:18px;display:grid;gap:8px;font-size:.9rem}
+    .body{padding:28px}
+    .kicker{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:rgba(15,76,129,.08);color:#0f4c81;font-size:.8rem;font-weight:800;text-transform:uppercase}
+    h2{margin:10px 0 8px;font-size:1.35rem}
+    .field{margin:14px 0}
+    label{display:block;font-weight:700;font-size:.92rem;color:#2a4661;margin-bottom:6px}
+    input{width:100%;padding:11px 12px;border:1px solid #ced4da;border-radius:8px;font-size:16px}
+    input:focus{border-color:#0f4c81;box-shadow:0 0 0 3px rgba(31,122,140,.15);outline:none}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .btn{border:none;border-radius:8px;padding:11px 16px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+    .primary{background:linear-gradient(140deg,#0f4c81 0%,#1f7a8c 100%);color:#fff}
+    .secondary{background:#fff;color:#0f4c81;border:1px solid #b7c7dc}
+    .hint{margin-top:10px;font-size:.84rem;color:#61768d}
+    .alert{padding:12px;margin-bottom:12px;border-radius:8px;background:#f4f9ff;border:1px solid #d5e5f7;color:#21486a}
+    .alert.error{background:#fff4f4;border-color:#f4c6c6;color:#b42318}
+    @media (max-width: 820px){.card{grid-template-columns:1fr}.hero{order:2}.body{order:1}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <aside class="hero">
+      <div class="kicker"><i class="fas fa-mobile-alt"></i> Parent setup</div>
+      <h1>Start with your phone number</h1>
+      <p>We’ll verify the phone linked by the school, then help you set a permanent password for future sign-ins.</p>
+      <ul>
+        <li>Enter the phone number linked to your child</li>
+        <li>Receive a one-time verification code</li>
+        <li>Create your permanent parent password</li>
+      </ul>
+    </aside>
+    <section class="body">
+      <div class="kicker"><i class="fas fa-shield-alt"></i> First-time parent login</div>
+      <h2>Verify your phone</h2>
+      <p class="note">If this number is linked to your child’s record, we’ll send a verification code to continue.</p>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert {% if category == 'error' %}error{% endif %}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field">
+          <label for="parent_phone">Parent Phone</label>
+          <input id="parent_phone" name="parent_phone" type="text" required autocomplete="tel" placeholder="+234..." value="{{ parent_phone or '' }}">
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn primary"><i class="fas fa-paper-plane"></i> Send Verification Code</button>
+          <a href="{{ url_for('login') }}" class="btn secondary"><i class="fas fa-arrow-left"></i> Back to Login</a>
+        </div>
+      </form>
+      <p class="hint">Tip: use the same phone number the school linked to your child profile.</p>
+    </section>
+  </div>
+</body>
+</html>
 '''
 
 PARENT_FIRST_VERIFY_HTML = '''
-<h2>Verify Code & Set Password</h2>
-<p>Phone: {{ phone }}</p>
-<form method="post">
-  <label>6-digit code</label>
-  <input name="otp" pattern="[0-9]{6}" required />
-  <label>New Password</label>
-  <input name="new_password" type="password" required minlength="6" />
-  <label>Confirm Password</label>
-  <input name="confirm_password" type="password" required minlength="6" />
-  <button type="submit">Set Password & Login</button>
-</form>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Parent Account</title>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260309a') }}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 14px;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#f3f6fa,#eef5fb);color:#0f172a}
+    .card{width:min(900px,100%);background:#fff;border:1px solid rgba(148,163,184,.25);border-radius:22px;box-shadow:0 24px 58px rgba(15,23,42,.14);overflow:hidden;display:grid;grid-template-columns:minmax(280px,.9fr) minmax(320px,1.1fr)}
+    .hero{padding:28px;background:linear-gradient(155deg,#0a2c57 0%,#0f5f89 100%);color:#eff6ff}
+    .hero h1{margin:14px 0 8px;font-size:clamp(1.5rem,2.6vw,2rem);line-height:1.2}
+    .hero p,.note{line-height:1.5;font-size:.92rem;color:rgba(239,246,255,.9)}
+    .hero ul{padding-left:18px;display:grid;gap:8px;font-size:.9rem}
+    .body{padding:28px}
+    .kicker{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:rgba(15,76,129,.08);color:#0f4c81;font-size:.8rem;font-weight:800;text-transform:uppercase}
+    h2{margin:10px 0 8px;font-size:1.35rem}
+    .field{margin:14px 0}
+    label{display:block;font-weight:700;font-size:.92rem;color:#2a4661;margin-bottom:6px}
+    input{width:100%;padding:11px 12px;border:1px solid #ced4da;border-radius:8px;font-size:16px}
+    input:focus{border-color:#0f4c81;box-shadow:0 0 0 3px rgba(31,122,140,.15);outline:none}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .btn{border:none;border-radius:8px;padding:11px 16px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+    .primary{background:linear-gradient(140deg,#0f4c81 0%,#1f7a8c 100%);color:#fff}
+    .secondary{background:#fff;color:#0f4c81;border:1px solid #b7c7dc}
+    .alert{padding:12px;margin-bottom:12px;border-radius:8px;background:#f4f9ff;border:1px solid #d5e5f7;color:#21486a}
+    .alert.error{background:#fff4f4;border-color:#f4c6c6;color:#b42318}
+    .password-wrapper{position:relative}
+    .password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:none;border-radius:50%;background:transparent;color:#0f4c81;cursor:pointer}
+    .password-wrapper input{padding-right:52px}
+    @media (max-width: 820px){.card{grid-template-columns:1fr}.hero{order:2}.body{order:1}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <aside class="hero">
+      <div class="kicker"><i class="fas fa-key"></i> One-time verification</div>
+      <h1>Set your permanent password</h1>
+      <p>Enter the code sent to your phone, then create a password you’ll use for future parent logins.</p>
+      <ul>
+        <li>Code confirms the phone belongs to the linked parent</li>
+        <li>Password becomes your normal sign-in method</li>
+        <li>You’ll then see all linked children on the dashboard</li>
+      </ul>
+    </aside>
+    <section class="body">
+      <div class="kicker"><i class="fas fa-unlock"></i> Verify code</div>
+      <h2>Phone: {{ phone }}</h2>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert {% if category == 'error' %}error{% endif %}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field">
+          <label for="otp">6-digit verification code</label>
+          <input id="otp" name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" placeholder="123456">
+        </div>
+        <div class="field">
+          <label for="new_password">New Password</label>
+          <div class="password-wrapper">
+            <input id="new_password" name="new_password" type="password" required minlength="6" placeholder="Create a password">
+            <button type="button" class="password-toggle" id="new-password-toggle" aria-label="Show password"><i class="fas fa-eye"></i></button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="confirm_password">Confirm Password</label>
+          <div class="password-wrapper">
+            <input id="confirm_password" name="confirm_password" type="password" required minlength="6" placeholder="Confirm password">
+            <button type="button" class="password-toggle" id="confirm-password-toggle" aria-label="Show password"><i class="fas fa-eye"></i></button>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn primary"><i class="fas fa-check-circle"></i> Set Password & Login</button>
+          <button type="submit" name="action" value="resend" class="btn secondary"><i class="fas fa-redo"></i> Resend Code</button>
+        </div>
+      </form>
+      <p class="note" style="color:#61768d;margin-top:10px;">Keep the code private. If you didn’t request it, go back and re-enter the phone number.</p>
+    </section>
+  </div>
+  <script>
+    (function() {
+      function bindToggle(toggleId, inputId) {
+        const toggle = document.getElementById(toggleId);
+        const input = document.getElementById(inputId);
+        if (!toggle || !input) return;
+        toggle.addEventListener('click', function() {
+          const show = input.type === 'password';
+          input.type = show ? 'text' : 'password';
+          toggle.innerHTML = show ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+          toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        });
+      }
+      bindToggle('new-password-toggle', 'new_password');
+      bindToggle('confirm-password-toggle', 'confirm_password');
+      const otp = document.getElementById('otp');
+      if (otp) otp.focus();
+    })();
+  </script>
+</body>
+</html>
 '''
 
 

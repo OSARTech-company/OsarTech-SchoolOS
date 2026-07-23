@@ -604,9 +604,23 @@
         font-weight: 700;
       }
 
-      .flash {
+      .publish-notice {
         border-radius: 18px;
+        border: 1px solid transparent;
         padding: 14px 16px;
+        margin-bottom: 14px;
+      }
+
+      .publish-notice.success {
+        color: #0f5132;
+        border-color: #a4d6b8;
+        background: #e7f7ee;
+      }
+
+      .publish-notice.error {
+        color: #842029;
+        border-color: #efc3c7;
+        background: #fdebec;
       }
 
       @media (max-width: 1240px) {
@@ -772,13 +786,7 @@
               </div>
             </section>
 
-            {% with messages = get_flashed_messages(with_categories=true) %}
-              {% if messages %}
-                {% for category, message in messages %}
-                  <div class="flash {{ category }}">{{ message }}</div>
-                {% endfor %}
-              {% endif %}
-            {% endwith %}
+            {% include "shared/_premium_alerts.html" %}
 
             <section class="panel-card filters-card">
               <div class="filters-top">
@@ -860,12 +868,12 @@
                 </div>
               </div>
               {% if dean_led_mode %}
-              <div class="flash success">
+              <div class="publish-notice success">
                 Simple Mode is active. School admin can publish directly from this page once class scores, behaviour assessment, attendance, and signatures are complete.
               </div>
               {% endif %}
               {% if not approval_workflow_enabled %}
-              <div class="flash error">
+              <div class="publish-notice error">
                 Approval workflow columns are missing. Run migration and reload this page.
               </div>
               {% endif %}
