@@ -8,6 +8,22 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .main-content {
+            padding-bottom: 120px;
+        }
+
+        .flash {
+            position: relative;
+            z-index: 1002;
+            margin-bottom: 14px;
+        }
+
+        .card {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
 </head>
 <body>
     {% include "shared/_loading_overlay.html" %}
