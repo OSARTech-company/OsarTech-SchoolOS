@@ -23197,6 +23197,7 @@ def _set_result_published_with_cursor(
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)"
         )
         params = (
+            teacher_id,
             resolved_teacher_name,
             resolved_principal_name,
             1 if is_published else 0,

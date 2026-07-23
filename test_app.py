@@ -806,6 +806,51 @@ def test_get_school_publication_statuses_fallback_when_approval_columns_missing(
     assert rows[0]["is_published"] is False
 
 
+def test_set_result_published_with_approval_columns_update_params(app_module, monkeypatch):
+    m = app_module
+    calls = []
+
+    class FakeCursor:
+        def __init__(self):
+            self.rowcount = 0
+
+    class FakeConn:
+        def __init__(self):
+            self._cursor = FakeCursor()
+
+        def cursor(self):
+            return self._cursor
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    def fake_db_execute(cursor, query, params=None):
+        calls.append((query, params))
+
+    monkeypatch.setattr(m, "ensure_result_publication_approval_columns", lambda: None)
+    monkeypatch.setattr(m, "result_publication_has_approval_columns", lambda: True)
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", fake_db_execute)
+
+    m._set_result_published_with_cursor(
+        c=FakeConn().cursor(),
+        school_id="SCH1",
+        classname="PRIMARY5S",
+        term="First Term",
+        academic_year="2025-2026",
+        teacher_id="T1",
+        is_published=False,
+        teacher_name="Mrs Johnson",
+        principal_name="Mr Principal",
+        arm="A",
+    )
+
+    assert len(calls) >= 1
+    update_calls = [params for (_query, params) in calls if params and len(params) >= 3]
+    assert any(call[0] == "T1" and call[1] == "Mrs Johnson" and call[2] == "Mr Principal" for call in update_calls)
+
+
 def test_teacher_publish_results_route_submits_for_approval(client, app_module, monkeypatch):
     m = app_module
     called = {}
