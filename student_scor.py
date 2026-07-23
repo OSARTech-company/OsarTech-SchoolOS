@@ -21898,6 +21898,23 @@ def save_behaviour_assessment_with_cursor(c, school_id, student_id, classname, t
         ),
     )
 
+def sync_published_result_behaviour_with_cursor(c, school_id, student_id, classname, term, academic_year, behaviour_payload, school_or_mode=None):
+    mode_source = school_or_mode if school_or_mode is not None else (get_school(school_id) or {})
+    db_execute(
+        c,
+        """UPDATE published_student_results
+           SET behaviour_json = ?,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE school_id = ? AND student_id = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+        (
+            json.dumps(normalize_behaviour_assessment(behaviour_payload, mode_source)),
+            school_id,
+            student_id,
+            term,
+            academic_year or '',
+        ),
+    )
+
 def get_class_behaviour_assessments(school_id, classname, term, academic_year='', school_or_mode=None):
     if not ensure_behaviour_assessment_schema():
         return {}
@@ -49506,6 +49523,16 @@ def teacher_enter_scores():
                         academic_year=current_year,
                         behaviour_payload=normalized_behaviour,
                         updated_by=teacher_id,
+                        school_or_mode=school,
+                    )
+                    sync_published_result_behaviour_with_cursor(
+                        c,
+                        school_id=school_id,
+                        student_id=student_id,
+                        classname=student.get('classname', ''),
+                        term=current_term,
+                        academic_year=current_year,
+                        behaviour_payload=normalized_behaviour,
                         school_or_mode=school,
                     )
                 audit_student_score_changes_with_cursor(
