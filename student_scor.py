@@ -755,6 +755,8 @@ TWILIO_ACCOUNT_SID = (os.environ.get('TWILIO_ACCOUNT_SID', '') or '').strip()
 TWILIO_AUTH_TOKEN = (os.environ.get('TWILIO_AUTH_TOKEN', '') or '').strip()
 TWILIO_FROM_NUMBER = (os.environ.get('TWILIO_FROM_NUMBER', '') or '').strip()
 TWILIO_MESSAGING_SERVICE_SID = (os.environ.get('TWILIO_MESSAGING_SERVICE_SID', '') or '').strip()
+BREVO_SMS_API_KEY = (os.environ.get('BREVO_SMS_API_KEY', '') or '').strip()
+BREVO_SMS_SENDER_NAME = (os.environ.get('BREVO_SMS_SENDER_NAME', 'SchoolOS') or 'SchoolOS').strip()
 EMAIL_SENDING_ENABLED = (os.environ.get('EMAIL_SENDING_ENABLED', '0') or '0').strip().lower() in ('1', 'true', 'yes')
 SMS_SENDING_ENABLED = (os.environ.get('SMS_SENDING_ENABLED', '0') or '0').strip().lower() in ('1', 'true', 'yes')
 MANUAL_PAYMENT_ACCOUNT_NUMBER = (os.environ.get('MANUAL_PAYMENT_ACCOUNT_NUMBER', '') or '').strip()
@@ -26704,12 +26706,13 @@ def _log_sms_delivery(school_id, phone, audience_role, provider, status, error_m
     except Exception:
         return
 
-def _enqueue_sms_delivery(school_id, phone, body, audience_role='', context='', provider='twilio'):
+def _enqueue_sms_delivery(school_id, phone, body, audience_role='', context='', provider=None):
     if not ensure_extended_features_schema():
         return None
     sid = (school_id or '').strip()
     if not sid or not phone or not body:
         return None
+    provider = (provider or SMS_PROVIDER or 'twilio').strip().lower()
     try:
         with db_connection(commit=True) as conn:
             c = conn.cursor()
@@ -26794,7 +26797,11 @@ def process_sms_queue_inline(school_id, max_jobs=25):
                 context = (row[5] or '').strip()
                 retry_count = int(row[6] or 0)
                 max_retries = int(row[7] or SMS_RETRY_MAX)
-                if provider != 'twilio':
+                if provider == 'twilio':
+                    ok, err = _send_twilio_sms(phone, body)
+                elif provider == 'brevo':
+                    ok, err = _send_brevo_sms(phone, body)
+                else:
                     db_execute(
                         c,
                         "UPDATE sms_delivery_queue SET status = 'failed', last_error = 'Unsupported provider', sent_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -26802,7 +26809,6 @@ def process_sms_queue_inline(school_id, max_jobs=25):
                     )
                     failed += 1
                     continue
-                ok, err = _send_twilio_sms(phone, body)
                 if ok:
                     db_execute(
                         c,
@@ -26810,7 +26816,7 @@ def process_sms_queue_inline(school_id, max_jobs=25):
                         (queue_id,),
                     )
                     sent += 1
-                    _log_sms_delivery(sid, phone, audience_role, 'twilio', 'sent', '', context, body)
+                    _log_sms_delivery(sid, phone, audience_role, provider, 'sent', '', context, body)
                 else:
                     next_retry = retry_count + 1
                     state = 'failed' if next_retry >= max_retries else 'retry'
@@ -26820,7 +26826,7 @@ def process_sms_queue_inline(school_id, max_jobs=25):
                         (state, next_retry, str(err)[:300], queue_id),
                     )
                     failed += 1
-                    _log_sms_delivery(sid, phone, audience_role, 'twilio', state, err, context, body)
+                    _log_sms_delivery(sid, phone, audience_role, provider, state, err, context, body)
     except Exception:
         return {'sent': sent, 'failed': failed}
     return {'sent': sent, 'failed': failed}
@@ -26849,6 +26855,21 @@ def send_bulk_sms_messages(phones, message, school_name='', context='', school_i
                 _log_sms_delivery(school_id, phone, audience_role, 'twilio', 'failed', err, context, message)
                 if allow_queue:
                     _enqueue_sms_delivery(school_id, phone, message, audience_role=audience_role, context=context, provider='twilio')
+        return {'sent_sms': sent, 'errors': errors}
+
+    if provider == 'brevo':
+        if not BREVO_SMS_API_KEY:
+            return {'sent_sms': 0, 'errors': ['Brevo SMS API key is not configured.']}
+        for phone in sorted(set(clean_phones)):
+            ok, err = _send_brevo_sms(phone, message)
+            if ok:
+                sent += 1
+                _log_sms_delivery(school_id, phone, audience_role, 'brevo', 'sent', '', context, message)
+            else:
+                errors.append(f'SMS send failed for {phone}: {err}')
+                _log_sms_delivery(school_id, phone, audience_role, 'brevo', 'failed', err, context, message)
+                if allow_queue:
+                    _enqueue_sms_delivery(school_id, phone, message, audience_role=audience_role, context=context, provider='brevo')
         return {'sent_sms': sent, 'errors': errors}
 
     sms_webhook = (os.environ.get('SMS_WEBHOOK_URL', '') or '').strip()

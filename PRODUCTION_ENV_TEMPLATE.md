@@ -31,7 +31,10 @@ SMTP_PASS=
 SMTP_FROM=
 
 # Optional SMS notifications
+SMS_PROVIDER=twilio
 SMS_WEBHOOK_URL=
+BREVO_SMS_API_KEY=
+BREVO_SMS_SENDER_NAME=SchoolOS
 ```
 
 ## Notes
