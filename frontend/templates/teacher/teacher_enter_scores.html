@@ -792,7 +792,7 @@
 
             window.submitMainForm = function() {
                 if (validationErrors.size > 0) {
-                    alert('Please correct the validation errors before saving.');
+                    console.warn('Please correct the validation errors before saving.');
                     return;
                 }
                 formHasChanges = false; // Prevent beforeunload popup
@@ -800,28 +800,18 @@
             };
 
             window.discardFormChanges = function() {
-                if (confirm('Discard all unsaved changes?')) {
-                    formHasChanges = false; // Prevent beforeunload popup
-                    window.location.reload();
-                }
-            };
-
-            // Display flash messages as popups after DOM is ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', function() {
-                    var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
-                    flashes.forEach(function(flash) {
-                        var msg = flash.textContent.trim();
-                        if (msg) alert(msg);
+                if (typeof window.__appConfirm === 'function') {
+                    window.__appConfirm('Discard all unsaved changes?').then(function(confirmed) {
+                        if (confirmed) {
+                            formHasChanges = false;
+                            window.location.reload();
+                        }
                     });
-                });
-            } else {
-                var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
-                flashes.forEach(function(flash) {
-                    var msg = flash.textContent.trim();
-                    if (msg) alert(msg);
-                });
-            }
+                    return;
+                }
+                formHasChanges = false;
+                window.location.reload();
+            };
 
             recalcAll();
         })();

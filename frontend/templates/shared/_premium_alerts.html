@@ -282,7 +282,131 @@
         container.appendChild(toast);
 
         autoTimer = setTimeout(dismissToast, 7000);
-    }    function processFlashes() {
+    }
+
+    function showConfirmModal(message) {
+        return new Promise(function(resolve) {
+            var overlay = document.createElement('div');
+            overlay.className = 'premium-confirm-overlay';
+            overlay.style.cssText = [
+                'position:fixed',
+                'inset:0',
+                'background:rgba(15, 23, 42, 0.6)',
+                'backdrop-filter:blur(8px)',
+                'display:flex',
+                'align-items:center',
+                'justify-content:center',
+                'z-index:100003',
+                'padding:24px'
+            ].join(';');
+
+            var card = document.createElement('div');
+            card.style.cssText = [
+                'background:var(--surface, #ffffff)',
+                'color:var(--text, #1e293b)',
+                'max-width:420px',
+                'width:min(90vw, 420px)',
+                'padding:28px 24px',
+                'border-radius:16px',
+                'border:1px solid var(--line, #e2e8f0)',
+                'box-shadow:0 20px 25px -5px rgba(0, 0, 0, 0.15)',
+                'box-sizing:border-box'
+            ].join(';');
+
+            var title = document.createElement('h2');
+            title.textContent = 'Please confirm';
+            title.style.cssText = 'margin:0 0 12px;font-size:1.35rem;';
+
+            var desc = document.createElement('p');
+            desc.textContent = message;
+            desc.style.cssText = 'margin:0 0 22px;line-height:1.5;color:var(--muted, #64748b);';
+
+            var actions = document.createElement('div');
+            actions.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;flex-wrap:wrap;';
+
+            var cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'btn btn-secondary';
+            cancelBtn.textContent = 'Cancel';
+
+            var confirmBtn = document.createElement('button');
+            confirmBtn.type = 'button';
+            confirmBtn.className = 'btn btn-primary';
+            confirmBtn.textContent = 'Confirm';
+
+            function cleanup(result) {
+                overlay.remove();
+                window.removeEventListener('keydown', onKeyDown, true);
+                resolve(result);
+            }
+
+            function onKeyDown(event) {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    cleanup(false);
+                }
+            }
+
+            cancelBtn.addEventListener('click', function() { cleanup(false); });
+            confirmBtn.addEventListener('click', function() { cleanup(true); });
+            overlay.addEventListener('click', function(event) {
+                if (event.target === overlay) cleanup(false);
+            });
+            window.addEventListener('keydown', onKeyDown, true);
+
+            actions.appendChild(cancelBtn);
+            actions.appendChild(confirmBtn);
+            card.appendChild(title);
+            card.appendChild(desc);
+            card.appendChild(actions);
+            overlay.appendChild(card);
+            document.body.appendChild(overlay);
+            confirmBtn.focus();
+        });
+    }
+
+    window.__appConfirm = showConfirmModal;
+
+    function installConfirmHandlers() {
+        document.addEventListener('submit', function(event) {
+            var form = event.target;
+            if (!form || !form.getAttribute) return;
+            var message = form.getAttribute('data-confirm-message');
+            if (!message) return;
+            if (form.dataset.confirmPending === '1') return;
+            event.preventDefault();
+            showConfirmModal(message).then(function(confirmed) {
+                if (!confirmed) return;
+                form.dataset.confirmPending = '1';
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+                delete form.dataset.confirmPending;
+            });
+        }, true);
+
+        document.addEventListener('click', function(event) {
+            var target = event.target.closest('[data-confirm-message]');
+            if (!target || !target.getAttribute) return;
+            var message = target.getAttribute('data-confirm-message');
+            if (!message) return;
+            if (target.tagName === 'FORM') return;
+            if (target.dataset.confirmPending === '1') return;
+            var form = target.closest('form');
+            if (!form) return;
+            event.preventDefault();
+            showConfirmModal(message).then(function(confirmed) {
+                if (!confirmed) return;
+                target.dataset.confirmPending = '1';
+                form.submit();
+                delete target.dataset.confirmPending;
+            });
+        }, true);
+    }
+
+    function processFlashes() {
         ensureStyles();
 
         var flashes = document.querySelectorAll('.flash, [class^="flash-"], [class*=" flash-"]');
@@ -340,8 +464,10 @@
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', processFlashes, { once: true });
+        document.addEventListener('DOMContentLoaded', installConfirmHandlers, { once: true });
     } else {
         processFlashes();
+        installConfirmHandlers();
     }
 })();
 </script>

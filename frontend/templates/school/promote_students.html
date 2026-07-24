@@ -537,26 +537,6 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
-    <script>
-        // Show flash messages as popups
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
-                var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
-                flashes.forEach(function(flash) {
-                    var span = flash.querySelector('span');
-                    var msg = (span ? span.textContent : flash.textContent).trim();
-                    if (msg) alert(msg);
-                });
-            });
-        } else {
-            var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
-            flashes.forEach(function(flash) {
-                var span = flash.querySelector('span');
-                var msg = (span ? span.textContent : flash.textContent).trim();
-                if (msg) alert(msg);
-            });
-        }
-    </script>
     {% if selected_class %}
     <script>
         function updateRowState(studentId) {
@@ -625,6 +605,21 @@
             const editContainer = document.getElementById('pass-mark-edit-container');
             const displaySpan = document.getElementById('pass-mark-display');
             const passMarkInput = document.getElementById('pass-mark-input');
+            let passMarkNotice = document.getElementById('pass-mark-notice');
+
+            function showPassMarkNotice(message) {
+                if (!passMarkNotice) {
+                    passMarkNotice = document.createElement('div');
+                    passMarkNotice.id = 'pass-mark-notice';
+                    passMarkNotice.className = 'flash error';
+                    passMarkNotice.style.marginTop = '12px';
+                    if (editContainer && editContainer.parentNode) {
+                        editContainer.parentNode.insertBefore(passMarkNotice, editContainer.nextSibling);
+                    }
+                }
+                passMarkNotice.textContent = message;
+                passMarkNotice.style.display = 'block';
+            }
 
             if (editBtn && editContainer) {
                 editBtn.addEventListener('click', () => {
@@ -646,7 +641,7 @@
                 saveBtn.addEventListener('click', () => {
                     const value = parseInt(passMarkInput.value, 10);
                     if (isNaN(value) || value < 0 || value > 100) {
-                        alert('Pass mark must be a number between 0 and 100.');
+                        showPassMarkNotice('Pass mark must be a number between 0 and 100.');
                         return;
                     }
 
@@ -669,13 +664,13 @@
                             // Reload the page to apply recommendations instantly
                             window.location.reload();
                         } else {
-                            alert(data.error || 'Failed to update pass mark.');
+                            showPassMarkNotice(data.error || 'Failed to update pass mark.');
                         }
                     })
                     .catch(err => {
                         saveBtn.disabled = false;
                         console.error(err);
-                        alert('An error occurred. Please try again.');
+                        showPassMarkNotice('An error occurred. Please try again.');
                     });
                 });
             }

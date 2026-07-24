@@ -262,7 +262,7 @@
               <div class="info-row">
                 <span class="info-label">Signature Action:</span>
                 <div class="info-val">
-                  <form action="{{ url_for('school_admin_remove_teacher_signature') }}" method="POST" onsubmit="return confirm('Remove this teacher signature?');" style="display:inline-block;">
+                  <form action="{{ url_for('school_admin_remove_teacher_signature') }}" method="POST" data-confirm-message="Remove this teacher signature?" style="display:inline-block;">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <input type="hidden" name="teacher_id" value="{{ teacher_id }}" />
                     <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i> Remove Signature</button>
@@ -324,7 +324,7 @@
             <div class="danger-zone">
               <h4><i class="fas fa-triangle-exclamation"></i> Danger Zone</h4>
               <p>Archiving will suspend access and clear current term assignments.</p>
-              <form action="{{ url_for('school_admin_archive_teacher') }}" method="POST" onsubmit="return confirm('Archive this teacher and clear current assignments?');">
+              <form action="{{ url_for('school_admin_archive_teacher') }}" method="POST" data-confirm-message="Archive this teacher and clear current assignments?">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                 <input type="hidden" name="teacher_id" value="{{ teacher_id }}" />
                 <input type="hidden" name="return_to" value="school_admin_teachers" />

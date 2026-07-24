@@ -23842,6 +23842,7 @@ def get_result_publication_row(school_id, classname, term, academic_year='', arm
     }
 
 def submit_result_approval_request(school_id, classname, term, academic_year, teacher_id, arm=''):
+    arm = _derive_arm_from_classname(classname, arm)
     ensure_result_publication_approval_columns()
     school = get_school(school_id) or {}
     resolved_principal_name = (school.get('principal_name', '') or '').strip()
@@ -24032,6 +24033,7 @@ def notify_teachers_term_deadline_approaching(school_id, term, days_until_deadli
 
 def publish_results_for_class_atomic(school_id, classname, term, teacher_id, academic_year='', reviewed_by='', review_note='', attendance_gate=None, arm=''):
     """Publish class results in a single transaction (snapshot + publish flag)."""
+    arm = _derive_arm_from_classname(classname, arm)
     ensure_result_publication_approval_columns()
     has_approval_cols = result_publication_has_approval_columns()
     school = get_school(school_id) or {}
@@ -24215,6 +24217,7 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
     notify_students_result_published(school_id, classname, term, publish_year)
 
 def review_result_approval_request(school_id, classname, term, academic_year, admin_user_id, approve, review_note='', arm=''):
+    arm = _derive_arm_from_classname(classname, arm)
     ensure_result_publication_approval_columns()
     clean_note = (review_note or '').strip()
     try:

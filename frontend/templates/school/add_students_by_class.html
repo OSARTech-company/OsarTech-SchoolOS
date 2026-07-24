@@ -84,7 +84,7 @@
             {% if selected_class %}
                 <div style="margin-top: 15px;">
                     <h3>{{ selected_class }} Student List</h3>
-                    <form method="POST" action="{{ url_for('school_admin_reset_class_student_passwords') }}" onsubmit="return confirm('Reset all ACTIVE students in this class to default student password?');" style="margin: 8px 0 12px;">
+                    <form method="POST" action="{{ url_for('school_admin_reset_class_student_passwords') }}" data-confirm-message="Reset all ACTIVE students in this class to default student password?" style="margin: 8px 0 12px;">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="classname" value="{{ selected_class }}"/>
                         <button type="submit" class="btn btn-warning"><i class="fas fa-key"></i> Reset Class Student Passwords</button>
@@ -124,12 +124,12 @@
                                         <button type="submit" class="btn btn-success btn-sm">Restore</button>
                                     </form>
                                     {% else %}
-                                    <form method="POST" action="{{ url_for('school_admin_reset_student_password') }}" style="display:inline;" data-confirm-message="Reset password for {{ s.firstname }} ({{ s.student_id }}) to default student password?" onsubmit="return confirm(this.dataset.confirmMessage);">
+                                    <form method="POST" action="{{ url_for('school_admin_reset_student_password') }}" style="display:inline;" data-confirm-message="Reset password for {{ s.firstname }} ({{ s.student_id }}) to default student password?">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                         <input type="hidden" name="student_id" value="{{ s.student_id }}"/>
                                         <button type="submit" class="btn btn-warning btn-sm">Reset Password</button>
                                     </form>
-                                    <form method="POST" action="{{ url_for('school_admin_archive_student') }}" style="display:inline;" onsubmit="return confirm('Archive this student account?');">
+                                    <form method="POST" action="{{ url_for('school_admin_archive_student') }}" style="display:inline;" data-confirm-message="Archive this student account?">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                         <input type="hidden" name="student_id" value="{{ s.student_id }}"/>
                                         <button type="submit" class="btn btn-danger btn-sm">Archive</button>

@@ -81,7 +81,7 @@ const dateField = document.getElementById('attendance_date');
 if (dateField) {
   dateField.addEventListener('change', function () {
     if (dateField.value && !validDates.has(dateField.value)) {
-      alert('Select a valid instructional date for this term.');
+      console.warn('Select a valid instructional date for this term.');
       dateField.value = '';
     }
   });
@@ -89,5 +89,4 @@ if (dateField) {
 </script>
 </body>
 </html>
-
 

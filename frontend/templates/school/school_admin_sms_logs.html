@@ -216,11 +216,15 @@
             var form = button.closest('form');
             var confirmInput = form ? form.querySelector('[data-confirm-clear]') : null;
             if (!form || !confirmInput) return;
-            if (!window.confirm(message)) {
-              evt.preventDefault();
-              return;
+            evt.preventDefault();
+            if (typeof window.__appConfirm === 'function') {
+              window.__appConfirm(message).then(function (confirmed) {
+                if (confirmed) {
+                  confirmInput.value = '1';
+                  form.submit();
+                }
+              });
             }
-            confirmInput.value = '1';
           });
         }
         var clearButtons = document.querySelectorAll('[data-confirm-clear-btn]');
@@ -233,12 +237,14 @@
           if (confirmLogBtn) {
             confirmLogBtn.addEventListener('click', function (evt) {
               var confirmInput = confirmLogForm.querySelector('[data-confirm-clear]');
-              if (!window.confirm('Clear SMS logs? This cannot be undone.')) {
-                evt.preventDefault();
-                return;
-              }
-              if (confirmInput) {
-                confirmInput.value = '1';
+              evt.preventDefault();
+              if (typeof window.__appConfirm === 'function') {
+                window.__appConfirm('Clear SMS logs? This cannot be undone.').then(function (confirmed) {
+                  if (confirmed && confirmInput) {
+                    confirmInput.value = '1';
+                    confirmLogForm.submit();
+                  }
+                });
               }
             });
           }
@@ -246,8 +252,13 @@
         var retryAllBtn = document.querySelector('[data-confirm-retry-all]');
         if (retryAllBtn) {
           retryAllBtn.addEventListener('click', function (evt) {
-            if (!window.confirm('Retry all queued SMS now?')) {
-              evt.preventDefault();
+            evt.preventDefault();
+            if (typeof window.__appConfirm === 'function') {
+              window.__appConfirm('Retry all queued SMS now?').then(function (confirmed) {
+                if (confirmed) {
+                  retryAllBtn.closest('form').submit();
+                }
+              });
             }
           });
         }
@@ -256,4 +267,3 @@
       {% include "shared/_loading_overlay.html" %}
 </body>
 </html>
-

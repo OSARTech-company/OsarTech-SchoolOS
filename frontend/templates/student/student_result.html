@@ -2697,10 +2697,15 @@
                     return false;
                 }
                 errorBox.textContent = '';
-                if (!window.confirm('Unpublish this class result now?')) {
-                    return false;
+                if (typeof window.__appConfirm !== 'function') {
+                    return true;
                 }
-                return true;
+                window.__appConfirm('Unpublish this class result now?').then(function (confirmed) {
+                    if (confirmed) {
+                        form.submit();
+                    }
+                });
+                return false;
             });
         })();
     </script>

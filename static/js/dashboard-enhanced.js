@@ -271,7 +271,7 @@ function initDashboardEnhancements() {
 function exportDashboardDataAsCSV(filename = 'dashboard-data.csv') {
     const table = document.querySelector('.enhanced-table');
     if (!table) {
-        alert('No table found to export');
+        console.warn('No table found to export');
         return;
     }
 
@@ -295,7 +295,7 @@ function exportDashboardDataAsCSV(filename = 'dashboard-data.csv') {
 function printDashboardSection(sectionId) {
     const section = document.getElementById(sectionId);
     if (!section) {
-        alert('Section not found');
+        console.warn('Section not found');
         return;
     }
 

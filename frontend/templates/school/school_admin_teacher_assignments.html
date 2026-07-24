@@ -264,7 +264,7 @@
                     <td>{{ a.term }}</td>
                     <td>{{ a.academic_year }}</td>
                     <td>
-                      <form action="{{ url_for('school_admin_remove_teacher_assignment') }}" method="POST" onsubmit="return confirm('Remove this class assignment?');">
+                      <form action="{{ url_for('school_admin_remove_teacher_assignment') }}" method="POST" data-confirm-message="Remove this class assignment?">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                         <input type="hidden" name="teacher_id" value="{{ a.teacher_id }}" />
                         <input type="hidden" name="classname" value="{{ a.classname }}" />
@@ -318,7 +318,7 @@
                     <td>{{ a.term }}</td>
                     <td>{{ a.academic_year }}</td>
                     <td>
-                      <form action="{{ url_for('school_admin_remove_subject_teacher_assignment') }}" method="POST" onsubmit="return confirm('Remove this subject assignment?');">
+                      <form action="{{ url_for('school_admin_remove_subject_teacher_assignment') }}" method="POST" data-confirm-message="Remove this subject assignment?">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                         <input type="hidden" name="teacher_id" value="{{ a.teacher_id }}" />
                         <input type="hidden" name="classname" value="{{ a.classname }}" />
