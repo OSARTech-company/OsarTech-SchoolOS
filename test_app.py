@@ -631,6 +631,56 @@ def test_review_result_approval_request_reject_requires_columns(app_module, monk
     assert "approval columns are missing" in message.lower()
 
 
+def test_get_result_publication_row_falls_back_to_class_without_arm(app_module, monkeypatch):
+    m = app_module
+    queries = []
+    fetch_results = [None, (
+        "SCH1",
+        "JSS1",
+        "First Term",
+        "2025-2026",
+        "T1",
+        "Teacher One",
+        "Principal One",
+        0,
+        None,
+        "pending",
+        "2026-07-24T10:00:00",
+        "T1",
+        None,
+        None,
+        None,
+        "",
+    )]
+
+    class FakeCursor:
+        def execute(self, query, params=None):
+            queries.append((query, params))
+
+        def fetchone(self):
+            return fetch_results.pop(0) if fetch_results else None
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    monkeypatch.setattr(m, "ensure_result_publication_approval_columns", lambda: None)
+    monkeypatch.setattr(m, "result_publication_has_approval_columns", lambda: True)
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", lambda cursor, query, params=None: cursor.execute(query, params))
+    monkeypatch.setattr(m, "_derive_arm_from_classname", lambda classname, arm='': "A")
+
+    row = m.get_result_publication_row("SCH1", "JSS1", "First Term", "2025-2026", arm="A")
+
+    assert row["approval_status"] == "pending"
+    assert row["classname"] == "JSS1"
+    assert len(queries) >= 2
+
+
 def test_promote_students_repeat_path_updates_promoted_without_nameerror(app_module, monkeypatch):
     m = app_module
     captured_updates = []
