@@ -23352,6 +23352,41 @@ def _set_result_published_with_cursor(
                         None,
                     ),
                 )
+            if c.rowcount == 0:
+                db_execute(
+                    c,
+                    """UPDATE result_publications SET
+                         teacher_id = ?,
+                         teacher_name = ?,
+                         principal_name = ?,
+                         is_published = ?,
+                         published_at = ?,
+                         approval_status = ?,
+                         submitted_at = ?,
+                         submitted_by = ?,
+                         reviewed_at = ?,
+                         reviewed_by = ?,
+                         review_note = ?,
+                         updated_at = CURRENT_TIMESTAMP
+                       WHERE school_id = ? AND classname = ? AND term = ? AND academic_year = ?""",
+                    (
+                        teacher_id,
+                        resolved_teacher_name,
+                        resolved_principal_name,
+                        1 if is_published else 0,
+                        datetime.now().isoformat() if is_published else None,
+                        'approved' if is_published else 'not_submitted',
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        school_id,
+                        classname,
+                        term,
+                        academic_year or '',
+                    ),
+                )
         else:
             update_sql = (
                 "UPDATE result_publications SET "
@@ -23419,6 +23454,28 @@ def _set_result_published_with_cursor(
                         resolved_principal_name,
                         1 if is_published else 0,
                         datetime.now().isoformat() if is_published else None,
+                    ),
+                )
+            if c.rowcount == 0:
+                db_execute(
+                    c,
+                    """UPDATE result_publications SET
+                         teacher_id = ?,
+                         teacher_name = ?,
+                         principal_name = ?,
+                         is_published = ?,
+                         published_at = ?,
+                         updated_at = CURRENT_TIMESTAMP
+                       WHERE school_id = ? AND classname = ? AND term = ? AND academic_year = ?""",
+                    (
+                        resolved_teacher_name,
+                        resolved_principal_name,
+                        1 if is_published else 0,
+                        datetime.now().isoformat() if is_published else None,
+                        school_id,
+                        classname,
+                        term,
+                        academic_year or '',
                     ),
                 )
     except Exception as exc:
