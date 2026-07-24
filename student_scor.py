@@ -52107,6 +52107,8 @@ def parent_first_login_verify():
                 sms_enabled=get_sms_sending_enabled(),
             )
 
+        preserved_candidates = list(session.get('parent_first_login_candidates') or [])
+
         # Establish parent session
         session.clear()
         session.permanent = True
@@ -52114,8 +52116,7 @@ def parent_first_login_verify():
         session['parent_phone'] = phone
         session['parent_logged_in_password_hash'] = new_hash
         # load linked students into session keys
-        candidates = session.get('parent_first_login_candidates') or []
-        session['parent_student_keys'] = sorted(candidates, key=lambda v: v.lower())
+        session['parent_student_keys'] = sorted(preserved_candidates, key=lambda v: v.lower())
 
         # Clear OTP state
         session.pop('parent_first_login_otp', None)
