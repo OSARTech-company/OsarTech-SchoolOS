@@ -23885,6 +23885,46 @@ def get_result_publication_row(school_id, classname, term, academic_year='', arm
         'arm': row[15] or '',
     }
 
+def get_result_publication_lookup_hint(school_id, classname, term, academic_year='', arm=''):
+    classname = canonicalize_classname(classname)
+    term = (term or '').strip()
+    academic_year = (academic_year or '').strip()
+    arm = (arm or '').strip()
+    try:
+        with db_connection() as conn:
+            c = conn.cursor()
+            db_execute(
+                c,
+                """SELECT classname, COALESCE(arm, ''), COALESCE(academic_year, ''), COALESCE(approval_status, 'not_submitted'),
+                          is_published, COALESCE(submitted_at, ''), COALESCE(published_at, '')
+                   FROM result_publications
+                   WHERE school_id = ? AND classname = ? AND term = ?
+                   ORDER BY CASE WHEN COALESCE(academic_year, '') = COALESCE(?, '') THEN 0 ELSE 1 END,
+                            CASE WHEN COALESCE(arm, '') = COALESCE(?, '') THEN 0 ELSE 1 END,
+                            COALESCE(submitted_at, published_at) DESC""",
+                (school_id, classname, term, academic_year, arm),
+            )
+            rows = c.fetchall() or []
+    except Exception as exc:
+        logging.warning("Failed to build result publication lookup hint: %s", exc)
+        return ''
+    if not rows:
+        return ''
+    samples = []
+    for row in rows[:3]:
+        row_class = row[0] or classname
+        row_arm = row[1] or ''
+        row_year = row[2] or ''
+        row_status = row[3] or 'not_submitted'
+        row_published = 'published' if bool(int(row[4] or 0)) else 'not published'
+        row_submitted_at = row[5] or row[6] or ''
+        label = row_class
+        if row_arm:
+            label = f'{label} {row_arm}'
+        extras = ', '.join(part for part in [row_year, row_status, row_published, row_submitted_at] if part)
+        samples.append(f'{label} ({extras})' if extras else label)
+    return '; '.join(samples)
+
 def submit_result_approval_request(school_id, classname, term, academic_year, teacher_id, arm=''):
     arm = _derive_arm_from_classname(classname, arm)
     ensure_result_publication_approval_columns()
@@ -24276,7 +24316,11 @@ def review_result_approval_request(school_id, classname, term, academic_year, ad
         )
         return False, f'Failed to load submission for review: {exc}'
     if not row:
-        return False, 'No submission found for this class.'
+        hint = get_result_publication_lookup_hint(school_id, classname, term, academic_year, arm=arm)
+        expected = f'{classname} ({term}{", " + academic_year if academic_year else ""})'
+        if hint:
+            return False, f'No submission found for {expected}. Found nearby records: {hint}.'
+        return False, f'No submission found for {expected}.'
     if row.get('approval_status') != 'pending':
         if row.get('is_published'):
             return False, 'This class is already published.'

@@ -631,6 +631,32 @@ def test_review_result_approval_request_reject_requires_columns(app_module, monk
     assert "approval columns are missing" in message.lower()
 
 
+def test_review_result_approval_request_no_submission_includes_hint(app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(m, "ensure_result_publication_approval_columns", lambda: True)
+    monkeypatch.setattr(m, "get_result_publication_row", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        m,
+        "get_result_publication_lookup_hint",
+        lambda *args, **kwargs: "JSS1 A (2025-2026, pending, not published, 2026-07-24T10:00:00)",
+    )
+
+    ok, message = m.review_result_approval_request(
+        school_id="SCH1",
+        classname="JSS1",
+        term="First Term",
+        academic_year="2025-2026",
+        admin_user_id="admin1",
+        approve=True,
+        review_note="",
+        arm="A",
+    )
+
+    assert ok is False
+    assert "No submission found for JSS1 (First Term, 2025-2026)." in message
+    assert "Found nearby records:" in message
+
+
 def test_get_result_publication_row_falls_back_to_class_without_arm(app_module, monkeypatch):
     m = app_module
     queries = []
