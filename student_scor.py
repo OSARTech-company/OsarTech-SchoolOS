@@ -9050,6 +9050,13 @@ def is_valid_student_phone(phone):
         return True
     return is_valid_parent_phone(phone)
 
+def _parent_school_id_from_candidates(candidates):
+    for row in candidates or []:
+        school_id = (row.get('school_id') or '').strip()
+        if school_id:
+            return school_id
+    return ''
+
 def _is_missing_column_error(exc, column_name):
     """Best-effort missing-column detection across DB adapters."""
     text = str(exc or '').strip().lower()
@@ -51854,6 +51861,7 @@ def parent_first_login():
 
         # Find candidate student rows for this phone
         candidates = get_parent_students_by_phone(parent_phone)
+        school_id = _parent_school_id_from_candidates(candidates)
         # Always generate OTP but keep messaging generic to avoid enumeration
         import secrets
         code = f"{secrets.randbelow(900000) + 100000}"
@@ -51862,10 +51870,12 @@ def parent_first_login():
         session['parent_first_login_otp_expires_at'] = expiry.isoformat()
         session['parent_first_login_phone'] = parent_phone
         session['parent_first_login_candidates'] = [f"{r.get('school_id','')}::{r.get('student_id','')}" for r in (candidates or [])]
+        if school_id:
+            session['parent_first_login_school_id'] = school_id
 
         if get_sms_sending_enabled():
             try:
-                _enqueue_sms_delivery(None, parent_phone, f"Your verification code is {code}", audience_role='parent')
+                _enqueue_sms_delivery(school_id or session.get('school_id') or 'parent-auth', parent_phone, f"Your verification code is {code}", audience_role='parent', context='parent_first_login')
             except Exception:
                 logging.exception('Failed to enqueue parent first-login OTP')
 
@@ -51879,6 +51889,7 @@ def parent_first_login():
 def parent_first_login_verify():
     """Verify OTP and let parent set password for first-time access."""
     phone = (session.get('parent_first_login_phone') or '').strip()
+    school_id = (session.get('parent_first_login_school_id') or session.get('school_id') or '').strip()
     expiry_raw = (session.get('parent_first_login_otp_expires_at') or '').strip()
     if request.method == 'POST':
         action = (request.form.get('action') or 'verify').strip().lower()
@@ -51893,7 +51904,7 @@ def parent_first_login_verify():
             session['parent_first_login_otp_expires_at'] = expiry.isoformat()
             if get_sms_sending_enabled():
                 try:
-                    _enqueue_sms_delivery(None, phone, f"Your verification code is {code}", audience_role='parent')
+                    _enqueue_sms_delivery(school_id or 'parent-auth', phone, f"Your verification code is {code}", audience_role='parent', context='parent_first_login_resend')
                 except Exception:
                     logging.exception('Failed to resend parent first-login OTP')
             flash('A fresh verification code has been sent.', 'success')
