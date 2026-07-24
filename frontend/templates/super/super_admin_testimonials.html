@@ -78,7 +78,7 @@
                                                 <button type="button" class="btn btn-secondary btn-sm" onclick="populateEditForm({{ t|tojson|safe }})">
                                                     <i class="fas fa-edit"></i> Edit
                                                 </button>
-                                                <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this testimonial?');">
+                                                <form method="post" style="display: inline;" data-confirm-message="Are you sure you want to delete this testimonial?">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <input type="hidden" name="action" value="delete">
                                                     <input type="hidden" name="quote_id" value="{{ t.id }}">

@@ -233,7 +233,7 @@
                     <td>{{ (row.gender or 'Not set')|title }}</td>
                     <td>{{ row.phone or 'Not set' }}</td>
                     <td>
-                      <form action="{{ url_for('school_admin_archive_bursar') }}" method="POST" onsubmit="return confirm('Archive this bursar?');">
+                      <form action="{{ url_for('school_admin_archive_bursar') }}" method="POST" data-confirm-message="Archive this bursar?">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                         <input type="hidden" name="bursar_id" value="{{ row.teacher_id }}" />
                         <button type="submit" class="btn btn-danger">Archive</button>

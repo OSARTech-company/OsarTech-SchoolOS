@@ -441,17 +441,17 @@
                                         <button type="submit" class="btn btn-success"><i class="fas fa-power-off"></i> Turn ON</button>
                                     {% endif %}
                                 </form>
-                                <form action="{{ url_for('super_admin_soft_delete_school') }}" method="POST" onsubmit="return confirm('Suspend this school? This disables operations but keeps data for audits.');">
+                                <form action="{{ url_for('super_admin_soft_delete_school') }}" method="POST" data-confirm-message="Suspend this school? This disables operations but keeps data for audits.">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <input type="hidden" name="school_id" value="{{ school.school_id }}"/>
                                     <button type="submit" class="btn btn-warning"><i class="fas fa-ban"></i> Suspend (Soft Delete)</button>
                                 </form>
-                                <form action="{{ url_for('super_admin_restore_school') }}" method="POST" onsubmit="return confirm('Restore this school? Operations will be re-enabled.');">
+                                <form action="{{ url_for('super_admin_restore_school') }}" method="POST" data-confirm-message="Restore this school? Operations will be re-enabled.">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <input type="hidden" name="school_id" value="{{ school.school_id }}"/>
                                     <button type="submit" class="btn btn-success"><i class="fas fa-rotate-right"></i> Restore</button>
                                 </form>
-                                <form action="{{ url_for('super_admin_delete_school') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this school? This will delete all students, teachers, and data associated with this school.');">
+                                <form action="{{ url_for('super_admin_delete_school') }}" method="POST" data-confirm-message="Are you sure you want to delete this school? This will delete all students, teachers, and data associated with this school.">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <input type="hidden" name="school_id" value="{{ school.school_id }}"/>
                                     <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> Delete</button>

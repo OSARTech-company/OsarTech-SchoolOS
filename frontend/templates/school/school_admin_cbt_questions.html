@@ -284,7 +284,7 @@
                                     {% if attempt_counts.submitted > 0 or test.status|lower == 'published' %}
                                     <span class="muted">Locked</span>
                                     {% else %}
-                                    <form method="post" action="{{ url_for('school_admin_cbt_delete_question', test_id=test.test_id) }}" onsubmit="return confirm('Delete question {{ q.question_no }}?');">
+                                    <form method="post" action="{{ url_for('school_admin_cbt_delete_question', test_id=test.test_id) }}" data-confirm-message="Delete question {{ q.question_no }}?">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <input type="hidden" name="question_no" value="{{ q.question_no }}">
                                         <button type="submit" class="btn btn-danger btn-sm">Delete</button>
@@ -371,4 +371,3 @@
 {% include "shared/_loading_overlay.html" %}
 </body>
 </html>
-

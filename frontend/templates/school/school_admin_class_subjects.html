@@ -198,7 +198,7 @@
                         <td>{{ cfg.optional_subjects|join(', ') }}</td>
                         <td>
                             <a href="{{ url_for('school_admin_class_subjects', edit=class_name) }}" class="btn btn-secondary" style="margin-right:8px; text-decoration:none;">Edit</a>
-                            <form method="post" action="{{ url_for('school_admin_delete_class_subject_config') }}" onsubmit="return confirm('Delete subject configuration for {{ class_name }}?');">
+                            <form method="post" action="{{ url_for('school_admin_delete_class_subject_config') }}" data-confirm-message="Delete subject configuration for {{ class_name }}?">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <input type="hidden" name="classname" value="{{ class_name }}"/>
                                 <button type="submit" class="btn btn-danger">Delete</button>

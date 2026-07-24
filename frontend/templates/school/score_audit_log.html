@@ -215,7 +215,7 @@
                 {% endif %}
               </td>
               <td>
-                <form method="POST" action="{{ url_for('school_admin_revert_score_audit') }}" onsubmit="return confirm('Revert this subject change for the student? This will create a new audit entry.');">
+                <form method="POST" action="{{ url_for('school_admin_revert_score_audit') }}" data-confirm-message="Revert this subject change for the student? This will create a new audit entry.">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                   <input type="hidden" name="audit_id" value="{{ row.id }}" />
                   <button type="submit" class="btn btn-primary" style="padding:8px 12px;">Revert</button>
@@ -245,6 +245,5 @@
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
   </body>
 </html>
-
 
 

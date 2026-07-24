@@ -573,7 +573,7 @@
                             <button type="submit" class="btn-mini btn-gray">Mark Unread</button>
                         </form>
                         {% endif %}
-                        <form method="POST" action="{{ url_for('view_reports_delete') }}" onsubmit="return confirm('Delete this report?');">
+                        <form method="POST" action="{{ url_for('view_reports_delete') }}" data-confirm-message="Delete this report?">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <input type="hidden" name="report_id" value="{{ report.id }}">
                             <button type="submit" class="btn-mini btn-red">Delete</button>
@@ -605,6 +605,5 @@
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 </body>
 </html>
-
 
 

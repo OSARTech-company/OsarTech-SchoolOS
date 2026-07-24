@@ -24923,19 +24923,35 @@ def get_published_students_for_class(school_id, classname, term, academic_year='
     """List published students for one class and term."""
     if not school_id or not classname or not term:
         return []
-    with db_connection() as conn:
-        c = conn.cursor()
-        db_execute(
-            c,
-            """SELECT student_id, firstname, classname, term, COALESCE(academic_year, ''),
-                      average_marks, grade, status, published_at
-               FROM published_student_results
-               WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
-                 AND COALESCE(academic_year, '') = COALESCE(?, '')
-               ORDER BY firstname ASC, student_id ASC""",
-            (school_id, classname, term, academic_year or ''),
-        )
-        rows = c.fetchall()
+    def _fetch_rows(year_filter):
+        with db_connection() as conn:
+            c = conn.cursor()
+            if year_filter is None:
+                db_execute(
+                    c,
+                    """SELECT student_id, firstname, classname, term, COALESCE(academic_year, ''),
+                              average_marks, grade, status, published_at
+                       FROM published_student_results
+                       WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
+                       ORDER BY firstname ASC, student_id ASC""",
+                    (school_id, classname, term),
+                )
+            else:
+                db_execute(
+                    c,
+                    """SELECT student_id, firstname, classname, term, COALESCE(academic_year, ''),
+                              average_marks, grade, status, published_at
+                       FROM published_student_results
+                       WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
+                         AND COALESCE(academic_year, '') = COALESCE(?, '')
+                       ORDER BY firstname ASC, student_id ASC""",
+                    (school_id, classname, term, year_filter or ''),
+                )
+            return c.fetchall()
+
+    rows = _fetch_rows(academic_year)
+    if not rows and academic_year:
+        rows = _fetch_rows(None)
     out = []
     for row in rows or []:
         out.append({
@@ -36754,6 +36770,8 @@ def school_admin_publish_results_corrections():
         term=term,
         academic_year=academic_year,
     )
+    for row in students:
+        row['term_token'] = _term_token(row.get('academic_year', academic_year), row.get('term', term))
     term_token = _term_token(academic_year, term)
     school_message_total = 0
     try:

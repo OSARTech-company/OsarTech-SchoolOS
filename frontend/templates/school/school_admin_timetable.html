@@ -181,7 +181,7 @@
                     </td>
                     <td>{{ h.changed_by or '-' }}</td>
                     <td>
-                        <form method="post" style="display:inline" onsubmit="return confirm('Restore this timetable version?');">
+                        <form method="post" style="display:inline" data-confirm-message="Restore this timetable version?">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="hidden" name="action" value="restore_history">
                             <input type="hidden" name="history_id" value="{{ h.id }}">
@@ -296,4 +296,3 @@
 </script>
 </body>
 </html>
-

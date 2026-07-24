@@ -59,7 +59,7 @@
                     <td>{{ row.grade or '-' }}</td>
                     <td>{{ row.status or '-' }}</td>
                     <td>
-                      <a class="btn btn-primary btn-sm" href="{{ url_for('school_admin_correct_result', student_id=row.student_id, term=term_token) }}">
+                      <a class="btn btn-primary btn-sm" href="{{ url_for('school_admin_correct_result', student_id=row.student_id, term=row.term_token) }}">
                         Open Correction
                       </a>
                     </td>
@@ -79,5 +79,4 @@
       {% include "shared/_loading_overlay.html" %}
 </body>
 </html>
-
 

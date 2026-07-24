@@ -961,7 +961,7 @@
                           <summary aria-label="More actions">&hellip;</summary>
                           <div class="action-menu-panel">
                             <p class="menu-title">Secondary Action</p>
-                            <form action="{{ url_for('school_admin_reset_class_student_passwords') }}" method="POST" class="menu-form" onsubmit="return confirm('Reset all ACTIVE student passwords in {{ p.classname }} to default student password?');">
+                            <form action="{{ url_for('school_admin_reset_class_student_passwords') }}" method="POST" class="menu-form" data-confirm-message="Reset all ACTIVE student passwords in {{ p.classname }} to default student password?">
                               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                               <input type="hidden" name="classname" value="{{ p.classname }}" />
                               <button type="submit" class="btn btn-warning btn-sm">Reset Class Passwords</button>
@@ -1043,7 +1043,7 @@
                               <input type="password" name="admin_password" placeholder="Admin password" required class="admin-pass-input" data-password-toggle />
                               <button type="submit" class="btn btn-danger btn-sm">Unpublish</button>
                             </form>
-                            <form action="{{ url_for('school_admin_reset_class_student_passwords') }}" method="POST" class="menu-form" onsubmit="return confirm('Reset all ACTIVE student passwords in {{ p.classname }} to default student password?');">
+                            <form action="{{ url_for('school_admin_reset_class_student_passwords') }}" method="POST" class="menu-form" data-confirm-message="Reset all ACTIVE student passwords in {{ p.classname }} to default student password?">
                               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                               <input type="hidden" name="classname" value="{{ p.classname }}" />
                               <button type="submit" class="btn btn-warning btn-sm">Reset Class Passwords</button>
@@ -1059,7 +1059,7 @@
                         <summary aria-label="More actions">&hellip;</summary>
                         <div class="action-menu-panel">
                           <p class="menu-title">Secondary Action</p>
-                          <form action="{{ url_for('school_admin_reset_class_student_passwords') }}" method="POST" class="menu-form" onsubmit="return confirm('Reset all ACTIVE student passwords in {{ p.classname }} to default student password?');">
+                          <form action="{{ url_for('school_admin_reset_class_student_passwords') }}" method="POST" class="menu-form" data-confirm-message="Reset all ACTIVE student passwords in {{ p.classname }} to default student password?">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                             <input type="hidden" name="classname" value="{{ p.classname }}" />
                             <button type="submit" class="btn btn-warning btn-sm">Reset Class Passwords</button>

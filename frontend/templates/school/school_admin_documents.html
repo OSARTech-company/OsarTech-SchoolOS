@@ -312,7 +312,7 @@
                                             <form method="post" action="{{ url_for('school_admin_archive_document') }}">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <input type="hidden" name="document_id" value="{{ doc.id }}">
-                                                <button type="submit" class="btn btn-secondary" onclick="return confirm('Archive this document?')">
+                                                <button type="submit" class="btn btn-secondary" data-confirm-message="Archive this document?">
                                                     <i class="fas fa-archive"></i> Archive
                                                 </button>
                                             </form>
