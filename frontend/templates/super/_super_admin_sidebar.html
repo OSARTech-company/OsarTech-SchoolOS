@@ -36,6 +36,10 @@
             <i class="fas fa-sliders-h"></i>
             <span>System Settings</span>
         </a>
+        <a href="{{ url_for('super_admin_sms_logs') }}" class="side-link{% if active_page == 'sms_logs' %} active{% endif %}">
+            <i class="fas fa-comment-dots"></i>
+            <span>SMS Logs</span>
+        </a>
         <a href="{{ url_for('super_admin_testimonials') }}" class="side-link{% if active_page == 'testimonials' %} active{% endif %}">
             <i class="fas fa-quote-left"></i>
             <span>Leader Testimonials</span>
@@ -63,4 +67,3 @@
 </div>
 {% include 'shared/_premium_alerts.html' %}
 {% include 'shared/_ai_assistant_widget.html' %}
-

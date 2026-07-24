@@ -36182,6 +36182,71 @@ def school_admin_sms_logs_export():
         headers={'Content-Disposition': f'attachment; filename=sms_logs_{school_id}.csv'},
     )
 
+@app.route('/super-admin/sms-logs')
+def super_admin_sms_logs():
+    if (session.get('role') or '').strip().lower() != 'super_admin':
+        return redirect(url_for('login'))
+    ensure_extended_features_schema()
+    provider_filter = (request.args.get('provider', '') or '').strip().lower()
+    phone_filter = (request.args.get('phone', '') or '').strip()
+    status_filter = (request.args.get('status', '') or '').strip().lower()
+    try:
+        page = int((request.args.get('page', '') or '1').strip())
+    except Exception:
+        page = 1
+    page = max(1, page)
+    per_page = 120
+    with db_connection() as conn:
+        c = conn.cursor()
+        where = ['1=1']
+        params = []
+        if provider_filter:
+            where.append('LOWER(provider) = ?')
+            params.append(provider_filter)
+        if phone_filter:
+            where.append('phone LIKE ?')
+            params.append(f'%{phone_filter}%')
+        if status_filter:
+            where.append('LOWER(status) = ?')
+            params.append(status_filter)
+        where_sql = ' AND '.join(where)
+        db_execute(c, f"SELECT COUNT(*) FROM sms_delivery_logs WHERE {where_sql}", tuple(params))
+        total_rows = int((c.fetchone() or [0])[0] or 0)
+        offset = (page - 1) * per_page
+        db_execute(
+            c,
+            f"""SELECT school_id, audience_role, phone, provider, status, error_message, context, body, created_at
+                FROM sms_delivery_logs
+                WHERE {where_sql}
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?""",
+            tuple(params + [per_page, offset]),
+        )
+        rows = c.fetchall() or []
+    log_items = [{
+        'school_id': row[0] or '',
+        'audience_role': row[1] or '',
+        'phone': row[2] or '',
+        'provider': row[3] or '',
+        'status': row[4] or '',
+        'error_message': row[5] or '',
+        'context': row[6] or '',
+        'body': row[7] or '',
+        'created_at': format_timestamp(row[8]),
+    } for row in rows]
+    total_pages = max(1, (total_rows + per_page - 1) // per_page)
+    return render_template(
+        'super/super_admin_sms_logs.html',
+        active_page='sms_logs',
+        log_items=log_items,
+        provider_filter=provider_filter,
+        phone_filter=phone_filter,
+        status_filter=status_filter,
+        page=page,
+        total_pages=total_pages,
+        total_rows=total_rows,
+    )
+
 @app.route('/school-admin/publish-results')
 @require_roles('school_admin')
 def school_admin_publish_results():
