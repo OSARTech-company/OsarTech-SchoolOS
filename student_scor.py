@@ -23788,6 +23788,10 @@ def get_result_publication_row(school_id, classname, term, academic_year='', arm
                               submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, arm
                        FROM result_publications
                        WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '') AND COALESCE(arm, '') = COALESCE(?, '')
+                       ORDER BY CASE WHEN COALESCE(approval_status, 'not_submitted') = 'pending' THEN 0 ELSE 1 END,
+                                CASE WHEN is_published = 1 THEN 1 ELSE 0 END,
+                                COALESCE(submitted_at, published_at) DESC,
+                                rowid DESC
                        LIMIT 1""",
                     (school_id, classname, term, academic_year or '', search_arm or ''),
                 )
@@ -23798,14 +23802,43 @@ def get_result_publication_row(school_id, classname, term, academic_year='', arm
                               is_published, published_at, arm
                        FROM result_publications
                        WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '') AND COALESCE(arm, '') = COALESCE(?, '')
+                       ORDER BY COALESCE(published_at, CURRENT_TIMESTAMP) DESC, rowid DESC
                        LIMIT 1""",
                     (school_id, classname, term, academic_year or '', search_arm or ''),
                 )
             return c.fetchone()
 
         row = _fetch(derived_arm)
-        if not row and derived_arm:
+        if not row:
             row = _fetch('')
+        if not row:
+            if has_approval_cols:
+                db_execute(
+                    c,
+                    """SELECT school_id, classname, term, COALESCE(academic_year, ''), teacher_id, teacher_name, principal_name,
+                              is_published, published_at, COALESCE(approval_status, 'not_submitted'),
+                              submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, arm
+                       FROM result_publications
+                       WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')
+                       ORDER BY CASE WHEN COALESCE(approval_status, 'not_submitted') = 'pending' THEN 0 ELSE 1 END,
+                                CASE WHEN is_published = 1 THEN 1 ELSE 0 END,
+                                COALESCE(submitted_at, published_at) DESC,
+                                rowid DESC
+                       LIMIT 1""",
+                    (school_id, classname, term, academic_year or ''),
+                )
+            else:
+                db_execute(
+                    c,
+                    """SELECT school_id, classname, term, COALESCE(academic_year, ''), teacher_id, teacher_name, principal_name,
+                              is_published, published_at, arm
+                       FROM result_publications
+                       WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')
+                       ORDER BY COALESCE(published_at, CURRENT_TIMESTAMP) DESC, rowid DESC
+                       LIMIT 1""",
+                    (school_id, classname, term, academic_year or ''),
+                )
+            row = c.fetchone()
     if not row:
         return {}
     if not has_approval_cols:
