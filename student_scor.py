@@ -51875,7 +51875,7 @@ def parent_first_login():
 
         if get_sms_sending_enabled():
             try:
-                send_bulk_sms_messages(
+                sms_result = send_bulk_sms_messages(
                     [parent_phone],
                     f"Your verification code is {code}",
                     context='parent_first_login',
@@ -51883,10 +51883,16 @@ def parent_first_login():
                     audience_role='parent',
                     allow_queue=False,
                 )
+                if sms_result.get('sent_sms'):
+                    flash('Verification code sent by SMS.', 'success')
+                else:
+                    flash(f"SMS did not send: {(sms_result.get('errors') or ['Unknown SMS error'])[0]}", 'error')
             except Exception:
                 logging.exception('Failed to enqueue parent first-login OTP')
+                flash('SMS send failed while generating the verification code.', 'error')
 
-        flash('If this phone number is linked to a student record, a verification code has been sent.', 'success')
+        if not get_sms_sending_enabled():
+            flash('SMS is currently disabled, so no verification code was sent.', 'error')
         return redirect(url_for('parent_first_login_verify'))
     parent_phone = session.get('parent_login_precheck_phone', '')
     return render_template_string(PARENT_FIRST_LOGIN_HTML, parent_phone=parent_phone)
@@ -51911,7 +51917,7 @@ def parent_first_login_verify():
             session['parent_first_login_otp_expires_at'] = expiry.isoformat()
             if get_sms_sending_enabled():
                 try:
-                    send_bulk_sms_messages(
+                    sms_result = send_bulk_sms_messages(
                         [phone],
                         f"Your verification code is {code}",
                         context='parent_first_login_resend',
@@ -51919,9 +51925,13 @@ def parent_first_login_verify():
                         audience_role='parent',
                         allow_queue=False,
                     )
+                    if sms_result.get('sent_sms'):
+                        flash('Fresh verification code sent by SMS.', 'success')
+                    else:
+                        flash(f"Resend failed: {(sms_result.get('errors') or ['Unknown SMS error'])[0]}", 'error')
                 except Exception:
                     logging.exception('Failed to resend parent first-login OTP')
-            flash('A fresh verification code has been sent.', 'success')
+                    flash('Resend failed while contacting SMS provider.', 'error')
             return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
 
         expected = (session.get('parent_first_login_otp') or '').strip()
