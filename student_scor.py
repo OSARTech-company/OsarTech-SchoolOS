@@ -52206,7 +52206,7 @@ PARENT_FIRST_LOGIN_HTML = '''
         <div style="margin-top:6px;">Use this code if SMS does not arrive today.</div>
       </div>
       {% endif %}
-      <form method="post">
+      <form method="post" action="{{ url_for('parent_first_login_verify') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="field">
           <label for="parent_phone">Parent Phone</label>
@@ -52290,7 +52290,7 @@ PARENT_FIRST_VERIFY_HTML = '''
         <div style="margin-top:6px;">This is the active code for setup if SMS is delayed.</div>
       </div>
       {% endif %}
-      <form method="post">
+      <form method="post" action="{{ url_for('parent_first_login_verify') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="field">
           <label for="otp">6-digit verification code</label>
