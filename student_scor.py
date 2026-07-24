@@ -23938,54 +23938,128 @@ def submit_result_approval_request(school_id, classname, term, academic_year, te
     has_approval_cols = result_publication_has_approval_columns()
     with db_connection(commit=True) as conn:
         c = conn.cursor()
+        update_params = (
+            teacher_id,
+            resolved_teacher_name,
+            resolved_principal_name,
+            0,
+            None,
+            'pending',
+            submitted_at,
+            teacher_id,
+            None,
+            None,
+            None,
+            school_id,
+            classname,
+            arm or '',
+            term,
+            academic_year or '',
+        )
         if has_approval_cols:
             db_execute(
                 c,
-                """INSERT INTO result_publications
-                   (school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at,
-                    approval_status, submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 'pending', ?, ?, NULL, NULL, NULL, CURRENT_TIMESTAMP)
-                   ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET
-                     teacher_id = excluded.teacher_id,
-                     teacher_name = excluded.teacher_name,
-                     principal_name = excluded.principal_name,
+                """UPDATE result_publications SET
+                     teacher_id = ?,
+                     teacher_name = ?,
+                     principal_name = ?,
                      is_published = 0,
                      published_at = NULL,
                      approval_status = 'pending',
-                     submitted_at = excluded.submitted_at,
-                     submitted_by = excluded.submitted_by,
+                     submitted_at = ?,
+                     submitted_by = ?,
                      reviewed_at = NULL,
                      reviewed_by = NULL,
                      review_note = NULL,
-                     updated_at = CURRENT_TIMESTAMP""",
-                (
-                    school_id,
-                    classname,
-                    arm or '',
-                    term,
-                    academic_year or '',
-                    teacher_id,
-                    resolved_teacher_name,
-                    resolved_principal_name,
-                    submitted_at,
-                    teacher_id,
-                ),
+                     updated_at = CURRENT_TIMESTAMP
+                   WHERE school_id = ? AND classname = ? AND COALESCE(arm, '') = COALESCE(?, '') AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+                update_params,
             )
+            if c.rowcount == 0:
+                try:
+                    db_execute(
+                        c,
+                        """INSERT INTO result_publications
+                           (school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at,
+                            approval_status, submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 'pending', ?, ?, NULL, NULL, NULL, CURRENT_TIMESTAMP)""",
+                        (
+                            school_id,
+                            classname,
+                            arm or '',
+                            term,
+                            academic_year or '',
+                            teacher_id,
+                            resolved_teacher_name,
+                            resolved_principal_name,
+                            submitted_at,
+                            teacher_id,
+                        ),
+                    )
+                except Exception:
+                    db_execute(
+                        c,
+                        """UPDATE result_publications SET
+                             teacher_id = ?,
+                             teacher_name = ?,
+                             principal_name = ?,
+                             is_published = 0,
+                             published_at = NULL,
+                             approval_status = 'pending',
+                             submitted_at = ?,
+                             submitted_by = ?,
+                             reviewed_at = NULL,
+                             reviewed_by = NULL,
+                             review_note = NULL,
+                             updated_at = CURRENT_TIMESTAMP
+                           WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+                        (
+                            teacher_id,
+                            resolved_teacher_name,
+                            resolved_principal_name,
+                            submitted_at,
+                            teacher_id,
+                            school_id,
+                            classname,
+                            term,
+                            academic_year or '',
+                        ),
+                    )
         else:
             db_execute(
                 c,
-                """INSERT INTO result_publications
-                   (school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, CURRENT_TIMESTAMP)
-                   ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET
-                     teacher_id = excluded.teacher_id,
-                     teacher_name = excluded.teacher_name,
-                     principal_name = excluded.principal_name,
+                """UPDATE result_publications SET
+                     teacher_id = ?,
+                     teacher_name = ?,
+                     principal_name = ?,
                      is_published = 0,
                      published_at = NULL,
-                     updated_at = CURRENT_TIMESTAMP""",
-                (school_id, classname, arm or '', term, academic_year or '', teacher_id, resolved_teacher_name, resolved_principal_name),
+                     updated_at = CURRENT_TIMESTAMP
+                   WHERE school_id = ? AND classname = ? AND COALESCE(arm, '') = COALESCE(?, '') AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+                (teacher_id, resolved_teacher_name, resolved_principal_name, school_id, classname, arm or '', term, academic_year or ''),
             )
+            if c.rowcount == 0:
+                try:
+                    db_execute(
+                        c,
+                        """INSERT INTO result_publications
+                           (school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, CURRENT_TIMESTAMP)""",
+                        (school_id, classname, arm or '', term, academic_year or '', teacher_id, resolved_teacher_name, resolved_principal_name),
+                    )
+                except Exception:
+                    db_execute(
+                        c,
+                        """UPDATE result_publications SET
+                             teacher_id = ?,
+                             teacher_name = ?,
+                             principal_name = ?,
+                             is_published = 0,
+                             published_at = NULL,
+                             updated_at = CURRENT_TIMESTAMP
+                           WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+                        (teacher_id, resolved_teacher_name, resolved_principal_name, school_id, classname, term, academic_year or ''),
+                    )
 
 def notify_students_result_published(school_id, classname, term, academic_year=''):
     """
