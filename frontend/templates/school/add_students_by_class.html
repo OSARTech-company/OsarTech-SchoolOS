@@ -245,23 +245,6 @@
     </div>
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
     <script>
-        // Show flash messages as popups
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
-                var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
-                flashes.forEach(function(flash) {
-                    var msg = flash.textContent.trim();
-                    if (msg) alert(msg);
-                });
-            });
-        } else {
-            var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
-            flashes.forEach(function(flash) {
-                var msg = flash.textContent.trim();
-                if (msg) alert(msg);
-            });
-        }
-        
         function buildRowHtml() {
             return `
                 <td><input type="text" name="student_name[]" placeholder="e.g. Student Name"></td>
@@ -348,32 +331,32 @@
                 if (!name) {
                     e.preventDefault();
                     if (typeof hideLoadingOverlay === 'function') hideLoadingOverlay();
-                    alert(`Row ${i + 1}: Student name is required.`);
+                    console.warn(`Row ${i + 1}: Student name is required.`);
                     return;
                 }
                 if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
                     e.preventDefault();
                     if (typeof hideLoadingOverlay === 'function') hideLoadingOverlay();
-                    alert(`Row ${i + 1}: Invalid email for ${name || 'student'}.`);
+                    console.warn(`Row ${i + 1}: Invalid email for ${name || 'student'}.`);
                     return;
                 }
                 if (!dob) {
                     e.preventDefault();
                     if (typeof hideLoadingOverlay === 'function') hideLoadingOverlay();
-                    alert(`Row ${i + 1}: Date of birth is required for ${name}.`);
+                    console.warn(`Row ${i + 1}: Date of birth is required for ${name}.`);
                     return;
                 }
                 if (!gender) {
                     e.preventDefault();
                     if (typeof hideLoadingOverlay === 'function') hideLoadingOverlay();
-                    alert(`Row ${i + 1}: Gender is required for ${name}.`);
+                    console.warn(`Row ${i + 1}: Gender is required for ${name}.`);
                     return;
                 }
                 const rowKey = [name.toLowerCase(), dob, gender.toLowerCase(), email.toLowerCase(), regNo.toLowerCase()].join('||');
                 if (seenRows.has(rowKey)) {
                     e.preventDefault();
                     if (typeof hideLoadingOverlay === 'function') hideLoadingOverlay();
-                    alert(`Row ${i + 1}: ${name} is duplicated in this submission table.`);
+                    console.warn(`Row ${i + 1}: ${name} is duplicated in this submission table.`);
                     return;
                 }
                 seenRows.add(rowKey);

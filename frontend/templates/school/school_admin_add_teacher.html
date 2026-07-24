@@ -360,24 +360,6 @@
         }
       }
       
-      // Show flash messages as popups
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-          var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
-          flashes.forEach(function(flash) {
-            var span = flash.querySelector('span');
-            var msg = (span ? span.textContent : flash.textContent).trim();
-            if (msg) alert(msg);
-          });
-        });
-      } else {
-        var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
-        flashes.forEach(function(flash) {
-          var span = flash.querySelector('span');
-          var msg = (span ? span.textContent : flash.textContent).trim();
-          if (msg) alert(msg);
-        });
-      }
     </script>
     {% include 'shared/_premium_alerts.html' %}
   </body>

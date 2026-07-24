@@ -363,22 +363,5 @@
         </div>
     </div>
     <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260309a') }}"></script>
-    <script>
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
-                var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
-                flashes.forEach(function(flash) {
-                    var msg = flash.textContent.trim();
-                    if (msg) alert(msg);
-                });
-            });
-        } else {
-            var flashes = document.querySelectorAll('.flash.error, .flash.success, .flash.warning, .flash.info');
-            flashes.forEach(function(flash) {
-                var msg = flash.textContent.trim();
-                if (msg) alert(msg);
-            });
-        }
-    </script>
 </body>
 </html>
