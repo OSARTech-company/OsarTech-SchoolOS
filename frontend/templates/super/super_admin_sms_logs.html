@@ -26,6 +26,15 @@
                     {% endif %}
                 {% endwith %}
                 <div class="card">
+                    <h3 class="no-margin">Send Test SMS</h3>
+                    <form method="post" class="inline-form" style="display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin-top:10px;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div><label>Test Phone</label><input name="test_phone" placeholder="+2348012345678"></div>
+                        <button class="btn btn-primary" type="submit"><i class="fas fa-paper-plane"></i> Send Test SMS</button>
+                    </form>
+                    <p class="note mt-10">This sends a direct Twilio test message and shows the success/failure result on this page.</p>
+                </div>
+                <div class="card">
                     <form method="get" class="inline-form" style="display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
                         <div><label>Provider</label><input name="provider" value="{{ provider_filter }}" placeholder="twilio"></div>
                         <div><label>Status</label><input name="status" value="{{ status_filter }}" placeholder="sent"></div>

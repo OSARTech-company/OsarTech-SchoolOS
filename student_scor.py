@@ -26967,6 +26967,13 @@ def _send_twilio_sms(phone, body):
         )
         with urllib.request.urlopen(req, timeout=15):
             return True, ''
+    except urllib.error.HTTPError as exc:
+        try:
+            details = exc.read().decode('utf-8', errors='replace').strip()
+        except Exception:
+            details = ''
+        message = f'HTTP {exc.code}: {details or exc.reason or str(exc)}'
+        return False, message[:600]
     except Exception as exc:
         return False, str(exc)
 
@@ -36187,6 +36194,28 @@ def super_admin_sms_logs():
     if (session.get('role') or '').strip().lower() != 'super_admin':
         return redirect(url_for('login'))
     ensure_extended_features_schema()
+    test_result = None
+    if request.method == 'POST':
+        test_phone = (request.form.get('test_phone', '') or '').strip()
+        if not test_phone:
+            flash('Enter a test phone number in E.164 format.', 'error')
+        else:
+            try:
+                test_result = send_bulk_sms_messages(
+                    [test_phone],
+                    'Test SMS from Super Admin SMS Logs',
+                    context='super_admin_test_sms',
+                    school_id='super-admin',
+                    audience_role='super_admin',
+                    allow_queue=False,
+                )
+                if test_result.get('sent_sms'):
+                    flash('Test SMS sent successfully.', 'success')
+                else:
+                    flash(f"Test SMS failed: {(test_result.get('errors') or ['Unknown SMS error'])[0]}", 'error')
+            except Exception as exc:
+                logging.exception('Super admin SMS test failed')
+                flash(f'Test SMS failed: {exc}', 'error')
     provider_filter = (request.args.get('provider', '') or '').strip().lower()
     phone_filter = (request.args.get('phone', '') or '').strip()
     status_filter = (request.args.get('status', '') or '').strip().lower()
@@ -36242,6 +36271,7 @@ def super_admin_sms_logs():
         provider_filter=provider_filter,
         phone_filter=phone_filter,
         status_filter=status_filter,
+        test_result=test_result,
         page=page,
         total_pages=total_pages,
         total_rows=total_rows,
@@ -51958,7 +51988,12 @@ def parent_first_login():
 
         if not get_sms_sending_enabled():
             flash('SMS is currently disabled, so no verification code was sent.', 'error')
-        return redirect(url_for('parent_first_login_verify'))
+        return render_template_string(
+            PARENT_FIRST_VERIFY_HTML,
+            phone=parent_phone,
+            otp_code_mock=code,
+            sms_enabled=get_sms_sending_enabled(),
+        )
     parent_phone = session.get('parent_login_precheck_phone', '')
     return render_template_string(PARENT_FIRST_LOGIN_HTML, parent_phone=parent_phone)
 
@@ -51997,7 +52032,12 @@ def parent_first_login_verify():
                 except Exception:
                     logging.exception('Failed to resend parent first-login OTP')
                     flash('Resend failed while contacting SMS provider.', 'error')
-            return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+            return render_template_string(
+                PARENT_FIRST_VERIFY_HTML,
+                phone=phone,
+                otp_code_mock=code,
+                sms_enabled=get_sms_sending_enabled(),
+            )
 
         expected = (session.get('parent_first_login_otp') or '').strip()
         otp_entered = (request.form.get('otp') or '').strip()
@@ -52018,16 +52058,36 @@ def parent_first_login_verify():
             return redirect(url_for('parent_first_login'))
         if otp_entered != expected:
             flash('Invalid verification code.', 'error')
-            return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+            return render_template_string(
+                PARENT_FIRST_VERIFY_HTML,
+                phone=phone,
+                otp_code_mock=expected,
+                sms_enabled=get_sms_sending_enabled(),
+            )
         if not new_password or not confirm_password:
             flash('Password fields are required.', 'error')
-            return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+            return render_template_string(
+                PARENT_FIRST_VERIFY_HTML,
+                phone=phone,
+                otp_code_mock=expected,
+                sms_enabled=get_sms_sending_enabled(),
+            )
         if new_password != confirm_password:
             flash('Passwords do not match.', 'error')
-            return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+            return render_template_string(
+                PARENT_FIRST_VERIFY_HTML,
+                phone=phone,
+                otp_code_mock=expected,
+                sms_enabled=get_sms_sending_enabled(),
+            )
         if len(new_password) < 6:
             flash('Password must be at least 6 characters.', 'error')
-            return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+            return render_template_string(
+                PARENT_FIRST_VERIFY_HTML,
+                phone=phone,
+                otp_code_mock=expected,
+                sms_enabled=get_sms_sending_enabled(),
+            )
 
         # Apply new password hash to all students with this parent phone
         new_hash = hash_password(new_password)
@@ -52040,7 +52100,12 @@ def parent_first_login_verify():
         except Exception as exc:
             logging.exception('Failed to set parent password during first-login')
             flash('Could not set password. Please try again later.', 'error')
-            return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+            return render_template_string(
+                PARENT_FIRST_VERIFY_HTML,
+                phone=phone,
+                otp_code_mock=expected,
+                sms_enabled=get_sms_sending_enabled(),
+            )
 
         # Establish parent session
         session.clear()
@@ -52064,7 +52129,12 @@ def parent_first_login_verify():
     # GET
     if not phone:
         return redirect(url_for('parent_first_login'))
-    return render_template_string(PARENT_FIRST_VERIFY_HTML, phone=phone)
+    return render_template_string(
+        PARENT_FIRST_VERIFY_HTML,
+        phone=phone,
+        otp_code_mock=(session.get('parent_first_login_otp') or '').strip(),
+        sms_enabled=get_sms_sending_enabled(),
+    )
 
 
 # Inline simple templates to avoid adding new files
@@ -52128,6 +52198,13 @@ PARENT_FIRST_LOGIN_HTML = '''
           {% endfor %}
         {% endif %}
       {% endwith %}
+      {% if otp_code_mock %}
+      <div class="alert" style="border-color:#f59e0b;background:#fff8e6;color:#7c4a03;">
+        <strong>Fallback code:</strong>
+        <span style="font-family:monospace;font-size:1.1rem;letter-spacing:.18em;">{{ otp_code_mock }}</span>
+        <div style="margin-top:6px;">Use this code if SMS does not arrive today.</div>
+      </div>
+      {% endif %}
       <form method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="field">
@@ -52205,6 +52282,13 @@ PARENT_FIRST_VERIFY_HTML = '''
           {% endfor %}
         {% endif %}
       {% endwith %}
+      {% if otp_code_mock %}
+      <div class="alert" style="border-color:#f59e0b;background:#fff8e6;color:#7c4a03;">
+        <strong>Fallback code:</strong>
+        <span style="font-family:monospace;font-size:1.1rem;letter-spacing:.18em;">{{ otp_code_mock }}</span>
+        <div style="margin-top:6px;">This is the active code for setup if SMS is delayed.</div>
+      </div>
+      {% endif %}
       <form method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="field">
