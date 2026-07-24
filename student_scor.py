@@ -23790,8 +23790,9 @@ def get_result_publication_row(school_id, classname, term, academic_year='', arm
                        WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '') AND COALESCE(arm, '') = COALESCE(?, '')
                        ORDER BY CASE WHEN COALESCE(approval_status, 'not_submitted') = 'pending' THEN 0 ELSE 1 END,
                                 CASE WHEN is_published = 1 THEN 1 ELSE 0 END,
-                                COALESCE(submitted_at, published_at) DESC,
-                                rowid DESC
+                                COALESCE(submitted_at, published_at, reviewed_at) DESC,
+                                teacher_id DESC,
+                                school_id DESC
                        LIMIT 1""",
                     (school_id, classname, term, academic_year or '', search_arm or ''),
                 )
@@ -23802,7 +23803,9 @@ def get_result_publication_row(school_id, classname, term, academic_year='', arm
                               is_published, published_at, arm
                        FROM result_publications
                        WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '') AND COALESCE(arm, '') = COALESCE(?, '')
-                       ORDER BY COALESCE(published_at, CURRENT_TIMESTAMP) DESC, rowid DESC
+                       ORDER BY COALESCE(published_at, submitted_at, CURRENT_TIMESTAMP) DESC,
+                                teacher_id DESC,
+                                school_id DESC
                        LIMIT 1""",
                     (school_id, classname, term, academic_year or '', search_arm or ''),
                 )
@@ -23822,8 +23825,9 @@ def get_result_publication_row(school_id, classname, term, academic_year='', arm
                        WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')
                        ORDER BY CASE WHEN COALESCE(approval_status, 'not_submitted') = 'pending' THEN 0 ELSE 1 END,
                                 CASE WHEN is_published = 1 THEN 1 ELSE 0 END,
-                                COALESCE(submitted_at, published_at) DESC,
-                                rowid DESC
+                                COALESCE(submitted_at, published_at, reviewed_at) DESC,
+                                teacher_id DESC,
+                                school_id DESC
                        LIMIT 1""",
                     (school_id, classname, term, academic_year or ''),
                 )
@@ -23834,7 +23838,9 @@ def get_result_publication_row(school_id, classname, term, academic_year='', arm
                               is_published, published_at, arm
                        FROM result_publications
                        WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')
-                       ORDER BY COALESCE(published_at, CURRENT_TIMESTAMP) DESC, rowid DESC
+                       ORDER BY COALESCE(published_at, submitted_at, CURRENT_TIMESTAMP) DESC,
+                                teacher_id DESC,
+                                school_id DESC
                        LIMIT 1""",
                     (school_id, classname, term, academic_year or ''),
                 )
