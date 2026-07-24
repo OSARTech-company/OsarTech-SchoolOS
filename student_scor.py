@@ -52127,7 +52127,7 @@ PARENT_FIRST_VERIFY_HTML = '''
         </div>
         <div class="actions">
           <button type="submit" class="btn primary"><i class="fas fa-check-circle"></i> Set Password & Login</button>
-          <button type="submit" name="action" value="resend" class="btn secondary"><i class="fas fa-redo"></i> Resend Code</button>
+          <button type="submit" name="action" value="resend" formnovalidate class="btn secondary"><i class="fas fa-redo"></i> Resend Code</button>
         </div>
       </form>
       <p class="note" style="color:#61768d;margin-top:10px;">Keep the code private. If you didn’t request it, go back and re-enter the phone number.</p>
