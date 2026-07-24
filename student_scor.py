@@ -51875,7 +51875,14 @@ def parent_first_login():
 
         if get_sms_sending_enabled():
             try:
-                _enqueue_sms_delivery(school_id or session.get('school_id') or 'parent-auth', parent_phone, f"Your verification code is {code}", audience_role='parent', context='parent_first_login')
+                send_bulk_sms_messages(
+                    [parent_phone],
+                    f"Your verification code is {code}",
+                    context='parent_first_login',
+                    school_id=school_id or session.get('school_id') or 'parent-auth',
+                    audience_role='parent',
+                    allow_queue=False,
+                )
             except Exception:
                 logging.exception('Failed to enqueue parent first-login OTP')
 
@@ -51904,7 +51911,14 @@ def parent_first_login_verify():
             session['parent_first_login_otp_expires_at'] = expiry.isoformat()
             if get_sms_sending_enabled():
                 try:
-                    _enqueue_sms_delivery(school_id or 'parent-auth', phone, f"Your verification code is {code}", audience_role='parent', context='parent_first_login_resend')
+                    send_bulk_sms_messages(
+                        [phone],
+                        f"Your verification code is {code}",
+                        context='parent_first_login_resend',
+                        school_id=school_id or 'parent-auth',
+                        audience_role='parent',
+                        allow_queue=False,
+                    )
                 except Exception:
                     logging.exception('Failed to resend parent first-login OTP')
             flash('A fresh verification code has been sent.', 'success')
