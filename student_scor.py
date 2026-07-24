@@ -54697,6 +54697,15 @@ def school_admin_student_result():
             'Grade': grade_from_score(average_marks, grade_cfg),
             'Status': status_from_score(average_marks, grade_cfg),
         }
+        live_behaviour = get_student_behaviour_assessment(
+            school_id,
+            sid,
+            target_term,
+            target_year,
+            school_or_mode=school,
+        )
+        if isinstance(live_behaviour, dict) and any((value or '').strip() for value in live_behaviour.values()):
+            result_student['behaviour_assessment'] = live_behaviour
         result_student.update(
             build_result_term_attendance_data(
                 school_id=school_id,
