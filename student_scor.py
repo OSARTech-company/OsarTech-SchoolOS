@@ -28826,6 +28826,10 @@ def set_teacher_signature(school_id, teacher_id, signature_image):
         )
     invalidate_school_cache(school_key)
 
+def clear_teacher_signature(school_id, teacher_id):
+    """Remove teacher signature image for result authorization."""
+    set_teacher_signature(school_id, teacher_id, '')
+
 def set_teacher_profile_image(school_id, teacher_id, profile_image):
     """Store teacher profile image for dashboard/sidebar avatar."""
     school_key = _normalize_school_id_text(school_id)
@@ -48248,6 +48252,32 @@ def teacher_upload_signature():
     set_teacher_signature(school_id, teacher_id, signature_data)
     flash('Teacher signature saved successfully.', 'success')
     return redirect(url_for('teacher_reports'))
+
+@app.route('/school-admin/teacher/remove-signature', methods=['POST'])
+def school_admin_remove_teacher_signature():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    teacher_id = (request.form.get('teacher_id', '') or '').strip()
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    if not teacher_id:
+        flash('Teacher ID is required.', 'error')
+        return redirect(safe_referrer_or(url_for('school_admin_teachers')))
+    teacher = get_teacher(school_id, teacher_id)
+    if not teacher:
+        flash('Teacher record not found.', 'error')
+        return redirect(safe_referrer_or(url_for('school_admin_teachers')))
+    clear_teacher_signature(school_id, teacher_id)
+    record_admin_action_audit(
+        school_id,
+        'remove_teacher_signature',
+        target_scope=teacher_id,
+        payload={'teacher_id': teacher_id},
+    )
+    flash(f'Teacher signature removed for {teacher_id}.', 'success')
+    return redirect(safe_referrer_or(url_for('school_admin_edit_teacher', teacher_id=teacher_id)))
 
 @app.route('/teacher/upload-profile-image', methods=['POST'])
 def teacher_upload_profile_image():

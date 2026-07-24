@@ -1134,6 +1134,102 @@ def test_remove_teacher_from_class_clears_primary_subject_links(app_module, monk
     assert any("DELETE FROM teacher_subject_assignments" in query for query in deleted_queries)
 
 
+def test_clear_teacher_signature_uses_blank_signature(app_module, monkeypatch):
+    m = app_module
+    captured = {}
+
+    monkeypatch.setattr(
+        m,
+        "set_teacher_signature",
+        lambda school_id, teacher_id, signature_image: captured.update(
+            {"school_id": school_id, "teacher_id": teacher_id, "signature_image": signature_image}
+        ),
+    )
+
+    m.clear_teacher_signature("SCH1", "T1")
+
+    assert captured == {"school_id": "SCH1", "teacher_id": "T1", "signature_image": ""}
+
+
+def test_school_admin_remove_teacher_signature_route_clears_signature(client, app_module, monkeypatch):
+    m = app_module
+    captured = {}
+
+    monkeypatch.setattr(m, "get_teacher", lambda school_id, teacher_id: {"firstname": "Jane", "lastname": "Doe"})
+    monkeypatch.setattr(
+        m,
+        "clear_teacher_signature",
+        lambda school_id, teacher_id: captured.update({"school_id": school_id, "teacher_id": teacher_id}),
+    )
+    monkeypatch.setattr(m, "record_admin_action_audit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "safe_referrer_or", lambda fallback: fallback)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "A1"
+
+    resp = client.post(
+        "/school-admin/teacher/remove-signature",
+        data={"teacher_id": "T1"},
+        follow_redirects=False,
+    )
+
+    assert resp.status_code == 302
+    assert captured == {"school_id": "SCH1", "teacher_id": "T1"}
+    assert "/school-admin/teacher/edit/T1" in resp.headers["Location"]
+
+
+def test_menu_route_renders_for_logged_in_user(client, app_module, monkeypatch):
+    m = app_module
+
+    monkeypatch.setattr(m, "render_template", lambda *args, **kwargs: "MENU")
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = "U1"
+        sess["role"] = "guest"
+
+    resp = client.get("/menu")
+    assert resp.status_code == 200
+    assert resp.get_data(as_text=True) == "MENU"
+
+
+def test_school_admin_alumni_route_renders(client, app_module, monkeypatch):
+    m = app_module
+    captured = {}
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"academic_year": "2025-2026"})
+    monkeypatch.setattr(m, "ensure_student_alumni_columns", lambda: True)
+    monkeypatch.setattr(m, "render_template", lambda template, **kwargs: captured.update(kwargs) or "ALUMNI")
+
+    class FakeCursor:
+        def execute(self, query, params=None):
+            self.query = str(query)
+
+        def fetchall(self):
+            return [("ST1", "Ada", "Lovelace", "Primary 6", "2025", "0801", "ada@example.com")]
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+        def close(self):
+            return None
+
+    monkeypatch.setitem(m.__dict__, "get_db_connection", lambda: FakeConn())
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "A1"
+
+    resp = client.get("/school-admin/alumni")
+    assert resp.status_code == 200
+    assert resp.get_data(as_text=True) == "ALUMNI"
+    assert captured["current_year"] == "2025-2026"
+    assert captured["alumni"][0]["student_id"] == "ST1"
+
+
 def test_school_admin_login_skips_setup_wizard_when_setup_is_complete(client, app_module, monkeypatch):
     m = app_module
     marked = {}

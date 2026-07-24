@@ -258,6 +258,18 @@
                   {% endif %}
                 </span>
               </div>
+              {% if teacher.signature_image %}
+              <div class="info-row">
+                <span class="info-label">Signature Action:</span>
+                <div class="info-val">
+                  <form action="{{ url_for('school_admin_remove_teacher_signature') }}" method="POST" onsubmit="return confirm('Remove this teacher signature?');" style="display:inline-block;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    <input type="hidden" name="teacher_id" value="{{ teacher_id }}" />
+                    <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i> Remove Signature</button>
+                  </form>
+                </div>
+              </div>
+              {% endif %}
             </div>
 
             <!-- Edit Fields & Password Reset Form -->
