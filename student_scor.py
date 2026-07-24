@@ -37117,7 +37117,60 @@ def school_admin_bulk_link_parents():
         flash('Parent access is not available yet. Run migration/startup schema updates and retry.', 'error')
         return redirect(url_for('school_admin_view_parents'))
 
-    raw_rows = (request.form.get('bulk_rows', '') or '').splitlines()
+    raw_rows = []
+    upload_file = request.files.get('bulk_file')
+    if upload_file and (upload_file.filename or '').strip():
+        upload_name = (upload_file.filename or '').strip().lower()
+        try:
+            file_bytes = upload_file.read() or b''
+            if upload_name.endswith('.csv'):
+                text = file_bytes.decode('utf-8-sig')
+                reader = csv.DictReader(StringIO(text))
+                for row in reader:
+                    student_id = (row.get('student_id') or row.get('student id') or row.get('Student ID') or '').strip()
+                    parent_phone = (row.get('parent_phone') or row.get('parent phone') or row.get('Parent Phone') or '').strip()
+                    if student_id or parent_phone:
+                        raw_rows.append(f'{student_id},{parent_phone}')
+            elif upload_name.endswith('.xlsx'):
+                workbook = OpenpyxlWorkbook()
+                try:
+                    from openpyxl import load_workbook
+                    workbook = load_workbook(BytesIO(file_bytes), data_only=True)
+                except Exception as exc:
+                    raise ValueError(f'Could not read Excel file: {exc}')
+                sheet = workbook.active
+                headers = []
+                for cell in next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), ()):
+                    headers.append((str(cell).strip() if cell is not None else '').lower())
+                try:
+                    sid_idx = headers.index('student_id')
+                except ValueError:
+                    try:
+                        sid_idx = headers.index('student id')
+                    except ValueError:
+                        sid_idx = 0
+                try:
+                    phone_idx = headers.index('parent_phone')
+                except ValueError:
+                    try:
+                        phone_idx = headers.index('parent phone')
+                    except ValueError:
+                        phone_idx = 1
+                for row in sheet.iter_rows(min_row=2, values_only=True):
+                    if row is None:
+                        continue
+                    student_id = str(row[sid_idx] or '').strip() if sid_idx < len(row) else ''
+                    parent_phone = str(row[phone_idx] or '').strip() if phone_idx < len(row) else ''
+                    if student_id or parent_phone:
+                        raw_rows.append(f'{student_id},{parent_phone}')
+            else:
+                flash('Upload a CSV (.csv) or Excel workbook (.xlsx) file.', 'error')
+                return redirect(url_for('school_admin_view_parents'))
+        except Exception as exc:
+            flash(f'Could not read the upload file: {exc}', 'error')
+            return redirect(url_for('school_admin_view_parents'))
+    else:
+        raw_rows = (request.form.get('bulk_rows', '') or '').splitlines()
     replace_existing = (request.form.get('replace_existing', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
     updated = 0
     skipped = 0
