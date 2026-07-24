@@ -48,7 +48,7 @@
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>School</th><th>Audience</th><th>Phone</th><th>Provider</th><th>Status</th><th>Error</th><th>Context</th><th>Created</th>
+                                <th>School</th><th>Audience</th><th>Phone</th><th>Provider</th><th>Status</th><th>Reason</th><th>Raw Error</th><th>Context</th><th>Created</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -59,12 +59,13 @@
                                 <td>{{ row.phone }}</td>
                                 <td>{{ row.provider }}</td>
                                 <td>{{ row.status }}</td>
-                                <td>{{ row.error_message or '-' }}</td>
+                                <td>{{ row.friendly_error_message or '-' }}</td>
+                                <td><small style="word-break:break-word;">{{ row.error_message or '-' }}</small></td>
                                 <td>{{ row.context or '-' }}</td>
                                 <td>{{ row.created_at }}</td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="8">No SMS logs found.</td></tr>
+                            <tr><td colspan="9">No SMS logs found.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>

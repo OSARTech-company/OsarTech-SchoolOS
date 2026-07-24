@@ -36189,6 +36189,33 @@ def school_admin_sms_logs_export():
         headers={'Content-Disposition': f'attachment; filename=sms_logs_{school_id}.csv'},
     )
 
+def _friendly_sms_error_message(error_message):
+    raw = (error_message or '').strip()
+    low = raw.lower()
+    if not raw:
+        return '-'
+    if '21608' in low or 'not yet verified' in low:
+        return 'Recipient number is not verified on this Twilio account.'
+    if '21610' in low or 'sms capability' in low or 'messaging service' in low:
+        return 'Sender or messaging setup is not enabled for SMS.'
+    if '21612' in low or 'permission' in low:
+        return 'Twilio permissions or geo settings are blocking this SMS.'
+    if '21614' in low or 'invalid mobile' in low:
+        return 'The destination number is not a valid mobile number.'
+    if 'http 400' in low or 'bad request' in low:
+        return 'Twilio rejected the message request.'
+    if 'http 401' in low or 'unauthorized' in low:
+        return 'Twilio credentials were rejected.'
+    if 'http 403' in low or 'forbidden' in low:
+        return 'Twilio blocked this request for account or permission reasons.'
+    if 'http 404' in low or 'not found' in low:
+        return 'Twilio sender or service configuration could not be found.'
+    if 'timeout' in low or 'timed out' in low:
+        return 'The SMS request timed out while contacting Twilio.'
+    if 'unable to resolve' in low or 'name or service not known' in low:
+        return 'Twilio could not be reached from the server.'
+    return raw[:160]
+
 @app.route('/super-admin/sms-logs')
 def super_admin_sms_logs():
     if (session.get('role') or '').strip().lower() != 'super_admin':
@@ -36259,6 +36286,7 @@ def super_admin_sms_logs():
         'provider': row[3] or '',
         'status': row[4] or '',
         'error_message': row[5] or '',
+        'friendly_error_message': _friendly_sms_error_message(row[5] or ''),
         'context': row[6] or '',
         'body': row[7] or '',
         'created_at': format_timestamp(row[8]),
@@ -37075,6 +37103,74 @@ def school_admin_link_parent():
         flash(f'Parent linked. Temporary password: {temp_password}. Share it securely.', 'warning')
     else:
         flash('Parent linked successfully.', 'success')
+    return redirect(url_for('school_admin_view_parents'))
+
+@app.route('/school-admin/parents/bulk-link', methods=['POST'])
+def school_admin_bulk_link_parents():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    if not students_has_parent_access_columns():
+        flash('Parent access is not available yet. Run migration/startup schema updates and retry.', 'error')
+        return redirect(url_for('school_admin_view_parents'))
+
+    raw_rows = (request.form.get('bulk_rows', '') or '').splitlines()
+    replace_existing = (request.form.get('replace_existing', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+    updated = 0
+    skipped = 0
+    errors = []
+    for index, raw_row in enumerate(raw_rows, start=1):
+        line = (raw_row or '').strip()
+        if not line:
+            continue
+        if ',' in line:
+            student_id, parent_phone = [part.strip() for part in line.split(',', 1)]
+        elif '\t' in line:
+            student_id, parent_phone = [part.strip() for part in line.split('\t', 1)]
+        else:
+            errors.append(f'Line {index}: use student_id,parent_phone')
+            continue
+        student_id = (student_id or '').strip()
+        parent_phone = normalize_parent_phone(parent_phone)
+        if not student_id or not parent_phone:
+            errors.append(f'Line {index}: missing student_id or parent_phone')
+            continue
+        if not is_valid_parent_phone(parent_phone):
+            errors.append(f'Line {index}: invalid parent phone')
+            continue
+        student = load_student(school_id, student_id)
+        if not student:
+            errors.append(f'Line {index}: student not found ({student_id})')
+            continue
+        existing_parent = normalize_parent_phone(student.get('parent_phone', ''))
+        if existing_parent and existing_parent != parent_phone and not replace_existing:
+            skipped += 1
+            continue
+        try:
+            student['parent_phone'] = parent_phone
+            if not (student.get('parent_name') or '').strip():
+                student['parent_name'] = student.get('firstname', '') or 'Parent'
+            if not (student.get('parent_gender') or '').strip():
+                student['parent_gender'] = 'female'
+            if not (student.get('parent_password_hash') or '').strip():
+                student['parent_password_hash'] = ''
+            save_student(school_id, student_id, student)
+            updated += 1
+        except Exception as exc:
+            errors.append(f'Line {index}: {student_id} not saved ({exc})')
+
+    flash(f'Bulk allocation finished. Updated {updated} student(s), skipped {skipped}.', 'success' if updated else 'warning')
+    for err in errors[:10]:
+        flash(err, 'warning')
+    record_admin_action_audit(
+        school_id,
+        'bulk_link_parent_phone',
+        target_scope='students',
+        payload={'updated': updated, 'skipped': skipped, 'errors': errors[:20], 'replace_existing': replace_existing},
+    )
     return redirect(url_for('school_admin_view_parents'))
 
 @app.route('/school-admin/parents-directory')
@@ -51981,10 +52077,15 @@ def parent_first_login():
                 if sms_result.get('sent_sms'):
                     flash('Verification code sent by SMS.', 'success')
                 else:
-                    flash(f"SMS did not send: {(sms_result.get('errors') or ['Unknown SMS error'])[0]}", 'error')
+                    logging.warning(
+                        "Parent first-login SMS failed for %s: %s",
+                        parent_phone,
+                        (sms_result.get('errors') or ['Unknown SMS error'])[0],
+                    )
+                    flash('We could not send the text message right now. Please use the code shown on this page.', 'error')
             except Exception:
                 logging.exception('Failed to enqueue parent first-login OTP')
-                flash('SMS send failed while generating the verification code.', 'error')
+                flash('We could not send the text message right now. Please use the code shown on this page.', 'error')
 
         if not get_sms_sending_enabled():
             flash('SMS is currently disabled, so no verification code was sent.', 'error')
@@ -52028,10 +52129,15 @@ def parent_first_login_verify():
                     if sms_result.get('sent_sms'):
                         flash('Fresh verification code sent by SMS.', 'success')
                     else:
-                        flash(f"Resend failed: {(sms_result.get('errors') or ['Unknown SMS error'])[0]}", 'error')
+                        logging.warning(
+                            "Parent first-login resend SMS failed for %s: %s",
+                            phone,
+                            (sms_result.get('errors') or ['Unknown SMS error'])[0],
+                        )
+                        flash('We could not resend the text message right now. Please use the code shown on this page.', 'error')
                 except Exception:
                     logging.exception('Failed to resend parent first-login OTP')
-                    flash('Resend failed while contacting SMS provider.', 'error')
+                    flash('We could not resend the text message right now. Please use the code shown on this page.', 'error')
             return render_template_string(
                 PARENT_FIRST_VERIFY_HTML,
                 phone=phone,

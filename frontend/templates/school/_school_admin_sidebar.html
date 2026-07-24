@@ -110,9 +110,17 @@
                     <span>Subject Requests</span>
                 </a>
                 {% endif %}
+            </div>
+        </details>
+
+        <details class="side-group">
+            <summary class="side-group-toggle">
+                <span>Parents</span><i class="fas fa-chevron-down"></i>
+            </summary>
+            <div class="side-group-links">
                 <a href="{{ url_for('school_admin_view_parents') }}" class="side-link{% if active_page == 'parents' %} active{% endif %}">
                     <i class="fas fa-user-friends"></i>
-                    <span>View Parents</span>
+                    <span>Parent Links</span>
                 </a>
                 <a href="{{ url_for('school_admin_parent_directory') }}" class="side-link{% if active_page == 'parents_directory' %} active{% endif %}">
                     <i class="fas fa-address-book"></i>
