@@ -23537,7 +23537,10 @@ def is_result_published(school_id, classname, term, academic_year='', arm=''):
             (school_id, classname, term, academic_year or '', arm or ''),
         )
         row = c.fetchone()
-        return bool(row and int(row[0]) == 1)
+        if row and int(row[0]) == 1:
+            return True
+    fallback_row = get_result_publication_row(school_id, classname, term, academic_year, arm=arm)
+    return bool(fallback_row.get('is_published'))
 
 def set_term_edit_lock(school_id, classname, term, academic_year='', is_locked=True, unlocked_minutes=0, unlock_reason='', unlocked_by='', arm=''):
     """Set or temporarily relax edit lock for one published class-term."""
@@ -55608,11 +55611,12 @@ def school_admin_unpublish_results():
         flash('Invalid term selected for unpublish.', 'error')
         return redirect(fallback)
 
-    if not is_result_published(school_id, classname, target_term, target_year, arm=arm):
+    pub_row = get_result_publication_row(school_id, classname, target_term, target_year, arm=arm) or {}
+    resolved_arm = (pub_row.get('arm', '') or arm or '').strip()
+    if not pub_row.get('is_published'):
         flash(f'{classname} ({target_term}) is already not published.', 'error')
         return redirect(fallback)
 
-    pub_row = get_result_publication_row(school_id, classname, target_term, target_year, arm=arm) or {}
     try:
         with db_connection(commit=True) as conn:
             c = conn.cursor()
@@ -55626,7 +55630,7 @@ def school_admin_unpublish_results():
                 is_published=False,
                 teacher_name=pub_row.get('teacher_name', '') or '',
                 principal_name=pub_row.get('principal_name', '') or '',
-                arm=arm,
+                arm=resolved_arm,
             )
             db_execute(
                 c,
@@ -55638,7 +55642,7 @@ def school_admin_unpublish_results():
             try:
                 db_execute(
                     c,
-                    """INSERT INTO term_edit_locks
+                """INSERT INTO term_edit_locks
                        (school_id, classname, arm, term, academic_year, is_locked, unlocked_until, unlock_reason, unlocked_by, updated_at)
                        VALUES (?, ?, ?, ?, ?, 0, NULL, 'Unpublished', ?, CURRENT_TIMESTAMP)
                        ON CONFLICT(school_id, classname, arm, term, academic_year) DO UPDATE SET
@@ -55647,7 +55651,7 @@ def school_admin_unpublish_results():
                          unlock_reason = 'Unpublished',
                          unlocked_by = excluded.unlocked_by,
                          updated_at = CURRENT_TIMESTAMP""",
-                    (school_id, classname, arm or '', target_term, target_year or '', session.get('user_id', '') or ''),
+                    (school_id, classname, resolved_arm or '', target_term, target_year or '', session.get('user_id', '') or ''),
                 )
             except Exception as lock_exc:
                 logging.warning("Failed to update term_edit_locks during unpublish: %s", lock_exc)

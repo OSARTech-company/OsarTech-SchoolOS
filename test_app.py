@@ -657,6 +657,37 @@ def test_review_result_approval_request_no_submission_includes_hint(app_module, 
     assert "Found nearby records:" in message
 
 
+def test_is_result_published_falls_back_to_publication_row(app_module, monkeypatch):
+    m = app_module
+
+    class FakeCursor:
+        def execute(self, *args, **kwargs):
+            return None
+
+        def fetchone(self):
+            return None
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", lambda *args, **kwargs: None)
+    monkeypatch.setattr(m, "get_result_publication_row", lambda *args, **kwargs: {
+        "is_published": True,
+        "teacher_id": "T1",
+        "teacher_name": "Teacher One",
+        "principal_name": "Principal One",
+        "arm": "A",
+    })
+
+    assert m.is_result_published("SCH1", "PRIMARY6A", "Third Term", "2025-2026", arm="") is True
+
+
 def test_get_result_publication_row_falls_back_to_class_without_arm(app_module, monkeypatch):
     m = app_module
     queries = []
