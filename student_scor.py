@@ -29541,6 +29541,28 @@ def assign_teacher_to_class(school_id, teacher_id, classname, term, academic_yea
                        ON CONFLICT(school_id, teacher_id, classname, term, academic_year)
                        DO UPDATE SET academic_year = excluded.academic_year""",
                    (school_id, teacher_id, classname, term, academic_year))
+    school = get_school(school_key) or {}
+    if not class_uses_subject_teachers(classname):
+        subjects = []
+        config = get_class_subject_config(school_key, classname) or {}
+        subjects = normalize_subjects_list(
+            (config.get('core_subjects') or [])
+            + (config.get('science_subjects') or [])
+            + (config.get('art_subjects') or [])
+            + (config.get('commercial_subjects') or [])
+            + (config.get('optional_subjects') or [])
+        )
+        if not subjects:
+            defaults = _catalog_defaults_for_class(classname)
+            subjects = normalize_subjects_list(
+                (defaults.get('core') or [])
+                + (defaults.get('science') or [])
+                + (defaults.get('art') or [])
+                + (defaults.get('commercial') or [])
+                + (defaults.get('optional') or [])
+            )
+        if subjects:
+            assign_teacher_to_subjects(school_key, teacher_id, classname, subjects, term, academic_year)
 
 def assign_teacher_to_subjects(school_id, teacher_id, classname, subjects, term, academic_year):
     """Add/keep teacher subject assignments for a class in a term/year."""
@@ -29695,6 +29717,16 @@ def remove_teacher_from_class(school_id, teacher_id, classname, term, academic_y
                  AND academic_year = ?""",
             (school_id, teacher_id, class_key, term, academic_year)
         )
+        if not class_uses_subject_teachers(class_key):
+            db_execute(
+                c,
+                """DELETE FROM teacher_subject_assignments
+                   WHERE school_id = ? AND teacher_id = ?
+                     AND REGEXP_REPLACE(UPPER(COALESCE(classname, '')), '[^A-Z0-9]+', '', 'g') = ?
+                     AND LOWER(TRIM(COALESCE(term, ''))) = LOWER(TRIM(?))
+                     AND academic_year = ?""",
+                (school_id, teacher_id, class_key, term, academic_year),
+            )
 
 def get_class_assignments(school_id):
     """Get class assignments with teacher display names."""

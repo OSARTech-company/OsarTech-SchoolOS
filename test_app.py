@@ -1035,6 +1035,105 @@ def test_school_admin_dashboard_passes_assignments_to_publication_statuses(clien
     # monkeypatch render_template to capture kwargs
     
 
+def test_assign_teacher_to_class_auto_assigns_primary_subjects(app_module, monkeypatch):
+    m = app_module
+    captured = {}
+
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"academic_year": "2025-2026", "school_type": "primary"})
+    monkeypatch.setattr(m, "class_uses_subject_teachers", lambda classname: False)
+    monkeypatch.setattr(
+        m,
+        "get_class_subject_config",
+        lambda school_id, classname: {
+            "core_subjects": ["English Language", "Mathematics"],
+            "science_subjects": ["Basic Science"],
+            "art_subjects": [],
+            "commercial_subjects": [],
+            "optional_subjects": ["Civic Education"],
+        },
+    )
+    monkeypatch.setattr(
+        m,
+        "assign_teacher_to_subjects",
+        lambda school_id, teacher_id, classname, subjects, term, academic_year: captured.update(
+            {
+                "school_id": school_id,
+                "teacher_id": teacher_id,
+                "classname": classname,
+                "subjects": list(subjects),
+                "term": term,
+                "academic_year": academic_year,
+            }
+        ) or 4,
+    )
+
+    class FakeCursor:
+        def __init__(self):
+            self.rowcount = 0
+            self.next_fetchone = (1,)
+
+        def fetchone(self):
+            result = self.next_fetchone
+            self.next_fetchone = None
+            return result
+
+    class FakeConn:
+        def __init__(self):
+            self.cursor_obj = FakeCursor()
+
+        def cursor(self):
+            return self.cursor_obj
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    def fake_db_execute(cursor, query, params=None):
+        if "FROM teachers" in str(query):
+            cursor.next_fetchone = (1,)
+
+    monkeypatch.setattr(m, "db_execute", fake_db_execute)
+
+    m.assign_teacher_to_class("SCH1", "T1", "Primary1", "First Term", "2025-2026")
+
+    assert captured["teacher_id"] == "T1"
+    assert captured["classname"] == "PRIMARY1"
+    assert captured["subjects"] == ["English Language", "Mathematics", "Basic Science", "Civic Education"]
+    assert captured["term"] == "First Term"
+    assert captured["academic_year"] == "2025-2026"
+
+
+def test_remove_teacher_from_class_clears_primary_subject_links(app_module, monkeypatch):
+    m = app_module
+    deleted_queries = []
+
+    monkeypatch.setattr(m, "class_uses_subject_teachers", lambda classname: False)
+
+    class FakeCursor:
+        def __init__(self):
+            self.rowcount = 0
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    def fake_db_execute(cursor, query, params=None):
+        deleted_queries.append(str(query))
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", fake_db_execute)
+
+    m.remove_teacher_from_class("SCH1", "T1", "Primary1", "First Term", "2025-2026")
+
+    assert any("DELETE FROM class_assignments" in query for query in deleted_queries)
+    assert any("DELETE FROM teacher_subject_assignments" in query for query in deleted_queries)
+
+
 def test_school_admin_login_skips_setup_wizard_when_setup_is_complete(client, app_module, monkeypatch):
     m = app_module
     marked = {}
