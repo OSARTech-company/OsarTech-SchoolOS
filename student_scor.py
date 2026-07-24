@@ -48053,6 +48053,118 @@ def teacher_behaviour_assessment():
         student_rows=prepared_rows,
     )
 
+@app.route('/teacher/class-comments', methods=['GET', 'POST'])
+def teacher_class_comments():
+    if session.get('role') != 'teacher':
+        return redirect(url_for('login'))
+
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+
+    teacher_id = session.get('user_id')
+    school = get_school(school_id) or {}
+    current_term = get_current_term(school)
+    current_year = (school.get('academic_year', '') or '').strip()
+
+    classes = get_teacher_classes(school_id, teacher_id, term=current_term, academic_year=current_year)
+    if not classes:
+        flash('No class assignment found for comments.', 'error')
+        return redirect(url_for('teacher_dashboard'))
+
+    selected_class = canonicalize_classname((request.values.get('classname', '') or '').strip())
+    if selected_class not in classes:
+        selected_class = classes[0]
+
+    if not teacher_has_class_access(school_id, teacher_id, selected_class, term=current_term, academic_year=current_year):
+        flash('You are not assigned to this class for the current term/year.', 'error')
+        return redirect(url_for('teacher_dashboard'))
+
+    class_students = load_students(school_id, class_filter=selected_class, term_filter=current_term)
+    student_rows = sorted(
+        [(sid, s) for sid, s in class_students.items()],
+        key=lambda row: ((row[1].get('firstname', '') or '').lower(), (row[0] or '').lower()),
+    )
+    if not student_rows:
+        flash(f'No students found in {selected_class} for {current_term}.', 'error')
+        return redirect(url_for('teacher_dashboard'))
+
+    existing_comments = {
+        sid: (student.get('teacher_comment', '') or '').strip()
+        for sid, student in student_rows
+    }
+
+    if request.method == 'POST':
+        updated_count = 0
+        try:
+            has_teacher_comment_col = students_has_teacher_comment_column()
+            if not has_teacher_comment_col:
+                flash('Class comment column is not available in the database yet.', 'error')
+                return redirect(url_for('teacher_class_comments', classname=selected_class))
+            with db_connection(commit=True) as conn:
+                c = conn.cursor()
+                for sid, _student in student_rows:
+                    comment = (request.form.get(f'comment_{sid}', '') or '').strip()[:1500]
+                    if comment == existing_comments.get(sid, ''):
+                        continue
+                    db_execute(
+                        c,
+                        "UPDATE students SET teacher_comment = ? WHERE school_id = ? AND student_id = ?",
+                        (comment, school_id, sid),
+                    )
+                    updated_count += 1
+            flash(f'Class comments saved for {selected_class}. Updated {updated_count} student(s).', 'success')
+        except Exception as exc:
+            flash(f'Failed to save class comments: {exc}', 'error')
+        return redirect(url_for('teacher_class_comments', classname=selected_class))
+
+    prepared_rows = []
+    for sid, student in student_rows:
+        prepared_rows.append({
+            'student_id': sid,
+            'firstname': student.get('firstname', ''),
+            'stream': student.get('stream', ''),
+            'comment': existing_comments.get(sid, ''),
+        })
+
+    teacher_profile = get_teachers(school_id).get(teacher_id, {})
+    teacher_name = f"{teacher_profile.get('firstname', '')} {teacher_profile.get('lastname', '')}".strip() or teacher_id
+    teacher_profile_image = (teacher_profile.get('profile_image') or '').strip()
+    unread_teacher_messages = 0
+    try:
+        teacher_messages = get_teacher_messages_for_teacher(
+            school_id=school_id,
+            teacher_id=teacher_id,
+            classes=classes,
+            subjects=[],
+            limit=20,
+        )
+        unread_teacher_messages = sum(1 for row in teacher_messages if not row.get('is_read'))
+    except Exception:
+        unread_teacher_messages = 0
+
+    return render_template(
+        'teacher/teacher_class_comments.html',
+        school=school,
+        teacher_name=teacher_name,
+        teacher_profile_image=teacher_profile_image,
+        teacher_phone=(teacher_profile.get('phone') or '').strip(),
+        classes=classes,
+        current_term=current_term,
+        current_year=current_year,
+        selected_class=selected_class,
+        student_rows=prepared_rows,
+        teacher_sidebar_profile_image=teacher_profile_image,
+        teacher_sidebar_display_name=teacher_name,
+        teacher_unread_notifications=unread_teacher_messages,
+        teacher_has_class_assignment_nav=bool(classes),
+        teacher_score_nav_tree=[],
+        teacher_selected_score_subject='',
+        teacher_selected_score_class='',
+        active_page='class_comments',
+    )
+
 @app.route('/teacher/update-profile', methods=['POST'])
 def teacher_update_profile():
     if session.get('role') != 'teacher':

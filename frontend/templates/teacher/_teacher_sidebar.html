@@ -124,6 +124,10 @@
                     <i class="fas fa-comments"></i>
                     <span>Subject Comments</span>
                 </a>
+                <a href="{{ url_for('teacher_class_comments') }}" class="side-link{% if active_page == 'class_comments' %} active{% endif %}">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Class Comments</span>
+                </a>
                 {% if not school or (school.score_entry_mode != 'dean_led' and school.school_type != 'primary' and school.school_type != 'nursery') %}
                 <a href="{{ url_for('teacher_subject_handover') }}" class="side-link{% if active_page == 'subject_handover' %} active{% endif %}">
                     <i class="fas fa-clipboard-check"></i>

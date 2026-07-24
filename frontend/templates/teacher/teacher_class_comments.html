@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Comments - Teacher</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260308f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; background: radial-gradient(circle at top left, rgba(15, 76, 129, 0.07), transparent 32%), #f4f7fb; }
+        .container { width: min(1180px, 100%); margin: 0 auto; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header h1 { margin: 0; font-size: 1.85rem; }
+        .header .back { color: white; text-decoration: none; font-weight: 700; }
+        .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 18px; }
+        .toolbar .btn { text-decoration: none; }
+        .comment-card { border: 1px solid #dce7f5; border-radius: 16px; background: #fff; box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05); padding: 18px; }
+        .intro { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 16px; }
+        .intro .pill { background: #eef5ff; border: 1px solid #d7e4f7; color: #1e3a5f; border-radius: 999px; padding: 10px 14px; font-weight: 700; }
+        .comment-table { width: 100%; border-collapse: collapse; }
+        .comment-table th, .comment-table td { border-bottom: 1px solid #e5edf6; padding: 12px; vertical-align: top; }
+        .comment-table thead th { background: #f8fbff; text-align: left; color: #16324f; }
+        .comment-table textarea {
+            width: 100%;
+            min-height: 104px;
+            border: 1px solid #cfd9e6;
+            border-radius: 10px;
+            padding: 10px 12px;
+            resize: vertical;
+            font: inherit;
+            box-sizing: border-box;
+        }
+        .student-meta strong { display: block; color: #16324f; }
+        .student-meta span { color: #64748b; font-size: 0.92rem; }
+        .sticky-actions {
+            position: sticky;
+            bottom: 12px;
+            margin-top: 16px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 14px;
+            background: rgba(255,255,255,0.92);
+            border: 1px solid #dce7f5;
+            border-radius: 14px;
+            backdrop-filter: blur(8px);
+        }
+        @media (max-width: 720px) {
+            .sticky-actions { flex-direction: column; }
+            .sticky-actions .btn { width: 100%; }
+        }
+    </style>
+</head>
+<body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
+    {% set active_page = active_page|default('class_comments', true) %}
+    {% set teacher_sidebar_profile_image = teacher_sidebar_profile_image if teacher_sidebar_profile_image is defined else teacher_profile_image %}
+    {% set teacher_sidebar_display_name = teacher_sidebar_display_name if teacher_sidebar_display_name is defined else teacher_name %}
+    <div class="app-shell topbar-layout">
+        {% include 'teacher/_teacher_sidebar.html' %}
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-comments"></i> Class Comments</h1>
+                    <a href="{{ url_for('teacher_dashboard') }}" class="back"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="toolbar">
+                    {% for cls in classes %}
+                    <a href="{{ url_for('teacher_class_comments', classname=cls) }}" class="btn btn-secondary btn-sm{% if cls == selected_class %} active{% endif %}">{{ cls }}</a>
+                    {% endfor %}
+                </div>
+
+                <div class="comment-card">
+                    <div class="intro">
+                        <div class="pill"><i class="fas fa-chalkboard"></i> Class: {{ selected_class }}</div>
+                        <div class="pill"><i class="fas fa-calendar"></i> Term: {{ current_term }}</div>
+                        <div class="pill"><i class="fas fa-calendar-alt"></i> Year: {{ current_year or '-' }}</div>
+                        <div class="pill"><i class="fas fa-user-graduate"></i> Students: {{ student_rows|length }}</div>
+                    </div>
+
+                    <form method="post" action="{{ url_for('teacher_class_comments', classname=selected_class) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="table-wrap">
+                            <table class="comment-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 24%;">Student</th>
+                                        <th>Comment</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in student_rows %}
+                                    <tr>
+                                        <td class="student-meta">
+                                            <strong>{{ row.firstname }}</strong>
+                                            <span>{{ row.student_id }}{% if row.stream %} - {{ row.stream }}{% endif %}</span>
+                                        </td>
+                                        <td>
+                                            <textarea name="comment_{{ row.student_id }}" placeholder="Write a class teacher comment for {{ row.firstname }}">{{ row.comment }}</textarea>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="sticky-actions">
+                            <a href="{{ url_for('teacher_dashboard') }}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save All Comments</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+    {% include "shared/_loading_overlay.html" %}
+</body>
+</html>
