@@ -24843,6 +24843,8 @@ def get_published_students_for_class(school_id, classname, term, academic_year='
     """List published students for one class and term."""
     if not school_id or not classname or not term:
         return []
+    class_key = canonicalize_classname(classname)
+
     def _fetch_rows(year_filter):
         with db_connection() as conn:
             c = conn.cursor()
@@ -24852,9 +24854,10 @@ def get_published_students_for_class(school_id, classname, term, academic_year='
                     """SELECT student_id, firstname, classname, term, COALESCE(academic_year, ''),
                               average_marks, grade, status, published_at
                        FROM published_student_results
-                       WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
+                       WHERE school_id = ? AND REGEXP_REPLACE(UPPER(COALESCE(classname, '')), '[^A-Z0-9]+', '', 'g') = ?
+                         AND term = ?
                        ORDER BY firstname ASC, student_id ASC""",
-                    (school_id, classname, term),
+                    (school_id, class_key, term),
                 )
             else:
                 db_execute(
@@ -24862,10 +24865,11 @@ def get_published_students_for_class(school_id, classname, term, academic_year='
                     """SELECT student_id, firstname, classname, term, COALESCE(academic_year, ''),
                               average_marks, grade, status, published_at
                        FROM published_student_results
-                       WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
+                       WHERE school_id = ? AND REGEXP_REPLACE(UPPER(COALESCE(classname, '')), '[^A-Z0-9]+', '', 'g') = ?
+                         AND term = ?
                          AND COALESCE(academic_year, '') = COALESCE(?, '')
                        ORDER BY firstname ASC, student_id ASC""",
-                    (school_id, classname, term, year_filter or ''),
+                    (school_id, class_key, term, year_filter or ''),
                 )
             return c.fetchall()
 
