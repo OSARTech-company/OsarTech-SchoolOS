@@ -17,6 +17,9 @@
             margin: 0 auto;
             padding: 24px;
         }
+        .main-content {
+            padding-bottom: 110px;
+        }
         .header {
             background: linear-gradient(135deg, #0f3d56 0%, #166486 58%, #17927d 100%);
             color: #fff;
@@ -213,6 +216,28 @@
             color: #b42318;
             font-weight: 700;
         }
+        .autosave-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #64748b;
+            font-size: 0.88rem;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+        .autosave-status.saved {
+            color: #166534;
+        }
+        .autosave-status.saving {
+            color: #92400e;
+        }
+        .autosave-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: currentColor;
+            display: inline-block;
+        }
         @media (max-width: 960px) {
             .meta-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -283,6 +308,10 @@
                             <div class="value">{{ total_students }} Student{{ '' if total_students == 1 else 's' }}</div>
                         </div>
                     </div>
+                    <p class="autosave-status" id="autosave-status" aria-live="polite">
+                        <span class="autosave-dot"></span>
+                        Draft not saved yet
+                    </p>
                 </div>
 
                 <div class="card">
@@ -466,6 +495,17 @@
         var gradeB = parseFloat(table.dataset.gradeB || '60');
         var gradeC = parseFloat(table.dataset.gradeC || '50');
         var gradeD = parseFloat(table.dataset.gradeD || '40');
+        var mainForm = document.getElementById('subject-sheet-form');
+        var autosaveStatus = document.getElementById('autosave-status');
+        var autosaveTimer = null;
+        var draftStorageKey = [
+          'subject-score-sheet-draft',
+          '{{ role }}',
+          '{{ selected_class }}',
+          '{{ selected_subject }}',
+          '{{ selected_term }}',
+          '{{ current_year or "" }}'
+        ].join('|');
 
         function parseValue(value) {
           var text = (value || '').trim();
@@ -485,6 +525,67 @@
           if (score >= gradeC) return 'C';
           if (score >= gradeD) return 'D';
           return 'F';
+        }
+
+        function updateAutosaveStatus(state, message) {
+          if (!autosaveStatus) return;
+          autosaveStatus.classList.remove('saved', 'saving');
+          if (state === 'saved') autosaveStatus.classList.add('saved');
+          if (state === 'saving') autosaveStatus.classList.add('saving');
+          autosaveStatus.innerHTML = '<span class="autosave-dot"></span>' + message;
+        }
+
+        function serializeDraft() {
+          var payload = {};
+          mainForm.querySelectorAll('input[name], textarea[name], select[name]').forEach(function (field) {
+            if (field.disabled || field.name === 'csrf_token') return;
+            payload[field.name] = field.value;
+          });
+          return payload;
+        }
+
+        function saveDraftNow() {
+          try {
+            localStorage.setItem(draftStorageKey, JSON.stringify({
+              savedAt: Date.now(),
+              values: serializeDraft()
+            }));
+            updateAutosaveStatus('saved', 'Draft saved automatically');
+          } catch (error) {
+            updateAutosaveStatus('saving', 'Draft could not be saved locally');
+          }
+        }
+
+        function scheduleDraftSave() {
+          updateAutosaveStatus('saving', 'Saving draft...');
+          if (autosaveTimer) clearTimeout(autosaveTimer);
+          autosaveTimer = setTimeout(saveDraftNow, 500);
+        }
+
+        function restoreDraft() {
+          try {
+            var raw = localStorage.getItem(draftStorageKey);
+            if (!raw) return;
+            var draft = JSON.parse(raw);
+            var values = (draft && draft.values) ? draft.values : {};
+            Object.keys(values).forEach(function (name) {
+              var selector = '[name="' + CSS.escape(name) + '"]';
+              var field = mainForm.querySelector(selector);
+              if (field && !field.disabled && field.name !== 'csrf_token') {
+                field.value = values[name];
+              }
+            });
+            recalcAll();
+            updateAutosaveStatus('saved', 'Draft restored automatically');
+          } catch (error) {
+            updateAutosaveStatus('idle', 'Draft not saved yet');
+          }
+        }
+
+        function clearDraft() {
+          try {
+            localStorage.removeItem(draftStorageKey);
+          } catch (error) {}
         }
 
         function getEditableRows() {
@@ -591,11 +692,13 @@
             var rowKey = input.getAttribute('data-row-key');
             markTouched(rowKey);
             recalcRow(rowKey);
+            scheduleDraftSave();
           });
           input.addEventListener('change', function () {
             var rowKey = input.getAttribute('data-row-key');
             markTouched(rowKey);
             recalcRow(rowKey);
+            scheduleDraftSave();
           });
           input.addEventListener('keydown', function (event) {
             var isCommentField = input.classList.contains('comment-input');
@@ -613,6 +716,11 @@
 
         document.querySelectorAll('.score-row').forEach(function (row) {
           recalcRow(row.getAttribute('data-row-key'));
+        });
+
+        restoreDraft();
+        mainForm.addEventListener('submit', function () {
+          clearDraft();
         });
       })();
     </script>

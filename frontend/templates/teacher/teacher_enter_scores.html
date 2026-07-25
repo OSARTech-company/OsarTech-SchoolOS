@@ -16,6 +16,9 @@
                         #f3f6fa;
         }
         .container { width: min(1220px, 100%); margin: 0 auto; padding: 24px; }
+        .main-content {
+            padding-bottom: 110px;
+        }
         
         .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
         .header h1 { margin: 0; font-size: 1.8rem; }
@@ -222,6 +225,27 @@
         .sticky-actions-bar.show {
             bottom: 0;
         }
+        .autosave-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #64748b;
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+        .autosave-status.saved {
+            color: #166534;
+        }
+        .autosave-status.saving {
+            color: #92400e;
+        }
+        .autosave-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: currentColor;
+            display: inline-block;
+        }
 
         @media (max-width: 640px) {
             .container { padding: 12px; }
@@ -270,6 +294,10 @@
                     This term has been published. Scores are locked for editing.
                 </p>
                 {% endif %}
+                <p class="autosave-status" id="autosave-status" aria-live="polite">
+                    <span class="autosave-dot"></span>
+                    Draft not saved yet
+                </p>
             </div>
             
             <form method="POST" id="score-entry-form">
@@ -529,6 +557,7 @@
             const mainForm = document.getElementById('score-entry-form');
             const stickyBar = document.getElementById('sticky-save-bar');
             const saveBtn = document.getElementById('save-scores-btn');
+            const autosaveStatus = document.getElementById('autosave-status');
             
             if (!table) return;
 
@@ -541,6 +570,91 @@
 
             let formHasChanges = false;
             let validationErrors = new Set();
+            let autosaveTimer = null;
+            const draftStorageKey = [
+                'teacher-score-entry-draft',
+                '{{ role }}',
+                '{{ student.student_id }}',
+                '{{ student.classname }}',
+                '{{ student.term }}',
+                '{{ student.stream or "" }}'
+            ].join('|');
+
+            function canUseLocalStorage() {
+                try {
+                    return !!window.localStorage;
+                } catch (error) {
+                    return false;
+                }
+            }
+
+            function updateAutosaveStatus(state, message) {
+                if (!autosaveStatus) return;
+                autosaveStatus.classList.remove('saved', 'saving');
+                if (state === 'saved') autosaveStatus.classList.add('saved');
+                if (state === 'saving') autosaveStatus.classList.add('saving');
+                autosaveStatus.innerHTML = '<span class="autosave-dot"></span>' + message;
+            }
+
+            function serializeDraft() {
+                const payload = {};
+                mainForm.querySelectorAll('input[name], textarea[name]').forEach((field) => {
+                    if (field.disabled || field.name === 'csrf_token') return;
+                    payload[field.name] = field.value;
+                });
+                return payload;
+            }
+
+            function saveDraftNow() {
+                if (!canUseLocalStorage()) return;
+                try {
+                    localStorage.setItem(draftStorageKey, JSON.stringify({
+                        savedAt: Date.now(),
+                        values: serializeDraft()
+                    }));
+                    updateAutosaveStatus('saved', 'Draft saved automatically');
+                } catch (error) {
+                    updateAutosaveStatus('saving', 'Draft could not be saved locally');
+                }
+            }
+
+            function scheduleDraftSave() {
+                if (stickyBar) {
+                    stickyBar.classList.add('show');
+                }
+                updateAutosaveStatus('saving', 'Saving draft...');
+                if (autosaveTimer) {
+                    clearTimeout(autosaveTimer);
+                }
+                autosaveTimer = setTimeout(saveDraftNow, 500);
+            }
+
+            function restoreDraft() {
+                if (!canUseLocalStorage()) return;
+                try {
+                    const raw = localStorage.getItem(draftStorageKey);
+                    if (!raw) return;
+                    const draft = JSON.parse(raw);
+                    const values = (draft && draft.values) ? draft.values : {};
+                    Object.keys(values).forEach((name) => {
+                        const selector = '[name="' + CSS.escape(name) + '"]';
+                        const field = mainForm.querySelector(selector);
+                        if (field && !field.disabled && field.name !== 'csrf_token') {
+                            field.value = values[name];
+                        }
+                    });
+                    updateAutosaveStatus('saved', 'Draft restored automatically');
+                } catch (error) {
+                    updateAutosaveStatus('idle', 'Draft not saved yet');
+                }
+            }
+
+            function clearDraft() {
+                if (!canUseLocalStorage()) return;
+                try {
+                    localStorage.removeItem(draftStorageKey);
+                } catch (error) {}
+            }
 
             function gradeFromScore(score) {
                 if (score >= thresholds.a) return 'A';
@@ -699,6 +813,7 @@
                     validateInput(input);
                     recalcForSubject(input.dataset.subjKey);
                     markTouched(input.dataset.subjKey);
+                    scheduleDraftSave();
                 });
                 
                 input.addEventListener('keydown', (event) => {
@@ -768,6 +883,7 @@
                     if (row) {
                         markTouched(row.dataset.subjKey);
                     }
+                    scheduleDraftSave();
                 });
                 if (input.classList.contains('subject-comment-input')) {
                     input.addEventListener('focus', () => {
@@ -780,6 +896,8 @@
                     });
                 }
             });
+
+            restoreDraft();
 
             // Prevent navigating away with unsaved changes
             window.addEventListener('beforeunload', function (e) {
@@ -796,6 +914,7 @@
                     return;
                 }
                 formHasChanges = false; // Prevent beforeunload popup
+                clearDraft();
                 if (mainForm) mainForm.submit();
             };
 
