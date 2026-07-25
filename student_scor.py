@@ -24251,9 +24251,8 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                 c,
                 """SELECT 1 FROM result_publications
                    WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')
-                     AND COALESCE(arm, '') = COALESCE(?, '')
                    LIMIT 1""",
-                (school_id, classname, term, publish_year, arm or ''),
+                (school_id, classname, term, publish_year),
             )
             return c.fetchone() is not None
 
