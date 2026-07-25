@@ -24855,7 +24855,7 @@ def get_published_students_for_class(school_id, classname, term, academic_year='
                               average_marks, grade, status, published_at
                        FROM published_student_results
                        WHERE school_id = ? AND REGEXP_REPLACE(UPPER(COALESCE(classname, '')), '[^A-Z0-9]+', '', 'g') = ?
-                         AND term = ?
+                         AND LOWER(TRIM(COALESCE(term, ''))) = LOWER(TRIM(?))
                        ORDER BY firstname ASC, student_id ASC""",
                     (school_id, class_key, term),
                 )
@@ -24866,8 +24866,8 @@ def get_published_students_for_class(school_id, classname, term, academic_year='
                               average_marks, grade, status, published_at
                        FROM published_student_results
                        WHERE school_id = ? AND REGEXP_REPLACE(UPPER(COALESCE(classname, '')), '[^A-Z0-9]+', '', 'g') = ?
-                         AND term = ?
-                         AND COALESCE(academic_year, '') = COALESCE(?, '')
+                         AND LOWER(TRIM(COALESCE(term, ''))) = LOWER(TRIM(?))
+                         AND LOWER(TRIM(COALESCE(academic_year, ''))) = LOWER(TRIM(?))
                        ORDER BY firstname ASC, student_id ASC""",
                     (school_id, class_key, term, year_filter or ''),
                 )
@@ -24883,6 +24883,22 @@ def get_published_students_for_class(school_id, classname, term, academic_year='
             rows = _fetch_rows(fallback_year)
         if not rows and publication_row:
             rows = _fetch_rows(None)
+    if not rows:
+        fallback_students = load_published_students_for_list(school_id, class_filter=classname, term_filter=term)
+        rows = [
+            (
+                student_id,
+                student_data.get('firstname', ''),
+                student_data.get('classname', ''),
+                student_data.get('term', ''),
+                student_data.get('academic_year', ''),
+                student_data.get('average_marks', 0),
+                student_data.get('grade', ''),
+                student_data.get('status', ''),
+                student_data.get('published_at', ''),
+            )
+            for student_id, student_data in fallback_students.items()
+        ]
     out = []
     for row in rows or []:
         out.append({
