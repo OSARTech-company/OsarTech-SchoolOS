@@ -24259,8 +24259,9 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                 c,
                 """SELECT 1 FROM result_publications
                    WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')
+                     AND COALESCE(arm, '') = COALESCE(?, '')
                    LIMIT 1""",
-                (school_id, classname, term, publish_year),
+                (school_id, classname, term, publish_year, arm or ''),
             )
             return c.fetchone() is not None
 
@@ -55469,23 +55470,220 @@ def school_admin_correct_result():
                     academic_year=target_year or '',
                     old_scores=previous_scores_for_audit,
                     new_scores=scores,
+        position=position,
+        subject_positions=subject_positions,
+        published_terms=published_terms,
+        current_term_token=current_term_token,
+        available_result_classes=[],
+        selected_result_class='',
+        term_notice=term_notice,
+        term_view_endpoint='school_admin_student_result',
+        prev_term=prev_term,
+        next_term=next_term,
+        behaviour_grade_scale=get_behaviour_grade_scale(school),
+        teacher_signature=teacher_signature,
+        teacher_name=teacher_name,
+        principal_signature=principal_signature,
+        principal_name=principal_name,
+        result_max_tests=result_max_tests,
+        exam_config=exam_config,
+        verification_url=verify_ctx.get('verification_url', ''),
+        verification_qr_url=verify_ctx.get('verification_qr_url', ''),
+        now=datetime.now()
+    )
+
+@app.route('/school-admin/correct-result', methods=['GET', 'POST'])
+@require_roles('school_admin')
+def school_admin_correct_result():
+    """Allow school admin to correct a published student result and republish."""
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+
+    school_id = session.get('school_id')
+    sid = (request.values.get('student_id', '') or '').strip()
+    requested_term = (request.values.get('term', '') or '').strip()
+    if not school_id or not sid:
+        flash('Student ID is required.', 'error')
+        return redirect(url_for('school_admin_dashboard'))
+
+    student = load_student(school_id, sid)
+    if not student:
+        flash('Student not found in your school.', 'error')
+        return redirect(url_for('school_admin_dashboard'))
+
+    school = get_school(school_id) or {}
+    current_term = get_current_term(school)
+    current_year = (school or {}).get('academic_year', '')
+    published_terms = get_published_terms_for_student(school_id, sid)
+    if not published_terms:
+        flash('No published result available for correction.', 'error')
+        return redirect(url_for('school_admin_dashboard'))
+    target_entry = resolve_requested_published_term(
+        published_terms,
+        requested_term,
+        current_term=current_term,
+        current_year=current_year,
+    ) if requested_term else pick_default_published_term(published_terms, current_term, current_year)
+    if not target_entry:
+        flash('Selected published term was not found.', 'error')
+        return redirect(url_for('school_admin_student_result', student_id=sid))
+
+    target_term = target_entry.get('term', '')
+    target_year = target_entry.get('academic_year', '')
+    target_token = target_entry.get('token', _term_token(target_year, target_term))
+    snapshot = load_published_student_result(school_id, sid, target_term, target_year)
+    if not snapshot:
+        flash('Published snapshot not found for correction.', 'error')
+        return redirect(url_for('school_admin_student_result', student_id=sid, term=target_token))
+    correction_version = build_result_correction_version_token(snapshot)
+    exam_config = get_assessment_config_for_class(school_id, snapshot.get('classname', ''))
+
+    if request.method == 'POST':
+        submitted_correction_version = (request.form.get('correction_version', '') or '').strip()
+        if submitted_correction_version and submitted_correction_version != correction_version:
+            flash(
+                'This result changed before your submission was saved. Reload and apply the correction again.',
+                'error',
+            )
+            return redirect(url_for('school_admin_correct_result', student_id=sid, term=target_token))
+        classname_for_lock = snapshot.get('classname', student.get('classname', ''))
+        term_lock = get_term_edit_lock_status(school_id, classname_for_lock, target_term, target_year)
+        if term_lock.get('locked'):
+            flash('Published term is locked for edits. Unlock it temporarily from Publish Results page.', 'error')
+            return redirect(url_for('school_admin_correct_result', student_id=sid, term=target_token))
+        correction_reason = (request.form.get('correction_reason', '') or '').strip()
+        if not correction_reason:
+            flash('Reason is required before changing a published result.', 'error')
+            return redirect(url_for('school_admin_correct_result', student_id=sid, term=target_token))
+        correction_reason = re.sub(r'\s+', ' ', correction_reason).strip()[:500]
+        previous_scores_for_audit = json.loads(
+            json.dumps(snapshot.get('scores', {}) if isinstance(snapshot.get('scores', {}), dict) else {})
+        )
+        scores = json.loads(json.dumps(snapshot.get('scores', {}) if isinstance(snapshot.get('scores', {}), dict) else {}))
+        allowed_subjects = normalize_subjects_list(snapshot.get('subjects', []) or [])
+        posted_subjects = normalize_subjects_list(request.form.getlist('subject_name'))
+        invalid_subjects = [s for s in posted_subjects if s not in allowed_subjects]
+        if invalid_subjects:
+            flash('Invalid subject payload detected. Reload and try again.', 'error')
+            return redirect(url_for('school_admin_correct_result', student_id=sid, term=target_token))
+        subjects = list(allowed_subjects)
+        grade_cfg = get_grade_config(school_id)
+        for idx, subject in enumerate(subjects):
+            block = scores.get(subject, {}) if isinstance(scores.get(subject, {}), dict) else {}
+            total_text = (request.form.get(f'subject_total_{idx}', '') or '').strip()
+            if not total_text:
+                continue
+            try:
+                total_value = float(total_text)
+            except Exception:
+                flash(f'Invalid total score for {subject}.', 'error')
+                return redirect(url_for('school_admin_correct_result', student_id=sid, term=target_token))
+            if not math.isfinite(total_value) or total_value < 0 or total_value > 100:
+                flash(f'{subject} total score must be between 0 and 100.', 'error')
+                return redirect(url_for('school_admin_correct_result', student_id=sid, term=target_token))
+            total_value = round(total_value, 2)
+            total_test = _coerce_number(block.get('total_test', 0), 0.0)
+            if total_test > total_value:
+                total_test = total_value
+                block['total_test'] = total_test
+            exam_mode = ((block.get('exam_mode') or exam_config.get('exam_mode') or 'separate')).strip().lower()
+            exam_total_max = max(0.0, safe_float(exam_config.get('exam_score_max', 70), 70))
+            computed_total_exam = round(max(0.0, total_value - total_test), 2)
+            if computed_total_exam > exam_total_max:
+                flash(
+                    f'{subject} exam component cannot exceed {exam_total_max:g} for current exam configuration.',
+                    'error',
+                )
+                return redirect(url_for('school_admin_correct_result', student_id=sid, term=target_token))
+            block['total_exam'] = computed_total_exam
+            if exam_mode == 'combined':
+                block['objective'] = 0
+                block['theory'] = 0
+                block['exam_score'] = block['total_exam']
+                block['exam_mode'] = 'combined'
+            else:
+                objective_max = max(0.0, safe_float(exam_config.get('objective_max', 30), 30))
+                theory_max = max(0.0, safe_float(exam_config.get('theory_max', 40), 40))
+                objective = min(block['total_exam'], objective_max)
+                theory = round(block['total_exam'] - objective, 2)
+                if theory > theory_max:
+                    theory = theory_max
+                    objective = round(block['total_exam'] - theory, 2)
+                if objective < 0 or objective > objective_max or theory < 0 or theory > theory_max:
+                    flash(
+                        f'{subject} exam split does not fit configured objective/theory limits.',
+                        'error',
+                    )
+                    return redirect(url_for('school_admin_correct_result', student_id=sid, term=target_token))
+                block['objective'] = round(objective, 2)
+                block['theory'] = round(theory, 2)
+                block.pop('exam_score', None)
+                block['exam_mode'] = 'separate'
+            block['overall_mark'] = total_value
+            block['total_score'] = total_value
+            block['grade'] = grade_from_score(total_value, grade_cfg)
+            scores[subject] = block
+
+        teacher_comment = (request.form.get('teacher_comment', '') or '').strip()[:1500]
+        principal_comment = (request.form.get('principal_comment', '') or '').strip()[:1500]
+        average_marks = compute_average_marks_from_scores(scores, subjects=subjects)
+        grade = grade_from_score(average_marks, grade_cfg)
+        status = status_from_score(average_marks, grade_cfg)
+        classname = snapshot.get('classname', student.get('classname', ''))
+
+        try:
+            with db_connection(commit=True) as conn:
+                c = conn.cursor()
+                db_execute(
+                    c,
+                    """UPDATE published_student_results
+                       SET scores = ?, teacher_comment = ?, principal_comment = ?,
+                           average_marks = ?, grade = ?, status = ?, published_at = CURRENT_TIMESTAMP
+                       WHERE school_id = ? AND student_id = ? AND term = ?
+                         AND COALESCE(academic_year, '') = COALESCE(?, '')
+                         AND LOWER(classname) = LOWER(?)""",
+                    (
+                        json.dumps(scores),
+                        teacher_comment,
+                        principal_comment,
+                        float(average_marks),
+                        grade,
+                        status,
+                        school_id,
+                        sid,
+                        target_term,
+                        target_year or '',
+                        classname,
+                    ),
+                )
+                audit_student_score_changes_with_cursor(
+                    c=c,
+                    school_id=school_id,
+                    student_id=sid,
+                    classname=classname,
+                    term=target_term,
+                    academic_year=target_year or '',
+                    old_scores=previous_scores_for_audit,
+                    new_scores=scores,
                     changed_by=(session.get('user_id') or ''),
                     changed_by_role='school_admin',
                     change_source=f'school_admin_correction: {correction_reason[:180]}',
                     change_reason=correction_reason,
                     subjects_scope=subjects,
                 )
-            pub_row = get_result_publication_row(school_id, classname, target_term, target_year or '') or {}
-            set_result_published(
-                school_id,
-                classname,
-                target_term,
-                target_year or '',
-                pub_row.get('teacher_id', '') or '',
-                True,
-                teacher_name=pub_row.get('teacher_name', '') or '',
-                principal_name=(school.get('principal_name', '') or '').strip(),
-            )
+                resolved_arm = _derive_arm_from_classname(snapshot.get('classname', student.get('classname', '')))
+                pub_row = get_result_publication_row(school_id, classname, target_term, target_year or '', arm=resolved_arm) or {}
+                set_result_published(
+                    school_id,
+                    classname,
+                    target_term,
+                    target_year or '',
+                    pub_row.get('teacher_id', '') or '',
+                    True,
+                    teacher_name=pub_row.get('teacher_name', '') or '',
+                    principal_name=(school.get('principal_name', '') or '').strip(),
+                    arm=resolved_arm,
+                )
             flash('Result corrected and republished successfully.', 'success')
         except Exception as exc:
             flash(f'Failed to correct/republish result: {exc}', 'error')
@@ -55589,13 +55787,34 @@ def school_admin_unpublish_results():
                 principal_name=pub_row.get('principal_name', '') or '',
                 arm=resolved_arm,
             )
-            db_execute(
-                c,
-                """DELETE FROM published_student_results
-                   WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
-                     AND COALESCE(academic_year, '') = COALESCE(?, '')""",
-                (school_id, classname, target_term, target_year or ''),
-            )
+            if resolved_arm:
+                arm_upper = resolved_arm.strip().upper()
+                class_students = load_students(school_id, class_filter=classname, term_filter=target_term)
+                target_sids = [
+                    s_id for s_id, s_data in class_students.items() 
+                    if (s_data.get('classname') or '').strip().upper().endswith(arm_upper) 
+                    or (s_data.get('arm') or '').strip().upper() == arm_upper
+                ]
+                if target_sids:
+                    for i in range(0, len(target_sids), 500):
+                        chunk = target_sids[i:i+500]
+                        placeholders = ','.join(['?'] * len(chunk))
+                        db_execute(
+                            c,
+                            f"""DELETE FROM published_student_results
+                               WHERE school_id = ? AND term = ?
+                                 AND COALESCE(academic_year, '') = COALESCE(?, '')
+                                 AND student_id IN ({placeholders})""",
+                            [school_id, target_term, target_year or ''] + chunk,
+                        )
+            else:
+                db_execute(
+                    c,
+                    """DELETE FROM published_student_results
+                       WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
+                         AND COALESCE(academic_year, '') = COALESCE(?, '')""",
+                    (school_id, classname, target_term, target_year or ''),
+                )
             try:
                 db_execute(
                     c,
