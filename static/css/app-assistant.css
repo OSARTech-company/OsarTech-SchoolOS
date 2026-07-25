@@ -19,6 +19,11 @@ body.has-global-footer > .main-content {
     flex: 1 0 auto;
 }
 
+body.has-global-footer > .app-shell,
+body.has-global-footer > .main-content {
+    padding-bottom: 72px;
+}
+
 .app-ai-panel[hidden] {
     display: none !important;
 }

@@ -17,6 +17,14 @@
         display: flex;
         flex-direction: column;
       }
+      .app-shell.topbar-layout {
+        display: flex;
+        min-height: 100vh;
+        width: 100%;
+      }
+      .app-shell.topbar-layout .side-taskbar {
+        flex: 0 0 auto;
+      }
       .container {
         max-width: 1400px;
         margin: 0 auto;
@@ -541,6 +549,9 @@
         .app-shell.topbar-layout {
           flex-direction: column;
         }
+        .app-shell.topbar-layout .side-taskbar {
+          width: 100%;
+        }
         .main-content {
           width: 100%;
         }
@@ -576,6 +587,13 @@
     <div class="app-shell topbar-layout">
         {% set active_page = 'view_students' %}
         {% if session.get('role') == 'teacher' %}
+            {% set teacher_sidebar_profile_image = teacher_sidebar_profile_image if teacher_sidebar_profile_image is defined else (session.get('profile_image') or session.get('photo_url') or '') %}
+            {% set teacher_sidebar_display_name = teacher_sidebar_display_name if teacher_sidebar_display_name is defined else (session.get('full_name') or session.get('name') or session.get('username') or 'Teacher') %}
+            {% set teacher_unread_notifications = teacher_unread_notifications if teacher_unread_notifications is defined else 0 %}
+            {% set teacher_score_nav_tree = teacher_score_nav_tree if teacher_score_nav_tree is defined else [] %}
+            {% set teacher_selected_score_subject = teacher_selected_score_subject if teacher_selected_score_subject is defined else '' %}
+            {% set teacher_selected_score_class = teacher_selected_score_class if teacher_selected_score_class is defined else selected_class %}
+            {% set teacher_has_class_assignment_nav = teacher_has_class_assignment_nav if teacher_has_class_assignment_nav is defined else true %}
             {% include 'teacher/_teacher_sidebar.html' %}
         {% else %}
             {% include 'school/_school_admin_sidebar.html' %}
