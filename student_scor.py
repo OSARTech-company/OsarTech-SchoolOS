@@ -24591,7 +24591,7 @@ def get_published_overview_for_students(school_id, student_ids):
         student_ids=student_ids,
     )
 
-def load_published_student_result(school_id, student_id, term, academic_year='', classname=''):
+def load_published_student_result(school_id, student_id, term, academic_year='', classname='', allow_combination=True):
     with db_connection() as conn:
         c = conn.cursor()
         if academic_year and classname:
@@ -24709,10 +24709,10 @@ def load_published_student_result(school_id, student_id, term, academic_year='',
     snapshot['number_of_subject'] = len(snapshot['subjects'])
 
     # if third-term and the school wants combined results, merge earlier terms
-    if (term or '').strip().lower() == 'third term' and bool(school.get('combine_third_term_results')):
+    if allow_combination and (term or '').strip().lower() == 'third term' and bool(school.get('combine_third_term_results')):
         extras = []
         for t in ('First Term', 'Second Term'):
-            other = load_published_student_result(school_id, student_id, t, academic_year, classname)
+            other = load_published_student_result(school_id, student_id, t, academic_year, classname, allow_combination=False)
             if other:
                 extras.append(other)
         if extras:
@@ -54756,7 +54756,7 @@ def teacher_student_result():
     target_year = target_entry.get('academic_year', '')
     current_term_token = target_entry['token']
 
-    snapshot = load_published_student_result(school_id, sid, target_term, target_year)
+    snapshot = load_published_student_result(school_id, sid, target_term, target_year, classname=student.get('classname', ''), allow_combination=False)
     if not snapshot:
         flash('Published result snapshot not found.', 'error')
         return redirect(url_for('teacher_view_students'))
