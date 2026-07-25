@@ -24003,9 +24003,8 @@ def submit_result_approval_request(school_id, classname, term, academic_year, te
                 c,
                 """SELECT 1 FROM result_publications
                    WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')
-                     AND COALESCE(arm, '') = COALESCE(?, '')
                    LIMIT 1""",
-                (school_id, classname, term, academic_year or '', arm or ''),
+                (school_id, classname, term, academic_year or ''),
             )
             return c.fetchone() is not None
 
@@ -24050,7 +24049,7 @@ def submit_result_approval_request(school_id, classname, term, academic_year, te
                              reviewed_by = NULL,
                              review_note = NULL,
                              updated_at = CURRENT_TIMESTAMP
-                           WHERE school_id = ? AND classname = ? AND COALESCE(arm, '') = COALESCE(?, '') AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')"""
+                           WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')"""
             insert_sql = """INSERT INTO result_publications
                            (school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at,
                             approval_status, submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, updated_at)
@@ -24076,11 +24075,11 @@ def submit_result_approval_request(school_id, classname, term, academic_year, te
                              is_published = 0,
                              published_at = NULL,
                              updated_at = CURRENT_TIMESTAMP
-                           WHERE school_id = ? AND classname = ? AND COALESCE(arm, '') = COALESCE(?, '') AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')"""
+                           WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')"""
             insert_sql = """INSERT INTO result_publications
                            (school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at, updated_at)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, CURRENT_TIMESTAMP)"""
-            update_values = (teacher_id, resolved_teacher_name, resolved_principal_name, school_id, classname, arm or '', term, academic_year or '')
+            update_values = (teacher_id, resolved_teacher_name, resolved_principal_name, school_id, classname, term, academic_year or '')
             insert_values = (school_id, classname, arm or '', term, academic_year or '', teacher_id, resolved_teacher_name, resolved_principal_name)
             _upsert_publication_row(insert_sql, insert_values, update_sql, update_values)
 
