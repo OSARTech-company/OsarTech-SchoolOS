@@ -14,21 +14,15 @@
                     #f3f6fa;
         min-height: 100vh;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        display: block;
         margin: 0;
       }
       .app-shell.topbar-layout {
         display: flex;
         min-height: 100vh;
         width: 100%;
-        align-items: stretch;
-        overflow-x: hidden;
       }
       .app-shell.topbar-layout .side-taskbar {
         flex: 0 0 auto;
-        width: 280px;
-        min-width: 280px;
-        max-width: 280px;
       }
       .container {
         max-width: 1400px;
@@ -41,8 +35,9 @@
       .main-content {
         flex: 1;
         min-width: 0;
-        width: 0;
       }
+      body.rail-expanded .topbar-layout .side-link span { display: inline !important; }
+      body.rail-expanded .topbar-layout .side-brand span { display: inline !important; }
       
       /* Glassmorphism Header */
       .page-header-block {
