@@ -24017,24 +24017,6 @@ def submit_result_approval_request(school_id, classname, term, academic_year, te
             except Exception:
                 db_execute(c, update_sql, update_values)
 
-        update_params = (
-            teacher_id,
-            resolved_teacher_name,
-            resolved_principal_name,
-            0,
-            None,
-            'pending',
-            submitted_at,
-            teacher_id,
-            None,
-            None,
-            None,
-            school_id,
-            classname,
-            arm or '',
-            term,
-            academic_year or '',
-        )
         if has_approval_cols:
             update_sql = """UPDATE result_publications SET
                              teacher_id = ?,
@@ -24054,6 +24036,17 @@ def submit_result_approval_request(school_id, classname, term, academic_year, te
                            (school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at,
                             approval_status, submitted_at, submitted_by, reviewed_at, reviewed_by, review_note, updated_at)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 'pending', ?, ?, NULL, NULL, NULL, CURRENT_TIMESTAMP)"""
+            update_params = (
+                teacher_id,
+                resolved_teacher_name,
+                resolved_principal_name,
+                submitted_at,
+                teacher_id,
+                school_id,
+                classname,
+                term,
+                academic_year or '',
+            )
             insert_values = (
                 school_id,
                 classname,
