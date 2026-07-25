@@ -24952,6 +24952,13 @@ def get_published_students_for_class(school_id, classname, term, academic_year='
     rows = _fetch_rows(academic_year)
     if not rows and academic_year:
         rows = _fetch_rows(None)
+    if not rows:
+        publication_row = get_result_publication_row(school_id, classname, term, academic_year) or {}
+        fallback_year = (publication_row.get('academic_year', '') or academic_year or '').strip()
+        if fallback_year and fallback_year != academic_year:
+            rows = _fetch_rows(fallback_year)
+        if not rows and publication_row:
+            rows = _fetch_rows(None)
     out = []
     for row in rows or []:
         out.append({
@@ -48061,6 +48068,19 @@ def teacher_messages():
     )
     subject_set = {normalize_subject_name(row.get('subject', '')) for row in subject_rows if normalize_subject_name(row.get('subject', ''))}
     class_set = sorted(set(classes) | {str(row.get('classname') or '').strip() for row in subject_rows if (row.get('classname') or '').strip()})
+    teacher_subject_options = []
+    seen_subject_options = set()
+    for row in subject_rows:
+        classname = canonicalize_classname(row.get('classname', ''))
+        subject = normalize_subject_name(row.get('subject', ''))
+        if not classname or not subject:
+            continue
+        option_key = (classname.lower(), subject.lower())
+        if option_key in seen_subject_options:
+            continue
+        seen_subject_options.add(option_key)
+        teacher_subject_options.append({'classname': classname, 'subject': subject})
+    teacher_subject_options.sort(key=lambda item: (item['classname'].lower(), item['subject'].lower()))
     teacher_messages = get_teacher_messages_for_teacher(
         school_id=school_id,
         teacher_id=teacher_id,
@@ -48078,9 +48098,11 @@ def teacher_messages():
         school=school,
         current_term=current_term,
         current_year=current_year,
+        teacher_id=teacher_id,
         teacher_name=teacher_name,
         teacher_profile_image=teacher_profile_image,
         classes=class_set,
+        teacher_subject_options=teacher_subject_options,
         selected_class=(class_set[0] if class_set else ''),
         teacher_messages=teacher_messages,
         unread_teacher_messages=unread_teacher_messages,

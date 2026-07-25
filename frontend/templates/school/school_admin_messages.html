@@ -399,6 +399,28 @@
         color: #94a3b8;
         margin-left: 8px;
       }
+      .draft-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #64748b;
+        margin-top: 8px;
+      }
+      .draft-status.saved {
+        color: #166534;
+      }
+      .draft-status.saving {
+        color: #92400e;
+      }
+      .draft-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: currentColor;
+        display: inline-block;
+      }
       .is-hidden { display: none !important; }
     </style>
   </head>
@@ -598,6 +620,10 @@
                     <textarea id="msgBody" name="message" required placeholder="Type announcement message here..." maxlength="3000"></textarea>
                     <button type="submit" class="chat-send-btn" id="btnSendBroadcast" title="Send Broadcast"><i class="fas fa-paper-plane"></i></button>
                   </div>
+                  <p class="draft-status" id="composeDraftStatus" aria-live="polite">
+                    <span class="draft-dot"></span>
+                    Draft not saved yet
+                  </p>
                 </form>
               </div>
             </div>
@@ -651,13 +677,103 @@
         var msgBody = document.getElementById('msgBody');
         var charCounter = document.getElementById('charCounter');
         var sendSmsCheckbox = document.getElementById('sendSmsCheckbox');
+        var sendEmailCheckbox = chatComposeForm ? chatComposeForm.querySelector('input[name="send_email"]') : null;
+        var draftStatus = document.getElementById('composeDraftStatus');
+        var draftSaveTimer = null;
+        var draftStorageKey = [
+          'school-admin-message-draft',
+          '{{ session.get("school_id") or "" }}'
+        ].join('|');
 
         var activeTarget = null;
+
+        function canUseStorage() {
+          try {
+            return !!window.localStorage;
+          } catch (e) {
+            return false;
+          }
+        }
+
+        function setDraftStatus(state, message) {
+          if (!draftStatus) return;
+          draftStatus.classList.remove('saved', 'saving');
+          if (state === 'saved') draftStatus.classList.add('saved');
+          if (state === 'saving') draftStatus.classList.add('saving');
+          draftStatus.innerHTML = '<span class="draft-dot"></span>' + message;
+        }
+
+        function serializeDraft() {
+          return {
+            title: msgTitle ? msgTitle.value : '',
+            deadline_date: msgDeadline ? msgDeadline.value : '',
+            message: msgBody ? msgBody.value : '',
+            target_mode: formTargetMode ? formTargetMode.value : 'all',
+            target_classname: formTargetClassname ? formTargetClassname.value : '',
+            target_subject: formTargetSubject ? formTargetSubject.value : '',
+            target_stream: selectStream ? selectStream.value : '',
+            send_sms: sendSmsCheckbox ? !!sendSmsCheckbox.checked : false,
+            send_email: sendEmailCheckbox ? !!sendEmailCheckbox.checked : false,
+            active_target: activeTarget || null
+          };
+        }
+
+        function saveDraftNow() {
+          if (!canUseStorage()) return;
+          try {
+            localStorage.setItem(draftStorageKey, JSON.stringify({
+              savedAt: Date.now(),
+              values: serializeDraft()
+            }));
+            setDraftStatus('saved', 'Draft saved automatically');
+          } catch (e) {
+            setDraftStatus('saving', 'Draft could not be saved locally');
+          }
+        }
+
+        function scheduleDraftSave() {
+          setDraftStatus('saving', 'Saving draft...');
+          if (draftSaveTimer) clearTimeout(draftSaveTimer);
+          draftSaveTimer = setTimeout(saveDraftNow, 400);
+        }
+
+        function restoreDraft() {
+          if (!canUseStorage()) return;
+          try {
+            var raw = localStorage.getItem(draftStorageKey);
+            if (!raw) return;
+            var draft = JSON.parse(raw);
+            var values = draft && draft.values ? draft.values : {};
+            if (msgTitle && values.title) msgTitle.value = values.title;
+            if (msgDeadline && values.deadline_date) msgDeadline.value = values.deadline_date;
+            if (msgBody && values.message) {
+              msgBody.value = values.message;
+              if (charCounter) charCounter.textContent = msgBody.value.length + ' / 3000 chars';
+            }
+            if (formTargetMode && values.target_mode) formTargetMode.value = values.target_mode;
+            if (formTargetClassname && values.target_classname) formTargetClassname.value = values.target_classname;
+            if (formTargetSubject && values.target_subject) formTargetSubject.value = values.target_subject;
+            if (selectStream && values.target_stream) selectStream.value = values.target_stream;
+            if (sendSmsCheckbox) sendSmsCheckbox.checked = !!values.send_sms;
+            if (sendEmailCheckbox) sendEmailCheckbox.checked = !!values.send_email;
+            setDraftStatus('saved', 'Draft restored automatically');
+          } catch (e) {
+            setDraftStatus('saving', 'Draft not restored');
+          }
+        }
+
+        function clearDraft() {
+          if (!canUseStorage()) return;
+          try {
+            localStorage.removeItem(draftStorageKey);
+          } catch (e) {}
+        }
 
         // Character counting
         if (msgBody && charCounter) {
           msgBody.addEventListener('input', function () {
             charCounter.textContent = msgBody.value.length + ' / 3000 chars';
+            scheduleDraftSave();
           });
         }
 
@@ -666,6 +782,7 @@
           msgAttachment.addEventListener('change', function () {
             var file = msgAttachment.files[0];
             fileNameLabel.textContent = file ? file.name : 'No file attached';
+            scheduleDraftSave();
           });
         }
 
@@ -732,11 +849,28 @@
             formTargetClassname.value = classname;
             formTargetSubject.value = subject;
             selectStream.value = '';
+            scheduleDraftSave();
 
             // Render bubbles
             renderMessages();
           });
         });
+
+        if (msgTitle) msgTitle.addEventListener('input', scheduleDraftSave);
+        if (msgDeadline) msgDeadline.addEventListener('change', scheduleDraftSave);
+        if (selectStream) selectStream.addEventListener('change', scheduleDraftSave);
+        if (sendSmsCheckbox) sendSmsCheckbox.addEventListener('change', scheduleDraftSave);
+        if (sendEmailCheckbox) sendEmailCheckbox.addEventListener('change', scheduleDraftSave);
+        if (formTargetMode) formTargetMode.addEventListener('change', scheduleDraftSave);
+        if (formTargetClassname) formTargetClassname.addEventListener('change', scheduleDraftSave);
+        if (formTargetSubject) formTargetSubject.addEventListener('change', scheduleDraftSave);
+
+        restoreDraft();
+        if (chatComposeForm) {
+          chatComposeForm.addEventListener('submit', function () {
+            clearDraft();
+          });
+        }
 
         function renderMessages() {
           if (!activeTarget) return;

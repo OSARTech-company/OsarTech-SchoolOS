@@ -211,6 +211,57 @@
             flex-direction: column;
             height: 100%;
         }
+        .compose-panel {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+        }
+        .compose-grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        }
+        .compose-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .compose-field label {
+            font-size: 0.8rem;
+            font-weight: 750;
+            color: #334155;
+        }
+        .compose-field input,
+        .compose-field select,
+        .compose-field textarea {
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.92rem;
+            background: #fff;
+        }
+        .compose-field textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        .compose-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .draft-status {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #64748b;
+        }
+        .draft-status.saved { color: #059669; }
+        .draft-status.dirty { color: #b45309; }
         .chat-header {
             background: #ffffff;
             padding: 12px 20px;
@@ -332,6 +383,61 @@
                     {% endif %}
                 {% endwith %}
 
+                <div class="compose-panel">
+                    <h2 style="margin:0 0 8px; font-size:1.05rem; color:#0f172a;"><i class="fas fa-paper-plane"></i> Send Student Message</h2>
+                    <p class="note" style="margin:0 0 14px;">Send an assignment or note to a class and subject you teach. Drafts are saved automatically while you type.</p>
+                    <form method="post" action="{{ url_for('teacher_send_student_message') }}" enctype="multipart/form-data" id="teacherStudentMessageForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="compose-grid">
+                            <div class="compose-field">
+                                <label for="message_kind">Message Type</label>
+                                <select name="message_kind" id="message_kind">
+                                    <option value="assignment">Assignment</option>
+                                    <option value="note">Note</option>
+                                </select>
+                            </div>
+                            <div class="compose-field">
+                                <label for="target_classname">Class</label>
+                                <select name="target_classname" id="target_classname" required>
+                                    <option value="">Select class</option>
+                                    {% for cls in classes %}
+                                        <option value="{{ cls }}">{{ cls }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="compose-field">
+                                <label for="target_subject">Subject</label>
+                                <select name="target_subject" id="target_subject" required>
+                                    <option value="">Select subject</option>
+                                    {% for item in teacher_subject_options %}
+                                        <option value="{{ item.subject }}" data-classname="{{ item.classname }}">{{ item.subject }} ({{ item.classname }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="compose-field">
+                                <label for="deadline_date">Deadline</label>
+                                <input type="date" name="deadline_date" id="deadline_date">
+                            </div>
+                            <div class="compose-field" style="grid-column: 1 / -1;">
+                                <label for="title">Title</label>
+                                <input type="text" name="title" id="title" maxlength="180" placeholder="Optional custom title">
+                            </div>
+                            <div class="compose-field" style="grid-column: 1 / -1;">
+                                <label for="message">Message</label>
+                                <textarea name="message" id="message" maxlength="5000" placeholder="Write the assignment or note here..." required></textarea>
+                            </div>
+                            <div class="compose-field" style="grid-column: 1 / -1;">
+                                <label for="attachment_file">Attachment</label>
+                                <input type="file" name="attachment_file" id="attachment_file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip">
+                            </div>
+                        </div>
+                        <div class="compose-actions">
+                            <span class="draft-status" id="teacherMessageDraftStatus">Draft not saved yet.</span>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send Message</button>
+                        </div>
+                    </form>
+                </div>
+
                 <div class="chat-container">
                     <!-- Sidebar channels -->
                     <div class="chat-sidebar" id="chatSidebar">
@@ -436,8 +542,110 @@
             var chatSidebar = document.getElementById('chatSidebar');
             var chatWindow = document.getElementById('chatWindow');
             var activeChatBackBtn = document.getElementById('activeChatBackBtn');
+            var messageForm = document.getElementById('teacherStudentMessageForm');
+            var draftStatus = document.getElementById('teacherMessageDraftStatus');
+            var draftKeyParts = [
+                'teacher_student_message_draft',
+                {{ teacher_id|tojson if teacher_id else "''" }},
+                {{ school.id|tojson if school and school.id else "''" }},
+                {{ current_term|tojson }},
+                {{ current_year|tojson }}
+            ];
+            var draftStorageKey = draftKeyParts.join(':');
+            var draftSaveTimer = null;
+            var draftDirty = false;
 
             var activeFilter = 'all';
+
+            function setDraftStatus(text, mode) {
+                if (!draftStatus) return;
+                draftStatus.textContent = text;
+                draftStatus.className = 'draft-status' + (mode ? ' ' + mode : '');
+            }
+
+            function getFormDraft() {
+                if (!messageForm) return null;
+                var fileInput = document.getElementById('attachment_file');
+                return {
+                    message_kind: document.getElementById('message_kind').value,
+                    target_classname: document.getElementById('target_classname').value,
+                    target_subject: document.getElementById('target_subject').value,
+                    deadline_date: document.getElementById('deadline_date').value,
+                    title: document.getElementById('title').value,
+                    message: document.getElementById('message').value,
+                    attachment_name: fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0].name : ''
+                };
+            }
+
+            function saveDraft() {
+                if (!window.localStorage || !messageForm) return;
+                try {
+                    localStorage.setItem(draftStorageKey, JSON.stringify(getFormDraft()));
+                    draftDirty = false;
+                    setDraftStatus('Draft saved locally.', 'saved');
+                } catch (e) {
+                    console.warn('Unable to save teacher message draft', e);
+                }
+            }
+
+            function scheduleDraftSave() {
+                if (!messageForm) return;
+                draftDirty = true;
+                setDraftStatus('Saving draft...', 'dirty');
+                if (draftSaveTimer) {
+                    clearTimeout(draftSaveTimer);
+                }
+                draftSaveTimer = setTimeout(saveDraft, 250);
+            }
+
+            function restoreDraft() {
+                if (!window.localStorage || !messageForm) return;
+                try {
+                    var raw = localStorage.getItem(draftStorageKey);
+                    if (!raw) return;
+                    var draft = JSON.parse(raw);
+                    if (!draft) return;
+                    if (draft.message_kind) document.getElementById('message_kind').value = draft.message_kind;
+                    if (draft.target_classname) document.getElementById('target_classname').value = draft.target_classname;
+                    if (draft.target_subject) document.getElementById('target_subject').value = draft.target_subject;
+                    if (draft.deadline_date) document.getElementById('deadline_date').value = draft.deadline_date;
+                    if (draft.title) document.getElementById('title').value = draft.title;
+                    if (draft.message) document.getElementById('message').value = draft.message;
+                    setDraftStatus('Draft restored.', 'saved');
+                } catch (e) {
+                    console.warn('Unable to restore teacher message draft', e);
+                }
+            }
+
+            function clearDraft() {
+                if (!window.localStorage) return;
+                try {
+                    localStorage.removeItem(draftStorageKey);
+                } catch (e) {}
+            }
+
+            function filterSubjectOptions() {
+                var classSelect = document.getElementById('target_classname');
+                var subjectSelect = document.getElementById('target_subject');
+                if (!classSelect || !subjectSelect) return;
+                var selectedClass = classSelect.value;
+                var firstVisibleValue = '';
+                Array.prototype.forEach.call(subjectSelect.options, function (option, index) {
+                    if (index === 0) return;
+                    var optionClass = option.getAttribute('data-classname') || '';
+                    var visible = !selectedClass || optionClass === selectedClass;
+                    option.hidden = !visible;
+                    if (visible && !firstVisibleValue) {
+                        firstVisibleValue = option.value;
+                    }
+                });
+                if (subjectSelect.value && subjectSelect.selectedOptions && subjectSelect.selectedOptions[0] && subjectSelect.selectedOptions[0].hidden) {
+                    subjectSelect.value = '';
+                }
+                if (!subjectSelect.value && firstVisibleValue) {
+                    subjectSelect.value = firstVisibleValue;
+                }
+            }
 
             // Mobile back button
             if (activeChatBackBtn) {
@@ -451,6 +659,40 @@
             if (noticeSearchInput) {
                 noticeSearchInput.addEventListener('input', function () {
                     renderHistory();
+                });
+            }
+
+            if (messageForm) {
+                restoreDraft();
+                filterSubjectOptions();
+                ['message_kind', 'target_classname', 'target_subject', 'deadline_date', 'title', 'message'].forEach(function (fieldId) {
+                    var el = document.getElementById(fieldId);
+                    if (!el) return;
+                    el.addEventListener('input', scheduleDraftSave);
+                    el.addEventListener('change', scheduleDraftSave);
+                });
+                var classSelect = document.getElementById('target_classname');
+                if (classSelect) {
+                    classSelect.addEventListener('change', function () {
+                        filterSubjectOptions();
+                        scheduleDraftSave();
+                    });
+                }
+                var subjectSelect = document.getElementById('target_subject');
+                if (subjectSelect) {
+                    subjectSelect.addEventListener('change', scheduleDraftSave);
+                }
+                var attachmentFile = document.getElementById('attachment_file');
+                if (attachmentFile) {
+                    attachmentFile.addEventListener('change', scheduleDraftSave);
+                }
+                messageForm.addEventListener('submit', function (event) {
+                    if (!document.getElementById('target_classname').value || !document.getElementById('target_subject').value || !document.getElementById('message').value.trim()) {
+                        event.preventDefault();
+                        setDraftStatus('Please complete class, subject, and message before sending.', 'dirty');
+                        return false;
+                    }
+                    clearDraft();
                 });
             }
 
