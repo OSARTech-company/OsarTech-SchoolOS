@@ -1,4 +1,37 @@
 <div class="side-taskbar school-admin-sidebar teacher-sidebar">
+    <style>
+      .app-shell.topbar-layout .side-taskbar.teacher-sidebar {
+        width: 280px;
+        min-width: 280px;
+        max-width: 280px;
+        background: linear-gradient(180deg, #121b3f 0%, #0f1737 100%) !important;
+        border-right: 1px solid #233056 !important;
+        box-shadow: 2px 0 16px rgba(4, 10, 26, 0.4) !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.teacher-sidebar .side-brand {
+        background: #162148 !important;
+        border-bottom: 1px solid #2a365f !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.teacher-sidebar .teacher-brand-org,
+      .app-shell.topbar-layout .side-taskbar.teacher-sidebar .teacher-brand-name,
+      .app-shell.topbar-layout .side-taskbar.teacher-sidebar .side-group-toggle,
+      .app-shell.topbar-layout .side-taskbar.teacher-sidebar .side-link span,
+      .app-shell.topbar-layout .side-taskbar.teacher-sidebar .side-link i {
+        color: #eef2ff !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.teacher-sidebar .side-link {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: rgba(148, 163, 184, 0.28) !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.teacher-sidebar .side-link:hover {
+        background: rgba(255, 255, 255, 0.14) !important;
+        border-color: rgba(148, 163, 184, 0.45) !important;
+      }
+      .app-shell.topbar-layout .side-taskbar.teacher-sidebar .side-link.active {
+        background: rgba(99, 102, 241, 0.34) !important;
+        border-color: rgba(129, 140, 248, 0.62) !important;
+      }
+    </style>
     <div class="side-brand teacher-brand">
         {% if teacher_sidebar_profile_image %}
         <img src="{{ teacher_sidebar_profile_image }}" alt="Profile Picture" class="teacher-brand-photo">

@@ -10,6 +10,26 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-enhanced.css', v='20260411b') }}" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
     <style>
+      .app-shell.topbar-layout {
+        display: flex;
+        min-height: 100vh;
+        width: 100%;
+      }
+      .app-shell.topbar-layout .side-taskbar {
+        flex: 0 0 auto;
+      }
+      .main-content {
+        flex: 1;
+        min-width: 0;
+      }
+      @media (max-width: 900px) {
+        .app-shell.topbar-layout {
+          flex-direction: column;
+        }
+        .app-shell.topbar-layout .side-taskbar {
+          width: 100%;
+        }
+      }
       body {
         background: radial-gradient(circle at 10% 10%, rgba(31, 122, 140, 0.04), transparent 32%),
                     radial-gradient(circle at 90% 2%, rgba(15, 76, 129, 0.04), transparent 30%),
