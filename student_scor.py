@@ -24575,8 +24575,9 @@ def get_published_terms_for_student(school_id, student_id, classname=''):
         academic_year = row[0] or ''
         term = row[1] or ''
         row_classname = row[2] or ''
+        row_arm = _derive_arm_from_classname(row_classname)
         token = _term_token(academic_year, term)
-        seen_key = (token, (row_classname or '').strip().lower())
+        seen_key = (token, (row_classname or '').strip().lower(), (row_arm or '').strip().lower())
         if seen_key in seen:
             continue
         seen.add(seen_key)
@@ -24585,6 +24586,7 @@ def get_published_terms_for_student(school_id, student_id, classname=''):
             'academic_year': academic_year,
             'term': term,
             'classname': row_classname,
+            'arm': row_arm,
             'token': token,
             'label': label,
         })
@@ -55470,27 +55472,31 @@ def school_admin_correct_result():
                     academic_year=target_year or '',
                     old_scores=previous_scores_for_audit,
                     new_scores=scores,
-        position=position,
-        subject_positions=subject_positions,
-        published_terms=published_terms,
-        current_term_token=current_term_token,
-        available_result_classes=[],
-        selected_result_class='',
-        term_notice=term_notice,
-        term_view_endpoint='school_admin_student_result',
-        prev_term=prev_term,
-        next_term=next_term,
-        behaviour_grade_scale=get_behaviour_grade_scale(school),
-        teacher_signature=teacher_signature,
-        teacher_name=teacher_name,
-        principal_signature=principal_signature,
-        principal_name=principal_name,
-        result_max_tests=result_max_tests,
-        exam_config=exam_config,
-        verification_url=verify_ctx.get('verification_url', ''),
-        verification_qr_url=verify_ctx.get('verification_qr_url', ''),
-        now=datetime.now()
-    )
+                    changed_by=(session.get('user_id') or ''),
+                    changed_by_role='school_admin',
+                    change_source=f'school_admin_correction: {correction_reason[:180]}',
+                    change_reason=correction_reason,
+                    subjects_scope=subjects,
+                )
+            resolved_arm = _derive_arm_from_classname(snapshot.get('classname', student.get('classname', '')))
+            pub_row = get_result_publication_row(school_id, classname, target_term, target_year or '', arm=resolved_arm) or {}
+            set_result_published(
+                school_id,
+                classname,
+                target_term,
+                target_year or '',
+                pub_row.get('teacher_id', '') or '',
+                True,
+                teacher_name=pub_row.get('teacher_name', '') or '',
+                principal_name=(school.get('principal_name', '') or '').strip(),
+                arm=resolved_arm,
+            )
+            flash('Result corrected and republished successfully.', 'success')
+        except Exception as exc:
+            flash(f'Failed to correct/republish result: {exc}', 'error')
+            return redirect(url_for('school_admin_correct_result', student_id=sid, term=target_token))
+
+        return redirect(url_for('school_admin_student_result', student_id=sid, term=target_token))
 
 @app.route('/school-admin/correct-result', methods=['GET', 'POST'])
 @require_roles('school_admin')
@@ -55671,19 +55677,19 @@ def school_admin_correct_result():
                     change_reason=correction_reason,
                     subjects_scope=subjects,
                 )
-                resolved_arm = _derive_arm_from_classname(snapshot.get('classname', student.get('classname', '')))
-                pub_row = get_result_publication_row(school_id, classname, target_term, target_year or '', arm=resolved_arm) or {}
-                set_result_published(
-                    school_id,
-                    classname,
-                    target_term,
-                    target_year or '',
-                    pub_row.get('teacher_id', '') or '',
-                    True,
-                    teacher_name=pub_row.get('teacher_name', '') or '',
-                    principal_name=(school.get('principal_name', '') or '').strip(),
-                    arm=resolved_arm,
-                )
+            resolved_arm = _derive_arm_from_classname(snapshot.get('classname', student.get('classname', '')))
+            pub_row = get_result_publication_row(school_id, classname, target_term, target_year or '', arm=resolved_arm) or {}
+            set_result_published(
+                school_id,
+                classname,
+                target_term,
+                target_year or '',
+                pub_row.get('teacher_id', '') or '',
+                True,
+                teacher_name=pub_row.get('teacher_name', '') or '',
+                principal_name=(school.get('principal_name', '') or '').strip(),
+                arm=resolved_arm,
+            )
             flash('Result corrected and republished successfully.', 'success')
         except Exception as exc:
             flash(f'Failed to correct/republish result: {exc}', 'error')
