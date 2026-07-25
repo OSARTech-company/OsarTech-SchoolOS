@@ -55508,6 +55508,29 @@ def school_admin_correct_result():
 
         return redirect(url_for('school_admin_student_result', student_id=sid, term=target_token))
 
+    subject_rows = []
+    for subject in (snapshot.get('subjects', []) or []):
+        block = (snapshot.get('scores', {}) or {}).get(subject, {})
+        subject_rows.append({
+            'subject': subject,
+            'total': round(subject_overall_mark(block), 2) if isinstance(block, dict) else 0.0,
+            'grade': (block.get('grade', '') if isinstance(block, dict) else ''),
+        })
+    return render_template(
+        'school/school_admin_correct_result.html',
+        school=school,
+        student_id=sid,
+        student_name=snapshot.get('firstname', student.get('firstname', '')),
+        classname=snapshot.get('classname', student.get('classname', '')),
+        term=target_term,
+        academic_year=target_year,
+        term_token=target_token,
+        correction_version=correction_version,
+        subject_rows=subject_rows,
+        teacher_comment=snapshot.get('teacher_comment', ''),
+        principal_comment=snapshot.get('principal_comment', ''),
+    )
+
 @app.route('/school-admin/unpublish-results', methods=['POST'])
 @require_roles('school_admin')
 @require_rate_limit('school_admin_unpublish_results', RATE_LIMIT_MUTATION_PER_MIN, 60, redirect_endpoint='view_students', methods=('POST',))
