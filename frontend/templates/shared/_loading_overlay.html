@@ -343,4 +343,6 @@
     });
 </script>
 
+{% if request.endpoint not in ['login', 'cbt_login', 'forgot_password'] %}
 {% include "shared/_premium_alerts.html" %}
+{% endif %}

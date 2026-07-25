@@ -25,6 +25,10 @@
         flex: 1 0 auto;
         box-sizing: border-box;
       }
+      .main-content {
+        flex: 1;
+        min-width: 0;
+      }
       
       /* Glassmorphism Header */
       .page-header-block {
@@ -534,6 +538,22 @@
       }
 
       @media (max-width: 768px) {
+        .app-shell.topbar-layout {
+          flex-direction: column;
+        }
+        .main-content {
+          width: 100%;
+        }
+        .container {
+          padding: 16px 10px;
+        }
+        .page-header-block {
+          padding: 18px 16px;
+          margin-bottom: 22px;
+        }
+        .page-header-block h1 {
+          font-size: 1.65rem;
+        }
         .search-filter-row {
           grid-template-columns: 1fr;
         }
@@ -542,16 +562,30 @@
           align-items: center;
           text-align: center;
         }
+        .stats-overview {
+          grid-template-columns: 1fr;
+        }
+        .controls-section {
+          padding: 18px 14px;
+        }
       }
     </style>
 </head>
 <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
     {% include "shared/_loading_overlay.html" %}
-    <div class="container fade-in">
-        <div class="page-header-block">
-            <h1><i class="fas fa-users"></i> View Students</h1>
-            <div class="page-subtitle">Browse student records, scores, and class performance.</div>
-        </div>
+    <div class="app-shell topbar-layout">
+        {% set active_page = 'view_students' %}
+        {% if session.get('role') == 'teacher' %}
+            {% include 'teacher/_teacher_sidebar.html' %}
+        {% else %}
+            {% include 'school/_school_admin_sidebar.html' %}
+        {% endif %}
+        <div class="main-content">
+            <div class="container fade-in">
+                <div class="page-header-block">
+                    <h1><i class="fas fa-users"></i> View Students</h1>
+                    <div class="page-subtitle">Browse student records, scores, and class performance.</div>
+                </div>
 
         {% if show_class_list %}
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; padding: 10px 0 30px;">
@@ -920,10 +954,12 @@
             {% endif %}
         {% endif %}
 
-        <div style="text-align: center; margin-top: 30px;">
-            <a href="{{ url_for('menu') }}" class="btn btn-secondary" style="text-decoration:none;">
-                <i class="fas fa-arrow-left"></i> Back to Menu
-            </a>
+                <div style="text-align: center; margin-top: 30px;">
+                    <a href="{{ url_for('menu') }}" class="btn btn-secondary" style="text-decoration:none;">
+                        <i class="fas fa-arrow-left"></i> Back to Menu
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 
