@@ -40,14 +40,14 @@
                 display: flex;
                 flex-direction: column;
                 gap: 12px;
-                z-index: 100001 !important;
+                z-index: 2147483000 !important;
                 width: min(400px, 90vw);
                 pointer-events: none;
             }
             .premium-toast {
                 pointer-events: auto;
                 position: relative;
-                z-index: 100002 !important;
+                z-index: 2147483001 !important;
                 background: var(--surface, #ffffff);
                 border: 1px solid var(--line, #e2e8f0);
                 border-radius: 12px;
@@ -132,19 +132,19 @@
         var descColor = isDark ? '#cbd5e1' : '#64748b';
         var borderColor = isDark ? '#334155' : '#e2e8f0';
 
-        var backdrop = document.createElement('div');
-        backdrop.style.cssText = [
-            'position:fixed',
-            'inset:0',
-            'background:rgba(15, 23, 42, 0.6)',
-            'backdrop-filter:blur(8px)',
-            'display:flex',
-            'align-items:center',
-            'justify-content:center',
-            'z-index:100002',
-            'animation:premiumFadeIn 0.3s ease forwards',
-            'padding:24px'
-        ].join(';');
+            var backdrop = document.createElement('div');
+            backdrop.style.cssText = [
+                'position:fixed',
+                'inset:0',
+                'background:rgba(15, 23, 42, 0.6)',
+                'backdrop-filter:blur(8px)',
+                'display:flex',
+                'align-items:center',
+                'justify-content:center',
+                'z-index:2147483002',
+                'animation:premiumFadeIn 0.3s ease forwards',
+                'padding:24px'
+            ].join(';');
 
         var card = document.createElement('div');
         card.style.cssText = [
@@ -155,11 +155,11 @@
             'padding:32px 24px',
             'border-radius:16px',
             'box-shadow:0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.05)',
-            'border:1px solid ' + borderColor,
-            'animation:premiumSlideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
-            'position:relative',
-            'box-sizing:border-box'
-        ].join(';');
+                'border:1px solid ' + borderColor,
+                'animation:premiumSlideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+                'position:relative',
+                'box-sizing:border-box'
+            ].join(';');
 
         var iconDiv = document.createElement('div');
         iconDiv.style.cssText = [
@@ -296,7 +296,7 @@
                 'display:flex',
                 'align-items:center',
                 'justify-content:center',
-                'z-index:100003',
+                'z-index:2147483003',
                 'padding:24px'
             ].join(';');
 
