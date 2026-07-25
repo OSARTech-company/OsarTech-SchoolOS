@@ -24343,7 +24343,7 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                              reviewed_by = ?,
                              review_note = ?,
                              updated_at = CURRENT_TIMESTAMP
-                           WHERE school_id = ? AND classname = ? AND COALESCE(arm, '') = COALESCE(?, '') AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')"""
+                           WHERE school_id = ? AND classname = ? AND term = ? AND COALESCE(academic_year, '') = COALESCE(?, '')"""
             insert_sql = """INSERT INTO result_publications
                            (school_id, classname, arm, term, academic_year, teacher_id, teacher_name, principal_name, is_published, published_at,
                             approval_status, reviewed_at, reviewed_by, review_note, updated_at)
@@ -24358,7 +24358,6 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                 (review_note or '').strip() or None,
                 school_id,
                 classname,
-                arm or '',
                 term,
                 publish_year,
             )
