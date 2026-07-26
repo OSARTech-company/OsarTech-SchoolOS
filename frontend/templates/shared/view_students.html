@@ -17,27 +17,18 @@
         margin: 0;
       }
       .app-shell.topbar-layout {
-        display: flex;
-        min-height: 100vh;
-        width: 100%;
-      }
-      .app-shell.topbar-layout .side-taskbar {
-        flex: 0 0 auto;
+        display: block;
       }
       .container {
         max-width: 1400px;
         margin: 0 auto;
         padding: 24px 16px;
         width: 100%;
-        flex: 1 0 auto;
         box-sizing: border-box;
       }
       .main-content {
-        flex: 1;
         min-width: 0;
       }
-      body.rail-expanded .topbar-layout .side-link span { display: inline !important; }
-      body.rail-expanded .topbar-layout .side-brand span { display: inline !important; }
       
       /* Glassmorphism Header */
       .page-header-block {
@@ -547,14 +538,6 @@
       }
 
       @media (max-width: 768px) {
-        .app-shell.topbar-layout {
-          flex-direction: column;
-        }
-        .app-shell.topbar-layout .side-taskbar {
-          width: 100%;
-          min-width: 0;
-          max-width: none;
-        }
         .main-content {
           width: 100%;
           min-width: 0;
@@ -588,28 +571,15 @@
 </head>
 <body style="--brand: {{ school.theme_primary_color if school and school.theme_primary_color else '#0F4C81' }}; --brand-2: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#1F7A8C' }}; --accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
     {% include "shared/_loading_overlay.html" %}
-    <div class="app-shell topbar-layout">
-        {% set active_page = 'view_students' %}
-        {% if session.get('role') == 'teacher' %}
-            {% set teacher_sidebar_profile_image = teacher_sidebar_profile_image if teacher_sidebar_profile_image is defined else (session.get('profile_image') or session.get('photo_url') or '') %}
-            {% set teacher_sidebar_display_name = teacher_sidebar_display_name if teacher_sidebar_display_name is defined else (session.get('full_name') or session.get('name') or session.get('username') or 'Teacher') %}
-            {% set teacher_unread_notifications = teacher_unread_notifications if teacher_unread_notifications is defined else 0 %}
-            {% set teacher_score_nav_tree = teacher_score_nav_tree if teacher_score_nav_tree is defined else [] %}
-            {% set teacher_selected_score_subject = teacher_selected_score_subject if teacher_selected_score_subject is defined else '' %}
-            {% set teacher_selected_score_class = teacher_selected_score_class if teacher_selected_score_class is defined else selected_class %}
-            {% set teacher_has_class_assignment_nav = teacher_has_class_assignment_nav if teacher_has_class_assignment_nav is defined else true %}
-            {% include 'teacher/_teacher_sidebar.html' %}
-        {% else %}
-            {% include 'school/_school_admin_sidebar.html' %}
-        {% endif %}
-        <div class="main-content">
-            <div class="container fade-in">
-                <div class="page-header-block">
-                    <h1><i class="fas fa-users"></i> View Students</h1>
-                    <div class="page-subtitle">Browse student records, scores, and class performance.</div>
-                </div>
+    {% set active_page = 'view_students' %}
+    <div class="main-content">
+        <div class="container fade-in">
+            <div class="page-header-block">
+                <h1><i class="fas fa-users"></i> View Students</h1>
+                <div class="page-subtitle">Browse student records, scores, and class performance.</div>
+            </div>
 
-        {% if show_class_list %}
+            {% if show_class_list %}
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; padding: 10px 0 30px;">
                 {% for class_name in available_classes %}
                 <a href="{{ url_for('school_admin_view_students', **{'class': class_name}) }}" style="text-decoration: none; color: inherit; display: block;">
@@ -627,7 +597,7 @@
                 </div>
                 {% endfor %}
             </div>
-        {% elif students %}
+            {% elif students %}
             <!-- Statistics Overview -->
             <div class="stats-overview">
                 <div class="stat-card">
@@ -974,7 +944,7 @@
                     </div>
                 </div>
             {% endif %}
-        {% endif %}
+            {% endif %}
 
                 <div style="text-align: center; margin-top: 30px;">
                     <a href="{{ url_for('menu') }}" class="btn btn-secondary" style="text-decoration:none;">
@@ -989,6 +959,8 @@
     {% include 'shared/_ai_assistant_widget.html' %}
     {% endif %}
 
+        </div>
+    </div>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const searchInput = document.getElementById('searchInput');
