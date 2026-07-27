@@ -7880,6 +7880,41 @@ try:
 except Exception as exc:
     logging.warning("Alembic head check failed: %s", exc)
 
+def ensure_result_backup_schema():
+    """Best-effort schema guard for result snapshot backup tables."""
+    try:
+        with db_connection(commit=True) as conn:
+            c = conn.cursor()
+            db_execute(c, """CREATE TABLE IF NOT EXISTS result_snapshot_backups (
+                                id SERIAL PRIMARY KEY,
+                                school_id TEXT NOT NULL,
+                                student_id TEXT NOT NULL,
+                                classname TEXT DEFAULT '',
+                                academic_year TEXT DEFAULT '',
+                                term TEXT DEFAULT '',
+                                snapshot_type TEXT DEFAULT 'published',
+                                snapshot_json TEXT DEFAULT '{}',
+                                created_by TEXT DEFAULT '',
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )""")
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_result_snapshot_backups_lookup ON result_snapshot_backups(school_id, student_id, classname, academic_year, term, created_at DESC)')
+            db_execute(c, """CREATE TABLE IF NOT EXISTS result_draft_snapshots (
+                                id SERIAL PRIMARY KEY,
+                                school_id TEXT NOT NULL,
+                                student_id TEXT NOT NULL,
+                                classname TEXT DEFAULT '',
+                                academic_year TEXT DEFAULT '',
+                                term TEXT DEFAULT '',
+                                snapshot_json TEXT DEFAULT '{}',
+                                created_by TEXT DEFAULT '',
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )""")
+            db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_result_draft_snapshots_lookup ON result_draft_snapshots(school_id, student_id, classname, academic_year, term, created_at DESC)')
+    except Exception as exc:
+        logging.warning("Failed to ensure result backup schema: %s", exc)
+
+ensure_result_backup_schema()
+
 
 def ensure_core_auth_schema():
     """Best-effort core auth schema guard for startup/bootstrap."""
