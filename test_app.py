@@ -1142,6 +1142,46 @@ def test_school_admin_dashboard_passes_assignments_to_publication_statuses(clien
     # monkeypatch render_template to capture kwargs
     
 
+def test_school_admin_publish_results_gracefully_handles_assignment_query_failure(client, app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"academic_year": "2025-2026", "principal_signature_image": ""})
+    monkeypatch.setattr(m, "get_current_term", lambda school: "First Term")
+    monkeypatch.setattr(m, "get_class_assignments", lambda school_id: (_ for _ in ()).throw(RuntimeError("missing table")))
+    monkeypatch.setattr(m, "get_school_publication_statuses", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "result_publication_has_approval_columns", lambda: False)
+    monkeypatch.setattr(m, "school_uses_dean_led_score_entry", lambda school: False)
+    monkeypatch.setattr(m, "get_school_student_messages", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "get_school_teacher_messages", lambda *args, **kwargs: [])
+    monkeypatch.setattr(m, "format_timestamp", lambda value: "")
+    monkeypatch.setattr(m, "render_template", lambda *args, **kwargs: "OK")
+    monkeypatch.setattr(m, "db_execute", lambda *args, **kwargs: None)
+
+    class FakeCursor:
+        def fetchall(self):
+            return []
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+    import contextlib
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+
+    with client.session_transaction() as sess:
+        sess["role"] = "school_admin"
+        sess["school_id"] = "SCH1"
+        sess["user_id"] = "A1"
+
+    resp = client.get("/school-admin/publish-results")
+    assert resp.status_code == 200
+    assert resp.get_data(as_text=True) == "OK"
+
+
 def test_assign_teacher_to_class_auto_assigns_primary_subjects(app_module, monkeypatch):
     m = app_module
     captured = {}

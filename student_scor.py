@@ -36897,7 +36897,11 @@ def school_admin_publish_results():
     if selected_term not in {'First Term', 'Second Term', 'Third Term'}:
         selected_term = current_term
     selected_year = (request.args.get('academic_year', '') or '').strip() or current_year
-    assignments = get_class_assignments(school_id)
+    try:
+        assignments = get_class_assignments(school_id)
+    except Exception as exc:
+        logging.warning("Failed to load class assignments for publish page school_id=%s: %s", school_id, exc)
+        assignments = []
     term_options = ['First Term', 'Second Term', 'Third Term']
     year_options_set = {
         (current_year or '').strip(),
@@ -36925,14 +36929,32 @@ def school_admin_publish_results():
         year_options = [current_year]
     prev_term, prev_year = _previous_term_and_year(selected_term, selected_year)
     can_load_previous = bool(prev_term and prev_year and prev_year in set(year_options))
-    publication_statuses = get_school_publication_statuses(
-        school_id,
-        selected_term,
-        selected_year,
-        assignments=assignments,
-    )
-    dean_led_mode = school_uses_dean_led_score_entry(school)
-    approval_workflow_enabled = result_publication_has_approval_columns()
+    try:
+        publication_statuses = get_school_publication_statuses(
+            school_id,
+            selected_term,
+            selected_year,
+            assignments=assignments,
+        )
+    except Exception as exc:
+        logging.warning(
+            "Failed to load publication statuses for publish page school_id=%s term=%s year=%s: %s",
+            school_id,
+            selected_term,
+            selected_year,
+            exc,
+        )
+        publication_statuses = []
+    try:
+        dean_led_mode = school_uses_dean_led_score_entry(school)
+    except Exception as exc:
+        logging.warning("Failed to determine publish mode for school_id=%s: %s", school_id, exc)
+        dean_led_mode = False
+    try:
+        approval_workflow_enabled = result_publication_has_approval_columns()
+    except Exception as exc:
+        logging.warning("Failed to check publication approval columns for school_id=%s: %s", school_id, exc)
+        approval_workflow_enabled = False
     try:
         student_message_rows = get_school_student_messages(school_id, limit=12)
     except Exception as exc:
