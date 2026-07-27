@@ -48649,11 +48649,10 @@ def teacher_class_comments():
                     comment = (request.form.get(f'comment_{sid}', '') or '').strip()[:1500]
                     if comment == existing_comments.get(sid, ''):
                         continue
-                    db_execute(
-                        c,
-                        "UPDATE students SET teacher_comment = ? WHERE school_id = ? AND student_id = ?",
-                        (comment, school_id, sid),
-                    )
+                    updated_student = dict(_student or {})
+                    updated_student['teacher_comment'] = comment
+                    updated_student['term'] = current_term
+                    save_student_with_cursor(c, school_id, sid, updated_student)
                     backup_result_draft_snapshot(
                         c,
                         school_id=school_id,
