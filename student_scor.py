@@ -24325,6 +24325,17 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                     if not (live_student.get('subjects') or []):
                         live_student['subjects'] = singular_student.get('subjects', []) or []
             scores = live_student.get('scores', {}) if isinstance(live_student.get('scores', {}), dict) else {}
+            logging.info(
+                "Publish read path school_id=%s teacher_id=%s student_id=%s class=%s term=%s year=%s teacher_comment_len=%s score_keys=%s",
+                school_id,
+                teacher_id,
+                sid,
+                classname,
+                term,
+                publish_year,
+                len((live_student.get('teacher_comment') or '').strip()),
+                list(scores.keys())[:8],
+            )
             behaviour_payload = behaviour_by_student.get(sid, _default_behaviour_assessment())
             average_marks = compute_average_marks_from_scores(scores, subjects=live_student.get('subjects', []))
             grade = grade_from_score(average_marks, grade_cfg)
@@ -48679,6 +48690,17 @@ def teacher_class_comments():
                     comment = (request.form.get(f'comment_{sid}', '') or '').strip()[:1500]
                     if comment == existing_comments.get(sid, ''):
                         continue
+                    logging.info(
+                        "Class comment save request school_id=%s teacher_id=%s student_id=%s class=%s term=%s year=%s comment_len=%s comment=%r",
+                        school_id,
+                        teacher_id,
+                        sid,
+                        selected_class,
+                        current_term,
+                        current_year,
+                        len(comment),
+                        comment[:120],
+                    )
                     updated_student = dict(_student or {})
                     updated_student['teacher_comment'] = comment
                     updated_student['term'] = current_term
