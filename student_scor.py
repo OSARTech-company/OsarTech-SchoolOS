@@ -24292,7 +24292,26 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
             average_marks = compute_average_marks_from_scores(scores, subjects=student.get('subjects', []))
             grade = grade_from_score(average_marks, grade_cfg)
             status = status_from_score(average_marks, grade_cfg)
+            teacher_comment = (student.get('teacher_comment') or '').strip()
             principal_comment = (student.get('principal_comment') or '').strip()
+            if not teacher_comment or not principal_comment:
+                db_execute(
+                    c,
+                    """SELECT teacher_comment, principal_comment
+                       FROM published_student_results
+                       WHERE school_id = ? AND student_id = ? AND term = ?
+                         AND COALESCE(academic_year, '') = COALESCE(?, '')
+                         AND LOWER(classname) = LOWER(?)
+                       ORDER BY published_at DESC
+                       LIMIT 1""",
+                    (school_id, sid, term, publish_year, classname),
+                )
+                previous_publication = c.fetchone()
+                if previous_publication:
+                    if not teacher_comment:
+                        teacher_comment = (previous_publication[0] or '').strip()
+                    if not principal_comment:
+                        principal_comment = (previous_publication[1] or '').strip()
             db_execute(
                 c,
                 """INSERT INTO published_student_results
@@ -24325,7 +24344,7 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                     json.dumps(student.get('subjects', [])),
                     json.dumps(scores),
                     json.dumps(behaviour_payload),
-                    (student.get('teacher_comment') or '').strip(),
+                    teacher_comment,
                     principal_comment,
                     float(average_marks),
                     grade,
@@ -24914,6 +24933,9 @@ def build_end_of_term_class_result_export(school_id, classname, term, academic_y
     published_students = get_published_students_for_class(school_id, classname, term, academic_year)
     student_rows = []
     subject_counts = {}
+    subject_display_names = {}
+    subject_first_seen = {}
+    subject_seen_index = 0
 
     for published_student in published_students:
         student_id = (published_student.get('student_id') or '').strip()
@@ -24926,7 +24948,14 @@ def build_end_of_term_class_result_export(school_id, classname, term, academic_y
         ordered_scores = build_ordered_subject_score_map(scores_map, snapshot.get('subjects', []))
         row_subjects = list(ordered_scores.keys())
         for subject_name in row_subjects:
-            subject_counts[subject_name] = subject_counts.get(subject_name, 0) + 1
+            normalized_subject = normalize_subject_name(subject_name).lower()
+            if not normalized_subject:
+                continue
+            subject_counts[normalized_subject] = subject_counts.get(normalized_subject, 0) + 1
+            subject_display_names.setdefault(normalized_subject, subject_name)
+            if normalized_subject not in subject_first_seen:
+                subject_first_seen[normalized_subject] = subject_seen_index
+                subject_seen_index += 1
         student_rows.append({
             'student_id': student_id,
             'firstname': (snapshot.get('firstname') or published_student.get('firstname') or student_id).strip(),
@@ -24941,8 +24970,11 @@ def build_end_of_term_class_result_export(school_id, classname, term, academic_y
 
     subject_columns = sorted(
         subject_counts.keys(),
-        key=lambda subject_name: (-subject_counts.get(subject_name, 0), str(subject_name).lower()),
+        key=lambda subject_name: (
+            str(subject_display_names.get(subject_name, subject_name)).lower(),
+        ),
     )
+    subject_columns = [subject_display_names.get(subject_name, subject_name) for subject_name in subject_columns]
     total_students = len(student_rows)
     class_average = round(
         sum(float(row.get('average_marks', 0) or 0) for row in student_rows) / total_students,
@@ -29518,11 +29550,11 @@ def get_automatic_head_teacher_remark(school, grade, existing_remark=''):
         'F': (school.get('performance_remark_f', '') or '').strip(),
     }
     fallback_map = {
-        'A': 'Excellent performance. Keep it up.',
-        'B': 'Very good performance. Keep working hard.',
-        'C': 'Good effort. There is room for improvement.',
-        'D': 'Fair performance. Please improve further.',
-        'F': 'Poor performance. Urgent improvement is needed.',
+        'A': 'An excellent performance has been recorded. Keep up the commendable effort.',
+        'B': 'A very good performance has been recorded. Continue to strive for excellence.',
+        'C': 'A satisfactory performance has been recorded. More consistent effort is encouraged.',
+        'D': 'An overall fair performance has been recorded. Greater dedication is required for improvement.',
+        'F': 'An unsatisfactory performance has been recorded. Immediate improvement is strongly advised.',
     }
     return school_remark_map.get(grade_letter) or fallback_map.get(grade_letter) or 'Result reviewed.'
 
@@ -50036,6 +50068,7 @@ def teacher_enter_scores():
     can_edit_teacher_comment = bool(class_access)
     can_edit_behaviour = bool(class_access) and role == 'school_admin'
     behaviour_entry_is_separate = bool(class_access) and role == 'teacher'
+    saved_teacher_comment = session.pop('teacher_enter_scores_saved_comment', '') or ''
     locked_subjects_for_class = []
     if class_access and not dean_led_mode and role != 'school_admin' and class_uses_subject_teachers(class_name):
         class_subject_assignments = get_teacher_subject_assignments(
@@ -50299,6 +50332,7 @@ def teacher_enter_scores():
             return redirect(url_for('teacher_enter_scores', **redirect_kwargs))
 
         student['teacher_comment'] = teacher_comment
+        session['teacher_enter_scores_saved_comment'] = teacher_comment
         student['term'] = current_term
         audit_change_source = 'manual_entry'
         audit_change_reason = ''
@@ -50468,6 +50502,7 @@ def teacher_enter_scores():
         current_term=current_term,
         is_locked=is_locked,
         can_edit_teacher_comment=can_edit_teacher_comment,
+        saved_teacher_comment=saved_teacher_comment,
         locked_subjects_for_class=locked_subjects_for_class,
         subject_key_map=subject_key_map,
         exam_config=exam_config,

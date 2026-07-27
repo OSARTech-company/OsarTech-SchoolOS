@@ -1485,6 +1485,21 @@ button:disabled {
   background: #fff8dd;
 }
 
+.flash,
+.premium-toast-container {
+  position: relative;
+  z-index: 5000;
+}
+
+body.has-global-footer .flash,
+body.has-global-footer .premium-toast-container {
+  z-index: 2147483000;
+}
+
+body.has-global-footer .main-content .flash:first-of-type {
+  margin-bottom: 72px;
+}
+
 table,
 .assignment-table {
   width: 100%;
@@ -2436,4 +2451,3 @@ input[type="number"]::-webkit-inner-spin-button,
     background: var(--surface-soft) !important;
   }
 }
-

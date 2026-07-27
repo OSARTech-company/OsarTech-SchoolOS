@@ -480,7 +480,7 @@
                 {% if can_edit_teacher_comment %}
                 <div style="margin-top:14px;">
                     <label for="teacher_comment" style="display:block; margin-bottom:6px; font-weight:600; color:#2c3e50;">{{ 'School Comment' if role == 'school_admin' else 'Teacher Comment' }}</label>
-                    <textarea id="teacher_comment" name="teacher_comment" rows="4" style="width:100%; border:1px solid #ccd3db; border-radius:8px; padding:10px; box-sizing:border-box;" placeholder="Enter comment for this student's report" {% if is_locked %}disabled{% endif %}>{{ student.teacher_comment or '' }}</textarea>
+                    <textarea id="teacher_comment" name="teacher_comment" rows="4" style="width:100%; border:1px solid #ccd3db; border-radius:8px; padding:10px; box-sizing:border-box;" placeholder="Enter comment for this student's report" {% if is_locked %}disabled{% endif %}>{{ saved_teacher_comment or student.teacher_comment or '' }}</textarea>
                 </div>
                 <div style="margin-top:14px;">
                     <label for="score_override_reason" style="display:block; margin-bottom:6px; font-weight:600; color:#2c3e50;">Reason For Score Change</label>
