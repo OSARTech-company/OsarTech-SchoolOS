@@ -170,6 +170,7 @@
                                         {% endif %}
                                         {% if student.is_class_owner %}
                                         <a href="{{ url_for('teacher_enter_scores', student_id=student_id) }}" class="btn btn-primary btn-xs">Scores</a>
+                                        <a href="{{ url_for('teacher_class_comments', classname=student.classname) }}" class="btn btn-secondary btn-xs">Comments</a>
                                         {% elif student.matched_subjects %}
                                             {% for subject in student.matched_subjects %}
                                             <a href="{{ url_for('teacher_enter_subject_scores', student_id=student_id, subject=subject) }}" class="btn btn-primary btn-xs">{{ subject }}</a>
@@ -227,4 +228,3 @@
     {% include "shared/_loading_overlay.html" %}
 </body>
 </html>
-
