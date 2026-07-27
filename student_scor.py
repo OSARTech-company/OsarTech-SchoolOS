@@ -48683,6 +48683,20 @@ def teacher_class_comments():
                     updated_student['teacher_comment'] = comment
                     updated_student['term'] = current_term
                     save_student_with_cursor(c, school_id, sid, updated_student)
+                    db_execute(
+                        c,
+                        "UPDATE students SET teacher_comment = ?, term = ? WHERE school_id = ? AND student_id = ?",
+                        (comment, current_term, school_id, sid),
+                    )
+                    logging.info(
+                        "Class comment saved school_id=%s class=%s student_id=%s term=%s comment_len=%s comment=%r",
+                        school_id,
+                        selected_class,
+                        sid,
+                        current_term,
+                        len(comment),
+                        comment[:120],
+                    )
                     backup_result_draft_snapshot(
                         c,
                         school_id=school_id,
