@@ -55548,6 +55548,10 @@ def school_admin_correct_result():
 
         teacher_comment = (request.form.get('teacher_comment', '') or '').strip()[:1500]
         principal_comment = (request.form.get('principal_comment', '') or '').strip()[:1500]
+        if not teacher_comment:
+            teacher_comment = (snapshot.get('teacher_comment') or '').strip()
+        if not principal_comment:
+            principal_comment = (snapshot.get('principal_comment') or '').strip()
         average_marks = compute_average_marks_from_scores(scores, subjects=subjects)
         grade = grade_from_score(average_marks, grade_cfg)
         status = status_from_score(average_marks, grade_cfg)
@@ -55709,34 +55713,6 @@ def school_admin_unpublish_results():
                 principal_name=pub_row.get('principal_name', '') or '',
                 arm=resolved_arm,
             )
-            if resolved_arm:
-                arm_upper = resolved_arm.strip().upper()
-                class_students = load_students(school_id, class_filter=classname, term_filter=target_term)
-                target_sids = [
-                    s_id for s_id, s_data in class_students.items() 
-                    if (s_data.get('classname') or '').strip().upper().endswith(arm_upper) 
-                    or (s_data.get('arm') or '').strip().upper() == arm_upper
-                ]
-                if target_sids:
-                    for i in range(0, len(target_sids), 500):
-                        chunk = target_sids[i:i+500]
-                        placeholders = ','.join(['?'] * len(chunk))
-                        db_execute(
-                            c,
-                            f"""DELETE FROM published_student_results
-                               WHERE school_id = ? AND term = ?
-                                 AND COALESCE(academic_year, '') = COALESCE(?, '')
-                                 AND student_id IN ({placeholders})""",
-                            [school_id, target_term, target_year or ''] + chunk,
-                        )
-            else:
-                db_execute(
-                    c,
-                    """DELETE FROM published_student_results
-                       WHERE school_id = ? AND LOWER(classname) = LOWER(?) AND term = ?
-                         AND COALESCE(academic_year, '') = COALESCE(?, '')""",
-                    (school_id, classname, target_term, target_year or ''),
-                )
             try:
                 db_execute(
                     c,
