@@ -899,7 +899,7 @@
                       <span class="cell-label">Class</span>
                       <span class="class-name">
                         {{ p.classname }}
-                        {% if p.arm and not p.classname|upper.endswith(p.arm|upper) %}
+                        {% if p.arm and p.classname[-(p.arm|length):]|upper != p.arm|upper %}
                           {{ p.arm }}
                         {% endif %}
                       </span>
