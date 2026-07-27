@@ -25706,6 +25706,10 @@ def load_students(school_id, class_filter='', term_filter='', include_archived=F
     has_email_col = students_has_email_column()
     has_archive_cols = students_has_archive_columns()
     has_phone_col = students_has_phone_column()
+    has_teacher_comment_col = students_has_teacher_comment_column()
+    has_principal_comment_col = students_has_principal_comment_column()
+    teacher_comment_col = ', teacher_comment' if has_teacher_comment_col else ""
+    principal_comment_col = ', principal_comment' if has_principal_comment_col else ""
     lastname_col = 'lastname' if has_lastname_col else "'' AS lastname"
     email_col = 'email' if has_email_col else "'' AS email"
     with db_connection() as conn:
@@ -25716,14 +25720,14 @@ def load_students(school_id, class_filter='', term_filter='', include_archived=F
             if has_parent_multi_cols:
                 query = f"""SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream,
                             number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash, parent_name, parent_gender,
-                            parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2{archive_col}{phone_col}
+                            parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2{archive_col}{phone_col}{teacher_comment_col}{principal_comment_col}
                             FROM students WHERE school_id = ?"""
             else:
-                query = f'SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash{archive_col}{phone_col} FROM students WHERE school_id = ?'
+                query = f'SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash{archive_col}{phone_col}{teacher_comment_col}{principal_comment_col} FROM students WHERE school_id = ?'
         else:
             archive_col = ', COALESCE(is_archived, 0)' if has_archive_cols else ''
             phone_col = ', student_phone' if has_phone_col else ''
-            query = f'SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects, scores, promoted{archive_col}{phone_col} FROM students WHERE school_id = ?'
+            query = f'SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects, scores, promoted{archive_col}{phone_col}{teacher_comment_col}{principal_comment_col} FROM students WHERE school_id = ?'
         params = [school_id]
         
         if class_filter:
@@ -25743,6 +25747,9 @@ def load_students(school_id, class_filter='', term_filter='', include_archived=F
         db_execute(c, query, tuple(params))
         students_data = {}
         for row in c.fetchall():
+            row = list(row)
+            principal_comment = (row.pop() or '').strip() if has_principal_comment_col else ''
+            teacher_comment = (row.pop() or '').strip() if has_teacher_comment_col else ''
             if has_parent_cols:
                 if has_parent_multi_cols:
                     if has_archive_cols:
@@ -25810,6 +25817,8 @@ def load_students(school_id, class_filter='', term_filter='', include_archived=F
                 'parent_password_hash_2': (parent_password_hash_2 or '').strip(),
                 'parent_gender_2': (parent_gender_2 or '').strip(),
                 'is_archived': int(is_archived or 0),
+                'teacher_comment': teacher_comment,
+                'principal_comment': principal_comment,
             }
         return students_data
 
@@ -25828,6 +25837,10 @@ def load_students_for_classes(school_id, classnames, term_filter='', include_arc
     has_email_col = students_has_email_column()
     has_archive_cols = students_has_archive_columns()
     has_phone_col = students_has_phone_column()
+    has_teacher_comment_col = students_has_teacher_comment_column()
+    has_principal_comment_col = students_has_principal_comment_column()
+    teacher_comment_col = ', teacher_comment' if has_teacher_comment_col else ""
+    principal_comment_col = ', principal_comment' if has_principal_comment_col else ""
     lastname_col = 'lastname' if has_lastname_col else "'' AS lastname"
     email_col = 'email' if has_email_col else "'' AS email"
     with db_connection() as conn:
@@ -25839,13 +25852,13 @@ def load_students_for_classes(school_id, classnames, term_filter='', include_arc
             if has_parent_multi_cols:
                 query = (
                     f'SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, '
-                    f'number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2{archive_col}{phone_col} '
+                    f'number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2{archive_col}{phone_col}{teacher_comment_col}{principal_comment_col} '
                     f"FROM students WHERE school_id = ? AND REGEXP_REPLACE(UPPER(COALESCE(classname, '')), '[^A-Z0-9]+', '', 'g') IN ({placeholders})"
                 )
             else:
                 query = (
                     f'SELECT student_id, firstname, {lastname_col}, {email_col}, date_of_birth, gender, classname, first_year_class, term, stream, '
-                    f'number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash{archive_col}{phone_col} '
+                    f'number_of_subject, subjects, scores, promoted, parent_phone, parent_password_hash{archive_col}{phone_col}{teacher_comment_col}{principal_comment_col} '
                     f"FROM students WHERE school_id = ? AND REGEXP_REPLACE(UPPER(COALESCE(classname, '')), '[^A-Z0-9]+', '', 'g') IN ({placeholders})"
                 )
         else:
@@ -25867,6 +25880,9 @@ def load_students_for_classes(school_id, classnames, term_filter='', include_arc
         db_execute(c, query, tuple(params))
         students_data = {}
         for row in c.fetchall():
+            row = list(row)
+            principal_comment = (row.pop() or '').strip() if has_principal_comment_col else ''
+            teacher_comment = (row.pop() or '').strip() if has_teacher_comment_col else ''
             if has_parent_cols:
                 if has_parent_multi_cols:
                     if has_archive_cols:
@@ -25932,6 +25948,8 @@ def load_students_for_classes(school_id, classnames, term_filter='', include_arc
                 'parent_password_hash_2': (parent_password_hash_2 or '').strip(),
                 'parent_gender_2': (parent_gender_2 or '').strip(),
                 'is_archived': int(is_archived or 0),
+                'teacher_comment': teacher_comment,
+                'principal_comment': principal_comment,
             }
         return students_data
 
@@ -48673,6 +48691,8 @@ def teacher_class_comments():
                     )
                     updated_count += 1
             flash(f'Class comments saved for {selected_class}. Updated {updated_count} student(s).', 'success')
+            if updated_count:
+                flash(f'Class comment update completed for {selected_class}.', 'info')
         except Exception as exc:
             flash(f'Failed to save class comments: {exc}', 'error')
         return redirect(url_for('teacher_class_comments', classname=selected_class))
@@ -50601,6 +50621,8 @@ def teacher_enter_scores():
             flash('Shared draft saved successfully. Scores, class comment, and behaviour are now visible to other Simple Mode editors immediately.', 'success')
         else:
             flash('Shared draft saved successfully. Scores and class comment are now visible to other Simple Mode editors immediately.', 'success')
+        if teacher_comment:
+            flash(f'Comment saved for {student.get("firstname", student_id)} ({len(teacher_comment)} chars).', 'info')
         if post_save_warning:
             flash(
                 'Scores were saved, but a follow-up update failed. Refresh the page to verify the latest status.',
