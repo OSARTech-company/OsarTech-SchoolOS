@@ -24312,13 +24312,25 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                 publish_year,
             )
         for sid, student in class_students.items():
-            scores = student.get('scores', {}) if isinstance(student.get('scores', {}), dict) else {}
+            live_student = student if isinstance(student, dict) else {}
+            if not (live_student.get('teacher_comment') or '').strip() or not (live_student.get('scores') if isinstance(live_student.get('scores'), dict) else {}):
+                singular_student = load_student(school_id, sid) or {}
+                if singular_student:
+                    if not (live_student.get('teacher_comment') or '').strip():
+                        live_student['teacher_comment'] = singular_student.get('teacher_comment', '')
+                    if not (live_student.get('principal_comment') or '').strip():
+                        live_student['principal_comment'] = singular_student.get('principal_comment', '')
+                    if not isinstance(live_student.get('scores'), dict) or not live_student.get('scores'):
+                        live_student['scores'] = singular_student.get('scores', {}) if isinstance(singular_student.get('scores', {}), dict) else {}
+                    if not (live_student.get('subjects') or []):
+                        live_student['subjects'] = singular_student.get('subjects', []) or []
+            scores = live_student.get('scores', {}) if isinstance(live_student.get('scores', {}), dict) else {}
             behaviour_payload = behaviour_by_student.get(sid, _default_behaviour_assessment())
-            average_marks = compute_average_marks_from_scores(scores, subjects=student.get('subjects', []))
+            average_marks = compute_average_marks_from_scores(scores, subjects=live_student.get('subjects', []))
             grade = grade_from_score(average_marks, grade_cfg)
             status = status_from_score(average_marks, grade_cfg)
-            teacher_comment = (student.get('teacher_comment') or '').strip()
-            principal_comment = (student.get('principal_comment') or '').strip()
+            teacher_comment = (live_student.get('teacher_comment') or '').strip()
+            principal_comment = (live_student.get('principal_comment') or '').strip()
             if not teacher_comment or not principal_comment:
                 db_execute(
                     c,
@@ -24361,9 +24373,9 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                         draft_scores = draft_snapshot.get('scores', {})
                         if isinstance(draft_scores, dict) and draft_scores:
                             scores = draft_scores
-                            average_marks = compute_average_marks_from_scores(scores, subjects=student.get('subjects', []))
-                            grade = grade_from_score(average_marks, grade_cfg)
-                            status = status_from_score(average_marks, grade_cfg)
+                        average_marks = compute_average_marks_from_scores(scores, subjects=live_student.get('subjects', []))
+                        grade = grade_from_score(average_marks, grade_cfg)
+                        status = status_from_score(average_marks, grade_cfg)
             backup_result_snapshot(
                 c,
                 school_id=school_id,
@@ -24372,13 +24384,13 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                 academic_year=publish_year,
                 term=term,
                 snapshot={
-                    'firstname': student.get('firstname', ''),
+                    'firstname': live_student.get('firstname', ''),
                     'classname': classname,
                     'academic_year': publish_year,
                     'term': term,
-                    'stream': student.get('stream', 'N/A'),
-                    'number_of_subject': int(student.get('number_of_subject', 0) or 0),
-                    'subjects': student.get('subjects', []),
+                    'stream': live_student.get('stream', 'N/A'),
+                    'number_of_subject': int(live_student.get('number_of_subject', 0) or 0),
+                    'subjects': live_student.get('subjects', []),
                     'scores': scores,
                     'behaviour_json': behaviour_payload,
                     'teacher_comment': teacher_comment,
@@ -24413,13 +24425,13 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                 (
                     school_id,
                     sid,
-                    student.get('firstname', ''),
+                    live_student.get('firstname', ''),
                     classname,
                     publish_year,
                     term,
-                    student.get('stream', 'N/A'),
-                    int(student.get('number_of_subject', 0) or 0),
-                    json.dumps(student.get('subjects', [])),
+                    live_student.get('stream', 'N/A'),
+                    int(live_student.get('number_of_subject', 0) or 0),
+                    json.dumps(live_student.get('subjects', [])),
                     json.dumps(scores),
                     json.dumps(behaviour_payload),
                     teacher_comment,
