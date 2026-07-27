@@ -36909,17 +36909,20 @@ def school_admin_publish_results():
     }
     for row in assignments:
         year_options_set.add((row.get('academic_year', '') or '').strip())
-    with db_connection() as conn:
-        c = conn.cursor()
-        db_execute(
-            c,
-            """SELECT DISTINCT COALESCE(academic_year, '')
-               FROM result_publications
-               WHERE school_id = ?""",
-            (school_id,),
-        )
-        for row in c.fetchall() or []:
-            year_options_set.add((row[0] or '').strip())
+    try:
+        with db_connection() as conn:
+            c = conn.cursor()
+            db_execute(
+                c,
+                """SELECT DISTINCT COALESCE(academic_year, '')
+                   FROM result_publications
+                   WHERE school_id = ?""",
+                (school_id,),
+            )
+            for row in c.fetchall() or []:
+                year_options_set.add((row[0] or '').strip())
+    except Exception as exc:
+        logging.warning("Failed to load publication years for publish page school_id=%s: %s", school_id, exc)
     year_options = sorted(
         [y for y in year_options_set if y],
         key=lambda y: ((_academic_year_start(y) or 0), y),
