@@ -48654,6 +48654,24 @@ def teacher_class_comments():
                         "UPDATE students SET teacher_comment = ? WHERE school_id = ? AND student_id = ?",
                         (comment, school_id, sid),
                     )
+                    backup_result_draft_snapshot(
+                        c,
+                        school_id=school_id,
+                        student_id=sid,
+                        classname=selected_class,
+                        academic_year=current_year,
+                        term=current_term,
+                        snapshot={
+                            'firstname': next((row.get('firstname', '') for student_id, row in student_rows if student_id == sid), ''),
+                            'classname': selected_class,
+                            'academic_year': current_year,
+                            'term': current_term,
+                            'stream': next((row.get('stream', '') for student_id, row in student_rows if student_id == sid), ''),
+                            'teacher_comment': comment,
+                            'scores': {},
+                        },
+                        created_by=teacher_id or '',
+                    )
                     updated_count += 1
             flash(f'Class comments saved for {selected_class}. Updated {updated_count} student(s).', 'success')
         except Exception as exc:
@@ -50163,9 +50181,11 @@ def teacher_enter_scores():
     grade_cfg = get_grade_config(school_id)
     if student.get('term') != current_term:
         # New term starts with fresh term-scoped fields.
+        previous_teacher_comment = (student.get('teacher_comment') or '').strip()
+        previous_principal_comment = (student.get('principal_comment') or '').strip()
         student['scores'] = {}
-        student['teacher_comment'] = ''
-        student['principal_comment'] = ''
+        student['teacher_comment'] = previous_teacher_comment
+        student['principal_comment'] = previous_principal_comment
     is_locked = is_result_published(school_id, student.get('classname', ''), current_term, current_year)
     exam_config = get_assessment_config_for_class(school_id, student.get('classname', ''))
     all_subjects = sorted(
