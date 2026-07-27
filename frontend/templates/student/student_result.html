@@ -2303,6 +2303,7 @@
                         <th>Cumulative Average</th>
                         <th>Grade</th>
                         <th>Position</th>
+                        <th>Remark</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -2324,6 +2325,7 @@
                                 -
                             {% endif %}
                         </td>
+                        <td class="subject-remark-cell" data-label="Remark">{{ s.get('subject_teacher_comment', '-') if s.get('subject_teacher_comment') else '-' }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -2333,7 +2335,7 @@
                         <td colspan="3" style="text-align: center; font-weight: bold;">Average Score</td>
                         <td style="font-weight: bold;">{{ "%.1f"|format(student.average_marks) }}</td>
                         <td style="font-weight: bold;">{{ display_grade_label(student.Grade, school) }}</td>
-                        <td class="{{ status_css_class_from_status(student.Status, school) }}" style="font-weight: bold;">
+                        <td colspan="2" class="{{ status_css_class_from_status(student.Status, school) }}" style="font-weight: bold;">
                             {{ student.Status if student.Status else 'Status Pending' }}
                         </td>
                     </tr>
@@ -2349,6 +2351,7 @@
                         <th rowspan="2">{% if is_third_term_combined %}Cumulative<br>Total{% else %}Total<br>(100%){% endif %}</th>
                         <th rowspan="2">Grade</th>
                         <th rowspan="2">Position</th>
+                        <th rowspan="2">Remark</th>
                     </tr>
                     <tr>
                         {% for i in range(1, result_max_tests + 1) %}
@@ -2389,6 +2392,7 @@
                                 -
                             {% endif %}
                         </td>
+                        <td class="subject-remark-cell" data-label="Remark">{{ s.get('subject_teacher_comment', '-') if s.get('subject_teacher_comment') else '-' }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -2398,7 +2402,7 @@
                         <td colspan="{{ result_max_tests + (1 if combined_exam else 2) + 2 }}" style="text-align: center; font-weight: bold;">Average Score</td>
                         <td style="font-weight: bold;">{{ "%.1f"|format(student.average_marks) }}</td>
                         <td style="font-weight: bold;">{{ display_grade_label(student.Grade, school) }}</td>
-                        <td class="{{ status_css_class_from_status(student.Status, school) }}" style="font-weight: bold;">
+                        <td colspan="2" class="{{ status_css_class_from_status(student.Status, school) }}" style="font-weight: bold;">
                             {{ student.Status if student.Status else 'Status Pending' }}
                         </td>
                     </tr>
