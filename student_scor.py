@@ -22327,7 +22327,11 @@ def _build_rich_result_pdf_reportlab(report):
     attendance = report.get('attendance') if isinstance(report.get('attendance'), dict) else {}
     behaviour = report.get('behaviour') if isinstance(report.get('behaviour'), dict) else {}
     teacher_comment = (report.get('teacher_comment') or '').strip()
-    principal_comment = (report.get('principal_comment') or '').strip()
+    principal_comment = get_automatic_head_teacher_remark(
+        report.get('school') if isinstance(report.get('school'), dict) else {},
+        report.get('grade'),
+        report.get('principal_comment'),
+    )
 
     def _decode_signature_ref(ref):
         raw = (ref or '').strip()
@@ -25435,12 +25439,26 @@ def build_subject_positions_for_student(school_id, student, school):
         student_stream = (student.get('stream') or '').strip()
         peer_items = [(sid, s) for sid, s in peer_items if (s.get('stream') or '').strip() == student_stream]
 
+    offered_subjects = {
+        normalize_subject_name(subj)
+        for subj in normalize_subjects_list(student.get('subjects', []))
+        if str(subj).strip()
+    }
     subject_positions = {}
     for subject in subjects:
+        if offered_subjects and subject not in offered_subjects:
+            continue
         ranked = []
         for sid, pdata in peer_items:
             peer_year = (pdata.get('academic_year') or '').strip()
             if academic_year and peer_year and peer_year != academic_year:
+                continue
+            peer_offered_subjects = {
+                normalize_subject_name(subj)
+                for subj in normalize_subjects_list(pdata.get('subjects', []))
+                if str(subj).strip()
+            }
+            if peer_offered_subjects and subject not in peer_offered_subjects:
                 continue
             pscores = pdata.get('scores', {}) if isinstance(pdata.get('scores', {}), dict) else {}
             subj_score = pscores.get(subject, {}) if isinstance(pscores.get(subject, {}), dict) else {}
@@ -25533,6 +25551,13 @@ def build_positions_from_published_results(school, classname, term, class_result
     for subject in subjects or []:
         ranked = []
         for x in results_for_rank:
+            offered_subjects = {
+                normalize_subject_name(subj)
+                for subj in normalize_subjects_list(x.get('subjects', []))
+                if str(subj).strip()
+            }
+            if offered_subjects and subject not in offered_subjects:
+                continue
             scores_map = x.get('scores', {})
             if not isinstance(scores_map, dict) or subject not in scores_map:
                 continue
@@ -29478,6 +29503,28 @@ def get_result_signoff_details(school_id, classname, term, academic_year=''):
         'teacher_name': teacher_name,
         'principal_name': principal_name,
     }
+
+def get_automatic_head_teacher_remark(school, grade, existing_remark=''):
+    remark = (existing_remark or '').strip()
+    if remark:
+        return remark
+    school = school or {}
+    grade_letter = (grade or '').strip().upper()
+    school_remark_map = {
+        'A': (school.get('performance_remark_a', '') or '').strip(),
+        'B': (school.get('performance_remark_b', '') or '').strip(),
+        'C': (school.get('performance_remark_c', '') or '').strip(),
+        'D': (school.get('performance_remark_d', '') or '').strip(),
+        'F': (school.get('performance_remark_f', '') or '').strip(),
+    }
+    fallback_map = {
+        'A': 'Excellent performance. Keep it up.',
+        'B': 'Very good performance. Keep working hard.',
+        'C': 'Good effort. There is room for improvement.',
+        'D': 'Fair performance. Please improve further.',
+        'F': 'Poor performance. Urgent improvement is needed.',
+    }
+    return school_remark_map.get(grade_letter) or fallback_map.get(grade_letter) or 'Result reviewed.'
 
 def normalize_teacher_gender(value):
     raw = (value or '').strip().lower()
@@ -46954,7 +47001,26 @@ def teacher_score_entry_start():
         return redirect(url_for('teacher_dashboard'))
         
     if len(classes_list) == 1:
-        return redirect(url_for('teacher_score_entry_select_subject', classname=classes_list[0]))
+        class_name = classes_list[0]
+        subject_rows_for_class = get_teacher_subject_assignments(
+            school_id,
+            teacher_id=teacher_id,
+            classname=class_name,
+            term=current_term,
+            academic_year=current_year,
+        )
+        has_subject_assignment = any(
+            normalize_subject_name(row.get('subject', ''))
+            for row in (subject_rows_for_class or [])
+            if (row.get('classname') or '').strip().lower() == class_name.lower()
+        )
+        if has_subject_assignment:
+            return redirect(url_for('teacher_score_entry_select_subject', classname=class_name))
+        flash(
+            f'Your score-entry assignment for {class_name} is incomplete. Please contact the school admin to reassign your subjects.',
+            'warning',
+        )
+        return redirect(url_for('teacher_dashboard', tab='score'))
         
     return render_template('teacher/score_entry_select_class.html', classes=classes_list, school=school)
 
@@ -47035,8 +47101,11 @@ def teacher_score_entry_select_subject(classname):
     subjects = sorted(list(set(subjects)), key=lambda x: str(x).lower())
     
     if not subjects:
-        flash(f'No subjects are assigned to you for class {classname}.', 'warning')
-        return redirect(url_for('teacher_score_entry_start'))
+        flash(
+            f'No subjects are assigned to you for class {classname}. Please contact the school admin to review your assignment.',
+            'warning',
+        )
+        return redirect(url_for('teacher_dashboard', tab='score'))
         
     if len(subjects) == 1:
         if use_subject_sheet:
@@ -54674,6 +54743,7 @@ def download_result_pdf():
             )
 
     rich_report = {
+        'school': school or {},
         'school_name': (school or {}).get('school_name', ''),
         'student_name': snapshot.get('firstname', ''),
         'student_id': sid,

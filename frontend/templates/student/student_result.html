@@ -2319,7 +2319,7 @@
                         <td class="subject-position-cell" data-label="{{ student_label }} Position">
                             {% set sp = subject_positions.get(subject) if subject_positions else None %}
                             {% if sp %}
-                                {{ sp.pos|ordinal }}/{{ sp.size }}
+                                {{ sp.pos|ordinal }} of {{ sp.size }}
                             {% else %}
                                 -
                             {% endif %}
@@ -2384,7 +2384,7 @@
                         </td>
                         <td class="subject-position-cell" data-label="{{ student_label }} Position">
                             {% if sp %}
-                                {{ sp.pos|ordinal }}/{{ sp.size }}
+                                {{ sp.pos|ordinal }} of {{ sp.size }}
                             {% else %}
                                 -
                             {% endif %}
@@ -2409,6 +2409,23 @@
         </div>
 
         {% set teacher_comment_text = ((student.teacher_comment or '')|trim) %}
+        {% set grade_letter = ((student.Grade or student.grade or '')|trim|upper) %}
+        {% set head_teacher_remark = ((student.principal_comment or '')|trim) %}
+        {% if not head_teacher_remark %}
+            {% if grade_letter == 'A' %}
+                {% set head_teacher_remark = ((school.performance_remark_a if school else '') or 'Excellent performance. Keep it up.') %}
+            {% elif grade_letter == 'B' %}
+                {% set head_teacher_remark = ((school.performance_remark_b if school else '') or 'Very good performance. Keep working hard.') %}
+            {% elif grade_letter == 'C' %}
+                {% set head_teacher_remark = ((school.performance_remark_c if school else '') or 'Good effort. There is room for improvement.') %}
+            {% elif grade_letter == 'D' %}
+                {% set head_teacher_remark = ((school.performance_remark_d if school else '') or 'Fair performance. Please improve further.') %}
+            {% elif grade_letter == 'F' %}
+                {% set head_teacher_remark = ((school.performance_remark_f if school else '') or 'Poor performance. Urgent improvement is needed.') %}
+            {% else %}
+                {% set head_teacher_remark = 'Result reviewed.' %}
+            {% endif %}
+        {% endif %}
         <div class="behaviour-panel">
             <div class="table-title">Behaviour Assessment (Affective Domain)</div>
             {% if student.behaviour_assessment %}
@@ -2440,11 +2457,7 @@
             <div class="teacher-comment">
                 <div class="comment-title">{{ leadership_label }}'s Comment</div>
                 <div class="comment-body">
-                    {% if (student.principal_comment or '')|trim %}
-                        {{ (student.principal_comment or '')|trim }}
-                    {% else %}
-                        <span class="comment-empty">No {{ leadership_label|lower }} comment provided.</span>
-                    {% endif %}
+                    {{ head_teacher_remark }}
                 </div>
             </div>
         </div>
@@ -2458,16 +2471,6 @@
 
         <div class="signatures">
             <div class="signature-box">
-                {% if teacher_signature %}
-                <img src="{{ teacher_signature }}" alt="Class Teacher Signature" class="signature-image">
-                {% endif %}
-                <div class="signature-line"></div>
-                <div class="signature-name">{{ teacher_name or '' }}</div>
-                <div class="signature-title">(Term Class Teacher)</div>
-                <div class="signature-meta">Academic verification</div>
-            </div>
-
-            <div class="signature-box">
                 {% if principal_signature %}
                 <img src="{{ principal_signature }}" alt="{{ leadership_label }} Signature" class="signature-image">
                 {% endif %}
@@ -2475,12 +2478,6 @@
                 <div class="signature-name">{{ principal_name or '' }}</div>
                 <div class="signature-title">({{ leadership_label }})</div>
                 <div class="signature-meta">School authorization</div>
-            </div>
-
-            <div class="signature-box">
-                <div class="signature-line"></div>
-                <div class="signature-title">Parent/Guardian</div>
-                <div class="signature-meta">Acknowledgement</div>
             </div>
         </div>
 

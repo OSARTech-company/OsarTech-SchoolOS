@@ -97,16 +97,9 @@
                 <div class="form-group">
                     <label>School Type:</label>
                     {% set school_type_val = school.school_type if school else 'mixed' %}
+                    {% set school_type_label = 'Nursery School' if school_type_val == 'nursery' else ('Primary School' if school_type_val == 'primary' else ('Secondary School' if school_type_val == 'secondary' else 'Mixed School')) %}
                     <div style="padding: 10px 12px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; font-weight: 500; color: #374151; display: inline-block;">
-                        {% if school_type_val == 'nursery' %}
-                            Nursery School
-                        {% elif school_type_val == 'primary' %}
-                            Primary School
-                        {% elif school_type_val == 'secondary' %}
-                            Secondary School
-                        {% else %}
-                            Mixed School
-                        {% endif %}
+                        {{ school_type_label }}
                     </div>
                     <small style="color: #6b7280; display: block; margin-top: 8px;">
                         <i class="fas fa-lock" style="color: #9ca3af; margin-right: 4px;"></i> School type is locked to prevent grading and feature conflicts. To request a change, please contact support or your system administrator.
@@ -125,6 +118,12 @@
                         <option value="head_teacher" {% if leadership_title_value == 'head_teacher' %}selected{% endif %}>Head Teacher</option>
                     </select>
                     <small style="color:#5a6c7d; display:block; margin-top:6px;">This updates result comment and signature labels across your school portal.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="principal_name">{{ 'Head Teacher Name' if leadership_title_value == 'head_teacher' else 'Principal Name' }}</label>
+                    <input type="text" id="principal_name" name="principal_name" value="{{ settings_form.principal_name if settings_form and settings_form.principal_name else '' }}" placeholder="{{ 'Enter head teacher name' if leadership_title_value == 'head_teacher' else 'Enter principal name' }}">
+                    <small style="color:#5a6c7d; display:block; margin-top:6px;">This name appears on result sheets and approval/signature labels.</small>
                 </div>
                 
                 <div class="form-group">
@@ -316,7 +315,7 @@
                 {% elif school and school.school_type == 'nursery' %}
                     Set how nursery exam settings are configured so the total assessment score stays aligned with your score configuration.
                 {% else %}
-                    Set how JSS and SS exams are split, and the system will keep the total assessment score aligned with your test configuration.
+                    Set how secondary exams are split, and the system will keep the total assessment score aligned with your test configuration.
                 {% endif %}
             </p>
             <form method="POST" action="{{ url_for('school_admin_settings', section='results') }}">
@@ -419,13 +418,13 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="ss1_stream_mode">SS1 Stream Mode</label>
+                    <label for="ss1_stream_mode">Senior Secondary Stream Mode</label>
                     <select id="ss1_stream_mode" name="ss1_stream_mode">
                         <option value="separate" {% if not settings_form or settings_form.ss1_stream_mode != 'combined' %}selected{% endif %}>
-                            SS1 Separate (Science, Art, Commercial + Optional)
+                            Separate streams (Science, Art, Commercial + Optional)
                         </option>
                         <option value="combined" {% if settings_form and settings_form.ss1_stream_mode == 'combined' %}selected{% endif %}>
-                            SS1 Combined (no stream, no optional)
+                            Combined streams (no stream, no optional)
                         </option>
                     </select>
                 </div>
@@ -433,22 +432,22 @@
                     <label for="ss_arm_mode">Senior Secondary Arm Mode</label>
                     <select id="ss_arm_mode" name="ss_arm_mode">
                         <option value="preserve" {% if not settings_form or settings_form.ss_arm_mode != 'drop' %}selected{% endif %}>
-                            Keep class arms when promoting into SS (e.g., SS1A)
+                            Keep class arms when promoting into senior secondary
                         </option>
                         <option value="drop" {% if settings_form and settings_form.ss_arm_mode == 'drop' %}selected{% endif %}>
-                            Drop class arms in SS and use stream only (SS1 + Science/Art/Commercial)
+                            Drop class arms in senior secondary and use stream only
                         </option>
                     </select>
                 </div>
                 {% endif %}
                 <div class="form-group">
-                    <label for="class_arm_ranking_mode">Class Arm Ranking Mode (e.g., JSS1A/JSS1S)</label>
+                    <label for="class_arm_ranking_mode">Class Arm Ranking Mode</label>
                     <select id="class_arm_ranking_mode" name="class_arm_ranking_mode">
                         <option value="separate" {% if not settings_form or settings_form.class_arm_ranking_mode != 'together' %}selected{% endif %}>
-                            Rank each arm separately (JSS1A separate from JSS1S)
+                            Rank each arm separately
                         </option>
                         <option value="together" {% if settings_form and settings_form.class_arm_ranking_mode == 'together' %}selected{% endif %}>
-                            Rank all arms together (merge by base class like JSS1)
+                            Rank all arms together by base class
                         </option>
                     </select>
                 </div>
@@ -456,7 +455,7 @@
                     <label for="show_positions">Show Positions In Result</label>
                     <select id="show_positions" name="show_positions">
                         <option value="1" {% if not settings_form or settings_form.show_positions %}selected{% endif %}>
-                            Yes - show class and subject positions (e.g., 1st of 10)
+                            Yes - show class and subject positions
                         </option>
                         <option value="0" {% if settings_form and not settings_form.show_positions %}selected{% endif %}>
                             No - hide all positions in result
