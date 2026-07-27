@@ -7068,6 +7068,31 @@ def init_db():
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )""")
     db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_school_auto_backups_school_created ON school_auto_backups(school_id, created_at DESC)')
+    db_execute(c, """CREATE TABLE IF NOT EXISTS result_snapshot_backups (
+                        id SERIAL PRIMARY KEY,
+                        school_id TEXT NOT NULL,
+                        student_id TEXT NOT NULL,
+                        classname TEXT DEFAULT '',
+                        academic_year TEXT DEFAULT '',
+                        term TEXT DEFAULT '',
+                        snapshot_type TEXT DEFAULT 'published',
+                        snapshot_json TEXT DEFAULT '{}',
+                        created_by TEXT DEFAULT '',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )""")
+    db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_result_snapshot_backups_lookup ON result_snapshot_backups(school_id, student_id, classname, academic_year, term, created_at DESC)')
+    db_execute(c, """CREATE TABLE IF NOT EXISTS result_draft_snapshots (
+                        id SERIAL PRIMARY KEY,
+                        school_id TEXT NOT NULL,
+                        student_id TEXT NOT NULL,
+                        classname TEXT DEFAULT '',
+                        academic_year TEXT DEFAULT '',
+                        term TEXT DEFAULT '',
+                        snapshot_json TEXT DEFAULT '{}',
+                        created_by TEXT DEFAULT '',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )""")
+    db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_result_draft_snapshots_lookup ON result_draft_snapshots(school_id, student_id, classname, academic_year, term, created_at DESC)')
     # Login attempt tracking for brute-force protection.
     db_execute(c, """CREATE TABLE IF NOT EXISTS login_attempts (
                         id SERIAL PRIMARY KEY,
@@ -24312,6 +24337,59 @@ def publish_results_for_class_atomic(school_id, classname, term, teacher_id, aca
                         teacher_comment = (previous_publication[0] or '').strip()
                     if not principal_comment:
                         principal_comment = (previous_publication[1] or '').strip()
+            if not teacher_comment or not scores:
+                db_execute(
+                    c,
+                    """SELECT snapshot_json
+                       FROM result_draft_snapshots
+                       WHERE school_id = ? AND student_id = ? AND term = ?
+                         AND COALESCE(academic_year, '') = COALESCE(?, '')
+                         AND LOWER(classname) = LOWER(?)
+                       ORDER BY created_at DESC
+                       LIMIT 1""",
+                    (school_id, sid, term, publish_year, classname),
+                )
+                draft_row = c.fetchone()
+                if draft_row:
+                    try:
+                        draft_snapshot = json.loads(draft_row[0] or '{}')
+                    except Exception:
+                        draft_snapshot = {}
+                    if not teacher_comment:
+                        teacher_comment = (draft_snapshot.get('teacher_comment') or '').strip()
+                    if not scores:
+                        draft_scores = draft_snapshot.get('scores', {})
+                        if isinstance(draft_scores, dict) and draft_scores:
+                            scores = draft_scores
+                            average_marks = compute_average_marks_from_scores(scores, subjects=student.get('subjects', []))
+                            grade = grade_from_score(average_marks, grade_cfg)
+                            status = status_from_score(average_marks, grade_cfg)
+            backup_result_snapshot(
+                c,
+                school_id=school_id,
+                student_id=sid,
+                classname=classname,
+                academic_year=publish_year,
+                term=term,
+                snapshot={
+                    'firstname': student.get('firstname', ''),
+                    'classname': classname,
+                    'academic_year': publish_year,
+                    'term': term,
+                    'stream': student.get('stream', 'N/A'),
+                    'number_of_subject': int(student.get('number_of_subject', 0) or 0),
+                    'subjects': student.get('subjects', []),
+                    'scores': scores,
+                    'behaviour_json': behaviour_payload,
+                    'teacher_comment': teacher_comment,
+                    'principal_comment': principal_comment,
+                    'average_marks': float(average_marks),
+                    'grade': grade,
+                    'status': status,
+                },
+                snapshot_type='published',
+                created_by=session.get('user_id', '') or '',
+            )
             db_execute(
                 c,
                 """INSERT INTO published_student_results
@@ -29535,6 +29613,47 @@ def get_result_signoff_details(school_id, classname, term, academic_year=''):
         'teacher_name': teacher_name,
         'principal_name': principal_name,
     }
+
+def backup_result_snapshot(c, school_id, student_id, classname, academic_year, term, snapshot, snapshot_type='published', created_by=''):
+    try:
+        db_execute(
+            c,
+            """INSERT INTO result_snapshot_backups
+               (school_id, student_id, classname, academic_year, term, snapshot_type, snapshot_json, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                school_id,
+                student_id,
+                classname or '',
+                academic_year or '',
+                term or '',
+                snapshot_type or 'published',
+                json.dumps(snapshot or {}, default=str),
+                created_by or '',
+            ),
+        )
+    except Exception as exc:
+        logging.warning("Failed to back up result snapshot for %s/%s: %s", school_id, student_id, exc)
+
+def backup_result_draft_snapshot(c, school_id, student_id, classname, academic_year, term, snapshot, created_by=''):
+    try:
+        db_execute(
+            c,
+            """INSERT INTO result_draft_snapshots
+               (school_id, student_id, classname, academic_year, term, snapshot_json, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                school_id,
+                student_id,
+                classname or '',
+                academic_year or '',
+                term or '',
+                json.dumps(snapshot or {}, default=str),
+                created_by or '',
+            ),
+        )
+    except Exception as exc:
+        logging.warning("Failed to back up draft snapshot for %s/%s: %s", school_id, student_id, exc)
 
 def get_automatic_head_teacher_remark(school, grade, existing_remark=''):
     remark = (existing_remark or '').strip()
@@ -50373,6 +50492,27 @@ def teacher_enter_scores():
                     merged_scores[subject] = scores.get(subject, {})
                 student['scores'] = merged_scores
                 save_student_with_cursor(c, school_id, student_id, student)
+                backup_result_draft_snapshot(
+                    c,
+                    school_id=school_id,
+                    student_id=student_id,
+                    classname=student.get('classname', ''),
+                    academic_year=current_year,
+                    term=current_term,
+                    snapshot={
+                        'firstname': student.get('firstname', ''),
+                        'classname': student.get('classname', ''),
+                        'academic_year': current_year,
+                        'term': current_term,
+                        'stream': student.get('stream', 'N/A'),
+                        'number_of_subject': int(student.get('number_of_subject', 0) or 0),
+                        'subjects': student.get('subjects', []),
+                        'scores': merged_scores,
+                        'teacher_comment': teacher_comment,
+                        'principal_comment': student.get('principal_comment', '') or '',
+                    },
+                    created_by=teacher_id or '',
+                )
                 if can_edit_behaviour:
                     save_behaviour_assessment_with_cursor(
                         c,
@@ -55560,6 +55700,17 @@ def school_admin_correct_result():
         try:
             with db_connection(commit=True) as conn:
                 c = conn.cursor()
+                backup_result_snapshot(
+                    c,
+                    school_id=school_id,
+                    student_id=sid,
+                    classname=classname,
+                    academic_year=target_year or '',
+                    term=target_term,
+                    snapshot=snapshot,
+                    snapshot_type='correction_before_update',
+                    created_by=session.get('user_id', '') or '',
+                )
                 db_execute(
                     c,
                     """UPDATE published_student_results
@@ -55701,6 +55852,25 @@ def school_admin_unpublish_results():
     try:
         with db_connection(commit=True) as conn:
             c = conn.cursor()
+            snapshot = load_published_student_result(
+                school_id,
+                sid,
+                target_term,
+                target_year,
+                classname=classname,
+                allow_combination=False,
+            ) or {}
+            backup_result_snapshot(
+                c,
+                school_id=school_id,
+                student_id=sid,
+                classname=classname,
+                academic_year=target_year or '',
+                term=target_term,
+                snapshot=snapshot,
+                snapshot_type='unpublish_before_update',
+                created_by=session.get('user_id', '') or '',
+            )
             _set_result_published_with_cursor(
                 c=c,
                 school_id=school_id,
