@@ -38,7 +38,7 @@
     </div>
     <div class="card">
         <table>
-            <thead><tr><th>When</th><th>Student</th><th>From</th><th>To</th><th>Action</th><th>Term</th><th>Year</th><th>By</th></tr></thead>
+            <thead><tr><th>When</th><th>Student</th><th>From</th><th>To</th><th>Action</th><th>Term</th><th>Year</th><th>By</th><th>Undo</th></tr></thead>
             <tbody>
             {% for row in logs %}
                 <tr>
@@ -50,9 +50,27 @@
                     <td>{{ row.term or '-' }}</td>
                     <td>{{ row.academic_year or '-' }}</td>
                     <td>{{ row.changed_by or '-' }}</td>
+                    <td>
+                        {% if row.action == 'promote' %}
+                        <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
+                            {% if row.snapshot_json and row.snapshot_json != '{}' %}
+                            <span class="compact-badge success">Full restore</span>
+                            {% else %}
+                            <span class="compact-badge warning">Class only</span>
+                            {% endif %}
+                        <form method="post" action="{{ url_for('school_admin_undo_promotion') }}" onsubmit="return confirm('Undo this promotion? This moves the student back to {{ row.from_class or "the previous class" }}.');">
+                            <input type="hidden" name="student_id" value="{{ row.student_id }}">
+                            <input type="hidden" name="created_at" value="{{ row.created_at }}">
+                            <button type="submit" class="btn btn-secondary btn-sm">Undo</button>
+                        </form>
+                        </div>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
                 </tr>
             {% else %}
-                <tr><td colspan="8">No promotion audit records found.</td></tr>
+                <tr><td colspan="9">No promotion audit records found.</td></tr>
             {% endfor %}
             </tbody>
         </table>
@@ -63,5 +81,3 @@
 <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
 </body>
 </html>
-
-

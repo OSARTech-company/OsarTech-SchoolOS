@@ -452,15 +452,16 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="show_positions">Show Positions In Result</label>
+                    <label for="show_positions">Result Positions</label>
                     <select id="show_positions" name="show_positions">
                         <option value="1" {% if not settings_form or settings_form.show_positions %}selected{% endif %}>
-                            Yes - show class and subject positions
+                            Show all positions
                         </option>
                         <option value="0" {% if settings_form and not settings_form.show_positions %}selected{% endif %}>
-                            No - hide all positions in result
+                            Hide overall and subject positions
                         </option>
                     </select>
+                    <small class="field-help">This setting controls both the overall class position and subject positions in the result.</small>
                 </div>
                 <div class="form-group">
                     <label for="pass_mark">Promotion Pass Mark</label>

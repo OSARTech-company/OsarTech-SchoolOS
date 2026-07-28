@@ -7194,8 +7194,10 @@ def init_db():
                         academic_year TEXT DEFAULT '',
                         changed_by TEXT DEFAULT '',
                         note TEXT DEFAULT '',
+                        snapshot_json TEXT DEFAULT '{}',
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )""")
+    safe_exec_ignore("ALTER TABLE promotion_audit_logs ADD COLUMN snapshot_json TEXT DEFAULT '{}' ")
     db_execute(c, """CREATE TABLE IF NOT EXISTS result_disputes (
                         id SERIAL PRIMARY KEY,
                         school_id TEXT NOT NULL,
@@ -17756,9 +17758,11 @@ def ensure_extended_features_schema():
                        academic_year TEXT DEFAULT '',
                        changed_by TEXT DEFAULT '',
                        note TEXT DEFAULT '',
+                       snapshot_json TEXT DEFAULT '{}',
                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                    )""",
             )
+            db_execute(c, "ALTER TABLE promotion_audit_logs ADD COLUMN IF NOT EXISTS snapshot_json TEXT DEFAULT '{}' ")
             db_execute(c, 'CREATE INDEX IF NOT EXISTS idx_promotion_audit_school_created ON promotion_audit_logs(school_id, created_at DESC)')
             db_execute(
                 c,
@@ -27920,7 +27924,7 @@ def promote_students(school_id, from_class, to_class, action_by_student, term=''
             params.append(term)
         db_execute(
             c,
-            f"""SELECT student_id, firstname, first_year_class, classname, subjects FROM students
+            f"""SELECT student_id, firstname, first_year_class, classname, stream, subjects, scores, promoted FROM students
                        {where}""",
             tuple(params),
         )
@@ -27930,6 +27934,9 @@ def promote_students(school_id, from_class, to_class, action_by_student, term=''
             student_name = row[1] or ''
             current_first_year_class = row[2] or ''
             current_classname = row[3] or ''
+            current_stream = row[4] or ''
+            current_subjects = _safe_json_rows(row[5]) if len(row) > 5 else []
+            current_scores = row[6] if len(row) > 6 else {}
             action = action_by_student.get(student_id, 'repeat')
 
             if action == 'promote':
@@ -27949,9 +27956,8 @@ def promote_students(school_id, from_class, to_class, action_by_student, term=''
                 # so ID start-year is based on JSS entry year.
                 if normalized_to in {'JSS1'} and to_level == 'jss' and from_level != 'jss':
                     new_first_year_class = 'JSS1'
-                existing_subjects = _safe_json_rows(row[4]) if len(row) > 4 else []
                 new_stream = 'N/A'
-                new_subjects = list(existing_subjects) if isinstance(existing_subjects, list) else []
+                new_subjects = list(current_subjects) if isinstance(current_subjects, list) else []
                 if target_class != 'Graduated':
                     target_config = get_class_subject_config(school_id, target_class)
                     if not target_config:
@@ -27987,6 +27993,16 @@ def promote_students(school_id, from_class, to_class, action_by_student, term=''
                     new_subjects = []
                     new_stream = 'N/A'
                 promoted_flag = normalize_promoted_db_value(True)
+                before_snapshot = {
+                    'classname': current_classname,
+                    'first_year_class': current_first_year_class,
+                    'term': term,
+                    'academic_year': academic_year,
+                    'stream': current_stream,
+                    'subjects': current_subjects,
+                    'scores': _safe_json_rows(current_scores),
+                    'promoted': row[7] if len(row) > 7 else 0,
+                }
                 db_execute(
                     c,
                     """UPDATE students
@@ -28015,6 +28031,7 @@ def promote_students(school_id, from_class, to_class, action_by_student, term=''
                     term=term,
                     academic_year=academic_year,
                     changed_by=changed_by,
+                    snapshot=before_snapshot,
                 )
             elif action == 'remove':
                 # Student left school: remove roster and login account for this school.
@@ -28160,7 +28177,7 @@ def _safe_json_rows(raw_value):
         return raw_value
     return []
 
-def log_promotion_audit_row(school_id, student_id, student_name, from_class, to_class, action, term, academic_year, changed_by, note=''):
+def log_promotion_audit_row(school_id, student_id, student_name, from_class, to_class, action, term, academic_year, changed_by, note='', snapshot=None):
     if not ensure_extended_features_schema():
         return
     try:
@@ -28169,8 +28186,8 @@ def log_promotion_audit_row(school_id, student_id, student_name, from_class, to_
             db_execute(
                 c,
                 """INSERT INTO promotion_audit_logs
-                   (school_id, student_id, student_name, from_class, to_class, action, term, academic_year, changed_by, note, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                   (school_id, student_id, student_name, from_class, to_class, action, term, academic_year, changed_by, note, snapshot_json, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
                 (
                     school_id,
                     student_id,
@@ -28182,10 +28199,86 @@ def log_promotion_audit_row(school_id, student_id, student_name, from_class, to_
                     (academic_year or '').strip(),
                     (changed_by or '').strip(),
                     (note or '').strip()[:300],
+                    json.dumps(snapshot or {}, default=str)[:8000],
                 ),
             )
     except Exception as exc:
         _log_suppressed_exception('log_promotion_audit_row', exc)
+
+def undo_promotion_from_audit_row(school_id, audit_row, changed_by=''):
+    school = get_school(school_id) or {}
+    student_id = (audit_row.get('student_id') or '').strip()
+    from_class = canonicalize_classname(audit_row.get('from_class', '') or '')
+    to_class = canonicalize_classname(audit_row.get('to_class', '') or '')
+    term = (audit_row.get('term') or '').strip()
+    academic_year = (audit_row.get('academic_year') or '').strip()
+    if not student_id or not from_class or not to_class:
+        return False, 'Promotion undo requires a valid promote audit row.'
+    if (audit_row.get('action') or '').strip().lower() != 'promote':
+        return False, 'Only promotion actions can be undone from the audit log.'
+    snapshot_raw = audit_row.get('snapshot_json') or audit_row.get('snapshot') or {}
+    if isinstance(snapshot_raw, str):
+        try:
+            snapshot = json.loads(snapshot_raw or '{}')
+        except Exception:
+            snapshot = {}
+    elif isinstance(snapshot_raw, dict):
+        snapshot = snapshot_raw
+    else:
+        snapshot = {}
+    restore_class = snapshot.get('classname') or from_class
+    restore_first_year_class = snapshot.get('first_year_class') or ''
+    restore_stream = snapshot.get('stream') or ''
+    restore_subjects = snapshot.get('subjects')
+    restore_scores = snapshot.get('scores')
+    restore_promoted = snapshot.get('promoted')
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """SELECT student_id, firstname, classname, first_year_class, term, stream, subjects, scores, promoted
+               FROM students
+               WHERE school_id = ? AND student_id = ?""",
+            (school_id, student_id),
+        )
+        row = c.fetchone()
+        if not row:
+            return False, 'Student record was not found.'
+        restored_first_year_class = restore_first_year_class or row[3] or ''
+        promoted_value = normalize_promoted_db_value(restore_promoted if restore_promoted is not None else False)
+        subjects_value = restore_subjects if isinstance(restore_subjects, list) else _safe_json_rows(row[6] if len(row) > 6 else [])
+        scores_value = restore_scores if isinstance(restore_scores, dict) else {}
+        stream_value = (restore_stream or row[5] or '')
+        db_execute(
+            c,
+            """UPDATE students
+               SET classname = ?, first_year_class = ?, promoted = ?, stream = ?, subjects = ?, number_of_subject = ?, scores = ?
+               WHERE school_id = ? AND student_id = ?""",
+            (
+                restore_class,
+                restored_first_year_class,
+                promoted_value,
+                stream_value,
+                json.dumps(subjects_value),
+                len(subjects_value) if isinstance(subjects_value, list) else 0,
+                json.dumps(scores_value),
+                school_id,
+                student_id,
+            ),
+        )
+        log_promotion_audit_row(
+            school_id=school_id,
+            student_id=student_id,
+            student_name=row[1] or audit_row.get('student_name', ''),
+            from_class=to_class,
+            to_class=restore_class,
+            action='repeat',
+            term=term,
+            academic_year=academic_year,
+            changed_by=changed_by,
+            note=f'Undo promotion from {to_class} back to {restore_class}.',
+        )
+    return True, f'{student_id} was restored to {restore_class}.'
 
 def _time_to_minutes(value):
     raw = (value or '').strip()
@@ -41114,6 +41207,63 @@ def school_admin_promotion_audit():
     } for r in rows]
     classes = sorted(set((item.get('from_class') or '') for item in logs if item.get('from_class')))
     return render_template('school/school_admin_promotion_audit.html', logs=logs, classes=classes, selected_class=classname, selected_action=action)
+
+@app.route('/school-admin/promotion-audit/undo', methods=['POST'])
+@require_roles('school_admin')
+def school_admin_undo_promotion():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    student_id = (request.form.get('student_id', '') or '').strip()
+    created_at = (request.form.get('created_at', '') or '').strip()
+    if not student_id or not created_at:
+        flash('Undo requires a valid audit row.', 'error')
+        return redirect(url_for('school_admin_promotion_audit'))
+    with db_connection() as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            """SELECT student_id, student_name, from_class, to_class, action, term, academic_year, changed_by, note, snapshot_json, created_at
+               FROM promotion_audit_logs
+               WHERE school_id = ? AND student_id = ? AND created_at = ?""",
+            (school_id, student_id, created_at),
+        )
+        row = c.fetchone()
+    if not row:
+        flash('Promotion audit row was not found.', 'error')
+        return redirect(url_for('school_admin_promotion_audit'))
+    audit_row = {
+        'student_id': row[0] or '',
+        'student_name': row[1] or '',
+        'from_class': row[2] or '',
+        'to_class': row[3] or '',
+        'action': row[4] or '',
+        'term': row[5] or '',
+        'academic_year': row[6] or '',
+        'changed_by': row[7] or '',
+        'note': row[8] or '',
+        'snapshot_json': row[9] or '{}',
+        'created_at': row[10] or '',
+    }
+    ok, message = undo_promotion_from_audit_row(school_id, audit_row, changed_by=(session.get('user_id') or ''))
+    flash(message, 'success' if ok else 'error')
+    if ok:
+        record_admin_action_audit(
+            school_id,
+            'undo_promotion',
+            target_scope=audit_row.get('student_id', ''),
+            payload={
+                'from_class': audit_row.get('from_class', ''),
+                'to_class': audit_row.get('to_class', ''),
+                'term': audit_row.get('term', ''),
+                'academic_year': audit_row.get('academic_year', ''),
+                'audit_created_at': audit_row.get('created_at', ''),
+            },
+        )
+    return redirect(url_for('school_admin_promotion_audit'))
 
 @app.route('/school-admin/timetable', methods=['GET', 'POST'])
 def school_admin_timetable():

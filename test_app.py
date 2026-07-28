@@ -1182,6 +1182,69 @@ def test_school_admin_publish_results_gracefully_handles_assignment_query_failur
     assert resp.get_data(as_text=True) == "OK"
 
 
+def test_school_admin_undo_promotion_restores_previous_class(app_module, monkeypatch):
+    m = app_module
+    fetched = {}
+
+    monkeypatch.setattr(m, "ensure_extended_features_schema", lambda: True)
+    monkeypatch.setattr(m, "get_school", lambda school_id: {"academic_year": "2025-2026"})
+    monkeypatch.setattr(m, "normalize_promoted_db_value", lambda value: 0)
+
+    class FakeCursor:
+        def __init__(self):
+            self.rows = [("ST1", "Ama", "PRIMARY6", "PRIMARY5", "promote", "Third Term", "2025-2026", "admin_1", "", "2026-07-27 10:00:00")]
+
+        def fetchone(self):
+            return self.rows[0]
+
+    class FakeConn:
+        def cursor(self):
+            return FakeCursor()
+
+    import contextlib
+
+    @contextlib.contextmanager
+    def fake_db_connection(commit=False):
+        yield FakeConn()
+
+    def fake_db_execute(cursor, query, params=None):
+        if "UPDATE students" in str(query):
+            fetched["query"] = query
+            fetched["params"] = params
+
+    monkeypatch.setattr(m, "db_connection", fake_db_connection)
+    monkeypatch.setattr(m, "db_execute", fake_db_execute)
+    monkeypatch.setattr(m, "log_promotion_audit_row", lambda *args, **kwargs: None)
+
+    ok, message = m.undo_promotion_from_audit_row(
+        "SCH1",
+        {
+            "student_id": "ST1",
+            "student_name": "Ama",
+            "from_class": "PRIMARY6",
+            "to_class": "PRIMARY5",
+            "action": "promote",
+            "term": "Third Term",
+            "academic_year": "2025-2026",
+            "changed_by": "admin_1",
+            "snapshot_json": {
+                "classname": "PRIMARY5",
+                "first_year_class": "PRIMARY5",
+                "stream": "A",
+                "subjects": ["Mathematics", "English"],
+                "scores": {"Mathematics": {"overall_mark": 88}},
+                "promoted": 1,
+            },
+        },
+        changed_by="A1",
+    )
+    assert ok is True
+    assert "restored" in message.lower()
+    assert fetched["params"][0] == "PRIMARY5"
+    assert fetched["params"][3] == "A"
+    assert fetched["params"][4] == '["Mathematics", "English"]'
+
+
 def test_assign_teacher_to_class_auto_assigns_primary_subjects(app_module, monkeypatch):
     m = app_module
     captured = {}
