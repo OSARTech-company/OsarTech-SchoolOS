@@ -25945,46 +25945,74 @@ def load_students_for_classes(school_id, classnames, term_filter='', include_arc
             row = list(row)
             principal_comment = (row.pop() or '').strip() if has_principal_comment_col else ''
             teacher_comment = (row.pop() or '').strip() if has_teacher_comment_col else ''
+            row_index = 0
+
+            def take(default=''):
+                nonlocal row_index
+                if row_index >= len(row):
+                    return default
+                value = row[row_index]
+                row_index += 1
+                return value
+
+            student_id = take('')
+            firstname = take('')
+            lastname = take('')
+            email = take('')
+            date_of_birth = take('')
+            gender = take('')
+            classname = take('')
+            first_year_class = take('')
+            term = take('')
+            stream = take('')
+            number_of_subject = take(0)
+            subjects_str = take('[]')
+            scores_str = take('{}')
+            promoted = take(0)
+            parent_phone = ''
+            parent_password_hash = ''
+            parent_name = ''
+            parent_gender = ''
+            parent_name_2 = ''
+            parent_phone_2 = ''
+            parent_password_hash_2 = ''
+            parent_gender_2 = ''
+            is_archived = 0
+            student_phone = ''
+
             if has_parent_cols:
                 if has_parent_multi_cols:
-                    if has_archive_cols:
-                        if has_phone_col:
-                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, is_archived, student_phone = row
-                        else:
-                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, is_archived = row
-                    else:
-                        if has_phone_col:
-                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2, student_phone = row
-                        else:
-                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2 = row
-                        is_archived = 0
+                    parent_phone = take('')
+                    parent_password_hash = take('')
+                    parent_name = take('')
+                    parent_gender = take('')
+                    parent_name_2 = take('')
+                    parent_phone_2 = take('')
+                    parent_password_hash_2 = take('')
+                    parent_gender_2 = take('')
                 else:
-                    if has_archive_cols:
-                        if has_phone_col:
-                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, is_archived, student_phone = row
-                        else:
-                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, is_archived = row
-                    else:
-                        if has_phone_col:
-                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash, student_phone = row
-                        else:
-                            student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, parent_phone, parent_password_hash = row
-                        is_archived = 0
-                    parent_name, parent_gender, parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2 = '', '', '', '', '', ''
+                    parent_phone = take('')
+                    parent_password_hash = take('')
+                if has_archive_cols:
+                    is_archived = take(0)
+                if has_phone_col:
+                    student_phone = take('')
             else:
                 if has_archive_cols:
-                    if has_phone_col:
-                        student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, is_archived, student_phone = row
-                    else:
-                        student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, is_archived = row
-                else:
-                    if has_phone_col:
-                        student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted, student_phone = row
-                    else:
-                        student_id, firstname, lastname, email, date_of_birth, gender, classname, first_year_class, term, stream, number_of_subject, subjects_str, scores_str, promoted = row
-                    is_archived = 0
-                parent_phone, parent_password_hash, parent_name, parent_gender = '', '', '', ''
-                parent_name_2, parent_phone_2, parent_password_hash_2, parent_gender_2 = '', '', '', ''
+                    is_archived = take(0)
+                if has_phone_col:
+                    student_phone = take('')
+            student_phone = (student_phone or '').strip() if has_phone_col else ''
+            if has_parent_cols and not has_parent_multi_cols:
+                parent_name = parent_name or ''
+                parent_gender = parent_gender or ''
+                parent_name_2 = parent_name_2 or ''
+                parent_phone_2 = parent_phone_2 or ''
+                parent_password_hash_2 = parent_password_hash_2 or ''
+                parent_gender_2 = parent_gender_2 or ''
+            if not has_parent_cols:
+                parent_phone = parent_password_hash = parent_name = parent_gender = ''
+                parent_name_2 = parent_phone_2 = parent_password_hash_2 = parent_gender_2 = ''
             student_phone = (student_phone or '').strip() if has_phone_col else ''
             students_data[student_id] = {
                 'firstname': firstname,
@@ -32238,6 +32266,14 @@ def csrf_error(error):
         return redirect(request.referrer or url_for('menu'))
     return redirect(url_for('login'))
 
+
+@app.route('/api/csrf-token')
+def api_csrf_token():
+    """Return a fresh CSRF token for JavaScript-driven actions."""
+    if 'user_id' not in session:
+        return jsonify({'ok': False, 'error': 'Not authenticated'}), 401
+    return jsonify({'ok': True, 'token': csrf.generate_csrf()})
+
 @app.errorhandler(500)
 def internal_server_error(error):
     """Friendly 500 page with error reference for support."""
@@ -34319,6 +34355,59 @@ def super_admin_view_schools():
         overview=overview,
         last_login_at=last_login_at,
         school_type_filter=school_type_filter,
+    )
+
+
+@app.route('/super-admin/data-integrity')
+def super_admin_data_integrity():
+    if session.get('role') != 'super_admin':
+        return redirect(url_for('login'))
+    try:
+        selected_term = (request.args.get('term', '') or '').strip() or ''
+        selected_year = (request.args.get('academic_year', '') or '').strip() or ''
+        schools = get_all_schools() or []
+        summaries = []
+        total_checks = 0
+        total_issues = 0
+        for school in schools:
+            school_id = (school.get('school_id') or '').strip()
+            if not school_id:
+                continue
+            school_term = selected_term or get_current_term(school)
+            school_year = selected_year or (school.get('academic_year') or '')
+            summary, issues = build_school_data_integrity_report(school_id, school_term, school_year)
+            issue_count = int((summary or {}).get('issue_count', 0) or 0)
+            total_checks += int((summary or {}).get('total_checks', 0) or 0)
+            total_issues += issue_count
+            summaries.append({
+                'school_id': school_id,
+                'school_name': school.get('school_name') or school_id,
+                'term': school_term,
+                'academic_year': school_year,
+                'issue_count': issue_count,
+                'total_checks': int((summary or {}).get('total_checks', 0) or 0),
+                'issues': (issues or [])[:5],
+            })
+        summaries.sort(key=lambda item: (-item['issue_count'], item['school_name'].lower()))
+        payload = {
+            'total_schools': len(summaries),
+            'total_checks': total_checks,
+            'total_issues': total_issues,
+            'high_risk_schools': sum(1 for row in summaries if row['issue_count'] > 0),
+        }
+    except Exception as exc:
+        logging.warning("Super admin data integrity scan failed: %s", exc)
+        summaries = []
+        payload = {'total_schools': 0, 'total_checks': 0, 'total_issues': 0, 'high_risk_schools': 0}
+    last_login_at = format_timestamp(get_last_login_at(session.get('user_id')))
+    return render_template(
+        'super/super_admin_data_integrity.html',
+        active_page='data_integrity',
+        overview=payload,
+        schools=summaries,
+        selected_term=selected_term,
+        selected_year=selected_year,
+        last_login_at=last_login_at,
     )
 
 

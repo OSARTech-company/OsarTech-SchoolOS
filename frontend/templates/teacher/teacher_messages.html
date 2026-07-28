@@ -817,8 +817,23 @@
                 return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
             }
 
+            function refreshCsrfToken() {
+                return fetch('/api/csrf-token', { credentials: 'same-origin' })
+                    .then(function (res) { return res.ok ? res.json() : null; })
+                    .then(function (payload) {
+                        if (payload && payload.ok && payload.token) {
+                            csrf.token = payload.token;
+                        }
+                    })
+                    .catch(function () {});
+            }
+
             // Init load
-            renderHistory();
+            if (!csrf.token) {
+                refreshCsrfToken().finally(renderHistory);
+            } else {
+                renderHistory();
+            }
         })();
     </script>
     {% include "shared/_loading_overlay.html" %}

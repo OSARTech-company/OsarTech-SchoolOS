@@ -974,6 +974,16 @@
                 heroSaveBtn.disabled = true;
                 setInlineStatus('Saving stream allocation...', 'success');
 
+                fetch('/api/csrf-token', { credentials: 'same-origin' })
+                    .then(function (res) { return res.ok ? res.json() : null; })
+                    .then(function (payload) {
+                        if (payload && payload.ok && payload.token) {
+                            var csrfInput = form.querySelector('input[name="csrf_token"]');
+                            if (csrfInput) csrfInput.value = payload.token;
+                        }
+                    })
+                    .catch(function () {});
+
                 var controller = new AbortController();
                 submitTimer = setTimeout(function () {
                     controller.abort();

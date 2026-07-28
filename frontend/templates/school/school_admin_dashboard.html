@@ -693,14 +693,21 @@
             statusEl.hidden = false;
             statusEl.textContent = 'Saving mode...';
           }
-          fetch(form.action || window.location.href, {
-            method: 'POST',
-            body: formData,
-            headers: {
-              'X-Requested-With': 'XMLHttpRequest',
-              'Accept': 'application/json'
-            },
-            credentials: 'same-origin'
+          fetch('/api/csrf-token', { credentials: 'same-origin' })
+          .then(function (response) { return response.ok ? response.json() : null; })
+          .then(function (payload) {
+            if (payload && payload.ok && payload.token) {
+              formData.set('csrf_token', payload.token);
+            }
+            return fetch(form.action || window.location.href, {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+              },
+              credentials: 'same-origin'
+            });
           })
           .then(function (response) {
             return response.json().catch(function () { return {}; }).then(function (data) {

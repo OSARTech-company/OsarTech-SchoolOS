@@ -55,6 +55,10 @@
                     <i class="fas fa-robot"></i>
                     <span>Assistant Analytics</span>
                 </a>
+                <a href="{{ url_for('super_admin_data_integrity') }}" class="side-link">
+                    <i class="fas fa-shield-halved"></i>
+                    <span>Data Integrity</span>
+                </a>
                 <a href="{{ url_for('super_admin_webhook_setup') }}" class="side-link">
                     <i class="fas fa-plug"></i>
                     <span>Webhook Setup</span>
@@ -174,7 +178,6 @@
     {% include 'shared/_ai_assistant_widget.html' %}
 </body>
 </html>
-
 
 
 

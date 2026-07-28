@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin Data Integrity</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260411b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='20260228b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-pro.css', v='20260307f') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    {% include "shared/_loading_overlay.html" %}
+    <div class="app-shell topbar-layout">
+        <div class="side-taskbar">
+            <div class="side-brand">
+                <img src="{{ url_for('static', filename='img/osartech-logo.png', v='20260411b') }}" alt="Osartech Logo" class="brand-logo">
+                <span>Super Admin</span>
+            </div>
+            <div class="side-links">
+                <a href="{{ url_for('super_admin_dashboard') }}" class="side-link">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('super_admin_data_integrity') }}" class="side-link active">
+                    <i class="fas fa-shield-halved"></i>
+                    <span>Data Integrity</span>
+                </a>
+                <a href="{{ url_for('super_admin_view_schools') }}" class="side-link">
+                    <i class="fas fa-school"></i>
+                    <span>View Schools</span>
+                </a>
+                <a href="{{ url_for('view_reports') }}" class="side-link">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Reported Issues</span>
+                </a>
+                <form method="post" action="{{ url_for('logout') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="side-link side-link-logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="container">
+                <div class="header">
+                    <h1><i class="fas fa-shield-halved"></i> Global Data Integrity</h1>
+                    <p class="meta-line"><strong>Last Login:</strong> {{ last_login_at }}</p>
+                </div>
+                <div class="card">
+                    <form method="get" class="toolbar">
+                        <div><label>Term</label>
+                            <select name="term">
+                                <option value="">All current terms</option>
+                                {% for t in ['First Term','Second Term','Third Term'] %}
+                                <option value="{{ t }}" {% if selected_term == t %}selected{% endif %}>{{ t }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div><label>Academic Year</label><input name="academic_year" value="{{ selected_year }}"></div>
+                        <button class="btn btn-secondary" type="submit">Run Checks</button>
+                    </form>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card"><h3>{{ overview.total_schools }}</h3><p>Schools Scanned</p></div>
+                    <div class="stat-card"><h3>{{ overview.high_risk_schools }}</h3><p>Schools With Issues</p></div>
+                    <div class="stat-card"><h3>{{ overview.total_checks }}</h3><p>Total Checks</p></div>
+                    <div class="stat-card"><h3>{{ overview.total_issues }}</h3><p>Total Issues</p></div>
+                </div>
+                <div class="card">
+                    <h2>School Scan Results</h2>
+                    <table>
+                        <thead>
+                            <tr><th>School</th><th>Term</th><th>Year</th><th>Issues</th><th>Top Issues</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for row in schools %}
+                            <tr>
+                                <td>{{ row.school_name }}</td>
+                                <td>{{ row.term }}</td>
+                                <td>{{ row.academic_year }}</td>
+                                <td><strong>{{ row.issue_count }}</strong></td>
+                                <td>
+                                    {% if row.issues %}
+                                        {% for issue in row.issues %}
+                                            <div style="margin-bottom:6px;">
+                                                <strong>{{ issue.severity|title }}</strong>: {{ issue.message }}
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        No issues
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5">No schools available for scanning.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/dashboard-menu.js', v='20260306e') }}"></script>
+</body>
+</html>
