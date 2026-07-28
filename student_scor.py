@@ -6288,6 +6288,7 @@ def init_db():
                         pass_mark INTEGER DEFAULT 50,
                         behaviour_grade_mode TEXT DEFAULT 'alpha_ad',
                         show_positions INTEGER DEFAULT 1,
+                        show_third_term_promotion_status INTEGER DEFAULT 1,
                         ss_ranking_mode TEXT DEFAULT 'together',
                         class_arm_ranking_mode TEXT DEFAULT 'separate',
                         combine_third_term_results INTEGER DEFAULT 0,
@@ -6453,6 +6454,7 @@ def init_db():
     safe_exec_ignore('ALTER TABLE schools ADD COLUMN pass_mark INTEGER DEFAULT 50')
     safe_exec_ignore("ALTER TABLE schools ADD COLUMN behaviour_grade_mode TEXT DEFAULT 'alpha_ad'")
     safe_exec_ignore('ALTER TABLE schools ADD COLUMN show_positions INTEGER DEFAULT 1')
+    safe_exec_ignore('ALTER TABLE schools ADD COLUMN show_third_term_promotion_status INTEGER DEFAULT 1')
     safe_exec_ignore("ALTER TABLE schools ADD COLUMN ss_ranking_mode TEXT DEFAULT 'together'")
     safe_exec_ignore("ALTER TABLE schools ADD COLUMN class_arm_ranking_mode TEXT DEFAULT 'separate'")
     safe_exec_ignore("ALTER TABLE schools ADD COLUMN combine_third_term_results INTEGER DEFAULT 0")
@@ -15994,6 +15996,7 @@ def update_school_settings_with_cursor(c, school_id, settings):
     db_execute(c, 'ALTER TABLE schools ADD COLUMN IF NOT EXISTS pass_mark INTEGER DEFAULT 50')
     db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS behaviour_grade_mode TEXT DEFAULT 'alpha_ad'")
     db_execute(c, 'ALTER TABLE schools ADD COLUMN IF NOT EXISTS show_positions INTEGER DEFAULT 1')
+    db_execute(c, 'ALTER TABLE schools ADD COLUMN IF NOT EXISTS show_third_term_promotion_status INTEGER DEFAULT 1')
     db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS ss_ranking_mode TEXT DEFAULT 'together'")
     db_execute(c, "ALTER TABLE schools ADD COLUMN IF NOT EXISTS class_arm_ranking_mode TEXT DEFAULT 'separate'")
     db_execute(c, 'ALTER TABLE schools ADD COLUMN IF NOT EXISTS combine_third_term_results INTEGER DEFAULT 0')
@@ -22396,6 +22399,9 @@ def _build_rich_result_pdf_reportlab(report):
         report.get('grade'),
         report.get('principal_comment'),
     )
+    promotion_status = (report.get('promotion_status') or '').strip()
+    show_third_term_promotion_status = bool(report.get('show_third_term_promotion_status', True))
+    term_is_third = (term or '').strip().lower() == 'third term'
 
     def _decode_signature_ref(ref):
         raw = (ref or '').strip()
@@ -22438,6 +22444,8 @@ def _build_rich_result_pdf_reportlab(report):
         ["Average", _format_mark(average), class_average_label, _format_mark(class_average)],
         ["Grade / Status", f"{grade} / {status}", "", ""],
     ]
+    if term_is_third and promotion_status and show_third_term_promotion_status:
+        meta_data.append(["Promotion Status", promotion_status, "", ""])
     if attendance:
         meta_data.extend([
             [
@@ -39105,6 +39113,7 @@ def _build_school_settings_form_state(school):
         'pass_mark': _normalize_non_negative_int(school.get('pass_mark', 50), 50, 100),
         'behaviour_grade_mode': normalize_behaviour_grade_mode(school.get('behaviour_grade_mode', 'alpha_ad')),
         'show_positions': 1 if int(school.get('show_positions', 1) or 0) else 0,
+        'show_third_term_promotion_status': 1 if int(school.get('show_third_term_promotion_status', 1) or 0) else 0,
         'ss_ranking_mode': (school.get('ss_ranking_mode') or 'together').strip().lower(),
         'class_arm_ranking_mode': (school.get('class_arm_ranking_mode') or 'separate').strip().lower(),
         'combine_third_term_results': 1 if int(school.get('combine_third_term_results', 0) or 0) else 0,
@@ -39168,6 +39177,7 @@ def _build_school_settings_form_state_from_request(school, form_data):
             default=state.get('behaviour_grade_mode', 'alpha_ad'),
         ),
         'show_positions': 1 if (form_data.get('show_positions', str(state.get('show_positions', 1))) or '0').strip() == '1' else 0,
+        'show_third_term_promotion_status': 1 if (form_data.get('show_third_term_promotion_status', str(state.get('show_third_term_promotion_status', 1))) or '0').strip() == '1' else 0,
         'ss_ranking_mode': (form_data.get('ss_ranking_mode', state.get('ss_ranking_mode', 'together')) or 'together').strip().lower(),
         'class_arm_ranking_mode': (form_data.get('class_arm_ranking_mode', state.get('class_arm_ranking_mode', 'separate')) or 'separate').strip().lower(),
         'combine_third_term_results': 1 if (form_data.get('combine_third_term_results', str(state.get('combine_third_term_results', 0))) or '0').strip() == '1' else 0,
@@ -39580,6 +39590,7 @@ def school_admin_settings():
         )
         parent_timetable_show_teacher = 1 if (request.form.get('parent_timetable_show_teacher', '1') or '1').strip() == '1' else 0
         show_positions = 1 if request.form.get('show_positions', str(int(current_school.get('show_positions', 1) or 0))).strip() == '1' else 0
+        show_third_term_promotion_status = 1 if request.form.get('show_third_term_promotion_status', str(int(current_school.get('show_third_term_promotion_status', 1) or 0))).strip() == '1' else 0
         behaviour_grade_mode = normalize_behaviour_grade_mode(
             request.form.get('behaviour_grade_mode', current_school.get('behaviour_grade_mode', 'alpha_ad')),
             default=current_school.get('behaviour_grade_mode', 'alpha_ad') or 'alpha_ad',
@@ -39819,6 +39830,7 @@ def school_admin_settings():
             'pass_mark': pass_mark,
             'behaviour_grade_mode': behaviour_grade_mode,
             'show_positions': show_positions,
+            'show_third_term_promotion_status': show_third_term_promotion_status,
             'ss_ranking_mode': ss_ranking_mode,
             'class_arm_ranking_mode': class_arm_ranking_mode,
             'combine_third_term_results': combine_third,
@@ -55395,6 +55407,8 @@ def download_result_pdf():
         'combine_third_term_results': bool((school or {}).get('combine_third_term_results', 0)),
         'third_term_layout_mode': ((school or {}).get('third_term_layout_mode') or 'term_summary').strip(),
         'school_type': (school or {}).get('school_type', 'mixed'),
+        'promotion_status': get_result_promotion_status(snapshot, target_term),
+        'show_third_term_promotion_status': bool((school or {}).get('show_third_term_promotion_status', 1)),
     }
     pdf_bytes = _build_rich_result_pdf_reportlab(rich_report) or _build_simple_pdf(lines)
     token_term = re.sub(r'[^A-Za-z0-9_-]+', '_', (target_term or 'term').strip())

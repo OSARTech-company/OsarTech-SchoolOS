@@ -2305,7 +2305,7 @@
                         {{ student.Status }}
                     </div>
                 </div>
-                {% if (student.term or '')|string|lower == 'third term' and student.promotion_status %}
+                {% if (student.term or '')|string|lower == 'third term' and student.promotion_status and (school.show_third_term_promotion_status if school else 1) %}
                 <div class="info-row">
                     <div class="info-label">Promotion Status</div>
                     <div class="info-value {{ 'status-pass' if student.promotion_status == 'Promoted' else 'status-fail' }}" style="font-weight: bold;">
