@@ -102,12 +102,12 @@
                     {{ 'Uploaded' if has_teacher_signature else 'Not Uploaded' }}
                   </strong>
                 </p>
-                <p class="note" style="margin-bottom: 12px;">Signature is required only when submitting a class result for approval.</p>
+                <p class="note" style="margin-bottom: 12px;">Signature is optional for class-score submission; it is only used for signed approval workflows.</p>
                 <form action="{{ url_for('teacher_upload_signature') }}" method="POST" enctype="multipart/form-data">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                   <div class="form-group">
                     <label for="teacher_signature">Upload Signature Image (PNG/JPG/WEBP, max 2MB)</label>
-                    <input type="file" id="teacher_signature" name="teacher_signature" accept=".png,.jpg,.jpeg,.webp,image/*" required />
+                    <input type="file" id="teacher_signature" name="teacher_signature" accept=".png,.jpg,.jpeg,.webp,image/*" />
                   </div>
                   <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Save Signature</button>
                 </form>

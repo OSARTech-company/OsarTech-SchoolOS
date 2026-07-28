@@ -41396,6 +41396,7 @@ def school_admin_undo_promotion_class():
         return redirect(url_for('school_admin_promotion_audit', classname=classname, action='promote'))
     undone = 0
     skipped = 0
+    undone_ids = []
     for row in rows:
         audit_row = {
             'student_id': row[0] or '',
@@ -41413,6 +41414,8 @@ def school_admin_undo_promotion_class():
         ok, message = undo_promotion_from_audit_row(school_id, audit_row, changed_by=(session.get('user_id') or ''))
         if ok:
             undone += 1
+            if audit_row.get('student_id'):
+                undone_ids.append(audit_row.get('student_id'))
         else:
             skipped += 1
             logging.info(
@@ -41431,6 +41434,7 @@ def school_admin_undo_promotion_class():
             'academic_year': academic_year,
             'undone': undone,
             'skipped': skipped,
+            'student_ids': undone_ids[:50],
         },
     )
     flash(f'Undo-all completed for {classname}: {undone} reversed, {skipped} skipped.', 'success' if undone else 'info')
@@ -49376,10 +49380,6 @@ def teacher_publish_results():
         return redirect(url_for('teacher_dashboard'))
     teachers = get_teachers(school_id) or {}
     teacher_lookup_id = _lookup_case_insensitive_mapping_key(teachers, teacher_id) or teacher_id
-    teacher_profile = teachers.get(teacher_lookup_id, {})
-    if not (teacher_profile.get('signature_image') or '').strip():
-        flash('Upload your class teacher signature before submitting this class result.', 'error')
-        return redirect(url_for('teacher_dashboard'))
     if not ((school or {}).get('principal_signature_image') or '').strip():
         leadership_label = get_school_leadership_label((school or {}).get('leadership_title', 'principal'))
         flash(f'{leadership_label} signature is required before approval. Ask school admin to upload it with admin password.', 'error')
