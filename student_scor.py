@@ -12276,9 +12276,9 @@ def sync_student_subjects_to_class_config(student, school_id, school=None):
         return False, None
 
     existing_scores = student.get('scores', {}) if isinstance(student.get('scores', {}), dict) else {}
-    # Preserve existing score blocks with tolerant subject-key matching so
-    # config sync does not silently wipe saved scores due key drift.
-    aligned_scores = {}
+    # Keep any already-saved score blocks intact while updating the subject list.
+    # This avoids wiping marks when class configuration is refreshed after entry.
+    aligned_scores = {str(key): dict(value) for key, value in existing_scores.items() if isinstance(value, dict)}
     for subj in desired_subjects:
         block = get_subject_score_block(existing_scores, subj)
         if isinstance(block, dict) and block:
@@ -50528,25 +50528,10 @@ def teacher_enter_scores():
                 current_year,
                 subject_name=subject_name,
             )
-            # Only block if: (1) another teacher is assigned, (2) they're on the SAME class arm (not different arm),
-            # and (3) they haven't submitted yet. This allows teachers on different arms (e.g., 6A vs 6B) to submit independently.
-            if (assigned_teacher and assigned_teacher != teacher_id and assigned_teacher not in submitted_teacher_ids
-                and other_teacher_classname == current_teacher_classname):
-                # Handover-safe: if inherited subject scores are already complete,
-                # do not lock editing just because teacher assignment changed.
-                target = (subject_name or '').strip().lower()
-                pending_count = 0
-                for _sid, st_now in (class_students_for_handover or {}).items():
-                    offered = normalize_subjects_list(st_now.get('subjects', []))
-                    offered_map = {x.lower(): x for x in offered}
-                    offered_key = offered_map.get(target, '')
-                    if not offered_key:
-                        continue
-                    score_block = get_subject_score_block((st_now.get('scores') or {}), offered_key)
-                    if not (is_score_complete_for_subject(score_block, school) and is_score_entry_confirmed(score_block, school)):
-                        pending_count += 1
-                if pending_count > 0:
-                    protected_subjects.add(subject_name)
+            # Lock the subject for the whole class until the assigned teacher submits.
+            # This prevents the class teacher from editing a subject that has been handed over.
+            if (assigned_teacher and assigned_teacher != teacher_id and assigned_teacher not in submitted_teacher_ids):
+                protected_subjects.add(subject_name)
         locked_subjects_for_class = sorted(protected_subjects, key=lambda x: str(x).lower())
     locked_subjects_set = {s.lower() for s in locked_subjects_for_class}
     if class_access:
@@ -56970,22 +56955,9 @@ def is_teacher_subject_sheet_locked(school_id, teacher_id, classname, subject_na
             academic_year,
             subject_name=normalized_subject,
         )
-        # Only block if: (1) another teacher is assigned, (2) they're on the SAME class arm (not different arm),
-        # and (3) they haven't submitted yet. This allows teachers on different arms (e.g., 6A vs 6B) to submit independently.
-        if assigned_teacher and assigned_teacher != teacher_id and assigned_teacher not in submitted_teacher_ids and other_teacher_classname == classname:
-            pending_count = 0
-            target = normalized_subject.lower()
-            for _sid, st_now in (class_students or {}).items():
-                offered = normalize_subjects_list(st_now.get('subjects', []))
-                offered_map = {x.lower(): x for x in offered}
-                offered_key = offered_map.get(target, '')
-                if not offered_key:
-                    continue
-                score_block = get_subject_score_block((st_now.get('scores') or {}), offered_key)
-                if not (is_score_complete_for_subject(score_block, school) and is_score_entry_confirmed(score_block, school)):
-                    pending_count += 1
-            if pending_count > 0:
-                return True
+        # Lock the subject for the whole class until the assigned teacher submits.
+        if assigned_teacher and assigned_teacher != teacher_id and assigned_teacher not in submitted_teacher_ids:
+            return True
     return False
 
 

@@ -1664,6 +1664,38 @@ def test_teacher_enter_scores_does_not_carry_previous_term_scores(client, app_mo
     assert "Old Subject" not in (saved.get("scores") or {})
 
 
+def test_sync_student_subjects_to_class_config_preserves_saved_scores(app_module, monkeypatch):
+    m = app_module
+    monkeypatch.setattr(m, "get_class_subject_config", lambda *args, **kwargs: {
+        "core_subjects": ["Mathematics"],
+        "science_subjects": [],
+        "art_subjects": [],
+        "commercial_subjects": [],
+        "optional_subjects": [],
+    })
+    monkeypatch.setattr(
+        m,
+        "build_subjects_from_config",
+        lambda classname, stream, config, selected_optional_subjects, school: (["Mathematics"], "N/A", None),
+    )
+
+    student = {
+        "classname": "PRIMARY5S",
+        "stream": "A",
+        "subjects": ["Mathematics"],
+        "scores": {
+            "Mathematics": {"overall_mark": 80},
+            "French": {"overall_mark": 65},
+        },
+    }
+
+    changed, err = m.sync_student_subjects_to_class_config(student, "SCH1", school={"ss1_stream_mode": "separate"})
+
+    assert changed is False or err is None
+    assert "Mathematics" in student["scores"]
+    assert "French" in student["scores"]
+
+
 def test_teacher_enter_scores_persists_teacher_comment(client, app_module, monkeypatch):
     m = app_module
     saved_rows = []
