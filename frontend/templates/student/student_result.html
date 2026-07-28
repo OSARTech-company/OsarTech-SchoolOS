@@ -1323,11 +1323,67 @@
             .school-primary-nursery .subjects-table {
                 padding: 12px;
             }
+            .school-primary-nursery .subjects-table .table-title {
+                font-size: 14px;
+            }
+            .school-primary-nursery .subjects-table .table-support {
+                gap: 6px;
+            }
+            .school-primary-nursery .subjects-table .table-pill {
+                width: 100%;
+                justify-content: center;
+                text-align: center;
+            }
             .school-primary-nursery .subjects-table table {
                 display: block;
                 width: 100%;
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
+            }
+            .school-primary-nursery .subject-performance-table tbody tr {
+                margin: 0 0 12px;
+                border-radius: 16px;
+            }
+            .school-primary-nursery .subject-performance-table tbody td {
+                grid-template-columns: minmax(96px, 118px) 1fr;
+                gap: 8px;
+                padding: 9px 10px;
+                font-size: 13px;
+            }
+            .school-primary-nursery .subject-performance-table tbody td:first-child {
+                padding: 12px;
+                font-size: 14px;
+            }
+            .school-primary-nursery .subject-performance-table tbody td::before {
+                font-size: 10px;
+                letter-spacing: 0.06em;
+            }
+            .school-primary-nursery .behaviour-panel {
+                margin: 12px 10px;
+                padding: 12px;
+                border-radius: 18px;
+            }
+            .school-primary-nursery .behaviour-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            .school-primary-nursery .behaviour-card {
+                padding: 12px;
+                border-radius: 16px;
+            }
+            .school-primary-nursery .behaviour-card-header {
+                align-items: center;
+                margin-bottom: 6px;
+            }
+            .school-primary-nursery .behaviour-trait {
+                font-size: 12.5px;
+            }
+            .school-primary-nursery .behaviour-grade-pill {
+                min-width: 34px;
+                padding: 4px 9px;
+            }
+            .school-primary-nursery .behaviour-meaning {
+                font-size: 11.5px;
             }
             .school-primary-nursery .subjects-table th,
             .school-primary-nursery .subjects-table td {
@@ -1352,6 +1408,10 @@
             .school-primary-nursery .action-buttons {
                 margin-left: 10px;
                 margin-right: 10px;
+            }
+            .subject-performance-table tbody td.subject-grade-cell,
+            .subject-performance-table tbody td.subject-position-cell {
+                justify-items: start;
             }
             .header {
                 grid-template-columns: 1fr;
