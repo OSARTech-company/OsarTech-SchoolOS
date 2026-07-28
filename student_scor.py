@@ -41354,6 +41354,87 @@ def school_admin_undo_promotion():
         )
     return redirect(url_for('school_admin_promotion_audit'))
 
+
+@app.route('/school-admin/promotion-audit/undo-class', methods=['POST'])
+@require_roles('school_admin')
+def school_admin_undo_promotion_class():
+    if session.get('role') != 'school_admin':
+        return redirect(url_for('login'))
+    school_id = _normalize_school_id_text(session.get('school_id'))
+    if not school_id:
+        flash('School session is missing. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    ensure_extended_features_schema()
+    classname = canonicalize_classname((request.form.get('classname', '') or '').strip())
+    term = (request.form.get('term', '') or '').strip()
+    academic_year = (request.form.get('academic_year', '') or '').strip()
+    if not classname:
+        flash('Select a class before undoing all promotions.', 'error')
+        return redirect(url_for('school_admin_promotion_audit'))
+    where = ['school_id = ?', 'LOWER(from_class) = LOWER(?)', 'action = ?']
+    params = [school_id, classname, 'promote']
+    if term:
+        where.append('term = ?')
+        params.append(term)
+    if academic_year:
+        where.append('academic_year = ?')
+        params.append(academic_year)
+    with db_connection() as conn:
+        c = conn.cursor()
+        db_execute(
+            c,
+            f"""SELECT student_id, student_name, from_class, to_class, action, term, academic_year, changed_by, note, snapshot_json, created_at
+               FROM promotion_audit_logs
+               WHERE {' AND '.join(where)}
+               ORDER BY created_at DESC, id DESC""",
+            tuple(params),
+        )
+        rows = c.fetchall() or []
+    if not rows:
+        flash('No promotion records were found for that class and filter.', 'info')
+        return redirect(url_for('school_admin_promotion_audit', classname=classname, action='promote'))
+    undone = 0
+    skipped = 0
+    for row in rows:
+        audit_row = {
+            'student_id': row[0] or '',
+            'student_name': row[1] or '',
+            'from_class': row[2] or '',
+            'to_class': row[3] or '',
+            'action': row[4] or '',
+            'term': row[5] or '',
+            'academic_year': row[6] or '',
+            'changed_by': row[7] or '',
+            'note': row[8] or '',
+            'snapshot_json': row[9] or '{}',
+            'created_at': row[10] or '',
+        }
+        ok, message = undo_promotion_from_audit_row(school_id, audit_row, changed_by=(session.get('user_id') or ''))
+        if ok:
+            undone += 1
+        else:
+            skipped += 1
+            logging.info(
+                'Bulk promotion undo skipped: school_id=%s student_id=%s reason=%s',
+                school_id,
+                audit_row.get('student_id', ''),
+                message,
+            )
+    record_admin_action_audit(
+        school_id,
+        'undo_promotion_class',
+        target_scope=classname,
+        payload={
+            'classname': classname,
+            'term': term,
+            'academic_year': academic_year,
+            'undone': undone,
+            'skipped': skipped,
+        },
+    )
+    flash(f'Undo-all completed for {classname}: {undone} reversed, {skipped} skipped.', 'success' if undone else 'info')
+    return redirect(url_for('school_admin_promotion_audit', classname=classname, action='promote'))
+
 @app.route('/school-admin/timetable', methods=['GET', 'POST'])
 def school_admin_timetable():
     if session.get('role') != 'school_admin':
