@@ -35,15 +35,19 @@
             </select>
             <button class="btn btn-secondary" type="submit">Filter</button>
         </form>
-        {% if selected_class %}
-        <form method="post" action="{{ url_for('school_admin_undo_promotion_class') }}" style="margin-top:12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;" onsubmit="return confirm('Undo all promotions for {{ selected_class }}? This will move every promoted student in the current filter back to the previous class.');">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="classname" value="{{ selected_class }}">
-            <input type="hidden" name="term" value="{{ request.args.get('term', '') }}">
-            <input type="hidden" name="academic_year" value="{{ request.args.get('academic_year', '') }}">
-            <button type="submit" class="btn btn-warning">Undo All for {{ selected_class }}</button>
-        </form>
-        {% endif %}
+        <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            {% if selected_class %}
+            <form method="post" action="{{ url_for('school_admin_undo_promotion_class') }}" onsubmit="return confirm('Undo all promotions for {{ selected_class }}? This will move every promoted student in the current filter back to the previous class.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="classname" value="{{ selected_class }}">
+                <input type="hidden" name="term" value="{{ request.args.get('term', '') }}">
+                <input type="hidden" name="academic_year" value="{{ request.args.get('academic_year', '') }}">
+                <button type="submit" class="btn btn-warning">Undo All for {{ selected_class }}</button>
+            </form>
+            {% else %}
+            <span class="compact-badge warning">Select a class above to unlock bulk undo.</span>
+            {% endif %}
+        </div>
     </div>
     <div class="card">
         <table>
@@ -69,8 +73,7 @@
                             {% endif %}
                         <form method="post" action="{{ url_for('school_admin_undo_promotion') }}" onsubmit="return confirm('Undo this promotion? This moves the student back to {{ row.from_class or "the previous class" }}.');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="student_id" value="{{ row.student_id }}">
-                            <input type="hidden" name="created_at" value="{{ row.created_at }}">
+                            <input type="hidden" name="audit_id" value="{{ row.id }}">
                             <button type="submit" class="btn btn-secondary btn-sm">Undo</button>
                         </form>
                         </div>

@@ -2102,6 +2102,51 @@
             margin-left: 18px;
             margin-right: 18px;
         }
+        .pdf-export-mode {
+            background: #ffffff !important;
+        }
+        .pdf-export-mode .report-card {
+            max-width: 1120px !important;
+            margin: 0 auto !important;
+            border-radius: 24px !important;
+            border: 1px solid #d7e0ea !important;
+            box-shadow: none !important;
+        }
+        .pdf-export-mode .header {
+            padding: 22px 24px 20px !important;
+        }
+        .pdf-export-mode .portal-header,
+        .pdf-export-mode .action-buttons {
+            display: none !important;
+        }
+        .pdf-export-mode .hero-ribbon,
+        .pdf-export-mode .student-info,
+        .pdf-export-mode .kpi-strip,
+        .pdf-export-mode .subjects-table,
+        .pdf-export-mode .behaviour-panel,
+        .pdf-export-mode .comment-grid > div,
+        .pdf-export-mode .signatures,
+        .pdf-export-mode .footer-note {
+            margin-left: 18px !important;
+            margin-right: 18px !important;
+        }
+        .pdf-export-mode .kpi-strip {
+            grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+        }
+        .pdf-export-mode .student-info {
+            grid-template-columns: 1.12fr 0.88fr !important;
+        }
+        .pdf-export-mode .subjects-table th,
+        .pdf-export-mode .subjects-table td {
+            font-size: 10px !important;
+            padding: 9px 8px !important;
+        }
+        .pdf-export-mode .behaviour-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+        .pdf-export-mode .comment-grid {
+            grid-template-columns: 1fr 1fr !important;
+        }
     </style>
 </head>
 <body class="report-page{% if is_nursery_primary %} school-primary-nursery{% endif %}" style="--school-primary: {{ school.theme_primary_color if school and school.theme_primary_color else '#1E3C72' }}; --school-secondary: {{ school.theme_secondary_color if school and school.theme_secondary_color else '#2A5298' }}; --school-accent: {{ school.theme_accent_color if school and school.theme_accent_color else '#1F7A8C' }};">
@@ -2733,17 +2778,19 @@
                     const exportScale = phone ? 1.5 : 2;
 
                     exportHost = document.createElement('div');
+                    exportHost.className = 'pdf-export-mode';
                     exportHost.style.position = 'fixed';
                     exportHost.style.left = '-100000px';
                     exportHost.style.top = '0';
-                    exportHost.style.width = '1200px';
+                    exportHost.style.width = '1280px';
                     exportHost.style.background = '#ffffff';
-                    exportHost.style.padding = '24px';
+                    exportHost.style.padding = '0';
                     exportHost.style.zIndex = '-1';
 
                     const clone = reportEl.cloneNode(true);
-                    clone.style.width = '1040px';
-                    clone.style.maxWidth = '1040px';
+                    clone.classList.add('pdf-export-mode');
+                    clone.style.width = '1120px';
+                    clone.style.maxWidth = '1120px';
                     clone.style.margin = '0 auto';
                     clone.style.boxSizing = 'border-box';
                     exportHost.appendChild(clone);
@@ -2756,7 +2803,7 @@
                         logging: false,
                         scrollX: 0,
                         scrollY: 0,
-                        windowWidth: 1200,
+                        windowWidth: 1280,
                     });
                     const imgData = canvas.toDataURL('image/jpeg', 0.95);
                     const { jsPDF } = window.jspdf;

@@ -41275,7 +41275,7 @@ def school_admin_promotion_audit():
         c = conn.cursor()
         db_execute(
             c,
-            f"""SELECT student_id, student_name, from_class, to_class, action, term, academic_year, changed_by, created_at
+            f"""SELECT id, student_id, student_name, from_class, to_class, action, term, academic_year, changed_by, created_at
                 FROM promotion_audit_logs
                 WHERE {' AND '.join(where)}
                 ORDER BY created_at DESC
@@ -41284,15 +41284,16 @@ def school_admin_promotion_audit():
         )
         rows = c.fetchall() or []
     logs = [{
-        'student_id': r[0] or '',
-        'student_name': r[1] or '',
-        'from_class': r[2] or '',
-        'to_class': r[3] or '',
-        'action': r[4] or '',
-        'term': r[5] or '',
-        'academic_year': r[6] or '',
-        'changed_by': r[7] or '',
-        'created_at': format_timestamp(r[8]),
+        'id': r[0] or 0,
+        'student_id': r[1] or '',
+        'student_name': r[2] or '',
+        'from_class': r[3] or '',
+        'to_class': r[4] or '',
+        'action': r[5] or '',
+        'term': r[6] or '',
+        'academic_year': r[7] or '',
+        'changed_by': r[8] or '',
+        'created_at': format_timestamp(r[9]),
     } for r in rows]
     classes = sorted(set((item.get('from_class') or '') for item in logs if item.get('from_class')))
     return render_template('school/school_admin_promotion_audit.html', logs=logs, classes=classes, selected_class=classname, selected_action=action)
@@ -41306,36 +41307,36 @@ def school_admin_undo_promotion():
     if not school_id:
         flash('School session is missing. Please log in again.', 'error')
         return redirect(url_for('login'))
-    student_id = (request.form.get('student_id', '') or '').strip()
-    created_at = (request.form.get('created_at', '') or '').strip()
-    if not student_id or not created_at:
+    audit_id = int(request.form.get('audit_id', 0) or 0)
+    if not audit_id:
         flash('Undo requires a valid audit row.', 'error')
         return redirect(url_for('school_admin_promotion_audit'))
     with db_connection() as conn:
         c = conn.cursor()
         db_execute(
             c,
-            """SELECT student_id, student_name, from_class, to_class, action, term, academic_year, changed_by, note, snapshot_json, created_at
+            """SELECT id, student_id, student_name, from_class, to_class, action, term, academic_year, changed_by, note, snapshot_json, created_at
                FROM promotion_audit_logs
-               WHERE school_id = ? AND student_id = ? AND created_at = ?""",
-            (school_id, student_id, created_at),
+               WHERE school_id = ? AND id = ?""",
+            (school_id, audit_id),
         )
         row = c.fetchone()
     if not row:
         flash('Promotion audit row was not found.', 'error')
         return redirect(url_for('school_admin_promotion_audit'))
     audit_row = {
-        'student_id': row[0] or '',
-        'student_name': row[1] or '',
-        'from_class': row[2] or '',
-        'to_class': row[3] or '',
-        'action': row[4] or '',
-        'term': row[5] or '',
-        'academic_year': row[6] or '',
-        'changed_by': row[7] or '',
-        'note': row[8] or '',
-        'snapshot_json': row[9] or '{}',
-        'created_at': row[10] or '',
+        'id': row[0] or 0,
+        'student_id': row[1] or '',
+        'student_name': row[2] or '',
+        'from_class': row[3] or '',
+        'to_class': row[4] or '',
+        'action': row[5] or '',
+        'term': row[6] or '',
+        'academic_year': row[7] or '',
+        'changed_by': row[8] or '',
+        'note': row[9] or '',
+        'snapshot_json': row[10] or '{}',
+        'created_at': row[11] or '',
     }
     ok, message = undo_promotion_from_audit_row(school_id, audit_row, changed_by=(session.get('user_id') or ''))
     flash(message, 'success' if ok else 'error')
