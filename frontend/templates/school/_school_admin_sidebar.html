@@ -224,6 +224,10 @@
                     <i class="fas fa-square-poll-vertical"></i>
                     <span>Result Settings</span>
                 </a>
+                <a href="{{ url_for('school_admin_settings_results') }}#result-ranking-config" class="side-link">
+                    <i class="fas fa-toggle-on"></i>
+                    <span>Third Term Promotion</span>
+                </a>
                 <a href="{{ url_for('school_admin_settings_branding') }}" class="side-link{% if active_page == 'settings' and active_settings_section == 'branding' %} active{% endif %}">
                     <i class="fas fa-palette"></i>
                     <span>Branding</span>
