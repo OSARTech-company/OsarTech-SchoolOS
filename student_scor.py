@@ -23329,7 +23329,7 @@ def _set_result_published_with_cursor(
         else:
             resolved_teacher_name = str(teacher_id)
     arm = _derive_arm_from_classname(classname, arm)
-    legacy_update_where = "WHERE school_id = ? AND classname = ? AND term = ? AND academic_year = ?"
+    legacy_update_where = "WHERE school_id = ? AND classname = ? AND term = ? AND academic_year = ? AND COALESCE(arm, '') = COALESCE(?, '')"
     try:
         if has_approval_cols:
             update_sql = (
@@ -23548,7 +23548,7 @@ def _set_result_published_with_cursor(
                          is_published = ?,
                          published_at = ?,
                          updated_at = CURRENT_TIMESTAMP
-                       WHERE school_id = ? AND classname = ? AND term = ? AND academic_year = ?""",
+                       WHERE school_id = ? AND classname = ? AND term = ? AND academic_year = ? AND COALESCE(arm, '') = COALESCE(?, '')""",
                     (
                         resolved_teacher_name,
                         resolved_principal_name,
@@ -23558,6 +23558,7 @@ def _set_result_published_with_cursor(
                         classname,
                         term,
                         academic_year or '',
+                        arm or '',
                     ),
                 )
     except Exception as exc:
@@ -23585,6 +23586,7 @@ def _set_result_published_with_cursor(
                     classname,
                     term,
                     academic_year or '',
+                    arm or '',
                 ),
             )
         else:
