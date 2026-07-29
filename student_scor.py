@@ -19339,6 +19339,12 @@ def set_app_setting(key, value):
         )
         return int(c.rowcount or 0)
 
+def get_school_admin_result_live_sync_enabled():
+    stored = (get_app_setting('school_admin_result_live_sync', '1') or '').strip().lower()
+    if stored in {'0', 'false', 'no', 'off'}:
+        return False
+    return True
+
 def get_email_sending_enabled():
     stored = get_app_setting('email_sending_enabled', '')
     if (stored or '').strip() != '':
@@ -37081,6 +37087,7 @@ def school_admin_publish_results():
 
     school_id = session.get('school_id')
     school = get_school(school_id) or {}
+    live_sync_enabled = get_school_admin_result_live_sync_enabled()
     current_term = get_current_term(school)
     current_year = (school or {}).get('academic_year', '')
     selected_term = (request.args.get('term', '') or '').strip() or current_term
@@ -55068,6 +55075,7 @@ def parent_view_result():
 
     school_id, student_id = student_key.split('::', 1)
     school = get_school(school_id) or {}
+    live_sync_enabled = get_school_admin_result_live_sync_enabled()
     current_term = get_current_term(school)
     current_year = (school or {}).get('academic_year', '')
     requested_term = (request.args.get('term', '') or '').strip()
@@ -55128,14 +55136,14 @@ def parent_view_result():
         'profile_image_url': get_student_profile_image_url(student, snapshot),
         'date_of_birth': (student.get('date_of_birth', '') or '').strip(),
         'gender': (student.get('gender', '') or '').strip(),
-        'class_name': snapshot.get('classname', student.get('classname', '')),
+        'class_name': (student.get('classname', '') if live_sync_enabled else snapshot.get('classname', student.get('classname', ''))),
         'class_size': len(class_results or []),
         'class_average': class_average_summary.get('average'),
         'class_average_size': class_average_summary.get('size', 0),
         'class_average_is_stream': class_average_summary.get('is_stream_separate', False),
         'term': target_term,
         'academic_year': target_year,
-        'number_of_subject': snapshot.get('number_of_subject', student.get('number_of_subject', 0)),
+        'number_of_subject': (student.get('number_of_subject', 0) if live_sync_enabled else snapshot.get('number_of_subject', student.get('number_of_subject', 0))),
         'subjects': snapshot.get('scores', {}),
         'behaviour_assessment': snapshot.get('behaviour_assessment', {}),
         'teacher_comment': snapshot.get('teacher_comment', ''),
@@ -55144,13 +55152,13 @@ def parent_view_result():
         'total_score': compute_total_score_from_scores(snapshot.get('scores', {})),
         'Grade': snapshot.get('Grade', 'F'),
         'Status': snapshot.get('Status', 'Fail'),
-        'promotion_status': get_result_promotion_status(student, target_term),
+        'promotion_status': get_result_promotion_status(student if live_sync_enabled else snapshot, target_term),
     }
     result_student.update(
         build_result_term_attendance_data(
             school_id=school_id,
             student_id=student_id,
-            classname=snapshot.get('classname', student.get('classname', '')),
+            classname=(student.get('classname', '') if live_sync_enabled else snapshot.get('classname', student.get('classname', ''))),
             term=target_term,
             academic_year=target_year,
         )
@@ -55449,6 +55457,7 @@ def teacher_student_result():
         return redirect(url_for('teacher_dashboard'))
 
     school = get_school(school_id) or {}
+    live_sync_enabled = get_school_admin_result_live_sync_enabled()
     current_term = get_current_term(school)
     current_year = (school or {}).get('academic_year', '')
     published_terms = get_published_terms_for_student(school_id, sid)
@@ -55519,14 +55528,14 @@ def teacher_student_result():
         'profile_image_url': get_student_profile_image_url(student, snapshot),
         'date_of_birth': (student.get('date_of_birth', '') or '').strip(),
         'gender': (student.get('gender', '') or '').strip(),
-        'class_name': snapshot_class,
+        'class_name': (student.get('classname', '') if live_sync_enabled else snapshot_class),
         'class_size': len(class_results or []),
         'class_average': class_average_summary.get('average'),
         'class_average_size': class_average_summary.get('size', 0),
         'class_average_is_stream': class_average_summary.get('is_stream_separate', False),
         'term': target_term,
         'academic_year': target_year,
-        'number_of_subject': snapshot.get('number_of_subject', student.get('number_of_subject', 0)),
+        'number_of_subject': (student.get('number_of_subject', 0) if live_sync_enabled else snapshot.get('number_of_subject', student.get('number_of_subject', 0))),
         'subjects': snapshot.get('scores', {}),
         'behaviour_assessment': snapshot.get('behaviour_assessment', {}),
         'teacher_comment': snapshot.get('teacher_comment', ''),
@@ -55535,7 +55544,7 @@ def teacher_student_result():
         'total_score': compute_total_score_from_scores(snapshot.get('scores', {})),
         'Grade': snapshot.get('Grade', 'F'),
         'Status': snapshot.get('Status', 'Fail'),
-        'promotion_status': get_result_promotion_status(student, target_term),
+        'promotion_status': get_result_promotion_status(student if live_sync_enabled else snapshot, target_term),
     }
     result_student.update(
         build_result_term_attendance_data(
@@ -56504,10 +56513,11 @@ def check_result():
         session['school_id'] = school_id
         session['must_change_password'] = True
         session['post_password_change_redirect'] = url_for('student_portal')
-        flash('This is your first login. Change your default password to continue.', 'error')
+        flash('First login detected. Change your default password to continue to your result.', 'error')
         return redirect(url_for('student_change_password'))
     school = get_school(school_id) or {}
     live_student = load_student(school_id, sid) or {}
+    live_sync_enabled = get_school_admin_result_live_sync_enabled()
     published_terms = filter_visible_terms_for_student(school, get_published_terms_for_student(school_id, sid))
     if not published_terms:
         if safe_int((school or {}).get('operations_enabled', 1), 1):
@@ -56539,21 +56549,25 @@ def check_result():
         return redirect(url_for('student_portal'))
     record_result_view(school_id, sid, target_term, snapshot.get('academic_year', target_year))
 
-    exam_config = get_assessment_config_for_class(school_id, snapshot.get('classname', ''))
-    class_results = load_published_class_results(school_id, snapshot.get('classname', ''), target_term, target_year, school=school)
+    display_classname = (live_student.get('classname') or snapshot.get('classname') or classname or '').strip() if live_sync_enabled else (snapshot.get('classname') or classname or '').strip()
+    display_stream = (live_student.get('stream') or snapshot.get('stream') or stream or '').strip() if live_sync_enabled else (snapshot.get('stream') or stream or '').strip()
+    display_number_of_subject = safe_int(live_student.get('number_of_subject', snapshot.get('number_of_subject', number_of_subject)), snapshot.get('number_of_subject', number_of_subject)) if live_sync_enabled else safe_int(snapshot.get('number_of_subject', number_of_subject), number_of_subject)
+
+    exam_config = get_assessment_config_for_class(school_id, display_classname)
+    class_results = load_published_class_results(school_id, display_classname, target_term, target_year, school=school)
     class_average_summary = build_class_average_from_published_results(
         school,
-        snapshot.get('classname', ''),
+        display_classname,
         class_results,
-        student_stream=snapshot.get('stream', ''),
+        student_stream=display_stream,
     )
     position, subject_positions = build_positions_from_published_results(
         school=school,
-        classname=snapshot.get('classname', ''),
+        classname=display_classname,
         term=target_term,
         class_results=class_results,
         student_id=sid,
-        student_stream=snapshot.get('stream', ''),
+        student_stream=display_stream,
         subjects=snapshot.get('subjects', []),
     )
 
@@ -56561,15 +56575,15 @@ def check_result():
         'first_name': snapshot.get('firstname', firstname),
         'student_id': sid,
         'profile_image_url': get_student_profile_image_url(live_student, snapshot),
-        'class_name': snapshot.get('classname', classname),
+        'class_name': display_classname,
         'class_size': len(class_results or []),
         'class_average': class_average_summary.get('average'),
         'class_average_size': class_average_summary.get('size', 0),
         'class_average_is_stream': class_average_summary.get('is_stream_separate', False),
         'term': target_term,
         'academic_year': target_year,
-        'stream': snapshot.get('stream', stream),
-        'number_of_subject': snapshot.get('number_of_subject', number_of_subject),
+        'stream': display_stream,
+        'number_of_subject': display_number_of_subject,
         'subjects': snapshot.get('scores', {}),
         'behaviour_assessment': snapshot.get('behaviour_assessment', {}),
         'teacher_comment': snapshot.get('teacher_comment', ''),
@@ -56578,13 +56592,13 @@ def check_result():
         'total_score': compute_total_score_from_scores(snapshot.get('scores', {})),
         'Grade': snapshot.get('Grade', 'F'),
         'Status': snapshot.get('Status', 'Fail'),
-        'promotion_status': get_result_promotion_status(live_student, target_term)
+        'promotion_status': get_result_promotion_status(live_student if live_sync_enabled else snapshot, target_term)
     }
     student.update(
         build_result_term_attendance_data(
             school_id=school_id,
             student_id=sid,
-            classname=snapshot.get('classname', classname),
+            classname=display_classname,
             term=target_term,
             academic_year=target_year,
         )
@@ -56592,7 +56606,7 @@ def check_result():
     result_max_tests = detect_max_tests_from_scores(snapshot.get('scores', {}), school.get('max_tests', 3))
     signoff = get_result_signoff_details(
         school_id,
-        snapshot.get('classname', ''),
+        display_classname,
         target_term,
         target_year,
     )
@@ -56605,7 +56619,7 @@ def check_result():
         student_id=sid,
         term=target_term,
         academic_year=target_year,
-        classname=snapshot.get('classname', ''),
+        classname=display_classname,
     )
     
     return render_template(
@@ -58354,21 +58368,26 @@ def super_admin_system_settings():
     if request.method == 'POST':
         email_enabled = (request.form.get('email_sending_enabled', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
         sms_enabled = (request.form.get('sms_sending_enabled', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+        result_live_sync_enabled = (request.form.get('school_admin_result_live_sync', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
         set_app_setting('email_sending_enabled', '1' if email_enabled else '0')
         set_app_setting('sms_sending_enabled', '1' if sms_enabled else '0')
+        set_app_setting('school_admin_result_live_sync', '1' if result_live_sync_enabled else '0')
         flash('System settings updated.', 'success')
         return redirect(url_for('super_admin_system_settings'))
 
     email_setting_raw = (get_app_setting('email_sending_enabled', '') or '').strip()
     sms_setting_raw = (get_app_setting('sms_sending_enabled', '') or '').strip()
+    result_live_sync_raw = (get_app_setting('school_admin_result_live_sync', '1') or '').strip()
     email_override_set = email_setting_raw != ''
     sms_override_set = sms_setting_raw != ''
     return render_template(
         'super/super_admin_system_settings.html',
         email_enabled=get_email_sending_enabled(),
         sms_enabled=get_sms_sending_enabled(),
+        result_live_sync_enabled=get_school_admin_result_live_sync_enabled(),
         email_override_set=email_override_set,
         sms_override_set=sms_override_set,
+        result_live_sync_override_set=result_live_sync_raw != '',
         email_env_enabled=bool(EMAIL_SENDING_ENABLED),
         sms_env_enabled=bool(SMS_SENDING_ENABLED),
     )
