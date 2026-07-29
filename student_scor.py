@@ -52034,6 +52034,9 @@ def student_change_password():
         upsert_user(username, hash_password(new_password), 'student', school_id)
         session.pop('must_change_password', None)
         flash('Password changed successfully.', 'success')
+        next_url = session.pop('post_password_change_redirect', '')
+        if next_url:
+            return redirect(next_url)
         return redirect(url_for('student_dashboard'))
 
     return render_template(
@@ -56495,6 +56498,14 @@ def check_result():
         update_user_school_id_only(user.get('username'), school_id)
     clear_failed_login('check_result', student_id, client_ip)
     record_login_audit(student_id, 'student', school_id, 'check_result', True, '')
+    if is_default_student_password(user.get('password_hash', '')):
+        session['user_id'] = user.get('username') or student_id
+        session['role'] = 'student'
+        session['school_id'] = school_id
+        session['must_change_password'] = True
+        session['post_password_change_redirect'] = url_for('student_portal')
+        flash('This is your first login. Change your default password to continue.', 'error')
+        return redirect(url_for('student_change_password'))
     school = get_school(school_id) or {}
     live_student = load_student(school_id, sid) or {}
     published_terms = filter_visible_terms_for_student(school, get_published_terms_for_student(school_id, sid))

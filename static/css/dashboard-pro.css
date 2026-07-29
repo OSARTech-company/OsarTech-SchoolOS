@@ -1461,10 +1461,16 @@ button:disabled {
 }
 
 .flash {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: min(420px, calc(100vw - 32px));
   border-radius: 10px;
   border: 1px solid transparent;
   padding: 12px 14px;
   margin-bottom: 14px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+  z-index: 2147483005;
 }
 
 .flash.success {
@@ -1487,13 +1493,12 @@ button:disabled {
 
 .flash,
 .premium-toast-container {
-  position: relative;
-  z-index: 5000;
+  z-index: 2147483000;
 }
 
 body.has-global-footer .flash,
 body.has-global-footer .premium-toast-container {
-  z-index: 2147483000;
+  z-index: 2147483005;
 }
 
 body.has-global-footer .main-content .flash:first-of-type {

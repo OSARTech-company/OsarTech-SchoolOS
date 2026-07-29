@@ -93,6 +93,30 @@
             display: none !important;
         }
 
+        .flash-messages {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: min(420px, calc(100vw - 32px));
+            z-index: 2147483005;
+            pointer-events: none;
+        }
+
+        .flash-messages .flash {
+            pointer-events: auto;
+            margin-bottom: 12px;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+        }
+
+        @media (max-width: 640px) {
+            .flash-messages {
+                top: 12px;
+                right: 12px;
+                left: 12px;
+                width: auto;
+            }
+        }
+
         .portal-header {
             background: linear-gradient(135deg, #113765 0%, var(--school-secondary) 58%, #3f6fb7 100%);
             color: white;
