@@ -523,22 +523,6 @@
                                 <div class="value">{{ '%.1f'|format(average_value) }}%</div>
                                 <div class="meta">Latest published performance snapshot</div>
                             </div>
-                            <div class="hero-summary-card">
-                                <span class="label">Current Standing</span>
-                                <div class="value">{{ display_grade_label(grade_text, school) or '-' }}</div>
-                                <div class="meta">
-                                    {% if status_text %}
-                                    <span class="status-pill {{ status_class }}">{{ status_text }}</span>
-                                    {% else %}
-                                    Awaiting published status
-                                    {% endif %}
-                                    {% if (student.term or '')|string|lower == 'third term' and student.promotion_status %}
-                                    <div style="margin-top:8px;">
-                                        <span class="status-pill {{ 'is-pass' if student.promotion_status == 'Promoted' else 'is-fail' }}">{{ student.promotion_status }}</span>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </section>
@@ -554,26 +538,6 @@
                         <div class="value">{{ grade_text or '-' }}</div>
                         <div class="sub">Overall academic grade</div>
                     </div>
-                    <div class="metric-card">
-                        <span class="label">Status</span>
-                        <div class="value">
-                            {% if status_text %}
-                            <span class="status-pill {{ status_class }}">{{ status_text }}</span>
-                            {% else %}
-                            -
-                            {% endif %}
-                        </div>
-                        <div class="sub">Result decision from published snapshot</div>
-                    </div>
-                    {% if (student.term or '')|string|lower == 'third term' and student.promotion_status %}
-                    <div class="metric-card">
-                        <span class="label">Promotion</span>
-                        <div class="value">
-                            <span class="status-pill {{ 'is-pass' if student.promotion_status == 'Promoted' else 'is-fail' }}">{{ student.promotion_status }}</span>
-                        </div>
-                        <div class="sub">Shown only on the Third Term result</div>
-                    </div>
-                    {% endif %}
                     <div class="metric-card">
                         <span class="label">Messages</span>
                         <div class="value">{{ unread_student_messages or 0 }}</div>

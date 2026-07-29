@@ -23609,6 +23609,54 @@ def set_result_published(school_id, classname, term, academic_year, teacher_id, 
             arm=arm,
         )
 
+def refresh_published_result_rows_for_class_term(school_id, classname, term, academic_year='', arm=''):
+    """Recompute stored published grades/statuses from saved scores for one class-term."""
+    school = get_school(school_id) or {}
+    grade_cfg = get_grade_config(school_id)
+    rows = get_published_students_for_class(school_id, classname, term, academic_year)
+    if arm:
+        rows = [row for row in rows if (row.get('stream', '') or '').strip().lower() == (arm or '').strip().lower()]
+    refreshed_count = 0
+    with db_connection(commit=True) as conn:
+        c = conn.cursor()
+        for row in rows:
+            student_id = (row.get('student_id') or '').strip()
+            if not student_id:
+                continue
+            snapshot = load_published_student_result(
+                school_id,
+                student_id,
+                term,
+                academic_year,
+                classname=classname,
+                allow_combination=False,
+            ) or {}
+            scores = snapshot.get('scores', {}) if isinstance(snapshot.get('scores', {}), dict) else {}
+            subjects = snapshot.get('subjects', []) if isinstance(snapshot.get('subjects', []), list) else []
+            average_marks = compute_average_marks_from_scores(scores, subjects=subjects)
+            grade = grade_from_score(average_marks, grade_cfg)
+            status = status_from_score(average_marks, grade_cfg)
+            db_execute(
+                c,
+                """UPDATE published_student_results
+                   SET average_marks = ?, grade = ?, status = ?, published_at = CURRENT_TIMESTAMP
+                   WHERE school_id = ? AND student_id = ? AND term = ?
+                     AND COALESCE(academic_year, '') = COALESCE(?, '')
+                     AND LOWER(classname) = LOWER(?)""",
+                (
+                    float(average_marks),
+                    grade,
+                    status,
+                    school_id,
+                    student_id,
+                    term,
+                    academic_year or '',
+                    classname,
+                ),
+            )
+            refreshed_count += 1
+    return refreshed_count
+
 def is_result_published(school_id, classname, term, academic_year='', arm=''):
     arm = _derive_arm_from_classname(classname, arm)
     with db_connection() as conn:
@@ -50050,7 +50098,22 @@ def school_admin_relock_term_edit():
         unlocked_by=admin_user_id,
         arm=arm,
     )
-    flash(f'Edit lock restored for {classname} ({term}).', 'success')
+    try:
+        refreshed_count = refresh_published_result_rows_for_class_term(
+            school_id,
+            classname,
+            term,
+            academic_year,
+            arm=arm,
+        )
+    except Exception as exc:
+        logging.exception("Failed to refresh published result rows on relock.")
+        flash(f'Edit lock restored for {classname} ({term}), but result refresh failed: {exc}', 'error')
+        return redirect(url_for('school_admin_publish_results'))
+    flash(
+        f'Edit lock restored for {classname} ({term}) and {refreshed_count} published result(s) refreshed.',
+        'success',
+    )
     return redirect(url_for('school_admin_publish_results'))
 
 @app.route('/school-admin/student/reset-password', methods=['POST'])
