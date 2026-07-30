@@ -97,6 +97,37 @@
                 </div>
 
                 <div class="card">
+                    <h3 class="no-margin">Third-Term Promotion Visibility</h3>
+                    <p class="note">Use this master switch to show or hide the promotion status area on Third Term result pages for all schools.</p>
+                    <div class="mt-10">
+                        {% if total_school_count %}
+                            {% if third_term_promotion_enabled_count == total_school_count %}
+                                <span class="pill ok"><i class="fas fa-eye"></i> Enabled for all schools</span>
+                            {% elif third_term_promotion_enabled_count == 0 %}
+                                <span class="pill warn"><i class="fas fa-eye-slash"></i> Disabled for all schools</span>
+                            {% else %}
+                                <span class="pill warn"><i class="fas fa-circle-half-stroke"></i> Mixed across schools</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="pill warn"><i class="fas fa-circle-info"></i> No schools found</span>
+                        {% endif %}
+                    </div>
+                    <form method="post" class="mt-12" onsubmit="return confirm('Apply this third-term promotion visibility change to all schools?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="toggle_scope" value="all_schools">
+                        <input type="hidden" name="confirm_global_toggle" value="1">
+                        <div class="toggle-row">
+                            <input type="checkbox" id="third_term_promotion_visible" name="third_term_promotion_visible" value="1" {% if third_term_promotion_enabled_count != 0 %}checked{% endif %}>
+                            <label for="third_term_promotion_visible"><strong>Show Third-Term Promotion Status</strong></label>
+                        </div>
+                        <p class="note mt-10">Turn this off to hide the promotion badge and status blocks on student result pages.</p>
+                        <div class="mt-12">
+                            <button type="submit" class="btn btn-warning">Save Global Visibility</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
                     <h3 class="no-margin">Notes</h3>
                     <ul class="note mt-10">
                         <li>Delivery requires SMTP (email) or Twilio/SMS provider credentials.</li>

@@ -42471,7 +42471,14 @@ def parent_submit_dispute():
         return redirect(url_for('parent_dashboard'))
     school_id, student_id = student_key.split('::', 1)
     school = get_school(school_id) or {}
-    published_terms = filter_visible_terms_for_student(school, get_published_terms_for_student(school_id, student_id))
+    student = load_student(school_id, student_id)
+    if not student:
+        flash('Student not found.', 'error')
+        return redirect(url_for('parent_dashboard'))
+    published_terms = filter_visible_terms_for_student(
+        school,
+        get_published_terms_for_student(school_id, student_id, classname=student.get('classname', '')),
+    )
     if request.method == 'POST':
         title = (request.form.get('title', '') or '').strip()
         details = (request.form.get('details', '') or '').strip()
@@ -51903,7 +51910,7 @@ def student_dashboard():
 
     visible_terms = filter_visible_terms_for_student(
         school,
-        get_published_terms_for_student(school_id, student_id),
+        get_published_terms_for_student(school_id, student_id, classname=student.get('classname', '')),
     )
     if visible_terms:
         target = pick_default_published_term(visible_terms, current_term, current_year)
@@ -51913,6 +51920,7 @@ def student_dashboard():
                 student_id,
                 target.get('term', ''),
                 target.get('academic_year', ''),
+                classname=student.get('classname', ''),
             )
             if snapshot:
                 my_data.update({
@@ -55151,7 +55159,7 @@ def parent_view_result():
 
     published_terms = filter_visible_terms_for_student(
         school,
-        get_published_terms_for_student(school_id, student_id),
+        get_published_terms_for_student(school_id, student_id, classname=student.get('classname', '')),
     )
     if not published_terms:
         flash('No published result available yet for this student.', 'error')
@@ -55172,7 +55180,7 @@ def parent_view_result():
     target_term = target_entry['term']
     target_year = target_entry.get('academic_year', '')
     current_term_token = target_entry['token']
-    snapshot = load_published_student_result(school_id, student_id, target_term, target_year)
+    snapshot = load_published_student_result(school_id, student_id, target_term, target_year, classname=student.get('classname', ''))
     if not snapshot:
         flash('Published result snapshot not found.', 'error')
         return redirect(url_for('parent_dashboard'))
@@ -55996,7 +56004,7 @@ def school_admin_student_result():
         target_year = target_entry.get('academic_year', '')
         current_term_token = target_entry['token']
 
-        snapshot = load_published_student_result(school_id, sid, target_term, target_year)
+        snapshot = load_published_student_result(school_id, sid, target_term, target_year, classname=student.get('classname', ''))
         if not snapshot:
             flash('Published result snapshot not found.', 'error')
             return redirect(url_for('school_admin_dashboard'))
@@ -56139,7 +56147,7 @@ def school_admin_correct_result():
     target_term = target_entry.get('term', '')
     target_year = target_entry.get('academic_year', '')
     target_token = target_entry.get('token', _term_token(target_year, target_term))
-    snapshot = load_published_student_result(school_id, sid, target_term, target_year)
+    snapshot = load_published_student_result(school_id, sid, target_term, target_year, classname=student.get('classname', ''))
     if not snapshot:
         flash('Published snapshot not found for correction.', 'error')
         return redirect(url_for('school_admin_student_result', student_id=sid, term=target_token))
@@ -56608,7 +56616,7 @@ def check_result():
     target_year = target_entry.get('academic_year', '')
     current_term_token = target_entry['token']
 
-    snapshot = load_published_student_result(school_id, sid, target_term, target_year)
+    snapshot = load_published_student_result(school_id, sid, target_term, target_year, classname=student.get('classname', ''))
     if not snapshot:
         flash('Published result snapshot not found.', 'error')
         return redirect(url_for('student_portal'))
@@ -58434,6 +58442,30 @@ def super_admin_system_settings():
         email_enabled = (request.form.get('email_sending_enabled', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
         sms_enabled = (request.form.get('sms_sending_enabled', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
         result_live_sync_enabled = (request.form.get('school_admin_result_live_sync', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+        third_term_promotion_visible = (request.form.get('third_term_promotion_visible', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+        confirm_global_toggle = (request.form.get('confirm_global_toggle', '') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+        if request.form.get('toggle_scope') == 'all_schools':
+            if not confirm_global_toggle:
+                flash('Please confirm the global third-term promotion toggle before saving.', 'error')
+                return redirect(url_for('super_admin_system_settings'))
+            try:
+                with db_connection(commit=True) as conn:
+                    c = conn.cursor()
+                    db_execute(
+                        c,
+                        "UPDATE schools SET show_third_term_promotion_status = ?, updated_at = ?",
+                        (1 if third_term_promotion_visible else 0, datetime.now()),
+                    )
+                _prune_school_cache()
+                flash(
+                    f"Third-term promotion visibility was {'enabled' if third_term_promotion_visible else 'disabled'} for all schools.",
+                    'success',
+                )
+            except Exception as exc:
+                logging.exception("Failed to update third-term promotion visibility for all schools.")
+                flash(f'Failed to update third-term promotion visibility: {exc}', 'error')
+                return redirect(url_for('super_admin_system_settings'))
+            return redirect(url_for('super_admin_system_settings'))
         set_app_setting('email_sending_enabled', '1' if email_enabled else '0')
         set_app_setting('sms_sending_enabled', '1' if sms_enabled else '0')
         set_app_setting('school_admin_result_live_sync', '1' if result_live_sync_enabled else '0')
@@ -58445,6 +58477,19 @@ def super_admin_system_settings():
     result_live_sync_raw = (get_app_setting('school_admin_result_live_sync', '1') or '').strip()
     email_override_set = email_setting_raw != ''
     sms_override_set = sms_setting_raw != ''
+    third_term_promotion_enabled_count = 0
+    total_school_count = 0
+    try:
+        with db_connection() as conn:
+            c = conn.cursor()
+            db_execute(c, 'SELECT COUNT(*) FROM schools')
+            row = c.fetchone()
+            total_school_count = int(row[0] or 0) if row else 0
+            db_execute(c, 'SELECT COUNT(*) FROM schools WHERE COALESCE(show_third_term_promotion_status, 1) = 1')
+            row = c.fetchone()
+            third_term_promotion_enabled_count = int(row[0] or 0) if row else 0
+    except Exception as exc:
+        logging.warning("Failed to load global third-term promotion visibility counts: %s", exc)
     return render_template(
         'super/super_admin_system_settings.html',
         email_enabled=get_email_sending_enabled(),
@@ -58455,6 +58500,8 @@ def super_admin_system_settings():
         result_live_sync_override_set=result_live_sync_raw != '',
         email_env_enabled=bool(EMAIL_SENDING_ENABLED),
         sms_env_enabled=bool(SMS_SENDING_ENABLED),
+        third_term_promotion_enabled_count=third_term_promotion_enabled_count,
+        total_school_count=total_school_count,
     )
 
 @app.route('/super-admin/testimonials', methods=['GET', 'POST'])
