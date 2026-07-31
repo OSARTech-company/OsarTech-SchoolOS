@@ -56591,7 +56591,10 @@ def check_result():
     school = get_school(school_id) or {}
     live_student = load_student(school_id, sid) or {}
     live_sync_enabled = get_school_admin_result_live_sync_enabled()
-    published_terms = filter_visible_terms_for_student(school, get_published_terms_for_student(school_id, sid))
+    published_terms = filter_visible_terms_for_student(
+        school,
+        get_published_terms_for_student(school_id, sid, classname=classname),
+    )
     if not published_terms:
         if safe_int((school or {}).get('operations_enabled', 1), 1):
             flash('No published result available yet.', 'error')
@@ -56616,7 +56619,7 @@ def check_result():
     target_year = target_entry.get('academic_year', '')
     current_term_token = target_entry['token']
 
-    snapshot = load_published_student_result(school_id, sid, target_term, target_year, classname=student.get('classname', ''))
+    snapshot = load_published_student_result(school_id, sid, target_term, target_year, classname=classname)
     if not snapshot:
         flash('Published result snapshot not found.', 'error')
         return redirect(url_for('student_portal'))
