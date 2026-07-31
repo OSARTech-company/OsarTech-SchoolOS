@@ -56147,7 +56147,7 @@ def school_admin_correct_result():
     target_term = target_entry.get('term', '')
     target_year = target_entry.get('academic_year', '')
     target_token = target_entry.get('token', _term_token(target_year, target_term))
-    snapshot = load_published_student_result(school_id, sid, target_term, target_year, classname=student.get('classname', ''))
+    snapshot = load_published_student_result(school_id, sid, target_term, target_year, classname=classname)
     if not snapshot:
         flash('Published snapshot not found for correction.', 'error')
         return redirect(url_for('school_admin_student_result', student_id=sid, term=target_token))
