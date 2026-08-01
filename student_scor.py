@@ -22596,29 +22596,6 @@ def _build_rich_result_pdf_reportlab(report):
         story.append(behaviour_table)
         story.append(Spacer(1, 8))
 
-    comment_rows = []
-    if teacher_comment:
-        comment_rows.append(["Teacher Comment", Paragraph(_pdf_escape(teacher_comment), styles['Normal'])])
-    if principal_comment:
-        comment_rows.append([f"{leadership_label} Comment", Paragraph(_pdf_escape(principal_comment), styles['Normal'])])
-    if comment_rows:
-        comment_table = Table(comment_rows, colWidths=[38 * mm, 134 * mm])
-        comment_table.setStyle(
-            TableStyle([
-                ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#8b8f94')),
-                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f3f5f7')),
-                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 8.5),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 5),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-                ('TOPPADDING', (0, 0), (-1, -1), 4),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ])
-        )
-        story.append(comment_table)
-        story.append(Spacer(1, 8))
-
     signature_table = Table(
         [
             ["Teacher Signature", f"{leadership_label} Signature"],

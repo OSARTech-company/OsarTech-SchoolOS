@@ -534,7 +534,7 @@
         .status-fail { color: #dc3545; }
 
         .subjects-table {
-            margin: 22px;
+            margin: 20px 18px;
             padding: 16px;
             background: #fff;
             border: 1px solid var(--school-border-soft);
@@ -592,9 +592,14 @@
         .table-wrap {
             width: 100%;
             overflow-x: auto;
+            overflow-y: hidden;
             border: 1px solid var(--school-border-soft);
             border-radius: 14px;
             background: #fff;
+        }
+
+        .subjects-table table {
+            min-width: 920px;
         }
 
         th, td {
@@ -635,7 +640,7 @@
             text-align: left;
             font-weight: 700;
             color: var(--school-ink);
-            min-width: 180px;
+            min-width: 170px;
             background: linear-gradient(90deg, rgba(42, 82, 152, 0.05), rgba(42, 82, 152, 0));
         }
         .score-cell {
@@ -664,6 +669,22 @@
         .summary-row td {
             padding-top: 14px;
             padding-bottom: 14px;
+        }
+
+        @media (max-width: 1100px) {
+            .subjects-table table {
+                min-width: 840px;
+            }
+        }
+
+        @media (max-width: 800px) {
+            .subjects-table {
+                margin: 14px 12px;
+                padding: 12px;
+            }
+            .subjects-table table {
+                min-width: 760px;
+            }
         }
 
         .summary-row {
@@ -2165,6 +2186,35 @@
             font-size: 10px !important;
             padding: 9px 8px !important;
         }
+        .pdf-export-mode .subjects-table .table-wrap {
+            overflow: visible !important;
+        }
+        .pdf-export-mode .subjects-table table {
+            display: table !important;
+            min-width: 920px !important;
+            width: 100% !important;
+            table-layout: fixed !important;
+        }
+        .pdf-export-mode .subjects-table thead {
+            display: table-header-group !important;
+        }
+        .pdf-export-mode .subjects-table tbody {
+            display: table-row-group !important;
+        }
+        .pdf-export-mode .subjects-table tr {
+            display: table-row !important;
+        }
+        .pdf-export-mode .subjects-table th,
+        .pdf-export-mode .subjects-table td {
+            display: table-cell !important;
+        }
+        .pdf-export-mode .subjects-table th,
+        .pdf-export-mode .subjects-table td {
+            white-space: nowrap !important;
+        }
+        .pdf-export-mode .subjects-table tbody td:first-child {
+            white-space: normal !important;
+        }
         .pdf-export-mode .behaviour-grid {
             grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
         }
@@ -2561,7 +2611,7 @@
                 <tfoot>
                     <tr class="summary-row">
                         <td style="text-align: left; font-weight: bold;">OVERALL AVERAGE</td>
-                        <td colspan="3" style="text-align: center; font-weight: bold;">Average Score</td>
+                        <td colspan="2" style="text-align: center; font-weight: bold;">Average Score</td>
                         <td style="font-weight: bold;">{{ "%.1f"|format(student.average_marks) }}</td>
                         <td style="font-weight: bold;">{{ display_grade_label(student.Grade, school) }}</td>
                         <td colspan="2" class="{{ status_css_class_from_status(student.Status, school) }}" style="font-weight: bold;">
@@ -2626,7 +2676,7 @@
                 <tfoot>
                     <tr class="summary-row">
                         <td style="text-align: left; font-weight: bold;">OVERALL AVERAGE</td>
-                        <td colspan="{{ result_max_tests + (1 if combined_exam else 2) + 3 }}" style="text-align: center; font-weight: bold;">Average Score</td>
+                        <td colspan="{{ result_max_tests + (1 if combined_exam else 2) + 1 }}" style="text-align: center; font-weight: bold;">Average Score</td>
                         <td style="font-weight: bold;">{{ "%.1f"|format(student.average_marks) }}</td>
                         <td style="font-weight: bold;">{{ display_grade_label(student.Grade, school) }}</td>
                         <td colspan="2" class="{{ status_css_class_from_status(student.Status, school) }}" style="font-weight: bold;">
@@ -2794,36 +2844,36 @@
                 downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparing PDF...';
                 let exportHost = null;
                 try {
-                    const phone = window.matchMedia('(max-width: 700px)').matches;
-                    const exportScale = phone ? 1.5 : 2;
-
                     exportHost = document.createElement('div');
                     exportHost.className = 'pdf-export-mode';
                     exportHost.style.position = 'fixed';
                     exportHost.style.left = '-100000px';
                     exportHost.style.top = '0';
-                    exportHost.style.width = '1280px';
+                    exportHost.style.width = '1440px';
+                    exportHost.style.minWidth = '1440px';
                     exportHost.style.background = '#ffffff';
                     exportHost.style.padding = '0';
                     exportHost.style.zIndex = '-1';
 
                     const clone = reportEl.cloneNode(true);
                     clone.classList.add('pdf-export-mode');
-                    clone.style.width = '1120px';
-                    clone.style.maxWidth = '1120px';
+                    clone.style.width = '1280px';
+                    clone.style.minWidth = '1280px';
+                    clone.style.maxWidth = '1280px';
                     clone.style.margin = '0 auto';
                     clone.style.boxSizing = 'border-box';
                     exportHost.appendChild(clone);
                     document.body.appendChild(exportHost);
 
                     const canvas = await window.html2canvas(clone, {
-                        scale: exportScale,
+                        scale: 2,
                         useCORS: true,
                         backgroundColor: '#ffffff',
                         logging: false,
                         scrollX: 0,
                         scrollY: 0,
-                        windowWidth: 1280,
+                        windowWidth: 1440,
+                        windowHeight: 2200,
                     });
                     const imgData = canvas.toDataURL('image/jpeg', 0.95);
                     const { jsPDF } = window.jspdf;
