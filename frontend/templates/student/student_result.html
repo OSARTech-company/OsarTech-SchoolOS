@@ -2189,11 +2189,15 @@
         .pdf-export-mode .subjects-table .table-wrap {
             overflow: visible !important;
         }
+        .pdf-export-mode .subjects-table {
+            padding: 16px !important;
+            margin: 16px !important;
+        }
         .pdf-export-mode .subjects-table table {
             display: table !important;
-            min-width: 920px !important;
+            min-width: 1440px !important;
             width: 100% !important;
-            table-layout: fixed !important;
+            table-layout: auto !important;
         }
         .pdf-export-mode .subjects-table thead {
             display: table-header-group !important;
@@ -2211,9 +2215,19 @@
         .pdf-export-mode .subjects-table th,
         .pdf-export-mode .subjects-table td {
             white-space: nowrap !important;
+            line-height: 1.15 !important;
         }
         .pdf-export-mode .subjects-table tbody td:first-child {
             white-space: normal !important;
+            width: 220px !important;
+        }
+        .pdf-export-mode .subjects-table thead th:first-child,
+        .pdf-export-mode .subjects-table tbody td:first-child,
+        .pdf-export-mode .subjects-table tfoot td:first-child {
+            position: sticky !important;
+            left: 0 !important;
+            z-index: 2 !important;
+            background: #fff !important;
         }
         .pdf-export-mode .behaviour-grid {
             grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
@@ -2857,16 +2871,16 @@
 
                     const clone = reportEl.cloneNode(true);
                     clone.classList.add('pdf-export-mode');
-                    clone.style.width = '1280px';
-                    clone.style.minWidth = '1280px';
-                    clone.style.maxWidth = '1280px';
+                    clone.style.width = '1366px';
+                    clone.style.minWidth = '1366px';
+                    clone.style.maxWidth = '1366px';
                     clone.style.margin = '0 auto';
                     clone.style.boxSizing = 'border-box';
                     exportHost.appendChild(clone);
                     document.body.appendChild(exportHost);
 
                     const canvas = await window.html2canvas(clone, {
-                        scale: 2,
+                        scale: 1.25,
                         useCORS: true,
                         backgroundColor: '#ffffff',
                         logging: false,
@@ -2877,7 +2891,7 @@
                     });
                     const imgData = canvas.toDataURL('image/jpeg', 0.95);
                     const { jsPDF } = window.jspdf;
-                    const pdf = new jsPDF('p', 'pt', 'a4');
+                    const pdf = new jsPDF('l', 'pt', 'a4');
                     const pageWidth = pdf.internal.pageSize.getWidth();
                     const pageHeight = pdf.internal.pageSize.getHeight();
                     const margin = 16;
